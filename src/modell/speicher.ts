@@ -6,6 +6,7 @@ import { FORMAT_VERSION, type Block, type Projekt, type Prozess, type Sequenz } 
 
 const PROJEKT_SCHLUESSEL = 'prozesslotse:projekt'
 const EINSTELLUNGEN_SCHLUESSEL = 'prozesslotse:einstellungen'
+const DOKUMENT_SCHLUESSEL = 'prozesslotse:dokument'
 
 export class Formatfehler extends Error {}
 
@@ -142,6 +143,44 @@ export function speichereImBrowser(p: Projekt): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+/** Zur Wiederherstellung: zu welcher Datei das Projekt im Browserspeicher gehört und ob es ungespeicherte Änderungen hat. */
+export interface DokumentInfo {
+  pfad: string | null
+  name: string | null
+  ungespeichert: boolean
+}
+
+export function ladeDokumentInfo(): DokumentInfo | null {
+  try {
+    const text = globalThis.localStorage?.getItem(DOKUMENT_SCHLUESSEL)
+    const d: unknown = text ? JSON.parse(text) : null
+    if (istObj(d) && (d.pfad === null || istText(d.pfad)) && (d.name === null || istText(d.name)) && typeof d.ungespeichert === 'boolean') {
+      return { pfad: d.pfad, name: d.name, ungespeichert: d.ungespeichert }
+    }
+  } catch {
+    // ohne Angaben weiter
+  }
+  return null
+}
+
+export function speichereDokumentInfo(d: DokumentInfo): void {
+  try {
+    globalThis.localStorage?.setItem(DOKUMENT_SCHLUESSEL, JSON.stringify(d))
+  } catch {
+    // nicht kritisch
+  }
+}
+
+/** Vergisst das zwischengespeicherte Projekt, z. B. wenn beim Schließen „Nicht speichern“ gewählt wurde. */
+export function vergissImBrowser(): void {
+  try {
+    globalThis.localStorage?.removeItem(PROJEKT_SCHLUESSEL)
+    globalThis.localStorage?.removeItem(DOKUMENT_SCHLUESSEL)
+  } catch {
+    // nicht kritisch
   }
 }
 

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-oeffnen"
+description = "Enables the oeffnen command without any pre-configured scope."
+commands.allow = ["oeffnen"]
+
+[[permission]]
+identifier = "deny-oeffnen"
+description = "Denies the oeffnen command without any pre-configured scope."
+commands.deny = ["oeffnen"]

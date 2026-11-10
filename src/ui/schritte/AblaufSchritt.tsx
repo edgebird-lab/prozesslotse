@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useBestaetigen } from '../frage'
 import { neueAufgabe, neueEntscheidung, neueParallel, neuesWarten, neueWiederholung } from '../../modell/bausteine'
 import { abschnittFertig, beschreibeCursor, cursorNachEinfuegen } from '../../modell/fuehrung'
 import {
@@ -214,6 +215,7 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
 
 function BlockBearbeiten() {
   const { z, p, aendere, dispatch } = useApp()
+  const bestaetige = useBestaetigen()
   const fund = z.auswahl ? findeBlock(p, z.auswahl) : null
   if (!fund) return null
   const b = fund.block
@@ -266,8 +268,8 @@ function BlockBearbeiten() {
         <button
           type="button"
           className="knopf knopf-gefahr"
-          onClick={() => {
-            if (anzahlInnen > 0 && !window.confirm(`„${blockTitel(b)}“ enthält ${anzahlInnen} weitere Schritte. Alles löschen?`)) return
+          onClick={async () => {
+            if (anzahlInnen > 0 && !(await bestaetige('Mit allen Schritten löschen?', `„${blockTitel(b)}“ enthält ${anzahlInnen} weitere Schritte. Sie werden mit gelöscht.`, 'Alles löschen'))) return
             aendere((q) => entferneBlock(q, b.id), { auswahl: null })
           }}
         >

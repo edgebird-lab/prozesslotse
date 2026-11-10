@@ -1,6 +1,6 @@
 # Prozesslotse
 
-Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zeichnen, mit Kennzahlen prüfen und mit begründeten Vorschlägen verbessern. Läuft komplett im Browser, ohne KI und ohne Server.
+Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zeichnen, mit Kennzahlen prüfen und mit begründeten Vorschlägen verbessern. Läuft als Windows-Programm oder im Browser, ohne KI und ohne Server.
 
 ![Schritt „Prüfen“: Kennzahlen links, Diagramm mit markierten Schwachstellen rechts](docs/bilder/pruefen.png)
 
@@ -13,7 +13,8 @@ Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zei
 - **Kennzahlen mit nachvollziehbaren Formeln:** Durchlaufzeit, Flusseffizienz, Kosten je Vorgang, Auslastung je Rolle mit Engpass nach dem Warteschlangenmodell M/M/c (die Schwelle hängt von der Teamgröße ab), Vorgänge in Arbeit nach dem Gesetz von Little, Medienbrüche und Übergaben. Eine Monte-Carlo-Simulation liefert zusätzlich den 90-%-Wert der Durchlaufzeit und die Durchlaufzeit je Ergebnis (z. B. versendet, storniert, verfallen).
 - **Schwachstellen im Diagramm:** Medienbruch, Engpass, lange Liegezeit, Nacharbeit, Freigabe ohne erkennbaren Nutzen, Kontrolle ohne Folge, dieselbe Person in parallelen Zweigen und Hin und Her zwischen Rollen werden am betroffenen Element markiert. Wiederholungen tragen einen Zweck: Nur Korrekturen zählen als Nacharbeit, gewollte Durchgänge („je Position“) nicht.
 - **Vorschläge mit berechneter Wirkung.** Sechs Regeln formen eine Kopie des Prozesses um, die Wirkung kommt aus denselben Formeln wie die Kennzahlen. Übernommene Vorschläge ergeben den Soll-Prozess.
-- **Bericht** mit Ist-Soll-Vergleich, Maßnahmen, Befunden und beiden Diagrammen. Export als BPMN, SVG und JSON, Druck als PDF.
+- **Bericht** mit Ist-Soll-Vergleich, Maßnahmen, Befunden und beiden Diagrammen. Export als BPMN, SVG und Projektdatei, Druck als PDF.
+- **Windows-Programm (Tauri 2):** Installer mit 1,3 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
 - **Lernmodus:** Zu jeder Auswahl erklärt ein Hinweis das passende BPMN-Element.
 
 | Ablauf beschreiben | Verbessern |
@@ -68,18 +69,22 @@ Prüfungen und Freigaben werden nie mit anderen Schritten zusammengelegt (Vier-A
 | `src/analyse` | Kennzahlen, Simulation, Schwachstellen, Verbesserungsregeln |
 | `src/bpmn` | eigenes Layout mit Bahnen und Spuren, BPMN-XML mit DI |
 | `src/ui` | React-Oberfläche: Assistent, Diagramm (bpmn-js), Prüfen, Verbessern, Bericht |
+| `src/plattform` | Öffnen, Speichern und Fenster: im Browser per Download, im Programm über den Rust-Teil |
+| `src-tauri` | Windows-Programm: Dateibefehle nur für vom Benutzer gewählte Pfade, Menü, PDF über WebView2, Installer |
 | `e2e` | Browsertests mit Playwright und axe |
 | `docs` | [Datenmodell](docs/datenmodell.md), [Fragenkatalog](docs/fragenkatalog.md) |
 
 Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur der Anzeige; Layout und BPMN-Export sind selbst geschrieben.
 
-**Technik:** React 19, TypeScript 7, Vite 8, bpmn-js 18, Vitest, Playwright, GitHub Actions.
+**Technik:** React 19, TypeScript 7, Vite 8, bpmn-js 18, Tauri 2 (Rust), Vitest, Playwright, GitHub Actions.
 
 ## Qualität
 
-- 91 Unit-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen und Ereignis-Entscheidungen): keine Überlappung, keine Kante durch fremde Elemente, Schema-Prüfung mit bpmn-moddle.
+- 102 Unit-Tests und 3 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen und Ereignis-Entscheidungen): keine Überlappung, keine Kante durch fremde Elemente, Schema-Prüfung mit bpmn-moddle.
 - Tokenspiel nach den Ausführungsregeln von BPMN 2.0: Für beide Beispiele und alle 300 Zufallsprozesse ist das exportierte Diagramm sound (keine Verklemmung, jeder Vorgang kann enden, kein toter Schritt), und die Häufigkeiten aus dem Tokenspiel stimmen mit den Formeln überein.
-- 11 Browsertests: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen.
+- 15 Browsertests: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen, BPMN wieder öffnen, Rückfrage bei ungespeicherten Änderungen.
+- Desktop-Test am echten Programm (`npm run desktop:test`): 16 Prüfungen von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4.
+- Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
 
@@ -91,6 +96,12 @@ npm run dev       # Entwicklungsserver
 npm test          # Unit-Tests (Vitest)
 npm run e2e       # Browsertests (lokal mit Edge, in der CI mit Chrome)
 npm run build     # Typprüfung und Produktions-Build
+
+# Windows-Programm (braucht Rust und die VS Build Tools)
+npm run desktop                        # Programm mit Entwicklungsserver
+npm run desktop:build                  # Programm und Installer (src-tauri/target/release/bundle/nsis)
+npx tauri build --debug --no-bundle    # Debug-Build für den Desktop-Test
+npm run desktop:test                   # Desktop-Test gegen den Debug-Build
 ```
 
 `node scripts/readme-bilder.mjs` erzeugt die Bilder dieser README neu (bei laufendem `npx vite preview --port 4173`).

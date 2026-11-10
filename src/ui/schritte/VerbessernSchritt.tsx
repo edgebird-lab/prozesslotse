@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useBestaetigen } from '../frage'
 import { bewerteVorschlaege, type BewerteterVorschlag, type Wirkung } from '../../analyse/regeln'
 import type { Prozess } from '../../modell/typen'
 import { formatiereDauer, formatiereEuro, formatiereZahl } from '../../modell/zeit'
@@ -40,6 +41,7 @@ function WirkungsChips({ w, std }: { w: Wirkung; std: number }) {
 
 export function VerbessernSchritt() {
   const { z, dispatch, setHervorhebung } = useApp()
+  const bestaetige = useBestaetigen()
   const { projekt } = z
   const basis: Prozess = projekt.soll ?? projekt.ist
   const vorschlaege = useMemo(() => bewerteVorschlaege(basis, projekt.verworfen), [basis, projekt.verworfen])
@@ -176,8 +178,8 @@ export function VerbessernSchritt() {
           <button
             type="button"
             className="knopf knopf-gefahr"
-            onClick={() => {
-              if (!window.confirm('Soll-Prozess und alle übernommenen Maßnahmen verwerfen?')) return
+            onClick={async () => {
+              if (!(await bestaetige('Soll zurücksetzen?', 'Der Soll-Prozess und alle übernommenen Maßnahmen werden verworfen.', 'Verwerfen'))) return
               dispatch({ typ: 'projekt', zeit: Date.now(), ansicht: 'ist', projekt: { ...projekt, soll: null, massnahmen: [], verworfen: [] } })
             }}
           >

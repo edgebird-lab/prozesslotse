@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-speichern-unter"
+description = "Enables the speichern_unter command without any pre-configured scope."
+commands.allow = ["speichern_unter"]
+
+[[permission]]
+identifier = "deny-speichern-unter"
+description = "Denies the speichern_unter command without any pre-configured scope."
+commands.deny = ["speichern_unter"]

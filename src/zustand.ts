@@ -19,8 +19,19 @@ export const SCHRITTE: { id: Schritt; name: string }[] = [
   { id: 'bericht', name: 'Bericht' },
 ]
 
+/** Die Datei hinter dem Projekt. */
+export interface Dokument {
+  /** Pfad im Windows-Programm; im Browser und bei neuen Projekten null. */
+  pfad: string | null
+  /** Dateiname zur Anzeige; null bei einem neuen, nie gespeicherten Projekt. */
+  name: string | null
+  /** Stand beim letzten Öffnen oder Speichern; null, wenn unbekannt (wiederhergestellte Änderungen). */
+  gespeichert: Projekt | null
+}
+
 export interface Zustand {
   projekt: Projekt
+  dokument: Dokument
   vergangenheit: Projekt[]
   zukunft: Projekt[]
   /** Zusammengehörige Eingaben (z. B. Tippen in einem Feld) werden zu einem Rückgängig-Schritt. */
@@ -36,7 +47,8 @@ export interface Zustand {
 export type Aktion =
   | { typ: 'prozess'; aenderung: Prozess | ((p: Prozess) => Prozess); gruppe?: string; zeit: number; cursor?: Cursor | null; auswahl?: Id | null }
   | { typ: 'projekt'; projekt: Projekt; zeit: number; ansicht?: Ansicht }
-  | { typ: 'laden'; projekt: Projekt; schritt?: Schritt }
+  | { typ: 'laden'; projekt: Projekt; schritt?: Schritt; ansicht?: Ansicht; dokument?: Partial<Dokument> }
+  | { typ: 'gespeichert'; projekt: Projekt; pfad: string | null; name: string }
   | { typ: 'rueckgaengig' }
   | { typ: 'wiederholen' }
   | { typ: 'schritt'; schritt: Schritt }
@@ -48,9 +60,10 @@ export type Aktion =
 const MAX_VERLAUF = 100
 const GRUPPE_MS = 1500
 
-export function startZustand(projekt: Projekt, lernmodus: boolean): Zustand {
+export function startZustand(projekt: Projekt, lernmodus: boolean, dokument: Partial<Dokument> = {}): Zustand {
   return {
     projekt,
+    dokument: { pfad: null, name: null, gespeichert: projekt, ...dokument },
     vergangenheit: [],
     zukunft: [],
     gruppe: null,
@@ -61,6 +74,15 @@ export function startZustand(projekt: Projekt, lernmodus: boolean): Zustand {
     auswahl: null,
     lernmodus,
   }
+}
+
+/**
+ * Weicht das Projekt vom gespeicherten Stand ab? Projekte sind unveränderlich,
+ * deshalb genügt der Vergleich der Referenz; wer bis zum gespeicherten Stand
+ * zurücknimmt, hat wieder nichts geändert.
+ */
+export function istGeaendert(z: Pick<Zustand, 'projekt' | 'dokument'>): boolean {
+  return z.dokument.gespeichert !== z.projekt
 }
 
 export function aktiverProzess(z: Pick<Zustand, 'projekt' | 'ansicht'>): Prozess {
@@ -109,8 +131,13 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
     }
     case 'projekt':
       return bereinige({ ...mitVerlauf(z, a.projekt, a.zeit), ansicht: a.ansicht ?? z.ansicht })
-    case 'laden':
-      return { ...startZustand(a.projekt, z.lernmodus), schritt: a.schritt ?? 'rahmen' }
+    case 'laden': {
+      const neu = startZustand(a.projekt, z.lernmodus, a.dokument)
+      return { ...neu, schritt: a.schritt ?? 'rahmen', ansicht: a.ansicht === 'soll' && a.projekt.soll ? 'soll' : 'ist' }
+    }
+    case 'gespeichert':
+      // Gespeichert wurde der Stand, der beim Speichern vorlag; spätere Änderungen bleiben „geändert“.
+      return { ...z, dokument: { pfad: a.pfad, name: a.name, gespeichert: a.projekt } }
     case 'rueckgaengig': {
       const vorher = z.vergangenheit[z.vergangenheit.length - 1]
       if (!vorher) return z

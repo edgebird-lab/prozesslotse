@@ -13,7 +13,7 @@ const AUSLOESER: { wert: AusloeserArt; text: string; beschreibung: string; symbo
 ]
 
 export function RahmenSchritt() {
-  const { z, p, aendere, dispatch } = useApp()
+  const { z, p, aendere, dispatch, datei } = useApp()
   const leer = !p.name && p.ablauf.schritte.length === 0 && p.rollen.length === 0 && !z.projekt.soll
   const setze = (werte: Partial<typeof p>, feld: string) => aendere({ ...p, ...werte }, { gruppe: `rahmen:${feld}` })
 
@@ -27,10 +27,10 @@ export function RahmenSchritt() {
             Schwachstellen und schlägt Verbesserungen mit ihrer Wirkung vor.
           </p>
           <div className="knopfreihe">
-            <button type="button" className="knopf knopf-haupt" onClick={() => dispatch({ typ: 'laden', projekt: beispielProjekt(), schritt: 'pruefen' })}>
+            <button type="button" className="knopf knopf-haupt" onClick={() => void datei.ladeBeispiel(beispielProjekt(), 'pruefen')}>
               Mit dem Beispiel „Lieferdienst“ starten
             </button>
-            <button type="button" className="knopf" onClick={() => dispatch({ typ: 'laden', projekt: beispielOnlineProjekt(), schritt: 'ablauf' })}>
+            <button type="button" className="knopf" onClick={() => void datei.ladeBeispiel(beispielOnlineProjekt(), 'ablauf')}>
               Beispiel „Onlinebestellung“ mit Rücksprung
             </button>
             <span className="oder">oder unten den eigenen Prozess anlegen</span>

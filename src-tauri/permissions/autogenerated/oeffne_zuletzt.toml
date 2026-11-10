@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-oeffne-zuletzt"
+description = "Enables the oeffne_zuletzt command without any pre-configured scope."
+commands.allow = ["oeffne_zuletzt"]
+
+[[permission]]
+identifier = "deny-oeffne-zuletzt"
+description = "Denies the oeffne_zuletzt command without any pre-configured scope."
+commands.deny = ["oeffne_zuletzt"]

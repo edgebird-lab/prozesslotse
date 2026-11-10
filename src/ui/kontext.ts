@@ -1,6 +1,7 @@
 import { createContext, useContext, type Dispatch } from 'react'
 import type { Cursor, Id, Prozess } from '../modell/typen'
 import type { Aktion, Zustand } from '../zustand'
+import type { DateiBefehle } from './datei'
 
 export interface AenderungsOptionen {
   /** Gleiche Gruppe kurz hintereinander ergibt einen Rückgängig-Schritt. */
@@ -18,6 +19,10 @@ export interface AppApi {
   aendere: (aenderung: Prozess | ((p: Prozess) => Prozess), optionen?: AenderungsOptionen) => void
   /** Bausteine, die im Diagramm vorübergehend hervorgehoben werden. */
   setHervorhebung: (ids: Id[]) => void
+  /** Öffnen, Speichern, Exportieren */
+  datei: DateiBefehle
+  /** Kurze Statusmeldung in der Kopfzeile */
+  melde: (text: string) => void
 }
 
 export const AppKontext = createContext<AppApi | null>(null)

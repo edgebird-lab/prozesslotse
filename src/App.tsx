@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from 'react'
-import { neuerProzess, neuesProjekt } from './modell/bausteine'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { neuesProjekt } from './modell/bausteine'
 import { beispielOnlineProjekt, beispielProjekt } from './modell/beispiel'
-import { alsJson, ladeAusBrowser, ladeEinstellungen, leseProjektText, speichereEinstellungen, speichereImBrowser } from './modell/speicher'
+import { ladeAusBrowser, ladeDokumentInfo, ladeEinstellungen, speichereDokumentInfo, speichereEinstellungen, speichereImBrowser } from './modell/speicher'
 import type { Id, Prozess } from './modell/typen'
-import { aktiverProzess, reduziere, SCHRITTE, startZustand } from './zustand'
+import { plattform, type MenueBefehl, type Zuletzt } from './plattform'
+import { aktiverProzess, istGeaendert, reduziere, SCHRITTE, startZustand } from './zustand'
 import { hauptElement, markierungen, useAnalyse, useBpmn } from './ui/analyse'
+import { useDateiBefehle, type FremdesBpmn } from './ui/datei'
 import { DiagrammLazy as Diagramm } from './ui/DiagrammLazy'
 import { Schalter } from './ui/Eingaben'
-import { dateiname, ladeHerunter, useVerzoegert } from './ui/hilfen'
+import { useFrage } from './ui/frage'
+import { FrageDialog } from './ui/FrageDialog'
+import { useVerzoegert } from './ui/hilfen'
 import { AppKontext, useApp, type AppApi } from './ui/kontext'
 import { AblaufSchritt } from './ui/schritte/AblaufSchritt'
 import { BerichtSchritt } from './ui/schritte/BerichtSchritt'
@@ -17,33 +21,139 @@ import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
 import { VerbessernSchritt } from './ui/schritte/VerbessernSchritt'
 import './styles.css'
 
+const VERSION = '0.2.0'
+
 function erstZustand() {
   const gespeichert = ladeAusBrowser()
+  const info = gespeichert ? ladeDokumentInfo() : null
   const projekt = gespeichert ?? neuesProjekt()
-  const z = startZustand(projekt, ladeEinstellungen().lernmodus)
+  // Wiederhergestellt: zugehörige Datei merken; ungespeicherte Änderungen bleiben als „geändert“ markiert
+  const dokument = info ? { pfad: info.pfad, name: info.name, gespeichert: info.ungespeichert ? null : projekt } : {}
+  const z = startZustand(projekt, ladeEinstellungen().lernmodus, dokument)
   return projekt.ist.ablauf.schritte.length > 0 ? { ...z, schritt: 'ablauf' as const } : z
 }
 
 export default function App() {
+  return (
+    <FrageDialog>
+      <Hauptfenster />
+    </FrageDialog>
+  )
+}
+
+function Hauptfenster() {
   const [z, dispatch] = useReducer(reduziere, undefined, erstZustand)
   const [hervorhebung, setHervorhebung] = useState<Id[]>([])
+  const [meldung, setMeldung] = useState('')
+  const [fremd, setFremd] = useState<FremdesBpmn | null>(null)
+  const frage = useFrage()
+  const dateiFeld = useRef<HTMLInputElement>(null)
+  const meldungsZeit = useRef<number | undefined>(undefined)
   const p = aktiverProzess(z)
+  const geaendert = istGeaendert(z)
 
+  const melde = useCallback((text: string) => {
+    setMeldung(text)
+    window.clearTimeout(meldungsZeit.current)
+    meldungsZeit.current = window.setTimeout(() => setMeldung(''), 6000)
+  }, [])
+
+  const datei = useDateiBefehle({ z, dispatch, melde, zeigeFremd: setFremd })
   const aendere = useCallback<AppApi['aendere']>((aenderung, optionen = {}) => dispatch({ typ: 'prozess', aenderung, zeit: Date.now(), ...optionen }), [])
+
+  // Öffnen: im Programm der Dialog des Systems, im Browser das Dateifeld
+  const oeffnen = useCallback(() => {
+    if (plattform.desktop) void datei.oeffnen()
+    else dateiFeld.current?.click()
+  }, [datei])
 
   // Sofort speichern: Ein Projekt ist nur wenige Kilobyte groß, und ein verzögertes
   // Speichern ginge verloren, wenn der Tab direkt nach einer Änderung geschlossen wird.
   useEffect(() => {
     speichereImBrowser(z.projekt)
-  }, [z.projekt])
+    speichereDokumentInfo({ pfad: z.dokument.pfad, name: z.dokument.name, ungespeichert: geaendert })
+  }, [z.projekt, z.dokument, geaendert])
 
   useEffect(() => speichereEinstellungen({ lernmodus: z.lernmodus }), [z.lernmodus])
 
+  // Fenstertitel; im Programm zeigt ein Punkt ungespeicherte Änderungen
+  useEffect(() => {
+    const name = fremd?.name ?? z.dokument.name ?? (z.projekt.ist.name || 'Unbenannter Prozess')
+    const punkt = plattform.desktop && !fremd && geaendert ? '• ' : ''
+    plattform.setzeTitel(`${punkt}${name} – Prozesslotse`)
+  }, [z.dokument.name, z.projekt.ist.name, fremd, geaendert])
+
+  // Programm: Startdatei (Doppelklick), weitere Dateien, Schließen, Menü
+  const gestartet = useRef(false)
+  useEffect(() => {
+    if (!plattform.desktop || gestartet.current) return
+    gestartet.current = true
+    void plattform.startDatei().then((d) => d && datei.oeffneDatei(d))
+  }, [datei])
+
+  useEffect(() => plattform.beiDatei((d) => void datei.oeffneDatei(d)), [datei])
+  useEffect(() => plattform.beimSchliessen(datei.darfSchliessen), [datei])
+
+  const befehl = useCallback(
+    (b: MenueBefehl) => {
+      switch (b) {
+        case 'neu':
+          return void datei.neu()
+        case 'oeffnen':
+          return oeffnen()
+        case 'speichern':
+          return void datei.speichern()
+        case 'speichernUnter':
+          return void datei.speichernUnter()
+        case 'bpmn':
+          return void datei.exportiereBpmn()
+        case 'drucken':
+          return window.print()
+        case 'pdf':
+          dispatch({ typ: 'schritt', schritt: 'bericht' })
+          return void plattform.alsPdf(`${z.projekt.ist.name || 'prozess'}.pdf`).then((ok) => ok && melde('PDF gespeichert.'))
+        case 'rueckgaengig':
+          return dispatch({ typ: 'rueckgaengig' })
+        case 'wiederholen':
+          return dispatch({ typ: 'wiederholen' })
+        case 'lernmodus':
+          return dispatch({ typ: 'lernmodus', an: !z.lernmodus })
+        case 'beispielLieferdienst':
+          return void datei.ladeBeispiel(beispielProjekt(), 'pruefen')
+        case 'beispielOnline':
+          return void datei.ladeBeispiel(beispielOnlineProjekt(), 'ablauf')
+        case 'ueber':
+          return void frage({
+            titel: 'Prozesslotse',
+            text: `Version ${VERSION}. Geschäftsprozesse geführt modellieren, als BPMN zeichnen, prüfen und verbessern. Läuft ohne Server; Projekte bleiben auf diesem Rechner.`,
+            knoepfe: [{ wert: 'ok', text: 'Schließen', art: 'haupt' }],
+            abbrechen: 'ok',
+          })
+      }
+    },
+    [datei, oeffnen, frage, melde, z.lernmodus, z.projekt.ist.name],
+  )
+
+  useEffect(() => plattform.beiMenue(befehl), [befehl])
+
   useEffect(() => {
     const taste = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return
-      if ((e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
       const k = e.key.toLowerCase()
+      // Dateibefehle gelten auch in Eingabefeldern
+      if (k === 's') {
+        e.preventDefault()
+        return befehl(e.shiftKey ? 'speichernUnter' : 'speichern')
+      }
+      if (k === 'o' && !e.shiftKey) {
+        e.preventDefault()
+        return befehl('oeffnen')
+      }
+      if (k === 'n' && !e.shiftKey && plattform.desktop) {
+        e.preventDefault()
+        return befehl('neu')
+      }
+      if ((e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable="true"]')) return
       if (k === 'z' && !e.shiftKey) {
         e.preventDefault()
         dispatch({ typ: 'rueckgaengig' })
@@ -54,13 +164,39 @@ export default function App() {
     }
     window.addEventListener('keydown', taste)
     return () => window.removeEventListener('keydown', taste)
-  }, [])
+  }, [befehl])
+
+  // Im Browser: Projekt- oder BPMN-Datei ins Fenster ziehen (im Programm meldet das der Rust-Teil)
+  useEffect(() => {
+    if (plattform.desktop) return
+    const ueber = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+    }
+    const ablegen = (e: DragEvent) => {
+      const f = e.dataTransfer?.files[0]
+      if (!f) return
+      e.preventDefault()
+      void f.text().then((inhalt) => datei.oeffneDatei({ pfad: null, name: f.name, inhalt }))
+    }
+    window.addEventListener('dragover', ueber)
+    window.addEventListener('drop', ablegen)
+    return () => {
+      window.removeEventListener('dragover', ueber)
+      window.removeEventListener('drop', ablegen)
+    }
+  }, [datei])
 
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [z.schritt])
 
-  const api = useMemo<AppApi>(() => ({ z, p, dispatch, aendere, setHervorhebung }), [z, p, aendere])
+  const dateiGewaehlt = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (f) await datei.oeffneDatei({ pfad: null, name: f.name, inhalt: await f.text() })
+  }
+
+  const api = useMemo<AppApi>(() => ({ z, p, dispatch, aendere, setHervorhebung, datei, melde }), [z, p, aendere, datei, melde])
 
   return (
     <AppKontext.Provider value={api}>
@@ -68,59 +204,60 @@ export default function App() {
         <a className="sprungmarke" href="#inhalt">
           Zum Inhalt springen
         </a>
-        <Kopfzeile />
-        <Schrittleiste />
-        {z.schritt === 'bericht' ? (
-          <main id="inhalt" className="bericht-flaeche">
-            <BerichtSchritt />
-          </main>
+        <Kopfzeile meldung={meldung} onOeffnen={oeffnen} befehl={befehl} />
+        <input
+          ref={dateiFeld}
+          type="file"
+          accept=".prozesslotse,.json,.bpmn,application/json,application/xml,text/xml"
+          hidden
+          onChange={(e) => void dateiGewaehlt(e)}
+        />
+        {fremd ? (
+          <FremdeAnsicht fremd={fremd} onSchliessen={() => setFremd(null)} />
         ) : (
-          <main id="inhalt" className="arbeitsflaeche">
-            <section className="panel" aria-label="Assistent">
-              {z.schritt === 'rahmen' && <RahmenSchritt />}
-              {z.schritt === 'beteiligte' && <BeteiligteSchritt />}
-              {z.schritt === 'ablauf' && <AblaufSchritt />}
-              {z.schritt === 'pruefen' && <PruefenSchritt />}
-              {z.schritt === 'verbessern' && <VerbessernSchritt />}
-            </section>
-            <Buehne p={p} hervorhebung={hervorhebung} />
-          </main>
+          <>
+            <Schrittleiste />
+            {z.schritt === 'bericht' ? (
+              <main id="inhalt" className="bericht-flaeche">
+                <BerichtSchritt />
+              </main>
+            ) : (
+              <main id="inhalt" className="arbeitsflaeche">
+                <section className="panel" aria-label="Assistent">
+                  {z.schritt === 'rahmen' && <RahmenSchritt />}
+                  {z.schritt === 'beteiligte' && <BeteiligteSchritt />}
+                  {z.schritt === 'ablauf' && <AblaufSchritt />}
+                  {z.schritt === 'pruefen' && <PruefenSchritt />}
+                  {z.schritt === 'verbessern' && <VerbessernSchritt />}
+                </section>
+                <Buehne p={p} hervorhebung={hervorhebung} />
+              </main>
+            )}
+          </>
         )}
       </div>
     </AppKontext.Provider>
   )
 }
 
-function Kopfzeile() {
-  const { z, dispatch } = useApp()
-  const datei = useRef<HTMLInputElement>(null)
+function Kopfzeile({ meldung, onOeffnen, befehl }: { meldung: string; onOeffnen: () => void; befehl: (b: MenueBefehl) => void }) {
+  const { z, dispatch, datei } = useApp()
   const menue = useRef<HTMLDetailsElement>(null)
-  const [meldung, setMeldung] = useState('')
+  const [zuletzt, setZuletzt] = useState<Zuletzt[]>([])
   const schliesse = () => menue.current?.removeAttribute('open')
-  const melde = (text: string) => {
-    setMeldung(text)
-    window.setTimeout(() => setMeldung(''), 5000)
-  }
-  const verwerfenOk = () => z.projekt.ist.ablauf.schritte.length === 0 || window.confirm('Das aktuelle Projekt wird ersetzt. Vorher als Datei speichern, wenn du es behalten willst. Fortfahren?')
-
-  const oeffnen = async (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    e.target.value = ''
-    if (!f) return
-    try {
-      const projekt = leseProjektText(await f.text())
-      dispatch({ typ: 'laden', projekt, schritt: 'ablauf' })
-      melde(`„${f.name}“ geladen.`)
-    } catch (err) {
-      melde(`Datei nicht geladen: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
+  const geaendert = plattform.desktop && istGeaendert(z)
 
   return (
     <header className="kopf">
       <div className="marke">
         <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={28} height={28} />
         <span>Prozesslotse</span>
+        {z.dokument.name && (
+          <span className="dokument-name" title={z.dokument.pfad ?? undefined}>
+            {z.dokument.name}
+            {geaendert && <span aria-label=" (ungespeichert)"> •</span>}
+          </span>
+        )}
       </div>
       <p className="meldung" role="status" aria-live="polite">
         {meldung}
@@ -135,59 +272,74 @@ function Kopfzeile() {
         <Schalter an={z.lernmodus} onAendern={(an) => dispatch({ typ: 'lernmodus', an })}>
           Lernmodus
         </Schalter>
-        <details className="menue" ref={menue}>
+        <details
+          className="menue"
+          ref={menue}
+          onToggle={(e) => {
+            if ((e.currentTarget as HTMLDetailsElement).open && plattform.desktop) void plattform.zuletzt().then(setZuletzt)
+          }}
+        >
           <summary className="knopf knopf-klein">Projekt</summary>
           <div className="menue-liste">
-            <button
-              type="button"
-              onClick={() => {
-                schliesse()
-                if (verwerfenOk()) dispatch({ typ: 'laden', projekt: neuesProjekt(neuerProzess()) })
-              }}
-            >
+            <MenuePunkt onClick={() => befehl('neu')} schliesse={schliesse} taste={plattform.desktop ? 'Strg+N' : undefined}>
               Neues Projekt
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                schliesse()
-                if (verwerfenOk()) dispatch({ typ: 'laden', projekt: beispielProjekt(), schritt: 'pruefen' })
-              }}
-            >
-              Beispiel „Lieferdienst“ laden
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                schliesse()
-                if (verwerfenOk()) dispatch({ typ: 'laden', projekt: beispielOnlineProjekt(), schritt: 'ablauf' })
-              }}
-            >
-              Beispiel „Onlinebestellung“ laden
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                schliesse()
-                datei.current?.click()
-              }}
-            >
+            </MenuePunkt>
+            <MenuePunkt onClick={onOeffnen} schliesse={schliesse} taste="Strg+O">
               Datei öffnen …
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                schliesse()
-                ladeHerunter(dateiname(z.projekt.ist.name, '.prozesslotse.json'), alsJson(z.projekt), 'application/json')
-              }}
-            >
-              Als Datei speichern
-            </button>
+            </MenuePunkt>
+            {zuletzt.length > 0 && (
+              <div className="menue-gruppe" role="group" aria-label="Zuletzt geöffnet">
+                <p className="menue-ueberschrift">Zuletzt geöffnet</p>
+                {zuletzt.map((d) => (
+                  <MenuePunkt key={d.pfad} onClick={() => void datei.oeffneZuletzt(d.pfad)} schliesse={schliesse} titel={d.pfad}>
+                    {d.name}
+                  </MenuePunkt>
+                ))}
+              </div>
+            )}
+            {plattform.desktop ? (
+              <>
+                <MenuePunkt onClick={() => befehl('speichern')} schliesse={schliesse} taste="Strg+S">
+                  Speichern
+                </MenuePunkt>
+                <MenuePunkt onClick={() => befehl('speichernUnter')} schliesse={schliesse} taste="Strg+Umschalt+S">
+                  Speichern unter …
+                </MenuePunkt>
+              </>
+            ) : (
+              <MenuePunkt onClick={() => befehl('speichern')} schliesse={schliesse} taste="Strg+S">
+                Als Datei speichern
+              </MenuePunkt>
+            )}
+            <MenuePunkt onClick={() => befehl('bpmn')} schliesse={schliesse}>
+              Als BPMN exportieren
+            </MenuePunkt>
+            <MenuePunkt onClick={() => befehl('beispielLieferdienst')} schliesse={schliesse}>
+              Beispiel „Lieferdienst“ laden
+            </MenuePunkt>
+            <MenuePunkt onClick={() => befehl('beispielOnline')} schliesse={schliesse}>
+              Beispiel „Onlinebestellung“ laden
+            </MenuePunkt>
           </div>
         </details>
-        <input ref={datei} type="file" accept=".json,application/json" hidden onChange={(e) => void oeffnen(e)} />
       </div>
     </header>
+  )
+}
+
+function MenuePunkt({ children, onClick, schliesse, taste, titel }: { children: ReactNode; onClick: () => void; schliesse: () => void; taste?: string; titel?: string }) {
+  return (
+    <button
+      type="button"
+      title={titel}
+      onClick={() => {
+        schliesse()
+        onClick()
+      }}
+    >
+      <span>{children}</span>
+      {taste && <kbd className="menue-taste">{taste}</kbd>}
+    </button>
   )
 }
 
@@ -208,6 +360,26 @@ function Schrittleiste() {
         ))}
       </ol>
     </nav>
+  )
+}
+
+/** Fremde BPMN-Datei ohne eingebettetes Projekt: nur ansehen. */
+function FremdeAnsicht({ fremd, onSchliessen }: { fremd: FremdesBpmn; onSchliessen: () => void }) {
+  return (
+    <main id="inhalt" className="fremd-flaeche">
+      <div className="banner banner-hinweis fremd-banner">
+        <p>
+          <strong>{fremd.name}</strong> wurde nicht mit dem Prozesslotsen erstellt und enthält kein Projekt. Sie wird nur angezeigt; Kennzahlen und Vorschläge gibt es für eigene Projekte.
+        </p>
+        <button type="button" className="knopf knopf-haupt" onClick={onSchliessen}>
+          Ansicht schließen
+        </button>
+      </div>
+      <section className="buehne fremd-buehne" aria-label="Diagramm">
+        <Diagramm xml={fremd.xml} beschriftung={`BPMN-Diagramm aus „${fremd.name}“`} />
+        <p className="buehne-fuss leise klein">Ziehen zum Verschieben, Strg + Mausrad zum Zoomen.</p>
+      </section>
+    </main>
   )
 }
 

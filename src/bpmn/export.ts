@@ -4,7 +4,8 @@
  * Medienbrüche stehen als Dokumentation an den Elementen.
  */
 import { findeBlock, mediumName, rolleName } from '../modell/operationen'
-import { istDigital, type Id, type Prozess } from '../modell/typen'
+import { istDigital, type Id, type Projekt, type Prozess } from '../modell/typen'
+import { einbettungXml, type Einbettung } from './einbettung'
 import { formatiereDauer, formatiereProzent } from '../modell/zeit'
 import { berechneLayout, xmlId, type Layout, type LayoutKante, type LayoutKnoten, type Rechteck } from './layout'
 
@@ -109,7 +110,8 @@ function kanteXml(k: LayoutKante): string {
   return `${e}<bpmn:sequenceFlow id="${k.id}"${attrName(k.name)} sourceRef="${k.von}" targetRef="${k.nach}">\n${doku(k.doku, `${e}  `)}${e}</bpmn:sequenceFlow>\n`
 }
 
-export function erzeugeBpmn(p: Prozess): BpmnErgebnis {
+/** Erzeugt BPMN-XML mit DI. Mit `einbettung` reist das ganze Projekt im Prozess-Element mit (für Exporte). */
+export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   const layout = berechneLayout(p)
   const rein = new Map<string, string[]>()
   const raus = new Map<string, string[]>()
@@ -142,6 +144,7 @@ export function erzeugeBpmn(p: Prozess): BpmnErgebnis {
   x += '  </bpmn:collaboration>\n'
   x += `  <bpmn:process id="Prozess"${attrName(p.name)} isExecutable="false">\n`
   x += doku(prozessDoku, '    ')
+  if (einbettung) x += einbettungXml(einbettung, '    ')
   x += '    <bpmn:laneSet id="Bahnen">\n'
   for (const b of layout.bahnen) {
     x += `      <bpmn:lane id="${bahnId(b.schluessel)}"${attrName(b.name)}>\n`
@@ -190,4 +193,10 @@ function bahnId(schluessel: string): string {
 function warteDauer(p: Prozess, blockId: Id): number {
   const b = findeBlock(p, blockId)?.block
   return b?.typ === 'warten' ? b.dauerMin : 0
+}
+
+/** BPMN-Datei für den Export: Diagramm des gewählten Prozesses, ganzes Projekt eingebettet. */
+export function bpmnFuerExport(projekt: Projekt, ansicht: 'ist' | 'soll'): string {
+  const soll = ansicht === 'soll' && projekt.soll !== null
+  return erzeugeBpmn(soll && projekt.soll ? projekt.soll : projekt.ist, { projekt, ansicht: soll ? 'soll' : 'ist' }).xml
 }

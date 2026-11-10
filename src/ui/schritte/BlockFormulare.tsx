@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useBestaetigen } from '../frage'
 import { neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
 import { blockTitel, freigabeAusgang } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
@@ -277,6 +278,7 @@ function danachVon(z: EntscheidungsZweig): string {
 
 function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidung>) {
   const { p } = useApp()
+  const bestaetige = useBestaetigen()
   const summe = e.zweige.reduce((s, z) => s + z.anteil, 0)
   const passt = Math.abs(summe - 1) < 1e-6
   const ereignisse = e.art === 'ereignis'
@@ -345,8 +347,8 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
                     className="knopf-icon"
                     aria-label={`Ausgang „${name}“ entfernen`}
                     title="Ausgang entfernen"
-                    onClick={() => {
-                      if (z.schritte.length > 0 && !window.confirm(`Der Ausgang „${name}“ enthält ${z.schritte.length} Schritte. Mit entfernen?`)) return
+                    onClick={async () => {
+                      if (z.schritte.length > 0 && !(await bestaetige('Ausgang entfernen?', `Der Ausgang „${name}“ enthält ${z.schritte.length} Schritte. Sie werden mit entfernt.`, 'Mit Schritten entfernen'))) return
                       onAendern({ ...e, zweige: e.zweige.filter((x) => x.id !== z.id) })
                     }}
                   >
@@ -423,6 +425,7 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
 }
 
 function ParallelFormular({ block: b, onAendern }: Props<Parallel>) {
+  const bestaetige = useBestaetigen()
   return (
     <fieldset className="zweige">
       <legend>Zweige, die gleichzeitig laufen</legend>
@@ -437,8 +440,8 @@ function ParallelFormular({ block: b, onAendern }: Props<Parallel>) {
               className="knopf-icon"
               aria-label={`Zweig ${i + 1} entfernen`}
               title="Zweig entfernen"
-              onClick={() => {
-                if (z.schritte.length > 0 && !window.confirm(`Zweig ${i + 1} enthält ${z.schritte.length} Schritte. Mit entfernen?`)) return
+              onClick={async () => {
+                if (z.schritte.length > 0 && !(await bestaetige('Zweig entfernen?', `Zweig ${i + 1} enthält ${z.schritte.length} Schritte. Sie werden mit entfernt.`, 'Mit Schritten entfernen'))) return
                 onAendern({ ...b, zweige: b.zweige.filter((x) => x.id !== z.id) })
               }}
             >

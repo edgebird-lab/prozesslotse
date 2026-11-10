@@ -1,0 +1,42 @@
+name: Windows-Programm
+
+# Windows-Läufe kosten im privaten Repo mehr Minuten. Deshalb nur, wenn sich der
+# Programmteil ändert, bei Versionen (Tags) oder von Hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'src/plattform/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/windows.yml'
+  workflow_dispatch:
+
+jobs:
+  bauen:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: npm ci
+      - name: Rust-Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Programm und Installer bauen
+        run: npx tauri build
+      - name: Installer prüfen (still installieren, Zuordnungen prüfen, deinstallieren)
+        shell: pwsh
+        run: ./src-tauri/windows/installer-test.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prozesslotse-windows
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          retention-days: 14

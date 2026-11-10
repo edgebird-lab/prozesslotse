@@ -44,6 +44,8 @@ export interface DiagrammProps {
   klein?: boolean
   /** Immer das ganze Diagramm zeigen (z. B. im Bericht). */
   uebersicht?: boolean
+  /** Für den Druck ein Bild des ganzen Diagramms einsetzen, das sich der Seitenbreite anpasst. */
+  druckbild?: boolean
 }
 
 const SYMBOL: Record<Markierung['art'], string> = {
@@ -90,7 +92,7 @@ function zeigeAnfang(canvas: Canvas): void {
   if (box.inner) canvas.viewbox({ x: box.inner.x - 24, y: box.inner.y - 24, width: box.width, height: box.height })
 }
 
-export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm({ xml, markierungen, ausgewaehlt, onKlick, beschriftung, klein, uebersicht }, ref) {
+export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm({ xml, markierungen, ausgewaehlt, onKlick, beschriftung, klein, uebersicht, druckbild }, ref) {
   const behaelter = useRef<HTMLDivElement>(null)
   const viewer = useRef<NavigatedViewer | null>(null)
   const klick = useRef(onKlick)
@@ -99,6 +101,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
   const letzteAuswahl = useRef<string>('')
   const [importNr, setImportNr] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
+  const [druckSvg, setDruckSvg] = useState('')
 
   useEffect(() => {
     klick.current = onKlick
@@ -140,6 +143,8 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         else zeigeAnfang(canvas)
         markiert.current = []
         setImportNr((n) => n + 1)
+        // Bild für Druck und PDF: Die Ansicht im Browser passt sich der Papierbreite nicht an, ein SVG-Bild schon.
+        if (druckbild) void v.saveSVG().then(({ svg }) => aktiv && setDruckSvg(svg))
       })
       .catch((e: unknown) => {
         if (aktiv) setFehler(e instanceof Error ? e.message : String(e))
@@ -147,7 +152,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
     return () => {
       aktiv = false
     }
-  }, [xml, uebersicht])
+  }, [xml, uebersicht, druckbild])
 
   useEffect(() => {
     const v = viewer.current
@@ -199,7 +204,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
   }))
 
   return (
-    <div className={`diagramm${klein ? ' diagramm-klein' : ''}`}>
+    <div className={`diagramm${klein ? ' diagramm-klein' : ''}${druckbild && druckSvg ? ' mit-druckbild' : ''}`}>
       <div className="diagramm-werkzeuge">
         <button type="button" onClick={() => zoome(1.2)} aria-label="Vergrößern" title="Vergrößern">
           +
@@ -212,6 +217,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         </button>
       </div>
       <div ref={behaelter} className="diagramm-flaeche" role="figure" aria-label={beschriftung} />
+      {druckbild && druckSvg && <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />}
       {fehler && (
         <p className="diagramm-fehler" role="alert">
           Das Diagramm konnte nicht gezeichnet werden: {fehler}

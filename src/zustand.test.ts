@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { neueAufgabe, neueRolle } from './modell/bausteine'
 import { beispielProjekt } from './modell/beispiel'
 import { entferneBlock, fuegeEin } from './modell/operationen'
-import { aktiverProzess, reduziere, startZustand, wirksamerCursor, type Zustand } from './zustand'
+import { aktiverProzess, istGeaendert, reduziere, startZustand, wirksamerCursor, type Zustand } from './zustand'
 
 const start = (): Zustand => startZustand(beispielProjekt(), true)
 
@@ -57,5 +57,38 @@ describe('Zustand mit Rückgängig', () => {
     const z = start()
     const p = aktiverProzess(z)
     expect(wirksamerCursor(z, p)).toEqual({ sequenzId: 'haupt', index: p.ablauf.schritte.length })
+  })
+})
+
+describe('Dokument: gespeichert oder geändert', () => {
+  const zeit = 1_000_000
+
+  it('ist nach dem Laden und nach Rückgängig bis zum gespeicherten Stand unverändert', () => {
+    const z0 = reduziere(startZustand(beispielProjekt(), false), { typ: 'laden', projekt: beispielProjekt(), dokument: { pfad: 'C:/a/b.prozesslotse', name: 'b.prozesslotse' } })
+    expect(istGeaendert(z0)).toBe(false)
+    expect(z0.dokument).toMatchObject({ pfad: 'C:/a/b.prozesslotse', name: 'b.prozesslotse' })
+    const z1 = reduziere(z0, { typ: 'prozess', aenderung: (p) => ({ ...p, name: 'Neu' }), zeit })
+    expect(istGeaendert(z1)).toBe(true)
+    expect(istGeaendert(reduziere(z1, { typ: 'rueckgaengig' }))).toBe(false)
+  })
+
+  it('bleibt geändert, wenn sich das Projekt während des Speicherns geändert hat', () => {
+    const z0 = startZustand(beispielProjekt(), false)
+    const z1 = reduziere(z0, { typ: 'prozess', aenderung: (p) => ({ ...p, name: 'Eins' }), zeit })
+    const gespeicherterStand = z1.projekt
+    const z2 = reduziere(z1, { typ: 'prozess', aenderung: (p) => ({ ...p, name: 'Zwei' }), zeit: zeit + 5000 })
+    const z3 = reduziere(z2, { typ: 'gespeichert', projekt: gespeicherterStand, pfad: 'C:/x.prozesslotse', name: 'x.prozesslotse' })
+    expect(istGeaendert(z3)).toBe(true)
+    expect(istGeaendert(reduziere(z3, { typ: 'gespeichert', projekt: z3.projekt, pfad: 'C:/x.prozesslotse', name: 'x.prozesslotse' }))).toBe(false)
+  })
+
+  it('öffnet auf Wunsch den Soll-Prozess, aber nur wenn es einen gibt', () => {
+    const mitSoll = { ...beispielProjekt(), soll: beispielProjekt().ist }
+    expect(reduziere(startZustand(beispielProjekt(), false), { typ: 'laden', projekt: mitSoll, ansicht: 'soll' }).ansicht).toBe('soll')
+    expect(reduziere(startZustand(beispielProjekt(), false), { typ: 'laden', projekt: beispielProjekt(), ansicht: 'soll' }).ansicht).toBe('ist')
+  })
+
+  it('markiert wiederhergestellte, ungespeicherte Änderungen als geändert', () => {
+    expect(istGeaendert(startZustand(beispielProjekt(), false, { gespeichert: null }))).toBe(true)
   })
 })

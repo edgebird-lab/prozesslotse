@@ -1,10 +1,10 @@
 import { useRef, useState, type RefObject } from 'react'
-import { alsJson } from '../../modell/speicher'
 import { formatiereDauer, formatiereEuro, formatiereProzent, formatiereZahl } from '../../modell/zeit'
 import { useAnalyse, useBpmn, useSimulation } from '../analyse'
 import type { DiagrammApi } from '../Diagramm'
 import { DiagrammLazy as Diagramm } from '../DiagrammLazy'
-import { dateiname, ladeHerunter, vorzeichen } from '../hilfen'
+import { plattform } from '../../plattform'
+import { dateiname, vorzeichen } from '../hilfen'
 import { useApp } from '../kontext'
 import { zaehle } from '../befundtext'
 import { StatusSymbol } from './PruefenSchritt'
@@ -21,7 +21,7 @@ interface Zeile {
 }
 
 export function BerichtSchritt() {
-  const { z } = useApp()
+  const { z, datei, melde } = useApp()
   const { projekt } = z
   const ist = projekt.ist
   const soll = projekt.soll
@@ -60,7 +60,7 @@ export function BerichtSchritt() {
 
   const svgSpeichern = async (ref: RefObject<DiagrammApi | null>, endung: string) => {
     const svg = await ref.current?.svg()
-    if (svg) ladeHerunter(dateiname(ist.name, endung), svg, 'image/svg+xml')
+    if (svg) await datei.exportiere(dateiname(ist.name, endung), svg, 'svg')
   }
 
   return (
@@ -76,9 +76,14 @@ export function BerichtSchritt() {
 
       <div className="bericht-aktionen knopfreihe">
         <button type="button" className="knopf knopf-haupt" onClick={() => window.print()}>
-          Drucken oder als PDF speichern
+          {plattform.desktop ? 'Drucken' : 'Drucken oder als PDF speichern'}
         </button>
-        <button type="button" className="knopf" onClick={() => ladeHerunter(dateiname(ist.name, '.prozesslotse.json'), alsJson(projekt), 'application/json')}>
+        {plattform.desktop && (
+          <button type="button" className="knopf" onClick={() => void plattform.alsPdf(dateiname(ist.name, '.pdf')).then((ok) => ok && melde('PDF gespeichert.'))}>
+            Als PDF speichern
+          </button>
+        )}
+        <button type="button" className="knopf" onClick={() => void datei.speichernUnter()}>
           Projekt als Datei speichern
         </button>
       </div>
@@ -119,8 +124,8 @@ export function BerichtSchritt() {
           </table>
         </div>
         <p className="leise klein">
-          Werte sind Erwartungswerte je Vorgang aus den geschätzten Zeiten und Anteilen. Bei „Gleichzeitig“ zählt der Zweig mit der längsten erwarteten Dauer; der 90-%-Wert stammt aus
-          einer Simulation mit 4.000 Durchläufen.
+          Werte sind Erwartungswerte je Vorgang aus den geschätzten Zeiten und Anteilen. Bei „Gleichzeitig“ zählt der Erwartungswert der längsten Zweigdauer; der 90-%-Wert stammt
+          aus einer Simulation mit 4.000 Durchläufen, die die Wege würfelt, nicht die Zeiten.
         </p>
       </section>
 
@@ -162,7 +167,7 @@ export function BerichtSchritt() {
         <div className="bericht-diagramm-kopf">
           <h3 id="bericht-ist">Ist-Prozess</h3>
           <div className="knopfreihe">
-            <button type="button" className="knopf knopf-klein" onClick={() => ladeHerunter(dateiname(ist.name, '-ist.bpmn'), bpmnIst.xml, 'application/xml')}>
+            <button type="button" className="knopf knopf-klein" onClick={() => void datei.exportiereBpmn('ist')}>
               BPMN-Datei
             </button>
             <button type="button" className="knopf knopf-klein" onClick={() => void svgSpeichern(refIst, '-ist.svg')}>
@@ -170,7 +175,7 @@ export function BerichtSchritt() {
             </button>
           </div>
         </div>
-        <Diagramm ref={refIst} xml={bpmnIst.xml} klein uebersicht beschriftung={`BPMN-Diagramm des Ist-Prozesses ${ist.name}`} />
+        <Diagramm ref={refIst} xml={bpmnIst.xml} klein uebersicht druckbild beschriftung={`BPMN-Diagramm des Ist-Prozesses ${ist.name}`} />
       </section>
 
       {soll && (
@@ -178,7 +183,7 @@ export function BerichtSchritt() {
           <div className="bericht-diagramm-kopf">
             <h3 id="bericht-soll">Soll-Prozess</h3>
             <div className="knopfreihe">
-              <button type="button" className="knopf knopf-klein" onClick={() => ladeHerunter(dateiname(ist.name, '-soll.bpmn'), bpmnSoll.xml, 'application/xml')}>
+              <button type="button" className="knopf knopf-klein" onClick={() => void datei.exportiereBpmn('soll')}>
                 BPMN-Datei
               </button>
               <button type="button" className="knopf knopf-klein" onClick={() => void svgSpeichern(refSoll, '-soll.svg')}>
@@ -186,7 +191,7 @@ export function BerichtSchritt() {
               </button>
             </div>
           </div>
-          <Diagramm ref={refSoll} xml={bpmnSoll.xml} klein uebersicht beschriftung={`BPMN-Diagramm des Soll-Prozesses ${ist.name}`} />
+          <Diagramm ref={refSoll} xml={bpmnSoll.xml} klein uebersicht druckbild beschriftung={`BPMN-Diagramm des Soll-Prozesses ${ist.name}`} />
         </section>
       )}
 

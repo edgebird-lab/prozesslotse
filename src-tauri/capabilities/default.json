@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Hauptfenster: Standardrechte, Fenstertitel, Schließen nach Rückfrage und die eigenen Dateibefehle. Keine allgemeinen Dateirechte.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-title",
+    "core:window:allow-destroy",
+    "allow-start-datei",
+    "allow-oeffnen",
+    "allow-speichern",
+    "allow-speichern-unter",
+    "allow-zuletzt",
+    "allow-oeffne-zuletzt",
+    "allow-als-pdf"
+  ]
+}

@@ -1,4 +1,5 @@
 import { neueRolle, neuesMedium } from '../../modell/bausteine'
+import { useBestaetigen } from '../frage'
 import { alleAufgaben, entferneMedium, entferneRolle } from '../../modell/operationen'
 import { MEDIUM_ARTEN, type MediumArt } from '../../modell/typen'
 import { ZahlEingabe } from '../Eingaben'
@@ -8,6 +9,7 @@ import { Kreuz } from '../Symbol'
 
 export function BeteiligteSchritt() {
   const { p, aendere, dispatch } = useApp()
+  const bestaetige = useBestaetigen()
   const aufgaben = alleAufgaben(p)
 
   return (
@@ -59,8 +61,8 @@ export function BeteiligteSchritt() {
                         className="knopf-icon"
                         aria-label={`Rolle ${r.name || i + 1} entfernen`}
                         title="Entfernen"
-                        onClick={() => {
-                          if (anzahl > 0 && !window.confirm(`„${r.name}“ hat ${anzahl} Aufgaben. Diese haben danach keine Rolle mehr. Entfernen?`)) return
+                        onClick={async () => {
+                          if (anzahl > 0 && !(await bestaetige('Rolle entfernen?', `„${r.name}“ hat ${anzahl} Aufgaben. Diese haben danach keine Rolle mehr.`, 'Entfernen'))) return
                           aendere(entferneRolle(p, r.id))
                         }}
                       >
