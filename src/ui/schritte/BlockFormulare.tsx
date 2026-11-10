@@ -258,6 +258,10 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
         ]}
         onAendern={(art) => setze({ art })}
       />
+      <div className="feldreihe">
+        <TeilnehmerWahl label="Schickt der Schritt etwas an jemand Externen?" keinText="Nein" wert={a.nachrichtAn} onAendern={(nachrichtAn) => setze({ nachrichtAn })} />
+        <TeilnehmerWahl label="Braucht er dafür eine Nachricht von jemand Externem?" keinText="Nein" wert={a.nachrichtVon} onAendern={(nachrichtVon) => setze({ nachrichtVon })} />
+      </div>
       {a.art === 'freigabe' && (folge ? (
         <p className="feld-hilfe">
           Wie oft freigegeben wird, ergibt sich aus der folgenden Entscheidung „{blockTitel(folge.entscheidung)}“: Ausgang „{folge.ausgang.bezeichnung}“ mit{' '}
@@ -368,6 +372,16 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
                     <option value="nachricht">Eine Nachricht kommt an</option>
                     <option value="zeit">Eine Frist läuft ab</option>
                   </select>
+                  {z.ereignis.art === 'nachricht' && p.teilnehmer.length > 0 && (
+                    <select aria-label={`Absender von „${name}“`} value={z.ereignis.von ?? ''} onChange={(ev) => setzeZweig(z.id, { ereignis: { ...z.ereignis!, von: ev.target.value || null } })}>
+                      <option value="">von innerhalb</option>
+                      {p.teilnehmer.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          von {t.name || 'Unbenannt'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <span className="leise">nach im Schnitt</span>
                   <ZeitEingabe
                     ariaLabel={`Wartezeit bis „${name}“`}
@@ -547,6 +561,26 @@ export function ZweckWahl({ w, onAendern }: { w: Wiederholung; onAendern: (w: Wi
   )
 }
 
+/** Auswahl eines externen Teilnehmers für eine Nachricht; erscheint nur, wenn es externe Beteiligte gibt. */
+function TeilnehmerWahl({ label, wert, onAendern, keinText }: { label: string; wert: Id | null | undefined; onAendern: (id: Id | null) => void; keinText: string }) {
+  const { p } = useApp()
+  if (p.teilnehmer.length === 0) return null
+  return (
+    <Feld label={label}>
+      {(id) => (
+        <select id={id} value={wert ?? ''} onChange={(e) => onAendern(e.target.value || null)}>
+          <option value="">{keinText}</option>
+          {p.teilnehmer.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name || 'Unbenannt'}
+            </option>
+          ))}
+        </select>
+      )}
+    </Feld>
+  )
+}
+
 function WiederholungFormular({ block: w, onAendern, kontext }: Props<Wiederholung>) {
   const mal = w.anteilWiederholung < 1 ? 1 / (1 - w.anteilWiederholung) : Infinity
   return (
@@ -583,6 +617,7 @@ function WartenFormular({ block: w, onAendern, kontext }: Props<Warten>) {
         onAendern={(art) => onAendern({ ...w, art })}
       />
       <Feld label="Wie lange im Schnitt?">{(id) => <ZeitEingabe id={id} wert={w.dauerMin} stundenProTag={p.arbeitsstundenProTag} onAendern={(dauerMin) => onAendern({ ...w, dauerMin })} />}</Feld>
+      {w.art === 'nachricht' && <TeilnehmerWahl label="Von wem kommt die Nachricht?" keinText="Von innerhalb (kein externer Beteiligter)" wert={w.von} onAendern={(von) => onAendern({ ...w, von })} />}
     </>
   )
 }

@@ -13,6 +13,7 @@ import type { Aufgabe, Block, Oder, Prozess } from '../modell/typen'
 import { graphAusXml } from '../testhilfen/bpmn-graph'
 import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { berechneKennzahlen } from './kennzahlen'
+import { standardfehler } from '../testhilfen/statistik'
 import { simuliere, zufallMitStartwert } from './simulation'
 
 const R = neueRolle('Team', { personen: 3 })
@@ -135,8 +136,11 @@ describe('ODER-Verzweigung', () => {
       if (![...durchlaufe(p.ablauf)].some((f) => f.block.typ === 'oder')) continue
       gezaehlt++
       const formel = berechneKennzahlen(p).durchlaufzeitMin
-      const sim = simuliere(p, 20_000, s).mittelMin
-      if (Math.abs(formel - sim) > 0.025 * Math.max(formel, 1)) abweichungen.push(`Startwert ${s}: Formel ${formel.toFixed(1)}, Simulation ${sim.toFixed(1)}`)
+      const sim = simuliere(p, 20_000, s)
+      // Toleranz aus der Streuung der Simulation: vier Standardfehler plus 0,5 %
+      if (Math.abs(formel - sim.mittelMin) > 4 * standardfehler(sim.zeiten) + 0.005 * Math.max(formel, 1)) {
+        abweichungen.push(`Startwert ${s}: Formel ${formel.toFixed(2)}, Simulation ${sim.mittelMin.toFixed(2)}`)
+      }
     }
     expect(gezaehlt).toBeGreaterThanOrEqual(20)
     expect(abweichungen).toEqual([])

@@ -43,6 +43,15 @@ export interface Rolle {
   verfuegbarProzent: number
 }
 
+/**
+ * Externer Beteiligter mit eigenem Pool, z. B. Kunde oder Lieferant. Was er
+ * intern tut, gehört nicht zum Modell; sichtbar sind nur die Nachrichten.
+ */
+export interface Teilnehmer {
+  id: Id
+  name: string
+}
+
 export type AufgabenArt = 'normal' | 'pruefung' | 'freigabe'
 
 /** Daten werden von Hand aus einem anderen Medium übertragen (Medienbruch). */
@@ -70,6 +79,10 @@ export interface Aufgabe {
   brauchtVorgaenger: boolean | null
   /** Medienbruch, falls Daten von Hand übertragen werden. */
   uebertragung: Uebertragung | null
+  /** Schickt eine Nachricht an diesen externen Teilnehmer (Nachrichtenfluss). */
+  nachrichtAn?: Id | null
+  /** Wartet auf eine Nachricht dieses externen Teilnehmers. */
+  nachrichtVon?: Id | null
 }
 
 /** Eine Folge von Schritten. Der Hauptablauf und jeder Zweig sind Sequenzen. */
@@ -83,6 +96,8 @@ export interface ZweigEreignis {
   art: WarteArt
   /** Wie lange es im Schnitt dauert, bis dieses Ereignis eintritt (wenn es das erste ist). */
   dauerMin: number
+  /** Bei einer Nachricht: von welchem externen Teilnehmer sie kommt. */
+  von?: Id | null
 }
 
 export interface EntscheidungsZweig extends Sequenz {
@@ -178,6 +193,8 @@ export interface Warten {
   name: string
   art: WarteArt
   dauerMin: number
+  /** Bei einer Nachricht: von welchem externen Teilnehmer sie kommt. */
+  von?: Id | null
 }
 
 export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten
@@ -190,7 +207,8 @@ export interface Prozess {
   id: Id
   name: string
   beschreibung: string
-  ausloeser: { art: AusloeserArt; text: string }
+  /** Bei einer Nachricht: `von` ist der externe Teilnehmer, der sie schickt. */
+  ausloeser: { art: AusloeserArt; text: string; von?: Id | null }
   /** Ergebnis am regulären Ende, z. B. „Ware zugestellt“. */
   ergebnis: string
   /** Neue Vorgänge pro Arbeitstag. */
@@ -198,6 +216,8 @@ export interface Prozess {
   arbeitsstundenProTag: number
   rollen: Rolle[]
   medien: Medium[]
+  /** Externe Teilnehmer (eigene Pools) wie Kunde oder Lieferant. */
+  teilnehmer: Teilnehmer[]
   ablauf: Sequenz
 }
 

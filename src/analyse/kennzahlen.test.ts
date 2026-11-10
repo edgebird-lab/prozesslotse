@@ -3,6 +3,7 @@ import { neueAufgabe, neueEntscheidung, neueParallel, neuerProzess, neueRolle, n
 import { beispielLieferdienst } from '../modell/beispiel'
 import type { Aufgabe, Block, Prozess, Rolle } from '../modell/typen'
 import { berechneKennzahlen } from './kennzahlen'
+import { standardfehler } from '../testhilfen/statistik'
 import { simuliere } from './simulation'
 import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { durchlaufe } from '../modell/operationen'
@@ -156,8 +157,11 @@ describe('Kennzahlen', () => {
       if (![...durchlaufe(p.ablauf)].some((f) => f.block.typ === 'parallel')) continue
       mitParallele++
       const formel = berechneKennzahlen(p).durchlaufzeitMin
-      const sim = simuliere(p, 20_000, s).mittelMin
-      if (Math.abs(formel - sim) > 0.025 * Math.max(formel, 1)) abweichungen.push(`Startwert ${s}: Formel ${formel.toFixed(1)}, Simulation ${sim.toFixed(1)}`)
+      const sim = simuliere(p, 20_000, s)
+      // Toleranz aus der Streuung der Simulation: vier Standardfehler plus 0,5 %
+      if (Math.abs(formel - sim.mittelMin) > 4 * standardfehler(sim.zeiten) + 0.005 * Math.max(formel, 1)) {
+        abweichungen.push(`Startwert ${s}: Formel ${formel.toFixed(2)}, Simulation ${sim.mittelMin.toFixed(2)}`)
+      }
     }
     expect(mitParallele).toBeGreaterThan(20)
     expect(abweichungen).toEqual([])

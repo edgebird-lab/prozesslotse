@@ -110,6 +110,15 @@ export function Kennzahlkacheln({ p, k, sim, vergleich }: { p: Prozess; k: Kennz
         d={v ? delta(v.medienbrueche, k.medienbrueche, (n) => formatiereZahl(n, 1)) : undefined}
         zusatz={`${dauer(k.uebertragungMin)} Abtippen`}
       />
+      {k.kontakte.map((kt) => (
+        <Kachel
+          key={kt.teilnehmer.id}
+          label={`Kontakte mit „${kt.teilnehmer.name || 'extern'}“`}
+          wert={formatiereZahl(kt.anzahl, 1)}
+          d={v ? delta(v.kontakte.find((x) => x.teilnehmer.id === kt.teilnehmer.id)?.anzahl ?? 0, kt.anzahl, (n) => formatiereZahl(n, 1)) : undefined}
+          zusatz="Nachrichten je Vorgang, hin und zurück"
+        />
+      ))}
       <Kachel
         label="Übergaben je Vorgang"
         wert={formatiereZahl(k.uebergaben, 1)}

@@ -13,6 +13,7 @@ import {
   type Prozess,
   type Rolle,
   type Sequenz,
+  type Teilnehmer,
   type Warten,
   type Wiederholung,
 } from './typen'
@@ -107,6 +108,10 @@ export function neueRolle(name = '', werte: Partial<Rolle> = {}): Rolle {
   return { id: neueId('rol'), name, stundensatz: 45, personen: 1, verfuegbarProzent: 100, ...werte }
 }
 
+export function neuerTeilnehmer(name = ''): Teilnehmer {
+  return { id: neueId('tln'), name }
+}
+
 export function neuesMedium(name = '', art: MediumArt = 'fachanwendung'): Medium {
   return { id: neueId('med'), name, art }
 }
@@ -123,6 +128,7 @@ export function neuerProzess(werte: Partial<Prozess> = {}): Prozess {
     arbeitsstundenProTag: 8,
     rollen: [],
     medien: [],
+    teilnehmer: [],
     ablauf: { id: 'haupt', schritte: [] },
     ...werte,
   }

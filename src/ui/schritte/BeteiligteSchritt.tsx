@@ -1,6 +1,6 @@
-import { neueRolle, neuesMedium } from '../../modell/bausteine'
+import { neueRolle, neuerTeilnehmer, neuesMedium } from '../../modell/bausteine'
 import { useBestaetigen } from '../frage'
-import { alleAufgaben, entferneMedium, entferneRolle } from '../../modell/operationen'
+import { alleAufgaben, entferneMedium, entferneRolle, entferneTeilnehmer, nachrichtenVerweise } from '../../modell/operationen'
 import { MEDIUM_ARTEN, type MediumArt } from '../../modell/typen'
 import { ZahlEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
@@ -148,6 +148,55 @@ export function BeteiligteSchritt() {
               }
             >
               Typische Auswahl übernehmen
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="extern-titel">
+        <h3 id="extern-titel">Externe Beteiligte</h3>
+        <p className="leise">
+          Kunden, Lieferanten oder Behörden bekommen einen eigenen Pool. Was sie intern tun, gehört nicht zum Prozess; im Diagramm erscheinen nur die Nachrichten zwischen
+          euch und ihnen.
+        </p>
+        <Lernhinweis thema="extern" />
+        {p.teilnehmer.length === 0 && <p className="leer-hinweis">Noch niemand. Typisch ist der Kunde, der bestellt, Rückfragen beantwortet oder storniert.</p>}
+        <ul className="teilnehmer-liste">
+          {p.teilnehmer.map((t, i) => {
+            const nachrichten = nachrichtenVerweise(p).filter((v) => v.teilnehmerId === t.id).length
+            return (
+              <li key={t.id} className="zweig-zeile">
+                <input
+                  type="text"
+                  aria-label={`Name des externen Beteiligten ${i + 1}`}
+                  value={t.name}
+                  placeholder="z. B. Kunde"
+                  onChange={(e) => aendere({ ...p, teilnehmer: p.teilnehmer.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)) }, { gruppe: `teilnehmer:${t.id}` })}
+                />
+                <span className="leise">{nachrichten === 1 ? '1 Nachricht' : `${nachrichten} Nachrichten`}</span>
+                <button
+                  type="button"
+                  className="knopf-icon"
+                  aria-label={`Externen Beteiligten ${t.name || i + 1} entfernen`}
+                  title="Entfernen"
+                  onClick={async () => {
+                    if (nachrichten > 0 && !(await bestaetige('Externen Beteiligten entfernen?', `Mit „${t.name}“ werden ${nachrichten} Nachrichten ausgetauscht. Sie bleiben ohne Absender oder Empfänger.`, 'Entfernen'))) return
+                    aendere(entferneTeilnehmer(p, t.id))
+                  }}
+                >
+                  <Kreuz />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <div className="knopfreihe">
+          <button type="button" className="knopf" onClick={() => aendere({ ...p, teilnehmer: [...p.teilnehmer, neuerTeilnehmer('')] })}>
+            + Externer Beteiligter
+          </button>
+          {p.teilnehmer.length === 0 && (
+            <button type="button" className="knopf knopf-leise" onClick={() => aendere({ ...p, teilnehmer: [neuerTeilnehmer('Kunde')] })}>
+              Kunde hinzufügen
             </button>
           )}
         </div>

@@ -55,6 +55,20 @@ export function RahmenSchritt() {
         optionen={AUSLOESER.map((a) => ({ wert: a.wert, text: a.text, beschreibung: a.beschreibung, symbol: <Symbol art={a.symbol} groesse={26} /> }))}
         onAendern={(art) => setze({ ausloeser: { ...p.ausloeser, art } }, 'ausloeser-art')}
       />
+      {p.ausloeser.art === 'nachricht' && p.teilnehmer.length > 0 && (
+        <Feld label="Von wem kommt die Nachricht?">
+          {(id) => (
+            <select id={id} value={p.ausloeser.von ?? ''} onChange={(e) => setze({ ausloeser: { ...p.ausloeser, von: e.target.value || null } }, 'ausloeser-von')}>
+              <option value="">Von innerhalb</option>
+              {p.teilnehmer.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name || 'Unbenannt'}
+                </option>
+              ))}
+            </select>
+          )}
+        </Feld>
+      )}
       <Feld label="Auslöser in Worten">
         {(id) => (
           <input id={id} type="text" value={p.ausloeser.text} onChange={(e) => setze({ ausloeser: { ...p.ausloeser, text: e.target.value } }, 'ausloeser')} placeholder="z. B. Kunde bestellt telefonisch" />

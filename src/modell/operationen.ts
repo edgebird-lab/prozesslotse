@@ -187,6 +187,54 @@ export function entferneMedium(p: Prozess, mediumId: Id): Prozess {
   return { ...ohne, medien: p.medien.filter((m) => m.id !== mediumId) }
 }
 
+/** Entfernt einen externen Teilnehmer; Nachrichten von und an ihn bleiben ohne Absender bzw. Empfänger. */
+export function entferneTeilnehmer(p: Prozess, teilnehmerId: Id): Prozess {
+  const ohne = (x: Id | null | undefined) => (x === teilnehmerId ? null : (x ?? null))
+  const neu = abbildeAblauf(p, (schritte) =>
+    schritte.map((b) => {
+      if (b.typ === 'aufgabe' && (b.nachrichtAn === teilnehmerId || b.nachrichtVon === teilnehmerId)) return { ...b, nachrichtAn: ohne(b.nachrichtAn), nachrichtVon: ohne(b.nachrichtVon) }
+      if (b.typ === 'warten' && b.von === teilnehmerId) return { ...b, von: null }
+      if (b.typ === 'entscheidung' && b.zweige.some((z) => z.ereignis?.von === teilnehmerId)) {
+        return { ...b, zweige: b.zweige.map((z) => (z.ereignis?.von === teilnehmerId ? { ...z, ereignis: { ...z.ereignis, von: null } } : z)) }
+      }
+      return b
+    }),
+  )
+  return {
+    ...neu,
+    ausloeser: p.ausloeser.von === teilnehmerId ? { ...p.ausloeser, von: null } : p.ausloeser,
+    teilnehmer: p.teilnehmer.filter((t) => t.id !== teilnehmerId),
+  }
+}
+
+export function teilnehmerName(p: Prozess, id: Id | null | undefined): string {
+  return p.teilnehmer.find((t) => t.id === id)?.name || 'extern'
+}
+
+/** Nachrichten mit externen Teilnehmern: Stelle im Modell, Richtung und Teilnehmer. */
+export interface NachrichtVerweis {
+  /** Baustein (Aufgabe, Warten), Ausgang (Ereignis) oder 'start' für den Auslöser */
+  ort: Id
+  richtung: 'an' | 'von'
+  teilnehmerId: Id
+}
+
+export function nachrichtenVerweise(p: Prozess): NachrichtVerweis[] {
+  const liste: NachrichtVerweis[] = []
+  if (p.ausloeser.art === 'nachricht' && p.ausloeser.von) liste.push({ ort: 'start', richtung: 'von', teilnehmerId: p.ausloeser.von })
+  for (const { block: b } of durchlaufe(p.ablauf)) {
+    if (b.typ === 'aufgabe') {
+      if (b.nachrichtVon) liste.push({ ort: b.id, richtung: 'von', teilnehmerId: b.nachrichtVon })
+      if (b.nachrichtAn) liste.push({ ort: b.id, richtung: 'an', teilnehmerId: b.nachrichtAn })
+    } else if (b.typ === 'warten' && b.art === 'nachricht' && b.von) {
+      liste.push({ ort: b.id, richtung: 'von', teilnehmerId: b.von })
+    } else if (b.typ === 'entscheidung' && b.art === 'ereignis') {
+      for (const z of b.zweige) if (z.ereignis?.art === 'nachricht' && z.ereignis.von) liste.push({ ort: z.id, richtung: 'von', teilnehmerId: z.ereignis.von })
+    }
+  }
+  return liste
+}
+
 export function rolleName(p: Prozess, id: Id | null): string {
   return p.rollen.find((r) => r.id === id)?.name || 'ohne Rolle'
 }

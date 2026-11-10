@@ -3,7 +3,7 @@
  * und Benennung nach den Seven Process Modeling Guidelines (7PMG,
  * Mendling, Reijers, van der Aalst 2010).
  */
-import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, istNebenlaeufig, kannWeiterlaufen, liegtInParallele, oderWahrscheinlichkeiten } from './operationen'
+import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, istNebenlaeufig, kannWeiterlaufen, liegtInParallele, nachrichtenVerweise, oderWahrscheinlichkeiten } from './operationen'
 import type { Block, Id, Prozess } from './typen'
 
 export type Schwere = 'fehler' | 'warnung' | 'hinweis'
@@ -294,6 +294,22 @@ export function pruefeProzess(p: Prozess): Befund[] {
       add({ schluessel: `satz:${r.id}`, schwere: 'hinweis', titel: 'Kein Stundensatz', text: `Für „${r.name}“ ist kein Stundensatz hinterlegt; die Kosten werden mit 0 € gerechnet.`, rolleId: r.id })
     }
   }
+  const verweise = nachrichtenVerweise(p)
+  const teilnehmerIds = new Set(p.teilnehmer.map((t) => t.id))
+  for (const t of p.teilnehmer) {
+    if (!t.name.trim()) {
+      add({ schluessel: `teilnehmername:${t.id}`, schwere: 'warnung', titel: 'Externer Beteiligter ohne Namen', text: 'Jeder externe Beteiligte braucht einen Namen, z. B. „Kunde“; er steht auf seinem Pool.' })
+    }
+    if (!verweise.some((v) => v.teilnehmerId === t.id)) {
+      add({ schluessel: `teilnehmer-unbenutzt:${t.id}`, schwere: 'hinweis', titel: 'Keine Nachrichten', text: `Mit „${t.name || 'Unbenannt'}“ werden keine Nachrichten ausgetauscht. Bei den Schritten angeben, wer etwas schickt oder bekommt.` })
+    }
+  }
+  for (const v of verweise) {
+    if (!teilnehmerIds.has(v.teilnehmerId)) {
+      add({ schluessel: `teilnehmer-fehlt:${v.ort}`, schwere: 'warnung', titel: 'Unbekannter Absender oder Empfänger', text: 'Eine Nachricht verweist auf einen externen Beteiligten, den es nicht mehr gibt.', blockId: v.ort === 'start' ? undefined : v.ort })
+    }
+  }
+
   for (const m of p.medien) {
     if (!benutzteMedien.has(m.id)) {
       add({ schluessel: `medium-unbenutzt:${m.id}`, schwere: 'hinweis', titel: 'System wird nicht genutzt', text: `„${m.name || 'Unbenanntes System'}“ kommt in keinem Schritt vor.` })

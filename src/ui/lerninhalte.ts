@@ -11,6 +11,7 @@ export interface Lerninhalt {
 export type LernThema =
   | 'rahmen'
   | 'beteiligte'
+  | 'extern'
   | 'aufgabe'
   | 'entscheidung'
   | 'ereignis'
@@ -34,6 +35,12 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Pool, Lanes, Benutzeraufgabe, manuelle Aufgabe',
     symbol: 'bahn',
     text: 'Der ganze Prozess ist ein Pool. Jede Rolle bekommt darin eine eigene Bahn (Lane); so sieht man, wer was tut und wo der Vorgang den Schreibtisch wechselt. Aufgaben mit IT-System werden als Benutzeraufgabe gezeichnet (Personensymbol), Aufgaben auf Papier oder am Telefon als manuelle Aufgabe (Handsymbol).',
+  },
+  extern: {
+    titel: 'Externe Beteiligte',
+    bpmn: 'Pool (Black Box) und Nachrichtenfluss',
+    symbol: 'bahn',
+    text: 'Wer nicht zu eurer Organisation gehört, etwa der Kunde, bekommt einen eigenen Pool. Zwischen Pools gibt es keine Sequenzflüsse, sondern gestrichelte Nachrichtenflüsse: Eine Aufgabe schickt etwas hinüber, ein Ereignis wartet auf die Antwort. Was im Pool des Kunden passiert, bleibt bewusst offen.',
   },
   aufgabe: {
     titel: 'Aufgabe',

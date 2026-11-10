@@ -149,6 +149,9 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
     'exporter="Prozesslotse" exporterVersion="0.1.0">\n'
   x += '  <bpmn:collaboration id="Kollaboration">\n'
   x += `    <bpmn:participant id="Teilnehmer"${attrName(p.name || 'Prozess')} processRef="Prozess" />\n`
+  // Externe Teilnehmer als Pools ohne Inhalt (Black Box); sichtbar sind nur ihre Nachrichten.
+  for (const pl of layout.pools) x += `    <bpmn:participant id="${pl.id}"${attrName(pl.name)} />\n`
+  for (const n of layout.nachrichten) x += `    <bpmn:messageFlow id="${n.id}" sourceRef="${n.von}" targetRef="${n.nach}" />\n`
   x += '  </bpmn:collaboration>\n'
   x += `  <bpmn:process id="Prozess"${attrName(p.name)} isExecutable="false">\n`
   x += doku(prozessDoku, '    ')
@@ -169,6 +172,11 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   x += '      <bpmndi:BPMNShape id="Teilnehmer_di" bpmnElement="Teilnehmer" isHorizontal="true">\n'
   x += bounds(layout.pool, '        ')
   x += '      </bpmndi:BPMNShape>\n'
+  for (const pl of layout.pools) {
+    x += `      <bpmndi:BPMNShape id="${pl.id}_di" bpmnElement="${pl.id}" isHorizontal="true">\n`
+    x += bounds(pl, '        ')
+    x += '      </bpmndi:BPMNShape>\n'
+  }
   for (const b of layout.bahnen) {
     x += `      <bpmndi:BPMNShape id="${bahnId(b.schluessel)}_di" bpmnElement="${bahnId(b.schluessel)}" isHorizontal="true">\n`
     x += bounds(b, '        ')
@@ -185,6 +193,11 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
     x += `      <bpmndi:BPMNEdge id="${k.id}_di" bpmnElement="${k.id}">\n`
     for (const pt of k.punkte) x += `        <di:waypoint x="${zahl(pt.x)}" y="${zahl(pt.y)}" />\n`
     if (k.beschriftung) x += `        <bpmndi:BPMNLabel>\n${bounds(k.beschriftung, '          ')}        </bpmndi:BPMNLabel>\n`
+    x += '      </bpmndi:BPMNEdge>\n'
+  }
+  for (const n of layout.nachrichten) {
+    x += `      <bpmndi:BPMNEdge id="${n.id}_di" bpmnElement="${n.id}">\n`
+    for (const pt of n.punkte) x += `        <di:waypoint x="${zahl(pt.x)}" y="${zahl(pt.y)}" />\n`
     x += '      </bpmndi:BPMNEdge>\n'
   }
   x += '    </bpmndi:BPMNPlane>\n'

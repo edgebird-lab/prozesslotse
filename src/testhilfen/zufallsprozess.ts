@@ -1,5 +1,18 @@
 import { zufallMitStartwert } from '../analyse/simulation'
-import { neueAufgabe, neueEntscheidung, neueOder, neueParallel, neuerOderZweig, neuerProzess, neueRolle, neuerZweig, neuesMedium, neuesWarten, neueWiederholung } from '../modell/bausteine'
+import {
+  neueAufgabe,
+  neueEntscheidung,
+  neueOder,
+  neueParallel,
+  neuerOderZweig,
+  neuerProzess,
+  neueRolle,
+  neuerTeilnehmer,
+  neuerZweig,
+  neuesMedium,
+  neuesWarten,
+  neueWiederholung,
+} from '../modell/bausteine'
 import { durchlaufe, findeBlock, liegtInParallele, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
 import type { Block, Prozess, Sequenz } from '../modell/typen'
 
@@ -15,9 +28,13 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
   const zufall = zufallMitStartwert(startwert)
   const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
   const rollen = [neueRolle('A'), neueRolle('B'), neueRolle('C')]
+  // ein externer Kunde; manche Aufgaben, Wartezeiten und Ereignisse tauschen Nachrichten mit ihm aus
+  const kunde = neuerTeilnehmer('Kunde')
+  const nachricht = () => (zufall() < 0.15 ? kunde.id : null)
   const medien = [neuesMedium('Papier', 'papier'), neuesMedium('ERP', 'erp')]
   let nr = 0
-  const aufgabe = () => neueAufgabe({ name: `Schritt ${++nr} erledigen`, rolleId: wahl(rollen).id, mediumId: wahl(medien).id, bearbeitungMin: 5, liegezeitMin: 10 })
+  const aufgabe = () =>
+    neueAufgabe({ name: `Schritt ${++nr} erledigen`, rolleId: wahl(rollen).id, mediumId: wahl(medien).id, bearbeitungMin: 5, liegezeitMin: 10, nachrichtAn: nachricht(), nachrichtVon: nachricht() })
 
   function sequenz(tiefe: number, inParallel: boolean, mindestens = 0): Block[] {
     const anzahl = Math.max(mindestens, Math.floor(zufall() * 4))
@@ -26,7 +43,7 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
   function block(tiefe: number, inParallel: boolean): Block {
     const r = zufall()
     if (tiefe >= 3 || r < 0.45) return aufgabe()
-    if (r < 0.52) return neuesWarten({ name: 'Warten', dauerMin: 30 })
+    if (r < 0.52) return neuesWarten({ name: 'Warten', dauerMin: 30, art: 'nachricht', von: nachricht() })
     if (r < 0.75) {
       const ereignisse = zufall() < 0.3
       const n = 2 + Math.floor(zufall() * 2)
@@ -34,7 +51,7 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
         neuerZweig(`Fall ${i + 1}`, 1 / n, {
           schritte: sequenz(tiefe + 1, inParallel),
           ende: !inParallel && (frei || i > 0) && zufall() < 0.3 ? `Ende ${i}` : null,
-          ereignis: ereignisse ? { art: zufall() < 0.5 ? 'nachricht' : 'zeit', dauerMin: 60 } : null,
+          ereignis: ereignisse ? (zufall() < 0.5 ? { art: 'nachricht', dauerMin: 60, von: nachricht() } : { art: 'zeit', dauerMin: 60 }) : null,
         }),
       )
       return neueEntscheidung({ frage: 'Welcher Fall?', art: ereignisse ? 'ereignis' : 'daten', zweige })
@@ -44,8 +61,9 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
       par.zweige = par.zweige.map((z: Sequenz) => ({ ...z, schritte: sequenz(tiefe + 1, true, 1) }))
       return par
     }
-    if (r < 0.92) {
-      // ODER: zwei bis drei Wege mit eigenen Anteilen; entweder ein Standardweg oder ein Weg, der immer läuft
+    if (r < 0.92 && tiefe <= 1) {
+      // ODER: zwei bis drei Wege mit eigenen Anteilen; entweder ein Standardweg oder ein Weg, der immer läuft.
+      // Nur in den oberen Ebenen: Jede ODER-Verzweigung vervielfacht die Zustände des Tokenspiels.
       const n = 2 + Math.floor(zufall() * 2)
       const zweige = Array.from({ length: n }, (_, i) => neuerOderZweig(`Weg ${i + 1}`, 0.2 + 0.6 * zufall(), { schritte: sequenz(tiefe + 1, true, 1) }))
       if (zufall() < 0.5) {
@@ -58,7 +76,14 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
     return neueWiederholung({ frage: 'Nochmal?', koerper: { id: `k${++nr}`, schritte: sequenz(tiefe + 1, inParallel, 1) } })
   }
 
-  let p = neuerProzess({ name: `Zufall ${startwert}`, rollen, medien, ablauf: { id: 'haupt', schritte: sequenz(0, false, 1) } })
+  let p = neuerProzess({
+    name: `Zufall ${startwert}`,
+    rollen,
+    medien,
+    teilnehmer: [kunde],
+    ausloeser: { art: 'nachricht', text: 'Anfrage kommt an', von: kunde.id },
+    ablauf: { id: 'haupt', schritte: sequenz(0, false, 1) },
+  })
 
   // Rücksprünge wie in der Oberfläche setzen: nie im ersten Ausgang (der führt weiter), nie aus „Gleichzeitig“ heraus
   const kandidaten: string[] = []

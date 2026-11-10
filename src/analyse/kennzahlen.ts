@@ -19,10 +19,10 @@
  *    Die Flusseffizienz ist TCT / CT (Dumas u. a.): dieselben Regeln, einmal
  *    nur mit Bearbeitungszeiten (TCT) und einmal mit allen Zeiten (CT).
  */
-import { durchlaufe, oderWahrscheinlichkeiten } from '../modell/operationen'
+import { durchlaufe, nachrichtenVerweise, oderWahrscheinlichkeiten } from '../modell/operationen'
 import { erwartungMaximum, erwartungOder } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
-import type { Aufgabe, Block, Id, Prozess, Rolle } from '../modell/typen'
+import type { Aufgabe, Block, Id, Prozess, Rolle, Teilnehmer } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
 // Ergebnis
@@ -54,6 +54,12 @@ export interface RollenKennzahl {
   wartefaktor: number
   /** Auslastung, ab der eine Rolle als Engpass gilt (Wartefaktor erreicht WARTEFAKTOR_SCHWELLE); hängt von der Teamgröße ab. */
   engpassSchwelle: number
+}
+
+/** Erwartete Nachrichten mit einem externen Teilnehmer je Vorgang (beide Richtungen). */
+export interface KontaktKennzahl {
+  teilnehmer: Teilnehmer
+  anzahl: number
 }
 
 export interface Ende {
@@ -95,6 +101,8 @@ export interface Kennzahlen {
   arbeitOhneRolleMin: number
   /** Je Wiederholung und Rücksprungbereich: Wahrscheinlichkeit pro Durchlauf, dass wiederholt wird. */
   wiederholAnteil: Map<Id, number>
+  /** Nachrichten mit externen Teilnehmern (Kunde, Lieferant) je Vorgang */
+  kontakte: KontaktKennzahl[]
 }
 
 // ---------------------------------------------------------------------------
@@ -193,11 +201,14 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
       return { aus: { anteil: f.anteil, letzte: new Map([[b.id, f.anteil]]) }, rueck: new Map() }
     }
     case 'warten':
+      plus(z.haeufigkeit, b.id, f.anteil)
       return { aus: f, rueck: new Map() }
     case 'entscheidung': {
       const aus = leererFluss()
       const rueck = new Map<Id, Fluss>()
       for (const zweig of b.zweige) {
+        // Bei einer Ereignis-Entscheidung tritt das Ereignis des Ausgangs so oft ein, wie der Ausgang genommen wird.
+        if (b.art === 'ereignis') plus(z.haeufigkeit, zweig.id, f.anteil * zweig.anteil)
         const o = flussSequenz(zweig.schritte, skaliere(f, zweig.anteil), z, ctx)
         addiereRueck(rueck, o.rueck)
         if (zweig.ende !== null) plus(z.enden, zweig.ende, o.aus.anteil)
@@ -425,7 +436,7 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ === 'warten') {
       const beitrag = dauer.beitraege.get(block.id) ?? { warten: 0, arbeit: 0 }
-      schritte.set(block.id, { id: block.id, haeufigkeit: 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
+      schritte.set(block.id, { id: block.id, haeufigkeit: z.haeufigkeit.get(block.id) ?? 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
     } else if (block.typ === 'entscheidung' && block.art === 'ereignis') {
       // Wartezeit bis zum Ereignis eines Ausgangs, unter der Kennung des Ausgangs
       for (const zweig of block.zweige) {
@@ -461,8 +472,15 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   const enden: Ende[] = [{ ergebnis: p.ergebnis || 'Ende', anteil: ende.anteil, regulaer: true }]
   for (const [ergebnis, anteil] of z.enden) enden.push({ ergebnis, anteil, regulaer: false })
 
+  const verweise = nachrichtenVerweise(p)
+  const kontakte: KontaktKennzahl[] = (p.teilnehmer ?? []).map((t) => ({
+    teilnehmer: t,
+    anzahl: verweise.filter((v) => v.teilnehmerId === t.id).reduce((s, v) => s + (v.ort === 'start' ? 1 : (z.haeufigkeit.get(v.ort) ?? 0)), 0),
+  }))
+
   const minutenProTag = p.arbeitsstundenProTag * 60
   return {
+    kontakte,
     durchlaufzeitMin: dauer.gesamt,
     kritischeArbeitMin: dauer.arbeit,
     flusseffizienz: dauer.gesamt > 0 ? dauer.arbeit / dauer.gesamt : 0,

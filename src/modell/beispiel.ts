@@ -39,7 +39,7 @@ export function beispielLieferdienst(): Prozess {
     name: 'Bestellung bis Rechnung (Lieferdienst)',
     beschreibung:
       'Ein regionaler Lieferdienst nimmt Bestellungen telefonisch an, liefert am Folgetag aus und stellt danach die Rechnung.',
-    ausloeser: { art: 'nachricht', text: 'Kunde bestellt telefonisch' },
+    ausloeser: { art: 'nachricht', text: 'Kunde bestellt telefonisch', von: 'tln_kunde' },
     ergebnis: 'Ware zugestellt und berechnet',
     vorgaengeProTag: 120,
     arbeitsstundenProTag: 8,
@@ -57,6 +57,7 @@ export function beispielLieferdienst(): Prozess {
       { id: 'med_excel', name: 'Excel-Tourenliste', art: 'tabelle' },
       { id: 'med_erp', name: 'Warenwirtschaft', art: 'erp' },
     ],
+    teilnehmer: [{ id: 'tln_kunde', name: 'Kunde' }],
     ablauf: {
       id: 'haupt',
       schritte: [
@@ -116,8 +117,8 @@ export function beispielLieferdienst(): Prozess {
           zweige: [
             zweig('zw_angetroffen_ja', 'Ja', 0.9, [aufgabe('auf_quittieren', 'Empfang quittieren lassen', 'rol_fahrer', 'med_papier', 2, 0)]),
             zweig('zw_angetroffen_nein', 'Nein', 0.1, [
-              aufgabe('auf_benachrichtigen', 'Benachrichtigung hinterlassen', 'rol_fahrer', 'med_papier', 1, 0),
-              { typ: 'warten', id: 'wrt_termin', name: 'Neuen Liefertermin abwarten', art: 'nachricht', dauerMin: TAG },
+              aufgabe('auf_benachrichtigen', 'Benachrichtigung hinterlassen', 'rol_fahrer', 'med_papier', 1, 0, { nachrichtAn: 'tln_kunde' }),
+              { typ: 'warten', id: 'wrt_termin', name: 'Neuen Liefertermin abwarten', art: 'nachricht', dauerMin: TAG, von: 'tln_kunde' },
               aufgabe('auf_erneut', 'Ware erneut zustellen', 'rol_fahrer', 'med_papier', 12, 2 * STD),
             ]),
           ],
@@ -128,7 +129,7 @@ export function beispielLieferdienst(): Prozess {
         }),
         aufgabe('auf_rechnung', 'Rechnung erstellen', 'rol_buchhaltung', 'med_erp', 1.5, TAG),
         aufgabe('auf_freigeben', 'Rechnung freigeben', 'rol_leitung', 'med_erp', 1, 2 * TAG, { art: 'freigabe', freigabeQuote: 0.98 }),
-        aufgabe('auf_versenden', 'Rechnung versenden', 'rol_buchhaltung', 'med_erp', 0.5, STD),
+        aufgabe('auf_versenden', 'Rechnung versenden', 'rol_buchhaltung', 'med_erp', 0.5, STD, { nachrichtAn: 'tln_kunde' }),
       ],
     },
   }
@@ -150,7 +151,7 @@ export function beispielOnlinebestellung(): Prozess {
     id: 'pro_onlinebestellung',
     name: 'Onlinebestellung bis Versand',
     beschreibung: 'Ein Onlineshop übernimmt Bestellungen ins ERP. Bei fehlerhaften Daten wird der Kunde gefragt; er berichtigt oder storniert.',
-    ausloeser: { art: 'nachricht', text: 'Bestellung im Shop eingegangen' },
+    ausloeser: { art: 'nachricht', text: 'Bestellung im Shop eingegangen', von: 'tln_kunde' },
     ergebnis: 'Ware versendet',
     vorgaengeProTag: 200,
     arbeitsstundenProTag: 8,
@@ -165,6 +166,7 @@ export function beispielOnlinebestellung(): Prozess {
       { id: 'med_email', name: 'E-Mail', art: 'email' },
       { id: 'med_papier', name: 'Papier', art: 'papier' },
     ],
+    teilnehmer: [{ id: 'tln_kunde', name: 'Kunde' }],
     ablauf: {
       id: 'haupt',
       schritte: [
@@ -189,17 +191,17 @@ export function beispielOnlinebestellung(): Prozess {
                 zweige: [
                   zweig('zw_daten_ja', 'Ja', 0.88, []),
                   zweig('zw_daten_nein', 'Nein', 0.12, [
-                    aufgabe('auf_nachfragen', 'Kunden um Korrektur bitten', 'rol_service', 'med_email', 4, 0),
+                    aufgabe('auf_nachfragen', 'Kunden um Korrektur bitten', 'rol_service', 'med_email', 4, 0, { nachrichtAn: 'tln_kunde' }),
                     {
                       typ: 'entscheidung',
                       id: 'ent_antwort',
                       art: 'ereignis',
                       frage: 'Antwort des Kunden?',
                       zweige: [
-                        zweig('zw_korrektur', 'Korrektur erhalten', 0.7, [], { zurueckZu: 'rsp_daten', ereignis: { art: 'nachricht', dauerMin: TAG } }),
+                        zweig('zw_korrektur', 'Korrektur erhalten', 0.7, [], { zurueckZu: 'rsp_daten', ereignis: { art: 'nachricht', dauerMin: TAG, von: 'tln_kunde' } }),
                         zweig('zw_storno', 'Stornierung erhalten', 0.2, [aufgabe('auf_storno', 'Bestellung stornieren', 'rol_service', 'med_erp', 2, 0)], {
                           ende: 'Bestellung storniert',
-                          ereignis: { art: 'nachricht', dauerMin: TAG },
+                          ereignis: { art: 'nachricht', dauerMin: TAG, von: 'tln_kunde' },
                         }),
                         zweig('zw_frist', '7 Tage ohne Antwort', 0.1, [aufgabe('auf_verfall', 'Bestellung verfallen lassen', 'rol_service', 'med_erp', 2, 0)], {
                           ende: 'Bestellung verfallen',
@@ -227,7 +229,7 @@ export function beispielOnlinebestellung(): Prozess {
             },
           ],
         },
-        aufgabe('auf_versenden', 'Ware versenden', 'rol_lager', 'med_erp', 3, 4 * STD),
+        aufgabe('auf_versenden', 'Ware versenden', 'rol_lager', 'med_erp', 3, 4 * STD, { nachrichtAn: 'tln_kunde' }),
       ],
     },
   }

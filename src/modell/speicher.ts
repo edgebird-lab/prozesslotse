@@ -36,6 +36,7 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       fordere(x.art === 'normal' || x.art === 'pruefung' || x.art === 'freigabe', `${wo}: unbekannte Aufgabenart.`)
       fordere(istZahl(x.freigabeQuote), `${wo}: Freigabequote fehlt.`)
       fordere(x.uebertragung === null || (istObj(x.uebertragung) && istZahl(x.uebertragung.minuten)), `${wo}: Übertragung ungültig.`)
+      fordere(istVerweis(x.nachrichtAn) && istVerweis(x.nachrichtVon), `${wo}: Nachrichtenverweis ungültig.`)
       return
     case 'entscheidung':
       fordere(istText(x.frage) && Array.isArray(x.zweige) && (x.art === 'daten' || x.art === 'ereignis'), `${wo}: Entscheidung unvollständig.`)
@@ -68,18 +69,23 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       pruefeSequenz(x.koerper, `${wo}, Körper`)
       return
     case 'warten':
-      fordere(istText(x.name) && istZahl(x.dauerMin) && (x.art === 'zeit' || x.art === 'nachricht'), `${wo}: Warten unvollständig.`)
+      fordere(istText(x.name) && istZahl(x.dauerMin) && (x.art === 'zeit' || x.art === 'nachricht') && istVerweis(x.von), `${wo}: Warten unvollständig.`)
       return
     default:
       throw new Formatfehler(`${wo}: unbekannter Baustein „${String(x.typ)}“.`)
   }
 }
 
+const istVerweis = (x: unknown) => x === undefined || x === null || istText(x)
+
 function pruefeProzess(x: unknown, wo: string): asserts x is Prozess {
   fordere(istObj(x), `${wo} fehlt.`)
+  // externe Teilnehmer gibt es seit Format 3; ältere Stände haben keine
+  x.teilnehmer ??= []
+  fordere(Array.isArray(x.teilnehmer) && x.teilnehmer.every((t) => istObj(t) && istText(t.id) && istText(t.name)), `${wo}: externe Teilnehmer ungültig.`)
   fordere(x.formatVersion === FORMAT_VERSION, `${wo}: Dateiformat ${String(x.formatVersion)} wird nicht unterstützt.`)
   fordere(istText(x.name) && istText(x.ergebnis) && istZahl(x.vorgaengeProTag) && istZahl(x.arbeitsstundenProTag), `${wo}: Grunddaten fehlen.`)
-  fordere(istObj(x.ausloeser) && istText(x.ausloeser.text), `${wo}: Auslöser fehlt.`)
+  fordere(istObj(x.ausloeser) && istText(x.ausloeser.text) && istVerweis(x.ausloeser.von), `${wo}: Auslöser fehlt.`)
   fordere(Array.isArray(x.rollen) && x.rollen.every((r) => istObj(r) && istText(r.id) && istText(r.name) && istZahl(r.stundensatz) && istZahl(r.personen) && istZahl(r.verfuegbarProzent)), `${wo}: Rollen ungültig.`)
   fordere(Array.isArray(x.medien) && x.medien.every((m) => istObj(m) && istText(m.id) && istText(m.name) && istText(m.art)), `${wo}: Systeme ungültig.`)
   pruefeSequenz(x.ablauf, `${wo}, Ablauf`)

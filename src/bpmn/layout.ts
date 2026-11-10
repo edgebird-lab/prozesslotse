@@ -57,6 +57,10 @@ export interface LayoutKnoten extends Rechteck {
   aufgabe?: Aufgabe
   ereignis?: 'nachricht' | 'zeit' | 'bedingung' | null
   beschriftung?: Rechteck
+  /** Nachricht an diesen externen Teilnehmer */
+  an?: Id | null
+  /** Nachricht von diesem externen Teilnehmer */
+  von?: Id | null
 }
 
 interface Spur {
@@ -95,11 +99,29 @@ export interface LayoutBahn extends Rechteck {
   rolleId: Id | null
 }
 
+/** Pool eines externen Teilnehmers (ohne Inhalt): abwechselnd über und unter dem Hauptpool. */
+export interface LayoutPool extends Rechteck {
+  id: string
+  teilnehmerId: Id
+  name: string
+  lage: 'oben' | 'unten'
+}
+
+/** Nachrichtenfluss zwischen einem Element des Prozesses und einem externen Pool. */
+export interface LayoutNachricht {
+  id: string
+  von: string
+  nach: string
+  punkte: Punkt[]
+}
+
 export interface Layout {
   knoten: LayoutKnoten[]
   kanten: LayoutKante[]
   bahnen: LayoutBahn[]
   pool: Rechteck
+  pools: LayoutPool[]
+  nachrichten: LayoutNachricht[]
 }
 
 /** Macht aus einer Kennung einen gültigen XML-Namen. */
@@ -243,7 +265,7 @@ function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
       const eigeneBahn = bahnVon(ctx, b.rolleId)
       const t = neuerTeil(eigeneBahn)
       const id = xmlId(b.id)
-      t.knoten.push(knoten({ id, art: 'aufgabe', name: b.name, blockId: b.id, bahn: eigeneBahn, spalte: 0, spur: 0, aufgabe: b }))
+      t.knoten.push(knoten({ id, art: 'aufgabe', name: b.name, blockId: b.id, bahn: eigeneBahn, spalte: 0, spur: 0, aufgabe: b, an: b.nachrichtAn ?? null, von: b.nachrichtVon ?? null }))
       belege(t, eigeneBahn, 1)
       t.breite = 1
       t.eintritt = id
@@ -253,7 +275,7 @@ function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
     case 'warten': {
       const t = neuerTeil(bahn)
       const id = xmlId(b.id)
-      t.knoten.push(knoten({ id, art: 'warten', name: b.name, blockId: b.id, bahn, spalte: 0, spur: 0, ereignis: b.art }))
+      t.knoten.push(knoten({ id, art: 'warten', name: b.name, blockId: b.id, bahn, spalte: 0, spur: 0, ereignis: b.art, von: b.art === 'nachricht' ? (b.von ?? null) : null }))
       belege(t, bahn, 1)
       t.breite = 1
       t.eintritt = id
@@ -305,7 +327,8 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
       // Jeder Ausgang einer Ereignis-Entscheidung beginnt mit seinem Ereignis.
       const ereignisId = xmlId(`${z.id}_ereignis`)
       const mitEreignis = neuerTeil(bahn)
-      mitEreignis.knoten.push(knoten({ id: ereignisId, art: 'warten', name: ez.bezeichnung, blockId: b.id, bahn, spalte: 0, spur: 0, ereignis: ez.ereignis?.art ?? 'nachricht' }))
+      const art = ez.ereignis?.art ?? 'nachricht'
+      mitEreignis.knoten.push(knoten({ id: ereignisId, art: 'warten', name: ez.bezeichnung, blockId: b.id, bahn, spalte: 0, spur: 0, ereignis: art, von: art === 'nachricht' ? (ez.ereignis?.von ?? null) : null }))
       belege(mitEreignis, bahn, 1)
       verschiebe(teil, 1, new Map())
       uebernimm(mitEreignis, teil)
@@ -473,7 +496,7 @@ export function berechneLayout(p: Prozess): Layout {
   verschiebe(haupt, 1, new Map())
   const t = neuerTeil(ersteBahn)
   const startEreignis = p.ausloeser.art === 'manuell' ? null : p.ausloeser.art
-  t.knoten.push(knoten({ id: 'Start', art: 'start', name: p.ausloeser.text, blockId: null, bahn: ersteBahn, spalte: 0, spur: 0, ereignis: startEreignis }))
+  t.knoten.push(knoten({ id: 'Start', art: 'start', name: p.ausloeser.text, blockId: null, bahn: ersteBahn, spalte: 0, spur: 0, ereignis: startEreignis, von: p.ausloeser.art === 'nachricht' ? (p.ausloeser.von ?? null) : null }))
   belege(t, ersteBahn, 1)
   uebernimm(t, haupt)
   if (haupt.eintritt === null) {
@@ -552,7 +575,62 @@ export function berechneLayout(p: Prozess): Layout {
     if (e.name) e.beschriftung = beschriftungFuer(e, a, e.ueber ? spurMitte(e.ueber) : null)
   }
 
-  return { knoten: t.knoten, kanten: t.kanten, bahnen, pool }
+  const pools = externePools(p, pool)
+  return { knoten: t.knoten, kanten: t.kanten, bahnen, pool, pools, nachrichten: nachrichtenfluesse(t.knoten, pools) }
+}
+
+const POOL_HOEHE = 60
+const POOL_ABSTAND = 40
+
+/** Externe Teilnehmer abwechselnd über und unter dem Hauptpool, damit sich Nachrichtenflüsse selten kreuzen. */
+function externePools(p: Prozess, haupt: Rechteck): LayoutPool[] {
+  const pools: LayoutPool[] = []
+  let oben = haupt.y
+  let unten = haupt.y + haupt.hoehe
+  ;(p.teilnehmer ?? []).forEach((tn, i) => {
+    const lage = i % 2 === 0 ? 'oben' : 'unten'
+    const y = lage === 'oben' ? (oben -= POOL_ABSTAND + POOL_HOEHE) : unten + POOL_ABSTAND
+    if (lage === 'unten') unten += POOL_ABSTAND + POOL_HOEHE
+    pools.push({ id: xmlId(`Pool_${tn.id}`), teilnehmerId: tn.id, name: tn.name || 'Extern', lage, x: haupt.x, y, breite: haupt.breite, hoehe: POOL_HOEHE })
+  })
+  return pools
+}
+
+/**
+ * Nachrichtenflüsse: vom Element ein kurzes Stück zum Pool hin, dann waagerecht
+ * in die Spaltenlücke (ausgehend rechts, eingehend links) und dort senkrecht zum
+ * Pool. In Spaltenlücken stehen nie Knoten, deshalb kreuzt die Linie keinen.
+ */
+function nachrichtenfluesse(knotenListe: LayoutKnoten[], pools: LayoutPool[]): LayoutNachricht[] {
+  const liste: LayoutNachricht[] = []
+  for (const k of knotenListe) {
+    const beide = !!k.an && !!k.von
+    for (const richtung of ['von', 'an'] as const) {
+      const tn = richtung === 'an' ? k.an : k.von
+      const pl = tn ? pools.find((x) => x.teilnehmerId === tn) : undefined
+      if (!pl) continue
+      const m = mitte(k)
+      const x = beide ? m.x + (richtung === 'an' ? 15 : -15) : m.x
+      const oben = pl.lage === 'oben'
+      const rand = oben ? k.y : k.y + k.hoehe
+      const stummel = oben ? rand - 8 : rand + 8
+      const lueckeX = m.x + (richtung === 'an' ? MASSE.spalte / 2 : -MASSE.spalte / 2)
+      const poolRand = oben ? pl.y + pl.hoehe : pl.y
+      const weg: Punkt[] = [
+        { x, y: rand },
+        { x, y: stummel },
+        { x: lueckeX, y: stummel },
+        { x: lueckeX, y: poolRand },
+      ]
+      liste.push({
+        id: `Nachricht_${liste.length + 1}`,
+        von: richtung === 'an' ? k.id : pl.id,
+        nach: richtung === 'an' ? pl.id : k.id,
+        punkte: richtung === 'an' ? weg : weg.reverse(),
+      })
+    }
+  }
+  return liste
 }
 
 function mitte(r: Rechteck): Punkt {

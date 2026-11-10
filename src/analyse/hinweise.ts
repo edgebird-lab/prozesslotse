@@ -15,6 +15,8 @@ export const LIEGEZEIT_SCHWELLE = 0.2
 export const FLUSSEFFIZIENZ_SCHWELLE = 0.1
 export const NACHARBEIT_SCHWELLE = 0.1
 export const FREIGABE_SCHWELLE = 0.9
+/** Ab so vielen Nachrichten mit einem externen Teilnehmer je Vorgang lohnt der Blick auf Kontaktreduktion. */
+export const KONTAKT_SCHWELLE = 3
 const PINGPONG_SCHWELLE = 0.05
 
 function personenText(n: number, dativ = false): string {
@@ -206,6 +208,18 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           blockId: id,
         })
       }
+    }
+  }
+
+  for (const kt of k.kontakte) {
+    if (kt.anzahl > KONTAKT_SCHWELLE) {
+      add({
+        schluessel: `kontakte:${kt.teilnehmer.id}`,
+        schwere: 'hinweis',
+        titel: `Viele Kontakte mit „${kt.teilnehmer.name || 'extern'}“`,
+        text: `Je Vorgang gehen im Schnitt ${formatiereZahl(kt.anzahl, 1)} Nachrichten zwischen euch und „${kt.teilnehmer.name || 'extern'}“ hin und her. Jeder Kontakt kostet Zeit und birgt Missverständnisse: Lassen sich Rückfragen bündeln oder vorher vermeiden?`,
+        quelle: 'Kontaktreduktion (Reijers & Limam Mansar 2005)',
+      })
     }
   }
 

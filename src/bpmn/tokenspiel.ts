@@ -290,11 +290,26 @@ function durchsuche(g: TokenGraph, maxZustaende: number, reduziert: boolean): So
 
 /** Zufällige Abläufe; an Verzweigungen nach `anteil` (Fluss → Wahrscheinlichkeit), sonst gleich verteilt. */
 export function zaehleAusfuehrungen(g: TokenGraph, anteil: Map<string, number>, laeufe: number, zufall: () => number): Map<string, number> {
+  return new Map([...zaehleMitFehler(g, anteil, laeufe, zufall)].map(([id, x]) => [id, x.mittel]))
+}
+
+export interface Zaehlung {
+  /** mittlere Zahl der Ausführungen je Vorgang */
+  mittel: number
+  /** Standardfehler dieses Mittelwerts */
+  fehler: number
+}
+
+/** Wie `zaehleAusfuehrungen`, dazu der Standardfehler je Aktivität (für Tests mit statistischer Toleranz). */
+export function zaehleMitFehler(g: TokenGraph, anteil: Map<string, number>, laeufe: number, zufall: () => number): Map<string, Zaehlung> {
   const knotenNachId = new Map(g.knoten.map((k) => [k.id, k]))
   const summe = new Map<string, number>()
+  const quadrate = new Map<string, number>()
+  const ergebnis = new Map<string, Zaehlung>()
   const start = g.knoten.find((k) => k.typ === 'start')
-  if (!start) return summe
+  if (!start) return ergebnis
   for (let l = 0; l < laeufe; l++) {
+    const lauf = new Map<string, number>()
     let m: Markierung = new Map(start.raus.map((f) => [f, 1]))
     for (let schritt = 0; m.size > 0 && schritt < 100_000; schritt++) {
       // eine bereite Stelle schalten; parallele Zusammenführungen erst, wenn alle Marken da sind
@@ -330,7 +345,7 @@ export function zaehleAusfuehrungen(g: TokenGraph, anteil: Map<string, number>, 
           }
           m = mit(m, [f], k.raus.length > 0 ? [wahl] : [])
         } else {
-          if (k.typ === 'aktivitaet') summe.set(k.id, (summe.get(k.id) ?? 0) + 1)
+          if (k.typ === 'aktivitaet') lauf.set(k.id, (lauf.get(k.id) ?? 0) + 1)
           m = mit(m, [f], k.typ === 'ende' ? [] : k.raus)
         }
         geschaltet = true
@@ -338,6 +353,15 @@ export function zaehleAusfuehrungen(g: TokenGraph, anteil: Map<string, number>, 
       }
       if (!geschaltet) break // Verklemmung; zeigt die Soundness-Prüfung
     }
+    for (const [id, n] of lauf) {
+      summe.set(id, (summe.get(id) ?? 0) + n)
+      quadrate.set(id, (quadrate.get(id) ?? 0) + n * n)
+    }
   }
-  return new Map([...summe].map(([id, n]) => [id, n / laeufe]))
+  for (const [id, s] of summe) {
+    const mittel = s / laeufe
+    const varianz = Math.max(0, (quadrate.get(id)! / laeufe - mittel * mittel) * (laeufe / Math.max(1, laeufe - 1)))
+    ergebnis.set(id, { mittel, fehler: Math.sqrt(varianz / laeufe) })
+  }
+  return ergebnis
 }

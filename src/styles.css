@@ -1734,3 +1734,17 @@ fieldset {
     object-fit: contain;
   }
 }
+
+/* Externe Beteiligte */
+.teilnehmer-liste {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.teilnehmer-liste input {
+  flex: 1;
+  max-width: 320px;
+}
