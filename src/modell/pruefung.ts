@@ -3,7 +3,7 @@
  * und Benennung nach den Seven Process Modeling Guidelines (7PMG,
  * Mendling, Reijers, van der Aalst 2010).
  */
-import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, kannWeiterlaufen, liegtInParallele } from './operationen'
+import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, istNebenlaeufig, kannWeiterlaufen, liegtInParallele, oderWahrscheinlichkeiten } from './operationen'
 import type { Block, Id, Prozess } from './typen'
 
 export type Schwere = 'fehler' | 'warnung' | 'hinweis'
@@ -128,7 +128,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
             add({ schluessel: `bezeichnung:${z.id}`, schwere: 'warnung', titel: 'Ausgang ohne Bezeichnung', text: `Ausgang ${i + 1} von „${blockTitel(b)}“ braucht eine Antwort, z. B. „Ja“ oder „Nein“.`, blockId: b.id })
           }
           if (z.ende !== null && liegtInParallele([...vorfahren, b])) {
-            add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
+            add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“ oder einer ODER-Verzweigung. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
           }
           if ((z.ende !== null || z.zurueckZu !== null) && z.schritte.length > 0 && !ausgaengeSequenz(z.schritte).has('weiter')) {
             add({
@@ -147,8 +147,8 @@ export function pruefeProzess(p: Prozess): Befund[] {
             const t = vorfahren.findIndex((v) => v.id === z.zurueckZu && v.typ === 'wiederholung' && v.modus === 'ruecksprung')
             if (t < 0) {
               add({ schluessel: `rueckziel:${z.id}`, schwere: 'fehler', titel: 'Rücksprung ins Leere', text: `Der Ausgang „${z.bezeichnung}“ springt zu einem Schritt zurück, der nicht vor dieser Entscheidung liegt.`, blockId: b.id })
-            } else if (vorfahren.slice(t + 1).some((v) => v.typ === 'parallel')) {
-              add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ springt aus „Gleichzeitig“ heraus zurück. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
+            } else if (vorfahren.slice(t + 1).some(istNebenlaeufig)) {
+              add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ springt aus „Gleichzeitig“ oder einer ODER-Verzweigung heraus zurück. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
             }
           }
           if (b.art === 'ereignis') {
@@ -169,6 +169,58 @@ export function pruefeProzess(p: Prozess): Befund[] {
             text: `Die Ausgänge ${ohneUnterschied.map((z, i) => `„${z.bezeichnung || i + 1}“`).join(' und ')} von „${blockTitel(b)}“ führen ohne eigene Schritte weiter. Für den Ablauf macht die Antwort dann keinen Unterschied: Ausgänge zusammenfassen oder die fehlenden Schritte ergänzen.`,
             blockId: b.id,
           })
+        }
+        pruefeSequenzen(b.zweige.map((z) => z.schritte))
+        break
+      }
+      case 'oder': {
+        const titel = blockTitel(b)
+        if (!b.frage.trim()) {
+          add({ schluessel: `frage:${b.id}`, schwere: 'warnung', titel: 'ODER-Verzweigung ohne Frage', text: 'Worum geht es, z. B. „Welche Unterlagen fehlen?“', blockId: b.id })
+        }
+        if (b.zweige.length < 2) {
+          add({ schluessel: `zweige:${b.id}`, schwere: 'fehler', titel: 'Zu wenige Wege', text: `„${titel}“ braucht mindestens zwei Wege.`, blockId: b.id })
+        }
+        if (b.standard !== null && !b.zweige.some((z) => z.id === b.standard)) {
+          add({ schluessel: `standard:${b.id}`, schwere: 'fehler', titel: 'Weg „wenn keiner zutrifft“ fehlt', text: `Der Weg für den Fall, dass keiner zutrifft, gehört nicht mehr zu „${titel}“.`, blockId: b.id })
+        }
+        const andere = b.zweige.filter((z) => z.id !== b.standard)
+        andere.forEach((z, i) => {
+          if (z.anteil < 0 || z.anteil > 1) {
+            add({ schluessel: `anteil:${z.id}`, schwere: 'fehler', titel: 'Anteil ungültig', text: `Weg ${i + 1} von „${titel}“ hat einen Anteil außerhalb von 0 bis 100 %.`, blockId: b.id })
+          }
+          if (!z.bezeichnung.trim()) {
+            add({ schluessel: `bezeichnung:${z.id}`, schwere: 'warnung', titel: 'Weg ohne Bezeichnung', text: `Weg ${i + 1} von „${titel}“ braucht eine Bezeichnung, z. B. „Gutachten fehlt“.`, blockId: b.id })
+          }
+          if (z.schritte.length === 0) {
+            add({ schluessel: `leer:${z.id}`, schwere: 'warnung', titel: 'Weg ohne Schritte', text: `Im Weg „${z.bezeichnung || i + 1}“ von „${titel}“ passiert nichts. Schritte ergänzen oder den Weg entfernen.`, blockId: b.id })
+          }
+        })
+        const wahrscheinlich = oderWahrscheinlichkeiten(b)
+        const keiner = andere.reduce((q, z) => q * (1 - Math.min(1, Math.max(0, z.anteil))), 1)
+        if (b.standard === null && keiner > TOLERANZ) {
+          add({
+            schluessel: `keiner:${b.id}`,
+            schwere: 'fehler',
+            titel: 'Manchmal trifft kein Weg zu',
+            text: `Bei „${titel}“ trifft in ${Math.round(keiner * 1000) / 10} % der Fälle keiner der Wege zu. Einen Weg „wenn keiner zutrifft“ festlegen oder die Anteile prüfen.`,
+            blockId: b.id,
+          })
+        }
+        if (andere.length >= 2 && andere.every((z) => z.anteil >= 1 - TOLERANZ)) {
+          add({ schluessel: `immer-alle:${b.id}`, schwere: 'hinweis', titel: 'Alle Wege laufen immer', text: `Bei „${titel}“ laufen alle Wege in jedem Fall. Das ist „Mehreres gleichzeitig“.`, blockId: b.id })
+        } else if (b.standard === null && andere.length >= 2 && Math.abs(andere.reduce((s, z) => s + z.anteil, 0) - 1) < TOLERANZ) {
+          // Typischer Bedienfehler: Anteile wie bei einer Entscheidung auf 100 % verteilt
+          add({
+            schluessel: `wie-entweder:${b.id}`,
+            schwere: 'hinweis',
+            titel: 'Schließen sich die Wege aus?',
+            text: `Die Anteile von „${titel}“ ergeben zusammen genau 100 %. Kommt immer nur einer der Wege vor, ist es eine Entscheidung (Entweder-oder). Bei ODER gibt jeder Anteil an, wie oft dieser Weg vorkommt, unabhängig von den anderen.`,
+            blockId: b.id,
+          })
+        }
+        if (b.standard !== null && wahrscheinlich[b.zweige.findIndex((z) => z.id === b.standard)] < TOLERANZ && b.zweige.some((z) => z.id === b.standard)) {
+          add({ schluessel: `standard-nie:${b.id}`, schwere: 'hinweis', titel: 'Weg „wenn keiner zutrifft“ kommt nie vor', text: `Bei „${titel}“ trifft immer mindestens ein anderer Weg zu; der Weg für „keiner“ wird nie genommen.`, blockId: b.id })
         }
         pruefeSequenzen(b.zweige.map((z) => z.schritte))
         break

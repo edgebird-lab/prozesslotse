@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useBestaetigen } from '../frage'
-import { neueAufgabe, neueEntscheidung, neueParallel, neuesWarten, neueWiederholung } from '../../modell/bausteine'
+import { neueAufgabe, neueEntscheidung, neueOder, neueParallel, neuesWarten, neueWiederholung } from '../../modell/bausteine'
 import { abschnittFertig, beschreibeCursor, cursorNachEinfuegen } from '../../modell/fuehrung'
 import {
   aendereBlock,
@@ -35,6 +35,7 @@ import { BlockFormular, ZweckWahl, type Danach } from './BlockFormulare'
 const WAHL: { typ: BlockTyp; text: string; beschreibung: string; symbol: SymbolArt }[] = [
   { typ: 'aufgabe', text: 'Eine Aufgabe', beschreibung: 'Jemand erledigt etwas', symbol: 'aufgabe' },
   { typ: 'entscheidung', text: 'Eine Entscheidung', beschreibung: 'Je nach Fall geht es anders weiter', symbol: 'xor' },
+  { typ: 'oder', text: 'Mehrere Wege möglich', beschreibung: 'einer, mehrere oder alle, je nach Fall', symbol: 'oder' },
   { typ: 'parallel', text: 'Mehreres gleichzeitig', beschreibung: 'Zweige laufen parallel', symbol: 'und' },
   { typ: 'wiederholung', text: 'Etwas wird wiederholt', beschreibung: 'z. B. Nacharbeit nach einer Prüfung', symbol: 'wiederholung' },
   { typ: 'warten', text: 'Warten', beschreibung: 'auf einen Termin oder eine Nachricht', symbol: 'warten-zeit' },
@@ -43,6 +44,7 @@ const WAHL: { typ: BlockTyp; text: string; beschreibung: string; symbol: SymbolA
 const TYPNAME: Record<BlockTyp, string> = {
   aufgabe: 'Aufgabe',
   entscheidung: 'Entscheidung',
+  oder: 'ODER-Verzweigung',
   parallel: 'Gleichzeitig',
   wiederholung: 'Wiederholung',
   warten: 'Warten',
@@ -85,6 +87,8 @@ function neuerEntwurf(typ: BlockTyp, p: Prozess, vorgaenger: Block | null): Bloc
       return neueEntscheidung()
     case 'parallel':
       return neueParallel(2)
+    case 'oder':
+      return neueOder()
     case 'wiederholung':
       return neueWiederholung()
     case 'warten':
@@ -223,7 +227,13 @@ function BlockBearbeiten() {
   const kinder = kinderSequenzen(b)
   const anzahlInnen = kinder.reduce((s, k) => s + k.schritte.length, 0)
   const zweigName = (i: number) =>
-    b.typ === 'entscheidung' ? `Ausgang „${b.zweige[i].bezeichnung || i + 1}“` : b.typ === 'parallel' ? `Zweig ${i + 1}` : 'Wiederholte Schritte'
+    b.typ === 'entscheidung'
+      ? `Ausgang „${b.zweige[i].bezeichnung || i + 1}“`
+      : b.typ === 'oder'
+        ? `Weg „${b.zweige[i].bezeichnung || i + 1}“`
+        : b.typ === 'parallel'
+          ? `Zweig ${i + 1}`
+          : 'Wiederholte Schritte'
 
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return <BereichBearbeiten bereichId={b.id} />
 
@@ -390,6 +400,7 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
   } else if (b.typ === 'warten') meta = formatiereDauer(b.dauerMin, std)
   else if (b.typ === 'wiederholung' && b.modus === 'anteil') meta = `wiederholt in ${formatiereProzent(b.anteilWiederholung)}`
   else if (b.typ === 'entscheidung' && b.art === 'ereignis') meta = 'je nachdem, was zuerst passiert'
+  else if (b.typ === 'oder') meta = 'einer, mehrere oder alle Wege'
   const gewaehlt = z.auswahl === b.id
   return (
     <>
@@ -408,6 +419,15 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
               {b.art === 'ereignis' && zw.ereignis && <span> · nach Ø {formatiereDauer(zw.ereignis.dauerMin, std)}</span>}
               {zw.ende !== null && <span className="zweig-ende-marke"> · endet: „{zw.ende || 'Ende'}“</span>}
               {zw.zurueckZu !== null && <span className="zweig-ende-marke"> · ↩ zurück zu „{zielTitel(p, zw.zurueckZu)}“</span>}
+            </div>
+            <SequenzListe seq={zw} cursor={cursor} />
+          </div>
+        ))}
+      {b.typ === 'oder' &&
+        b.zweige.map((zw) => (
+          <div key={zw.id} className="zweig">
+            <div className="zweig-kopf">
+              {zw.bezeichnung || 'Weg'} · {zw.id === b.standard ? 'wenn keiner der anderen zutrifft' : `kommt in ${formatiereProzent(zw.anteil)} der Fälle vor`}
             </div>
             <SequenzListe seq={zw} cursor={cursor} />
           </div>

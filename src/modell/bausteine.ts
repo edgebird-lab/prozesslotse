@@ -6,6 +6,8 @@ import {
   type Id,
   type Medium,
   type MediumArt,
+  type Oder,
+  type OderZweig,
   type Parallel,
   type Projekt,
   type Prozess,
@@ -60,6 +62,16 @@ export function neueEntscheidung(werte: Partial<Entscheidung> = {}): Entscheidun
     zweige: [neuerZweig('Ja', 0.5), neuerZweig('Nein', 0.5)],
     ...werte,
   }
+}
+
+export function neuerOderZweig(bezeichnung: string, anteil: number, werte: Partial<OderZweig> = {}): OderZweig {
+  return { id: neueId('ow'), schritte: [], bezeichnung, anteil, ...werte }
+}
+
+/** Neue ODER-Verzweigung: zwei Wege und ein Weg „Keiner davon“ für die übrigen Fälle. */
+export function neueOder(werte: Partial<Oder> = {}): Oder {
+  const keiner = neuerOderZweig('Keiner davon', 0)
+  return { typ: 'oder', id: neueId('oder'), frage: '', zweige: [neuerOderZweig('', 0.5), neuerOderZweig('', 0.5), keiner], standard: keiner.id, ...werte }
 }
 
 export function neueParallel(anzahlZweige = 2): Parallel {

@@ -19,8 +19,8 @@
  *    Die Flusseffizienz ist TCT / CT (Dumas u. a.): dieselben Regeln, einmal
  *    nur mit Bearbeitungszeiten (TCT) und einmal mit allen Zeiten (CT).
  */
-import { durchlaufe } from '../modell/operationen'
-import { erwartungMaximum } from './verteilung'
+import { durchlaufe, oderWahrscheinlichkeiten } from '../modell/operationen'
+import { erwartungMaximum, erwartungOder } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
 import type { Aufgabe, Block, Id, Prozess, Rolle } from '../modell/typen'
 
@@ -223,6 +223,27 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
       }
       return { aus: { anteil, letzte }, rueck }
     }
+    case 'oder': {
+      // Jeder Weg läuft mit seiner Wahrscheinlichkeit; danach geht es mit dem ganzen Fluss weiter.
+      const p = oderWahrscheinlichkeiten(b)
+      const letzte = new Map<string, number>()
+      const rueck = new Map<Id, Fluss>()
+      let weiter = 1
+      b.zweige.forEach((zweig, i) => {
+        const o = flussSequenz(zweig.schritte, skaliere(f, p[i]), z, ctx)
+        addiereRueck(rueck, o.rueck)
+        // Ein Weg, der den Prozess beendet, nimmt seinen Anteil mit (die Prüfung meldet das als Fehler).
+        if (f.anteil > 0) weiter *= 1 - p[i] + o.aus.anteil / f.anteil
+        for (const [k, w] of o.aus.letzte) {
+          if (f.letzte.has(k)) letzte.set(k, Math.max(letzte.get(k) ?? 0, w))
+          else plus(letzte, k, w)
+        }
+      })
+      // Kein Weg gewählt (nur ohne Standardweg möglich): der Vorgänger geht direkt weiter.
+      const keiner = p.reduce((q, x) => q * (1 - x), 1)
+      if (b.standard === null) for (const [k, w] of f.letzte) letzte.set(k, Math.max(letzte.get(k) ?? 0, w * keiner))
+      return { aus: { anteil: f.anteil * weiter, letzte }, rueck }
+    }
     case 'wiederholung': {
       // Antwort des Körpers auf einen Einheitsfluss, ohne zu zählen.
       const sonde = flussSequenz(b.koerper.schritte, { anteil: 1, letzte: new Map([[SONDE, 1]]) }, neueZaehler(), ctx)
@@ -326,6 +347,19 @@ function dauerBlock(b: Block): Dauer {
       addiereBeitraege(beitraege, laengster.beitraege, laengster.gesamt > 0 ? gesamt / laengster.gesamt : 1)
       // Rücksprünge aus „Gleichzeitig“ heraus meldet die Prüfung als Fehler.
       return { gesamt, arbeit, weiter: Math.min(...zweige.map((x) => x.weiter)), rueck: new Map(), beitraege }
+    }
+    case 'oder': {
+      const p = oderWahrscheinlichkeiten(b)
+      const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
+      // Erwartungswert des Maximums der gewählten Wege, aus ihren Verteilungen
+      const gesamt = erwartungOder(b, 'gesamt')
+      const arbeit = erwartungOder(b, 'arbeit')
+      // Beiträge: jeder Weg mit seiner Wahrscheinlichkeit, auf den exakten Erwartungswert umgerechnet
+      const beitraege = new Map<Id, Beitrag>()
+      const naiv = zweige.reduce((s, x, i) => s + p[i] * x.gesamt, 0)
+      zweige.forEach((x, i) => addiereBeitraege(beitraege, x.beitraege, naiv > 0 ? (p[i] * gesamt) / naiv : p[i]))
+      const weiter = zweige.reduce((w, x, i) => w * (1 - p[i] + p[i] * x.weiter), 1)
+      return { gesamt, arbeit, weiter, rueck: new Map(), beitraege }
     }
     case 'wiederholung': {
       const x = dauerSequenz(b.koerper.schritte)

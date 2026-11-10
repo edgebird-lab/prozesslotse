@@ -50,6 +50,14 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
         )
       })
       return
+    case 'oder':
+      fordere(istText(x.frage) && Array.isArray(x.zweige) && (x.standard === null || istText(x.standard)), `${wo}: ODER-Verzweigung unvollständig.`)
+      x.zweige.forEach((z, i) => {
+        pruefeSequenz(z, `${wo}, Weg ${i + 1}`)
+        const zweig = z as unknown as Obj
+        fordere(istText(zweig.bezeichnung) && istZahl(zweig.anteil), `${wo}, Weg ${i + 1}: Angaben fehlen.`)
+      })
+      return
     case 'parallel':
       fordere(Array.isArray(x.zweige), `${wo}: Zweige fehlen.`)
       x.zweige.forEach((z, i) => pruefeSequenz(z, `${wo}, Zweig ${i + 1}`))
@@ -83,7 +91,7 @@ function pruefeProzess(x: unknown, wo: string): asserts x is Prozess {
  */
 function migriereVon1(prozess: unknown): void {
   if (!istObj(prozess)) return
-  prozess.formatVersion = FORMAT_VERSION
+  prozess.formatVersion = 2
   const besuche = (x: unknown) => {
     if (Array.isArray(x)) return x.forEach(besuche)
     if (!istObj(x)) return
@@ -103,7 +111,12 @@ export function leseProjekt(daten: unknown): Projekt {
   if (daten.formatVersion === 1) {
     migriereVon1(daten.ist)
     if (daten.soll !== null) migriereVon1(daten.soll)
-    daten.formatVersion = FORMAT_VERSION
+    daten.formatVersion = 2
+  }
+  if (daten.formatVersion === 2) {
+    // Format 3 bringt nur neue Bausteine und Felder; bestehende Daten bleiben gültig.
+    for (const p of [daten.ist, daten.soll]) if (istObj(p) && p.formatVersion === 2) p.formatVersion = 3
+    daten.formatVersion = 3
   }
   fordere(daten.formatVersion === FORMAT_VERSION, `Dateiformat ${String(daten.formatVersion)} wird nicht unterstützt.`)
   pruefeProzess(daten.ist, 'Ist-Prozess')

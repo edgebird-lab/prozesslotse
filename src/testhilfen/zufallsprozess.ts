@@ -1,5 +1,5 @@
 import { zufallMitStartwert } from '../analyse/simulation'
-import { neueAufgabe, neueEntscheidung, neueParallel, neuerProzess, neueRolle, neuerZweig, neuesMedium, neuesWarten, neueWiederholung } from '../modell/bausteine'
+import { neueAufgabe, neueEntscheidung, neueOder, neueParallel, neuerOderZweig, neuerProzess, neueRolle, neuerZweig, neuesMedium, neuesWarten, neueWiederholung } from '../modell/bausteine'
 import { durchlaufe, findeBlock, liegtInParallele, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
 import type { Block, Prozess, Sequenz } from '../modell/typen'
 
@@ -39,10 +39,21 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
       )
       return neueEntscheidung({ frage: 'Welcher Fall?', art: ereignisse ? 'ereignis' : 'daten', zweige })
     }
-    if (r < 0.9) {
+    if (r < 0.84) {
       const par = neueParallel(2 + Math.floor(zufall() * 2))
       par.zweige = par.zweige.map((z: Sequenz) => ({ ...z, schritte: sequenz(tiefe + 1, true, 1) }))
       return par
+    }
+    if (r < 0.92) {
+      // ODER: zwei bis drei Wege mit eigenen Anteilen; entweder ein Standardweg oder ein Weg, der immer läuft
+      const n = 2 + Math.floor(zufall() * 2)
+      const zweige = Array.from({ length: n }, (_, i) => neuerOderZweig(`Weg ${i + 1}`, 0.2 + 0.6 * zufall(), { schritte: sequenz(tiefe + 1, true, 1) }))
+      if (zufall() < 0.5) {
+        const keiner = neuerOderZweig('Keiner davon', 0, { schritte: sequenz(tiefe + 1, true) })
+        return neueOder({ frage: 'Welche Wege?', zweige: [...zweige, keiner], standard: keiner.id })
+      }
+      zweige[0] = { ...zweige[0], anteil: 1 }
+      return neueOder({ frage: 'Welche Wege?', zweige, standard: null })
     }
     return neueWiederholung({ frage: 'Nochmal?', koerper: { id: `k${++nr}`, schritte: sequenz(tiefe + 1, inParallel, 1) } })
   }

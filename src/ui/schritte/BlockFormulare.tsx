@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useBestaetigen } from '../frage'
-import { neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
+import { neuerOderZweig, neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
 import { blockTitel, freigabeAusgang } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
 import type { RuecksprungZiel } from '../../modell/operationen'
-import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Parallel, type Warten, type Wiederholung } from '../../modell/typen'
+import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Oder, type OderZweig, type Parallel, type Warten, type Wiederholung } from '../../modell/typen'
 import { formatiereProzent } from '../../modell/zeit'
 import { Auswahl, Feld, ProzentEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
@@ -41,6 +41,8 @@ export function BlockFormular({ block, onAendern, kontext }: Props<Block>) {
       return <AufgabeFormular block={block} onAendern={onAendern} kontext={kontext} />
     case 'entscheidung':
       return <EntscheidungFormular block={block} onAendern={onAendern} kontext={kontext} />
+    case 'oder':
+      return <OderFormular block={block} onAendern={onAendern} kontext={kontext} />
     case 'parallel':
       return <ParallelFormular block={block} onAendern={onAendern} kontext={kontext} />
     case 'wiederholung':
@@ -420,6 +422,78 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
           + Ausgang
         </button>
       </fieldset>
+    </>
+  )
+}
+
+function OderFormular({ block: o, onAendern, kontext }: Props<Oder>) {
+  const bestaetige = useBestaetigen()
+  const setzeZweig = (id: Id, w: Partial<OderZweig>) => onAendern({ ...o, zweige: o.zweige.map((z) => (z.id === id ? { ...z, ...w } : z)) })
+  const andere = o.zweige.filter((z) => z.id !== o.standard)
+  const standard = o.zweige.find((z) => z.id === o.standard) ?? null
+  const keiner = andere.reduce((q, z) => q * (1 - Math.min(1, Math.max(0, z.anteil))), 1)
+  const entferne = async (z: OderZweig, name: string) => {
+    if (z.schritte.length > 0 && !(await bestaetige('Weg entfernen?', `Der Weg „${name}“ enthält ${z.schritte.length} Schritte. Sie werden mit entfernt.`, 'Mit Schritten entfernen'))) return
+    onAendern({ ...o, zweige: o.zweige.filter((x) => x.id !== z.id), standard: o.standard === z.id ? null : o.standard })
+  }
+  return (
+    <>
+      <Feld label="Worum geht es?" hilfe="z. B. „Welche Unterlagen fehlen?“ oder „Wer muss zustimmen?“">
+        {(id) => (
+          <input id={id} type="text" autoFocus={kontext.neu} value={o.frage} placeholder="z. B. Welche Unterlagen fehlen?" onChange={(ev) => onAendern({ ...o, frage: ev.target.value })} />
+        )}
+      </Feld>
+      <fieldset className="zweige">
+        <legend>Welche Wege kommen in Frage, und wie oft kommt jeder vor?</legend>
+        <p className="feld-hilfe">
+          Jeder Anteil gilt für sich: 30 % heißt, in 30 von 100 Fällen läuft dieser Weg, egal was mit den anderen ist. Zusammen dürfen es mehr oder weniger als 100 % sein.
+        </p>
+        {andere.map((z, i) => {
+          const name = z.bezeichnung || `Weg ${i + 1}`
+          return (
+            <div key={z.id} className="zweig-zeile">
+              <input type="text" aria-label={`Weg ${i + 1}`} value={z.bezeichnung} placeholder="z. B. Gehaltsnachweis fehlt" onChange={(ev) => setzeZweig(z.id, { bezeichnung: ev.target.value })} />
+              <ProzentEingabe ariaLabel={`Anteil von „${name}“`} anteil={z.anteil} onAendern={(anteil) => setzeZweig(z.id, { anteil })} />
+              {andere.length > 2 && (
+                <button type="button" className="knopf-icon" aria-label={`Weg „${name}“ entfernen`} title="Weg entfernen" onClick={() => void entferne(z, name)}>
+                  <Kreuz />
+                </button>
+              )}
+            </div>
+          )
+        })}
+        <button type="button" className="knopf knopf-leise" onClick={() => onAendern({ ...o, zweige: [...andere, neuerOderZweig('', 0.5), ...(standard ? [standard] : [])] })}>
+          + Weg
+        </button>
+      </fieldset>
+      <Auswahl
+        label="Was passiert, wenn keiner dieser Wege zutrifft?"
+        wert={standard ? 'standard' : 'nie'}
+        spalten={2}
+        optionen={[
+          { wert: 'standard', text: 'Dafür gibt es einen eigenen Weg', beschreibung: `kommt in ${formatiereProzent(keiner)} der Fälle vor` },
+          { wert: 'nie', text: 'Mindestens einer trifft immer zu' },
+        ]}
+        onAendern={async (w) => {
+          if (w === 'standard' && !standard) {
+            const neu = neuerOderZweig('Keiner davon', 0)
+            onAendern({ ...o, zweige: [...o.zweige, neu], standard: neu.id })
+          } else if (w === 'nie' && standard) {
+            if (standard.schritte.length > 0 && !(await bestaetige('Weg entfernen?', `Der Weg „${standard.bezeichnung || 'Keiner davon'}“ enthält ${standard.schritte.length} Schritte. Sie werden mit entfernt.`, 'Mit Schritten entfernen'))) return
+            onAendern({ ...o, zweige: o.zweige.filter((z) => z.id !== standard.id), standard: null })
+          }
+        }}
+      />
+      {standard && (
+        <Feld label="Wie heißt dieser Weg?" hilfe="Er läuft nur, wenn keiner der anderen zutrifft; im Diagramm mit Querstrich.">
+          {(id) => <input id={id} type="text" value={standard.bezeichnung} placeholder="z. B. Nichts fehlt" onChange={(ev) => setzeZweig(standard.id, { bezeichnung: ev.target.value })} />}
+        </Feld>
+      )}
+      {!standard && keiner > 1e-6 && (
+        <p className="feld-hilfe summe-falsch" role="status">
+          In {formatiereProzent(keiner)} der Fälle trifft keiner der Wege zu. Lege dafür einen eigenen Weg an oder prüfe die Anteile.
+        </p>
+      )}
     </>
   )
 }

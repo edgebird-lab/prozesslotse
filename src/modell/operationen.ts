@@ -4,7 +4,7 @@
  * Ist-Soll-Vergleich auf.
  */
 import { neuerRuecksprungBereich } from './bausteine'
-import type { Aufgabe, Block, Entscheidung, EntscheidungsZweig, Id, Prozess, Sequenz } from './typen'
+import type { Aufgabe, Block, Entscheidung, EntscheidungsZweig, Id, Oder, Prozess, Sequenz } from './typen'
 
 export interface Fundstelle {
   block: Block
@@ -20,6 +20,8 @@ export function kinderSequenzen(b: Block): Sequenz[] {
     case 'entscheidung':
       return b.zweige
     case 'parallel':
+      return b.zweige
+    case 'oder':
       return b.zweige
     case 'wiederholung':
       return [b.koerper]
@@ -72,9 +74,24 @@ export function anzahlBloecke(p: Prozess): number {
   return n
 }
 
-/** Liegt die Stelle innerhalb eines Gleichzeitig-Blocks? Dort darf der Prozess nicht enden. */
+/** Laufen die Zweige des Blocks womöglich gleichzeitig (Gleichzeitig, ODER)? Dann darf kein Zweig enden oder herausspringen. */
+export function istNebenlaeufig(b: Block): boolean {
+  return b.typ === 'parallel' || b.typ === 'oder'
+}
+
+/** Liegt die Stelle innerhalb von „Gleichzeitig“ oder einer ODER-Verzweigung? Dort darf der Prozess nicht enden. */
 export function liegtInParallele(vorfahren: Block[]): boolean {
-  return vorfahren.some((b) => b.typ === 'parallel')
+  return vorfahren.some(istNebenlaeufig)
+}
+
+/**
+ * Wahrscheinlichkeit je Weg einer ODER-Verzweigung. Die Wege sind unabhängig;
+ * der Standardweg läuft genau dann, wenn keiner der anderen zutrifft.
+ */
+export function oderWahrscheinlichkeiten(b: Oder): number[] {
+  const klemme = (x: number) => Math.min(1, Math.max(0, x))
+  const keiner = b.zweige.reduce((q, z) => (z.id === b.standard ? q : q * (1 - klemme(z.anteil))), 1)
+  return b.zweige.map((z) => (z.id === b.standard ? keiner : klemme(z.anteil)))
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +109,8 @@ function abbildeBlock(b: Block, f: SchrittAbbildung): Block {
     case 'entscheidung':
       return { ...b, zweige: b.zweige.map((z) => abbildeSequenz(z, f)) }
     case 'parallel':
+      return { ...b, zweige: b.zweige.map((z) => abbildeSequenz(z, f)) }
+    case 'oder':
       return { ...b, zweige: b.zweige.map((z) => abbildeSequenz(z, f)) }
     case 'wiederholung':
       return { ...b, koerper: abbildeSequenz(b.koerper, f) }
@@ -194,6 +213,8 @@ export function blockTitel(b: Block): string {
       return b.frage || 'Entscheidung ohne Frage'
     case 'parallel':
       return `Gleichzeitig (${b.zweige.length} Zweige)`
+    case 'oder':
+      return b.frage || 'Mehrere Wege möglich'
     case 'wiederholung':
       if (b.modus === 'ruecksprung') return `Bereich mit Rücksprung ab „${b.koerper.schritte[0] ? bereichTitel(b.koerper.schritte[0]) : '…'}“`
       return b.frage ? `Wiederholung: ${b.frage}` : 'Wiederholung'
@@ -226,7 +247,7 @@ export function ruecksprungZiele(p: Prozess, sequenzId: Id, index: number, mitSe
     const ab = seq.besitzer?.typ === 'wiederholung' && seq.besitzer.modus === 'ruecksprung' ? 1 : 0
     ebenen.push(seq.sequenz.schritte.slice(ab, bis + 1).map((b) => ({ id: b.id, titel: bereichTitel(b) })))
     const besitzer = seq.besitzer
-    if (!besitzer || besitzer.typ === 'parallel') break
+    if (!besitzer || istNebenlaeufig(besitzer)) break
     const ort = findeBlock(p, besitzer.id)
     if (!ort) break
     seq = findeSequenz(p, ort.sequenz.id)
@@ -250,7 +271,7 @@ export function setzeRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id, zi
   const imZiel = kette.findIndex((b) => ziel.sequenz.schritte.includes(b))
   if (imZiel < 0) return p
   // Liegt auf dem Weg vom Zielabschnitt zur Entscheidung ein „Gleichzeitig“ (auch als Block im Zielabschnitt selbst), wäre der Rücksprung eine Verklemmung.
-  if (kette.slice(imZiel).some((b) => b.typ === 'parallel')) return p
+  if (kette.slice(imZiel).some(istNebenlaeufig)) return p
   const i = ziel.index
   const j = ziel.sequenz.schritte.indexOf(kette[imZiel])
   if (j < i) return p
@@ -422,7 +443,9 @@ export function ausgaengeBlock(b: Block): Set<Ausgang> {
       }
       return aus
     }
-    case 'parallel': {
+    case 'parallel':
+    case 'oder': {
+      // Weiter nur, wenn jeder Zweig weiterkommt: Bei ODER kann jeder Weg auch der einzige gewählte sein.
       const aus = new Set<Ausgang>()
       let alleWeiter = b.zweige.length > 0
       for (const z of b.zweige) {

@@ -85,6 +85,26 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
       if (r.ende !== null || r.rueck) return { zeit: warten + r.zeit, ende: r.ende, rueck: r.rueck }
       return { zeit: warten + r.zeit, ende: gewaehlt.ende, rueck: gewaehlt.ende === null ? gewaehlt.zurueckZu : null }
     }
+    case 'oder': {
+      // Jeder Weg unabhängig nach seinem Anteil; der Standardweg nur, wenn keiner gewählt wurde
+      let zeit = 0
+      let ende: string | null = null
+      let keiner = true
+      for (const z of b.zweige) {
+        if (z.id === b.standard || zufall() >= z.anteil) continue
+        keiner = false
+        const r = laufeSequenz(z.schritte, zufall)
+        zeit = Math.max(zeit, r.zeit)
+        ende ??= r.ende
+      }
+      const standard = keiner ? b.zweige.find((z) => z.id === b.standard) : undefined
+      if (standard) {
+        const r = laufeSequenz(standard.schritte, zufall)
+        zeit = r.zeit
+        ende = r.ende
+      }
+      return { zeit, ende, rueck: null }
+    }
     case 'parallel': {
       let zeit = 0
       let ende: string | null = null

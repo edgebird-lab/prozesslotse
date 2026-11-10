@@ -8,7 +8,8 @@
  * bleiben, werden sie zusammengefasst; das geschieht mittelwerttreu, so dass
  * Erwartungswerte von Summen exakt bleiben.
  */
-import type { Block, Id } from '../modell/typen'
+import { oderWahrscheinlichkeiten } from '../modell/operationen'
+import type { Block, Id, Oder } from '../modell/typen'
 
 export interface Verteilung {
   wert: number[]
@@ -173,6 +174,8 @@ function verteilungBlock(b: Block, art: Zeitart): Ergebnis {
     }
     case 'parallel':
       return { weiter: maximum(b.zweige.map((z) => verteilungSequenz(z.schritte, art).weiter)), rueck: new Map() }
+    case 'oder':
+      return { weiter: verteilungOder(b, art), rueck: new Map() }
     case 'wiederholung': {
       const x = verteilungSequenz(b.koerper.schritte, art)
       const p = Math.min(Math.max(b.anteilWiederholung, 0), 0.999)
@@ -184,6 +187,41 @@ function verteilungBlock(b: Block, art: Zeitart): Ergebnis {
       return { weiter: falte(vorher, aus), rueck }
     }
   }
+}
+
+/**
+ * Dauer einer ODER-Verzweigung: Jeder Weg läuft unabhängig mit seiner
+ * Wahrscheinlichkeit (sonst Dauer 0), weiter geht es nach dem längsten
+ * gewählten. Läuft keiner, nimmt der Standardweg die Masse bei 0 ein.
+ */
+export function verteilungOder(b: Oder, art: Zeitart): Verteilung {
+  const p = oderWahrscheinlichkeiten(b)
+  const iStandard = b.zweige.findIndex((z) => z.id === b.standard)
+  const mischungen: Verteilung[] = []
+  b.zweige.forEach((z, i) => {
+    if (i === iStandard) return
+    const d = verteilungSequenz(z.schritte, art).weiter
+    const m = masse(d)
+    // vollständige Verteilung des Wegs (Masse 1), dann mit „läuft nicht“ bei 0 mischen
+    mischungen.push(addiere(skaliere(d, m > 0 ? p[i] / m : 0), punkt(0, 1 - p[i])))
+  })
+  let ergebnis = mischungen.length > 0 ? maximum(mischungen) : punkt(0)
+  if (iStandard >= 0 && p[iStandard] > 0) {
+    // „Keiner läuft“ liegt bei 0 mit Masse q; dort läuft stattdessen der Standardweg
+    const q = p[iStandard]
+    const wert = [...ergebnis.wert]
+    const masseListe = [...ergebnis.masse]
+    const null0 = wert.findIndex((w) => Math.abs(w) < 1e-9)
+    if (null0 >= 0) masseListe[null0] = Math.max(0, masseListe[null0] - q)
+    const d = verteilungSequenz(b.zweige[iStandard].schritte, art).weiter
+    const m = masse(d)
+    ergebnis = addiere({ wert, masse: masseListe }, skaliere(d, m > 0 ? q / m : 0))
+  }
+  return ergebnis
+}
+
+export function erwartungOder(b: Oder, art: Zeitart): number {
+  return erwartung(verteilungOder(b, art))
 }
 
 /** Erwartungswert des Maximums der Zweige von „Gleichzeitig“. */

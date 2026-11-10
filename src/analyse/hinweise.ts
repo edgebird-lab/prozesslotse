@@ -152,7 +152,7 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           })
         }
       }
-    } else if (block.typ === 'parallel') {
+    } else if (block.typ === 'parallel' || block.typ === 'oder') {
       // Dieselbe Rolle in mehr Zweigen, als sie Personen hat: Sie kann nicht an zwei Stellen zugleich arbeiten.
       const zweigeJeRolle = new Map<Id, number>()
       for (const z of block.zweige) {
@@ -167,7 +167,7 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           schluessel: `parallelrolle:${block.id}:${id}`,
           schwere: 'hinweis',
           titel: 'Gleichzeitig, aber dieselben Leute',
-          text: `In ${anzahl} Zweigen von „Gleichzeitig“ arbeitet ${rolle.name || 'dieselbe Rolle'}, die Rolle hat aber nur ${personenText(bedienende(rolle.personen))}. Wer an zwei Stellen zugleich arbeiten müsste, arbeitet tatsächlich nacheinander; die berechnete Durchlaufzeit ist dann zu niedrig.`,
+          text: `In ${anzahl} Zweigen von „${block.typ === 'oder' ? blockTitel(block) : 'Gleichzeitig'}“ arbeitet ${rolle.name || 'dieselbe Rolle'}, die Rolle hat aber nur ${personenText(bedienende(rolle.personen))}. Wer an zwei Stellen zugleich arbeiten müsste, arbeitet tatsächlich nacheinander; die berechnete Durchlaufzeit ist dann zu niedrig.`,
           blockId: block.id,
           rolleId: id,
         })

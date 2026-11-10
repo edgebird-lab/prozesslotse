@@ -28,6 +28,10 @@ function bereichText(p: Prozess, sequenzId: string): string {
     return `im Ausgang „${z?.bezeichnung || '?'}“ von „${b.frage || 'Entscheidung'}“`
   }
   if (b.typ === 'parallel') return `in Zweig ${b.zweige.findIndex((x) => x.id === sequenzId) + 1} von „Gleichzeitig“`
+  if (b.typ === 'oder') {
+    const z = b.zweige.find((x) => x.id === sequenzId)
+    return `im Weg „${z?.bezeichnung || '?'}“ von „${b.frage || 'Mehrere Wege'}“`
+  }
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return `im Bereich mit Rücksprung ab „${b.koerper.schritte[0] ? bereichTitel(b.koerper.schritte[0]) : '…'}“`
   if (b.typ === 'wiederholung') return `in der Wiederholung „${b.frage || 'Wiederholung'}“`
   return 'im Ablauf'
@@ -74,6 +78,7 @@ export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {
   switch (block.typ) {
     case 'entscheidung':
     case 'parallel':
+    case 'oder':
       return block.zweige.length > 0 ? { sequenzId: block.zweige[0].id, index: block.zweige[0].schritte.length } : { ...c, index: c.index + 1 }
     case 'wiederholung':
       return { sequenzId: block.koerper.id, index: block.koerper.schritte.length }
@@ -87,7 +92,7 @@ export function abschnittFertig(p: Prozess, c: Cursor): Cursor | 'fertig' {
   const f = findeSequenz(p, c.sequenzId)
   if (!f?.besitzer) return 'fertig'
   const b = f.besitzer
-  if (b.typ === 'entscheidung' || b.typ === 'parallel') {
+  if (b.typ === 'entscheidung' || b.typ === 'parallel' || b.typ === 'oder') {
     const j = b.zweige.findIndex((z) => z.id === c.sequenzId)
     const naechster = b.zweige[j + 1]
     if (naechster) return { sequenzId: naechster.id, index: naechster.schritte.length }

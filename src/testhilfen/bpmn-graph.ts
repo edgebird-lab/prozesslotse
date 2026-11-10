@@ -1,5 +1,5 @@
 import { BpmnModdle, type ModdleElement } from 'bpmn-moddle'
-import type { KnotenTyp, TokenGraph, TokenKnoten } from '../bpmn/tokenspiel'
+import { ergaenzeOderBereiche, type KnotenTyp, type TokenGraph, type TokenKnoten } from '../bpmn/tokenspiel'
 
 const TYP: Record<string, KnotenTyp> = {
   'bpmn:StartEvent': 'start',
@@ -7,6 +7,7 @@ const TYP: Record<string, KnotenTyp> = {
   'bpmn:ExclusiveGateway': 'xor',
   'bpmn:ParallelGateway': 'und',
   'bpmn:EventBasedGateway': 'ereignisgateway',
+  'bpmn:InclusiveGateway': 'oder',
   'bpmn:Task': 'aktivitaet',
   'bpmn:UserTask': 'aktivitaet',
   'bpmn:ManualTask': 'aktivitaet',
@@ -35,5 +36,11 @@ export async function graphAusXml(xml: string): Promise<TokenGraph> {
     knoten.get(f.targetRef!.id)!.rein.push(f.id)
     ziel.set(f.id, f.targetRef!.id)
   }
-  return { knoten: [...knoten.values()], ziel }
+  for (const e of prozess.flowElements ?? []) {
+    const standard = (e as ModdleElement & { default?: { id: string } }).default
+    if (standard) knoten.get(e.id)!.standard = standard.id
+  }
+  const g = { knoten: [...knoten.values()], ziel }
+  ergaenzeOderBereiche(g)
+  return g
 }

@@ -11,7 +11,7 @@
 export type Id = string
 
 /** Version des Dateiformats. Bei inkompatiblen Änderungen erhöhen; ältere Dateien migriert speicher.ts. */
-export const FORMAT_VERSION = 2
+export const FORMAT_VERSION = 3
 
 export type WarteArt = 'zeit' | 'nachricht'
 
@@ -125,6 +125,28 @@ export interface Parallel {
   zweige: Sequenz[]
 }
 
+/** Ein Weg einer ODER-Verzweigung mit eigener Wahrscheinlichkeit. */
+export interface OderZweig extends Sequenz {
+  /** Was in diesem Fall zu tun ist, z. B. „Gehaltsnachweis fehlt“. */
+  bezeichnung: string
+  /** Anteil der Fälle, in denen dieser Weg vorkommt (0–1), unabhängig von den anderen Wegen. */
+  anteil: number
+}
+
+/**
+ * ODER: Je nach Fall laufen einer, mehrere oder alle Wege (inklusives Gateway).
+ * Weiter geht es, wenn alle gewählten Wege fertig sind.
+ */
+export interface Oder {
+  typ: 'oder'
+  id: Id
+  /** Worum es geht, z. B. „Welche Unterlagen fehlen?“ */
+  frage: string
+  zweige: OderZweig[]
+  /** Weg, der genau dann läuft, wenn keiner der anderen zutrifft (Standardfluss); sein eigener Anteil zählt nicht. */
+  standard: Id | null
+}
+
 /**
  * „anteil“: Nach jedem Durchlauf entscheidet eine Frage mit festem Anteil über die Wiederholung.
  * „ruecksprung“: Rücksprungbereich; wiederholt wird, wenn ein Ausgang darin mit
@@ -158,7 +180,7 @@ export interface Warten {
   dauerMin: number
 }
 
-export type Block = Aufgabe | Entscheidung | Parallel | Wiederholung | Warten
+export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten
 export type BlockTyp = Block['typ']
 
 export type AusloeserArt = 'nachricht' | 'zeit' | 'bedingung' | 'manuell'

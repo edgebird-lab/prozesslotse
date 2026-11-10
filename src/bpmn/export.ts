@@ -70,7 +70,7 @@ const EREIGNIS_DEFINITION: Record<string, string> = {
   bedingung: 'bpmn:conditionalEventDefinition',
 }
 
-function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], blockDoku: Map<string, string>): string {
+function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], blockDoku: Map<string, string>, standardFluss: Map<string, string>): string {
   const e = '    '
   const flussRefs = rein.map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + raus.map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
   const definition = (art: string | null | undefined) => {
@@ -98,6 +98,12 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
       const richtung = k.richtung === 'auf' ? 'Diverging' : 'Converging'
       return `${e}<${typ} id="${k.id}"${attrName(k.name)} gatewayDirection="${richtung}">\n${flussRefs}${e}</${typ}>\n`
     }
+    case 'oder': {
+      // Inklusives Gateway: einer, mehrere oder alle Wege; der Standardfluss läuft, wenn keiner zutrifft.
+      const richtung = k.richtung === 'auf' ? 'Diverging' : 'Converging'
+      const standard = standardFluss.get(k.id)
+      return `${e}<bpmn:inclusiveGateway id="${k.id}"${attrName(k.name)} gatewayDirection="${richtung}"${standard ? ` default="${standard}"` : ''}>\n${flussRefs}${e}</bpmn:inclusiveGateway>\n`
+    }
     case 'ereignisgateway':
       // Es geht dort weiter, wo zuerst ein Ereignis eintritt (Workflow-Pattern „Deferred Choice“).
       return `${e}<bpmn:eventBasedGateway id="${k.id}"${attrName(k.name)} gatewayDirection="Diverging" instantiate="false" eventGatewayType="Exclusive">\n${flussRefs}${e}</bpmn:eventBasedGateway>\n`
@@ -115,9 +121,11 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   const layout = berechneLayout(p)
   const rein = new Map<string, string[]>()
   const raus = new Map<string, string[]>()
+  const standardFluss = new Map<string, string>()
   for (const k of layout.kanten) {
     raus.set(k.von, [...(raus.get(k.von) ?? []), k.id])
     rein.set(k.nach, [...(rein.get(k.nach) ?? []), k.id])
+    if (k.standard) standardFluss.set(k.von, k.id)
   }
 
   const elementZuBlock = new Map<string, Id>()
@@ -152,7 +160,7 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
     x += '      </bpmn:lane>\n'
   }
   x += '    </bpmn:laneSet>\n'
-  for (const k of layout.knoten) x += knotenXml(p, k, rein.get(k.id) ?? [], raus.get(k.id) ?? [], blockDoku)
+  for (const k of layout.knoten) x += knotenXml(p, k, rein.get(k.id) ?? [], raus.get(k.id) ?? [], blockDoku, standardFluss)
   for (const k of layout.kanten) x += kanteXml(k)
   x += '  </bpmn:process>\n'
 

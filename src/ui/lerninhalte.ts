@@ -16,6 +16,7 @@ export type LernThema =
   | 'ereignis'
   | 'ruecksprung'
   | 'parallel'
+  | 'oder'
   | 'wiederholung'
   | 'warten'
   | 'pruefen'
@@ -63,6 +64,12 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Paralleles Gateway (AND)',
     symbol: 'und',
     text: 'Eine Raute mit Plus: Alle Zweige laufen gleichzeitig los. Weiter geht es erst, wenn alle fertig sind; die Dauer bestimmt der längste Zweig. Deshalb darf ein Zweig hier den Prozess nicht beenden, sonst würde die Zusammenführung ewig warten.',
+  },
+  oder: {
+    titel: 'Mehrere Wege möglich',
+    bpmn: 'Inklusives Gateway (ODER)',
+    symbol: 'oder',
+    text: 'Eine Raute mit Kreis: Je nach Fall laufen einer, mehrere oder alle Wege, z. B. welche Unterlagen nachgefordert werden. Jeder Weg hat einen eigenen Anteil: Wie oft kommt er vor, unabhängig von den anderen? Weiter geht es, wenn alle gewählten Wege fertig sind. Der Weg für „keiner davon“ läuft nur, wenn keiner der anderen zutrifft; im Diagramm trägt er einen Querstrich (Standardfluss).',
   },
   wiederholung: {
     titel: 'Wiederholung',

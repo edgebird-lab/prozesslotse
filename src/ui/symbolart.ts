@@ -13,6 +13,8 @@ export function symbolFuer(b: Block, p: Prozess): SymbolArt {
       return b.art === 'ereignis' ? 'ereignisgateway' : 'xor'
     case 'parallel':
       return 'und'
+    case 'oder':
+      return 'oder'
     case 'wiederholung':
       return b.modus === 'ruecksprung' ? 'ruecksprung' : 'wiederholung'
     case 'warten':

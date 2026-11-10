@@ -11,13 +11,21 @@
 
 import type { KnotenArt, Layout } from './layout'
 
-export type KnotenTyp = 'start' | 'ende' | 'aktivitaet' | 'xor' | 'und' | 'ereignisgateway'
+export type KnotenTyp = 'start' | 'ende' | 'aktivitaet' | 'xor' | 'und' | 'oder' | 'ereignisgateway'
 
 export interface TokenKnoten {
   id: string
   typ: KnotenTyp
   rein: string[]
   raus: string[]
+  /** Nur ODER-Verzweigung: Fluss, der genommen wird, wenn kein anderer gewählt ist. */
+  standard?: string
+  /**
+   * Nur ODER-Zusammenführung: Flüsse zwischen der zugehörigen Verzweigung und
+   * ihr. Sie schaltet erst, wenn dort keine Marke mehr unterwegs ist (BPMN-Regel
+   * für das inklusive Gateway, für blockstrukturierte Modelle gleichwertig).
+   */
+  bereich?: string[]
 }
 
 export interface TokenGraph {
@@ -33,6 +41,7 @@ const TYP_AUS_LAYOUT: Record<KnotenArt, KnotenTyp> = {
   warten: 'aktivitaet',
   xor: 'xor',
   und: 'und',
+  oder: 'oder',
   ereignisgateway: 'ereignisgateway',
 }
 
@@ -44,8 +53,52 @@ export function graphAusLayout(l: Layout): TokenGraph {
     knoten.get(e.von)?.raus.push(e.id)
     knoten.get(e.nach)?.rein.push(e.id)
     ziel.set(e.id, e.nach)
+    if (e.standard) knoten.get(e.von)!.standard = e.id
   }
-  return { knoten: [...knoten.values()], ziel }
+  const g = { knoten: [...knoten.values()], ziel }
+  ergaenzeOderBereiche(g)
+  return g
+}
+
+/** Zu jeder ODER-Zusammenführung die Flüsse zwischen ihr und ihrer Verzweigung (vorwärts von der Verzweigung bis zur Zusammenführung). */
+export function ergaenzeOderBereiche(g: TokenGraph): void {
+  const nachId = new Map(g.knoten.map((k) => [k.id, k]))
+  for (const auf of g.knoten) {
+    if (auf.typ !== 'oder' || auf.raus.length < 2) continue
+    // Die passende Zusammenführung ist die erste ODER-Zusammenführung, die alle Wege erreichen.
+    const erreichbar = auf.raus.map((f) => {
+      const gesehen = new Set<string>()
+      const stapel = [f]
+      while (stapel.length > 0) {
+        const x = stapel.pop()!
+        if (gesehen.has(x)) continue
+        gesehen.add(x)
+        const k = nachId.get(g.ziel.get(x)!)
+        if (k) stapel.push(...k.raus)
+      }
+      return gesehen
+    })
+    const kandidaten = g.knoten.filter((k) => k.typ === 'oder' && k.raus.length <= 1 && k.rein.length >= 2 && erreichbar.every((e) => k.rein.some((f) => e.has(f))))
+    // die nächstgelegene: die mit dem kleinsten Bereich
+    let beste: { k: TokenKnoten; bereich: string[] } | null = null
+    for (const k of kandidaten) {
+      const bereich = new Set<string>()
+      for (const f of auf.raus) {
+        const stapel = [f]
+        while (stapel.length > 0) {
+          const x = stapel.pop()!
+          if (bereich.has(x)) continue
+          bereich.add(x)
+          const z = g.ziel.get(x)
+          if (z === k.id) continue
+          const nk = nachId.get(z!)
+          if (nk) stapel.push(...nk.raus)
+        }
+      }
+      if (!beste || bereich.size < beste.bereich.length) beste = { k, bereich: [...bereich] }
+    }
+    if (beste) beste.k.bereich = beste.bereich.filter((f) => !beste!.k.rein.includes(f))
+  }
 }
 
 type Markierung = Map<string, number>
@@ -76,10 +129,29 @@ interface Schritt {
   danach: Markierung
 }
 
+/** ODER-Zusammenführung: mindestens ein Eingang belegt und im Bereich davor keine Marke mehr unterwegs. */
+function oderZuBereit(k: TokenKnoten, m: Markierung): boolean {
+  return k.rein.some((f) => (m.get(f) ?? 0) > 0) && !(k.bereich ?? []).some((f) => (m.get(f) ?? 0) > 0)
+}
+
+function istOderZu(k: TokenKnoten): boolean {
+  return k.typ === 'oder' && k.bereich !== undefined
+}
+
 function bereit(k: TokenKnoten, m: Markierung): boolean {
   if (k.typ === 'start') return false
   if (k.typ === 'und') return k.rein.length > 0 && k.rein.every((f) => (m.get(f) ?? 0) > 0)
+  if (istOderZu(k)) return oderZuBereit(k, m)
   return k.rein.some((f) => (m.get(f) ?? 0) > 0)
+}
+
+/** Alle nichtleeren Auswahlen ausgehender Flüsse einer ODER-Verzweigung; der Standardfluss nur allein. */
+function oderAuswahlen(k: TokenKnoten): string[][] {
+  const andere = k.raus.filter((f) => f !== k.standard)
+  const auswahlen: string[][] = []
+  for (let maske = 1; maske < 1 << andere.length; maske++) auswahlen.push(andere.filter((_, i) => maske & (1 << i)))
+  if (k.standard) auswahlen.push([k.standard])
+  return auswahlen
 }
 
 /**
@@ -103,6 +175,14 @@ function schritte(g: TokenGraph, m: Markierung, nachId: Map<string, TokenKnoten>
         break
       case 'und':
         if (k.rein.length > 0 && belegt.length === k.rein.length) liste.push({ knoten: k.id, danach: mit(m, k.rein, k.raus) })
+        break
+      case 'oder':
+        if (istOderZu(k)) {
+          if (oderZuBereit(k, m)) liste.push({ knoten: k.id, danach: mit(m, belegt, k.raus) })
+        } else {
+          // Verzweigung: jede mögliche Auswahl von Wegen ist ein eigener Schritt
+          for (const f of belegt) for (const wahl of oderAuswahlen(k)) liste.push({ knoten: k.id, wahl: wahl.join('+'), danach: mit(m, [f], wahl) })
+        }
         break
       case 'xor':
       case 'ereignisgateway':
@@ -224,6 +304,18 @@ export function zaehleAusfuehrungen(g: TokenGraph, anteil: Map<string, number>, 
         if (k.typ === 'und') {
           if (!k.rein.every((r) => (m.get(r) ?? 0) > 0)) continue
           m = mit(m, k.rein, k.raus)
+        } else if (istOderZu(k)) {
+          if (!oderZuBereit(k, m)) continue
+          m = mit(
+            m,
+            k.rein.filter((r) => (m.get(r) ?? 0) > 0),
+            k.raus,
+          )
+        } else if (k.typ === 'oder') {
+          // jeder Weg unabhängig nach seinem Anteil, der Standardweg nur, wenn keiner gewählt wurde
+          const wahl = k.raus.filter((o) => o !== k.standard && zufall() < (anteil.get(o) ?? 0.5))
+          if (wahl.length === 0 && k.standard) wahl.push(k.standard)
+          m = mit(m, [f], wahl)
         } else if (k.typ === 'xor' || k.typ === 'ereignisgateway') {
           let wurf = zufall()
           let wahl = k.raus[k.raus.length - 1]

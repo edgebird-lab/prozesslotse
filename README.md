@@ -6,7 +6,7 @@ Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zei
 
 ## Was es kann
 
-- **Geführter Assistent statt Zeichenwerkzeug.** Der Ablauf entsteht aus Antworten auf „Was passiert als Nächstes?“ und fünf Bausteinen: Aufgabe, Entscheidung, Gleichzeitig, Wiederholung, Warten. Der Assistent führt nacheinander durch jeden Zweig einer Verzweigung.
+- **Geführter Assistent statt Zeichenwerkzeug.** Der Ablauf entsteht aus Antworten auf „Was passiert als Nächstes?“ und sechs Bausteinen: Aufgabe, Entscheidung, Mehrere Wege (ODER), Gleichzeitig, Wiederholung, Warten. Der Assistent führt nacheinander durch jeden Zweig einer Verzweigung.
 - **Rückfragen und Korrekturschleifen.** Jeder Ausgang einer Entscheidung führt weiter, beendet den Prozess oder springt zu einem früheren Schritt zurück. Eine Entscheidung kann auch davon abhängen, was zuerst passiert (Antwort des Kunden, Stornierung, Ablauf einer Frist), in BPMN ein ereignisbasiertes Gateway.
 - **Korrekt durch Bauweise und Prüfung.** Jede Verzweigung wird automatisch wieder zusammengeführt, Rücksprünge werden zu sauberen Bereichen (blockstrukturiertes Modell). Was die Bauweise allein nicht verhindert, etwa ein Prozessende innerhalb von „Gleichzeitig“ oder eine Entscheidung, deren Ausgänge alle zurückspringen, melden die Prüfregeln als Fehler. Dazu kommen Anteile ungleich 100 %, fehlende Angaben und Benennungen gegen die 7PMG-Richtlinien. Ein Tokenspiel nach den Ausführungsregeln von BPMN bestätigt in den Tests: Meldet die Prüfung keinen Fehler, ist das exportierte Diagramm sound.
 - **Normgerechtes BPMN 2.0** mit einer Bahn je Rolle, Benutzer- und manuellen Aufgaben, Ereignissen und Diagramm-Informationen (DI). Die Datei öffnet sich in bpmn.io, Camunda Modeler oder Signavio.
@@ -113,7 +113,7 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build
 - Wartezeiten durch Auslastung gehen nicht in die Durchlaufzeit ein; dafür stehen die geschätzten Liegezeiten. Das Warteschlangenmodell bewertet nur, ab wann eine Rolle zum Engpass wird. Es nimmt zufällig eintreffende Arbeit an und ist für geplante, gebündelte Arbeit eher zu vorsichtig.
 - Bei „Gleichzeitig“ gelten die Zweige als unabhängig. Arbeitet dieselbe Person in mehreren Zweigen, ist die berechnete Dauer zu niedrig; ein Hinweis meldet das.
 - Rücksprünge führen nur zu früheren Schritten derselben oder einer umgebenden Ebene, nie aus „Gleichzeitig“ heraus.
-- Noch nicht abbildbar: inklusive Verzweigung (OR), Mehrfachinstanzen („für jede Position“, nur als Wiederholung angenähert), Abbruch und Eskalation über Randereignisse, Unterprozesse, Nachrichten zwischen Organisationen (Pools).
+- Noch nicht abbildbar (in Arbeit, siehe [Modellierung, Format 3](docs/modellierung-v3.md)): Mehrfachinstanzen („für jede Position“, nur als Wiederholung angenähert), Abbruch und Eskalation über Randereignisse, Unterprozesse, Nachrichten zwischen Organisationen (Pools).
 
 ## Lizenz
 

@@ -157,6 +157,6 @@ describe('Dateiformat', () => {
     }
     entferne(v1.ist.ablauf)
     expect(leseProjektText(JSON.stringify(v1))).toEqual(v2)
-    expect(beispielLieferdienst().formatVersion).toBe(2)
+    expect(beispielLieferdienst().formatVersion).toBe(3)
   })
 })

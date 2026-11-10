@@ -17,6 +17,7 @@ Quelltext: [`src/modell/typen.ts`](../src/modell/typen.ts)
 | Aufgabe | Ein Arbeitsschritt einer Rolle | Benutzeraufgabe (digitales System) oder manuelle Aufgabe (Papier, Telefon) | Name, Rolle, System, Bearbeitungszeit, Liegezeit davor, Art (normal, Prüfung, Freigabe), Medienbruch, Abhängigkeit vom Vorgänger |
 | Entscheidung (Prüfung/Angabe) | Entweder-oder nach Daten, genau ein Ausgang | Exklusives Gateway (Raute mit X), Verzweigung und Zusammenführung | Frage, Ausgänge mit Bezeichnung und Anteil (Summe 100 %), „Danach“ je Ausgang |
 | Entscheidung (was zuerst passiert) | Es geht dort weiter, wo zuerst ein Ereignis eintritt | Ereignisbasiertes Gateway; jeder Ausgang beginnt mit einem Zwischenereignis (Nachricht oder Zeit) | wie oben, dazu je Ausgang Art des Ereignisses und mittlere Wartezeit |
+| Mehrere Wege möglich (ODER) | Je nach Fall laufen einer, mehrere oder alle Wege; weiter, wenn alle gewählten fertig sind | Inklusives Gateway (Raute mit Kreis), Standardfluss für „keiner davon“ | Frage, Wege mit eigenem Anteil (unabhängig, Summe beliebig), optional ein Weg „wenn keiner zutrifft“ |
 | Gleichzeitig | Alle Zweige laufen, weiter erst, wenn alle fertig sind | Paralleles Gateway (Raute mit +) | mindestens zwei Zweige |
 | Wiederholung | Schritte laufen mindestens einmal, danach mit Wahrscheinlichkeit p erneut | Exklusives Gateway vorn (Zusammenführung) und hinten (Frage) mit Rückfluss | Frage, Wiederholungsanteil p < 100 % |
 | Warten | Der Vorgang wartet auf einen Zeitpunkt oder eine Nachricht | Zwischenereignis mit Uhr oder Brief | Name, Art, Dauer |
@@ -52,7 +53,7 @@ Wählt man „zurück zu X“, fasst [`setzeRuecksprung`](../src/modell/operatio
 
 ## Projekt
 
-Gespeichert wird ein `Projekt` mit Ist-Prozess, optionalem Soll-Prozess, den übernommenen Maßnahmen und den verworfenen Vorschlägen. Die Datei trägt `formatVersion` (aktuell 2). Beim Laden prüft [`speicher.ts`](../src/modell/speicher.ts) die Struktur, stellt Dateien im Format 1 automatisch um und lehnt fremde oder beschädigte Dateien mit einer verständlichen Meldung ab.
+Gespeichert wird ein `Projekt` mit Ist-Prozess, optionalem Soll-Prozess, den übernommenen Maßnahmen und den verworfenen Vorschlägen. Die Datei trägt `formatVersion` (aktuell 3; Format 3 bringt die ODER-Verzweigung, siehe [Modellierung, Format 3](modellierung-v3.md)). Beim Laden prüft [`speicher.ts`](../src/modell/speicher.ts) die Struktur, stellt Dateien in den Formaten 1 und 2 automatisch um und lehnt fremde oder beschädigte Dateien mit einer verständlichen Meldung ab.
 
 ## Prüfregeln
 

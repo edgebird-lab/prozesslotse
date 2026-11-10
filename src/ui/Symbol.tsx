@@ -7,6 +7,7 @@ export type SymbolArt =
   | 'benutzer'
   | 'xor'
   | 'und'
+  | 'oder'
   | 'wiederholung'
   | 'warten-zeit'
   | 'warten-nachricht'
@@ -90,6 +91,8 @@ function inhalt(art: SymbolArt) {
       return raute(<path d="M12 12 20 20M20 12 12 20" {...strich} strokeWidth={2} />)
     case 'und':
       return raute(<path d="M16 10.5v11M10.5 16h11" {...strich} strokeWidth={2} />)
+    case 'oder':
+      return raute(<circle cx="16" cy="16" r="5.2" {...strich} strokeWidth={2} />)
     case 'wiederholung':
       return (
         <>
