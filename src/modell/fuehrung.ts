@@ -2,7 +2,7 @@
  * Führung durch den Ablauf: Wo steht die Einfügeposition, wohin springt sie
  * nach dem Einfügen und was passiert bei „Abschnitt fertig“.
  */
-import { blockTitel, findeBlock, findeSequenz, liegtInParallele } from './operationen'
+import { bereichTitel, blockTitel, findeBlock, findeSequenz, liegtInParallele } from './operationen'
 import type { Block, Cursor, Prozess } from './typen'
 
 export interface Ort {
@@ -28,6 +28,7 @@ function bereichText(p: Prozess, sequenzId: string): string {
     return `im Ausgang „${z?.bezeichnung || '?'}“ von „${b.frage || 'Entscheidung'}“`
   }
   if (b.typ === 'parallel') return `in Zweig ${b.zweige.findIndex((x) => x.id === sequenzId) + 1} von „Gleichzeitig“`
+  if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return `im Bereich mit Rücksprung ab „${b.koerper.schritte[0] ? bereichTitel(b.koerper.schritte[0]) : '…'}“`
   if (b.typ === 'wiederholung') return `in der Wiederholung „${b.frage || 'Wiederholung'}“`
   return 'im Ablauf'
 }
@@ -38,7 +39,7 @@ export function beschreibeCursor(p: Prozess, c: Cursor): Ort {
   const vorgaenger = c.index > 0 ? (schritte[c.index - 1] ?? null) : null
   const unerreichbar = schritte
     .slice(0, c.index)
-    .some((b) => b.typ === 'entscheidung' && b.zweige.length > 0 && b.zweige.every((z) => z.ende !== null))
+    .some((b) => b.typ === 'entscheidung' && b.zweige.length > 0 && b.zweige.every((z) => z.ende !== null || z.zurueckZu !== null))
   const ziel = abschnittFertig(p, c)
   let weiterText = 'Ablauf fertig, weiter zum Prüfen'
   if (ziel !== 'fertig') {

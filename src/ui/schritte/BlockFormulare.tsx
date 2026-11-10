@@ -2,16 +2,28 @@ import { useState } from 'react'
 import { neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
 import { blockTitel } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
-import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type Id, type MediumArt, type Parallel, type Warten, type Wiederholung } from '../../modell/typen'
+import type { RuecksprungZiel } from '../../modell/operationen'
+import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Parallel, type Warten, type Wiederholung } from '../../modell/typen'
 import { formatiereProzent } from '../../modell/zeit'
 import { Auswahl, Feld, ProzentEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
 import { Kreuz, Symbol } from '../Symbol'
 
+/** Wie es nach einem Ausgang weitergeht. */
+export type Danach = { art: 'weiter' } | { art: 'ende' } | { art: 'zurueck'; zielId: Id }
+
 export interface FormularKontext {
   vorgaenger: Block | null
   inParallele: boolean
   neu: boolean
+  /** Mögliche Ziele für „zurück zu …“ */
+  ziele?: RuecksprungZiel[]
+  /**
+   * Ändert, wie es nach einem Ausgang weitergeht. Bei bestehenden Entscheidungen
+   * verändert ein Rücksprung die Struktur; das übernimmt der Aufrufer. Ohne
+   * Rückruf (neuer Entwurf) merkt sich das Formular das Ziel im Ausgang.
+   */
+  setzeDanach?: (zweigId: Id, danach: Danach) => void
 }
 
 interface Props<B extends Block> {
@@ -246,57 +258,139 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
   )
 }
 
+function danachVon(z: EntscheidungsZweig): string {
+  if (z.ende !== null) return 'ende'
+  if (z.zurueckZu !== null) return `zurueck:${z.zurueckZu}`
+  return 'weiter'
+}
+
 function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidung>) {
+  const { p } = useApp()
   const summe = e.zweige.reduce((s, z) => s + z.anteil, 0)
   const passt = Math.abs(summe - 1) < 1e-6
-  const setzeZweig = (id: Id, w: Partial<Entscheidung['zweige'][number]>) => onAendern({ ...e, zweige: e.zweige.map((z) => (z.id === id ? { ...z, ...w } : z)) })
+  const ereignisse = e.art === 'ereignis'
+  const setzeZweig = (id: Id, w: Partial<EntscheidungsZweig>) => onAendern({ ...e, zweige: e.zweige.map((z) => (z.id === id ? { ...z, ...w } : z)) })
   const verteile = () => {
     const n = e.zweige.length
     onAendern({ ...e, zweige: e.zweige.map((z) => ({ ...z, anteil: summe > 0 ? z.anteil / summe : 1 / n })) })
   }
+  const danach = (z: EntscheidungsZweig, wert: string) => {
+    const d: Danach = wert === 'ende' ? { art: 'ende' } : wert.startsWith('zurueck:') ? { art: 'zurueck', zielId: wert.slice(8) } : { art: 'weiter' }
+    if (kontext.setzeDanach) return kontext.setzeDanach(z.id, d)
+    setzeZweig(z.id, { ende: d.art === 'ende' ? (z.ende ?? '') : null, zurueckZu: d.art === 'zurueck' ? d.zielId : null })
+  }
+  const ziele = kontext.ziele ?? []
   return (
     <>
-      <Feld label="Welche Frage wird entschieden?" hilfe="Als Frage mit Fragezeichen, z. B. „Ware vorrätig?“.">
-        {(id) => <input id={id} type="text" autoFocus={kontext.neu} value={e.frage} placeholder="z. B. Ware vorrätig?" onChange={(ev) => onAendern({ ...e, frage: ev.target.value })} />}
+      <Auswahl
+        label="Wovon hängt ab, wie es weitergeht?"
+        wert={e.art}
+        spalten={2}
+        optionen={[
+          { wert: 'daten', text: 'Von einer Prüfung oder Angabe', beschreibung: 'z. B. „Ware vorrätig?“', symbol: <Symbol art="xor" groesse={24} /> },
+          { wert: 'ereignis', text: 'Davon, was zuerst passiert', beschreibung: 'z. B. Antwort oder Frist', symbol: <Symbol art="ereignisgateway" groesse={24} /> },
+        ]}
+        onAendern={(art) =>
+          onAendern({
+            ...e,
+            art,
+            zweige: e.zweige.map((z) => ({ ...z, ereignis: art === 'ereignis' ? (z.ereignis ?? { art: 'nachricht', dauerMin: 60 * p.arbeitsstundenProTag }) : null })),
+          })
+        }
+      />
+      <Feld
+        label={ereignisse ? 'Worauf wird gewartet?' : 'Welche Frage wird entschieden?'}
+        hilfe={ereignisse ? 'z. B. „Antwort des Kunden?“' : 'Als Frage mit Fragezeichen, z. B. „Ware vorrätig?“.'}
+      >
+        {(id) => (
+          <input
+            id={id}
+            type="text"
+            autoFocus={kontext.neu}
+            value={e.frage}
+            placeholder={ereignisse ? 'z. B. Antwort des Kunden?' : 'z. B. Ware vorrätig?'}
+            onChange={(ev) => onAendern({ ...e, frage: ev.target.value })}
+          />
+        )}
       </Feld>
       <fieldset className="zweige">
-        <legend>Welche Ausgänge gibt es, und wie oft kommen sie vor?</legend>
-        {e.zweige.map((z, i) => (
-          <div key={z.id} className="zweig-zeile">
-            <input type="text" aria-label={`Antwort ${i + 1}`} value={z.bezeichnung} placeholder={`Antwort ${i + 1}`} onChange={(ev) => setzeZweig(z.id, { bezeichnung: ev.target.value })} />
-            <ProzentEingabe ariaLabel={`Anteil von „${z.bezeichnung || `Antwort ${i + 1}`}“`} anteil={z.anteil} onAendern={(anteil) => setzeZweig(z.id, { anteil })} />
-            {!kontext.inParallele && (
-              <label className="kontroll">
-                <input type="checkbox" checked={z.ende !== null} onChange={(ev) => setzeZweig(z.id, { ende: ev.target.checked ? '' : null })} />
-                endet den Prozess
-              </label>
-            )}
-            {e.zweige.length > 2 && (
-              <button
-                type="button"
-                className="knopf-icon"
-                aria-label={`Ausgang „${z.bezeichnung || i + 1}“ entfernen`}
-                title="Ausgang entfernen"
-                onClick={() => {
-                  if (z.schritte.length > 0 && !window.confirm(`Der Ausgang „${z.bezeichnung}“ enthält ${z.schritte.length} Schritte. Mit entfernen?`)) return
-                  onAendern({ ...e, zweige: e.zweige.filter((x) => x.id !== z.id) })
-                }}
-              >
-                <Kreuz />
-              </button>
-            )}
-            {z.ende !== null && (
-              <input
-                type="text"
-                className="zweig-ende"
-                aria-label={`Ergebnis, wenn „${z.bezeichnung}“`}
-                value={z.ende}
-                placeholder="Mit welchem Ergebnis? z. B. Bestellung storniert"
-                onChange={(ev) => setzeZweig(z.id, { ende: ev.target.value })}
-              />
-            )}
-          </div>
-        ))}
+        <legend>{ereignisse ? 'Was kann zuerst passieren, und wie oft?' : 'Welche Ausgänge gibt es, und wie oft kommen sie vor?'}</legend>
+        {e.zweige.map((z, i) => {
+          const name = z.bezeichnung || (ereignisse ? `Ereignis ${i + 1}` : `Antwort ${i + 1}`)
+          return (
+            <div key={z.id} className="zweig-block">
+              <div className="zweig-zeile">
+                <input
+                  type="text"
+                  aria-label={ereignisse ? `Ereignis ${i + 1}` : `Antwort ${i + 1}`}
+                  value={z.bezeichnung}
+                  placeholder={ereignisse ? 'z. B. Korrektur erhalten' : `Antwort ${i + 1}`}
+                  onChange={(ev) => setzeZweig(z.id, { bezeichnung: ev.target.value })}
+                />
+                <ProzentEingabe ariaLabel={`Anteil von „${name}“`} anteil={z.anteil} onAendern={(anteil) => setzeZweig(z.id, { anteil })} />
+                {e.zweige.length > 2 && (
+                  <button
+                    type="button"
+                    className="knopf-icon"
+                    aria-label={`Ausgang „${name}“ entfernen`}
+                    title="Ausgang entfernen"
+                    onClick={() => {
+                      if (z.schritte.length > 0 && !window.confirm(`Der Ausgang „${name}“ enthält ${z.schritte.length} Schritte. Mit entfernen?`)) return
+                      onAendern({ ...e, zweige: e.zweige.filter((x) => x.id !== z.id) })
+                    }}
+                  >
+                    <Kreuz />
+                  </button>
+                )}
+              </div>
+              {ereignisse && z.ereignis && (
+                <div className="zweig-zeile zweig-unter">
+                  <select
+                    aria-label={`Art von „${name}“`}
+                    value={z.ereignis.art}
+                    onChange={(ev) => setzeZweig(z.id, { ereignis: { ...z.ereignis!, art: ev.target.value as 'zeit' | 'nachricht' } })}
+                  >
+                    <option value="nachricht">Eine Nachricht kommt an</option>
+                    <option value="zeit">Eine Frist läuft ab</option>
+                  </select>
+                  <span className="leise">nach im Schnitt</span>
+                  <ZeitEingabe
+                    ariaLabel={`Wartezeit bis „${name}“`}
+                    wert={z.ereignis.dauerMin}
+                    stundenProTag={p.arbeitsstundenProTag}
+                    onAendern={(dauerMin) => setzeZweig(z.id, { ereignis: { ...z.ereignis!, dauerMin } })}
+                  />
+                </div>
+              )}
+              <div className="zweig-zeile zweig-unter">
+                <label className="danach">
+                  <span className="leise">Danach:</span>
+                  <select aria-label={`Wie es nach „${name}“ weitergeht`} value={danachVon(z)} onChange={(ev) => danach(z, ev.target.value)}>
+                    <option value="weiter">weiter im Ablauf</option>
+                    {!kontext.inParallele && <option value="ende">Prozess endet</option>}
+                    {!kontext.inParallele &&
+                      ziele.map((t) => (
+                        <option key={t.id} value={`zurueck:${t.id}`}>
+                          zurück zu „{t.titel}“
+                        </option>
+                      ))}
+                    {z.zurueckZu !== null && !ziele.some((t) => t.id === z.zurueckZu) && <option value={`zurueck:${z.zurueckZu}`}>zurück (Ziel nicht mehr gültig)</option>}
+                  </select>
+                </label>
+                {z.ende !== null && (
+                  <input
+                    type="text"
+                    className="zweig-ende"
+                    aria-label={`Ergebnis, wenn „${name}“`}
+                    value={z.ende}
+                    placeholder="Mit welchem Ergebnis? z. B. Bestellung storniert"
+                    onChange={(ev) => setzeZweig(z.id, { ende: ev.target.value })}
+                  />
+                )}
+              </div>
+            </div>
+          )
+        })}
         <div className={`summe${passt ? '' : ' summe-falsch'}`} aria-live="polite">
           Zusammen: {formatiereProzent(summe, 1)}
           {!passt && (
@@ -305,7 +399,11 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
             </button>
           )}
         </div>
-        <button type="button" className="knopf knopf-leise" onClick={() => onAendern({ ...e, zweige: [...e.zweige, neuerZweig('', 0)] })}>
+        <button
+          type="button"
+          className="knopf knopf-leise"
+          onClick={() => onAendern({ ...e, zweige: [...e.zweige, neuerZweig('', 0, { ereignis: ereignisse ? { art: 'nachricht', dauerMin: 60 * p.arbeitsstundenProTag } : null })] })}
+        >
           + Ausgang
         </button>
       </fieldset>

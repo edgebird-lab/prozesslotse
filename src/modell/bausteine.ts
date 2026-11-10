@@ -48,13 +48,14 @@ export function neueAufgabe(werte: Partial<Aufgabe> = {}): Aufgabe {
 }
 
 export function neuerZweig(bezeichnung: string, anteil: number, werte: Partial<EntscheidungsZweig> = {}): EntscheidungsZweig {
-  return { id: neueId('zw'), schritte: [], bezeichnung, anteil, ende: null, ...werte }
+  return { id: neueId('zw'), schritte: [], bezeichnung, anteil, ende: null, zurueckZu: null, ereignis: null, ...werte }
 }
 
 export function neueEntscheidung(werte: Partial<Entscheidung> = {}): Entscheidung {
   return {
     typ: 'entscheidung',
     id: neueId('ent'),
+    art: 'daten',
     frage: '',
     zweige: [neuerZweig('Ja', 0.5), neuerZweig('Nein', 0.5)],
     ...werte,
@@ -73,11 +74,17 @@ export function neueWiederholung(werte: Partial<Wiederholung> = {}): Wiederholun
   return {
     typ: 'wiederholung',
     id: neueId('wdh'),
+    modus: 'anteil',
     frage: 'Nacharbeit nötig?',
     anteilWiederholung: 0.1,
     koerper: neueSequenz(),
     ...werte,
   }
+}
+
+/** Rücksprungbereich um die gegebenen Schritte; legt der Assistent bei „zurück zu …“ an. */
+export function neuerRuecksprungBereich(schritte: Sequenz['schritte']): Wiederholung {
+  return { typ: 'wiederholung', id: neueId('rsp'), modus: 'ruecksprung', frage: '', anteilWiederholung: 0, koerper: neueSequenz(schritte) }
 }
 
 export function neuesWarten(werte: Partial<Warten> = {}): Warten {

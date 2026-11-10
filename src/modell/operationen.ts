@@ -3,6 +3,7 @@
  * Prozess und lassen den alten unverändert; darauf bauen Rückgängig und der
  * Ist-Soll-Vergleich auf.
  */
+import { neuerRuecksprungBereich } from './bausteine'
 import type { Aufgabe, Block, Id, Prozess, Sequenz } from './typen'
 
 export interface Fundstelle {
@@ -175,7 +176,7 @@ export function mediumName(p: Prozess, id: Id | null): string {
   return p.medien.find((m) => m.id === id)?.name || 'ohne Angabe'
 }
 
-/** Name für Sätze wie „gleichzeitig mit …“: Wiederholungen heißen nach ihrem ersten Schritt. */
+/** Name für Sätze wie „gleichzeitig mit …“ oder „zurück zu …“: Wiederholungen heißen nach ihrem ersten Schritt. */
 export function bereichTitel(b: Block): string {
   if (b.typ === 'wiederholung') {
     const erste = b.koerper.schritte[0]
@@ -194,8 +195,144 @@ export function blockTitel(b: Block): string {
     case 'parallel':
       return `Gleichzeitig (${b.zweige.length} Zweige)`
     case 'wiederholung':
+      if (b.modus === 'ruecksprung') return `Bereich mit Rücksprung ab „${b.koerper.schritte[0] ? bereichTitel(b.koerper.schritte[0]) : '…'}“`
       return b.frage ? `Wiederholung: ${b.frage}` : 'Wiederholung'
     case 'warten':
       return b.name || 'Warten'
   }
+}
+
+// ---------------------------------------------------------------------------
+// Rücksprünge
+
+export interface RuecksprungZiel {
+  /** Block, zu dessen Anfang zurückgesprungen wird. */
+  id: Id
+  titel: string
+}
+
+/**
+ * Mögliche Ziele für „zurück zu …“ aus einer Entscheidung an der Stelle
+ * (sequenzId, index): alle Schritte davor in derselben Sequenz und in den
+ * umgebenden Sequenzen, aber nicht über „Gleichzeitig“ hinweg (das gäbe eine
+ * Verklemmung). `mitSelbst`: die Entscheidung an `index` selbst ist auch ein Ziel.
+ */
+export function ruecksprungZiele(p: Prozess, sequenzId: Id, index: number, mitSelbst: boolean): RuecksprungZiel[] {
+  const ebenen: RuecksprungZiel[][] = []
+  let seq = findeSequenz(p, sequenzId)
+  let bis = mitSelbst ? index : index - 1
+  while (seq) {
+    // Der erste Schritt eines Rücksprungbereichs ist derselbe Punkt wie der Bereich selbst; angeboten wird der Bereich.
+    const ab = seq.besitzer?.typ === 'wiederholung' && seq.besitzer.modus === 'ruecksprung' ? 1 : 0
+    ebenen.push(seq.sequenz.schritte.slice(ab, bis + 1).map((b) => ({ id: b.id, titel: bereichTitel(b) })))
+    const besitzer = seq.besitzer
+    if (!besitzer || besitzer.typ === 'parallel') break
+    const ort = findeBlock(p, besitzer.id)
+    if (!ort) break
+    seq = findeSequenz(p, ort.sequenz.id)
+    bis = ort.index
+  }
+  // von außen nach innen, also in Leserichtung des Prozesses
+  return ebenen.reverse().flat()
+}
+
+/**
+ * Lässt einen Ausgang zum Anfang von `zielId` zurückspringen. Dafür wird der
+ * Abschnitt vom Ziel bis zum Block, der die Entscheidung enthält, zu einem
+ * Rücksprungbereich zusammengefasst. Ist das Ziel schon ein Rücksprungbereich,
+ * wird dieser erweitert. So bleibt das Modell blockstrukturiert.
+ */
+export function setzeRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id, zielId: Id): Prozess {
+  const ziel = findeBlock(p, zielId)
+  const ent = findeBlock(p, entscheidungId)
+  if (!ziel || !ent) return p
+  const kette = [...ent.vorfahren, ent.block]
+  const imZiel = kette.findIndex((b) => ziel.sequenz.schritte.includes(b))
+  if (imZiel < 0) return p
+  // Liegt auf dem Weg vom Zielabschnitt zur Entscheidung ein „Gleichzeitig“ (auch als Block im Zielabschnitt selbst), wäre der Rücksprung eine Verklemmung.
+  if (kette.slice(imZiel).some((b) => b.typ === 'parallel')) return p
+  const i = ziel.index
+  const j = ziel.sequenz.schritte.indexOf(kette[imZiel])
+  if (j < i) return p
+
+  let bereichId: Id
+  let q: Prozess
+  const zielBlock = ziel.block
+  const besitzer = findeSequenz(p, ziel.sequenz.id)?.besitzer
+  if (i === 0 && j === ziel.sequenz.schritte.length - 1 && besitzer?.typ === 'wiederholung' && besitzer.modus === 'ruecksprung') {
+    // Der Abschnitt ist schon genau ein Rücksprungbereich: denselben nutzen statt einen zweiten hineinzulegen
+    bereichId = besitzer.id
+    q = p
+  } else if (zielBlock.typ === 'wiederholung' && zielBlock.modus === 'ruecksprung') {
+    bereichId = zielBlock.id
+    const erweitert = { ...zielBlock, koerper: { ...zielBlock.koerper, schritte: [...zielBlock.koerper.schritte, ...ziel.sequenz.schritte.slice(i + 1, j + 1)] } }
+    q = ersetzeBereich(p, ziel.sequenz.id, i, j - i + 1, [erweitert])
+  } else {
+    const bereich = neuerRuecksprungBereich(ziel.sequenz.schritte.slice(i, j + 1))
+    bereichId = bereich.id
+    q = ersetzeBereich(p, ziel.sequenz.id, i, j - i + 1, [bereich])
+  }
+  q = aendereBlock(q, entscheidungId, (b) =>
+    b.typ === 'entscheidung' ? { ...b, zweige: b.zweige.map((z) => (z.id === zweigId ? { ...z, ende: null, zurueckZu: bereichId } : z)) } : b,
+  )
+  return normalisiere(q)
+}
+
+/** Entfernt den Rücksprung eines Ausgangs; ein danach leerer Bereich wird aufgelöst. */
+export function entferneRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id): Prozess {
+  return normalisiere(
+    aendereBlock(p, entscheidungId, (b) =>
+      b.typ === 'entscheidung' ? { ...b, zweige: b.zweige.map((z) => (z.id === zweigId ? { ...z, zurueckZu: null } : z)) } : b,
+    ),
+  )
+}
+
+/** Alle Ziele, auf die Ausgänge zurückspringen. */
+function ruecksprungZielIds(p: Prozess): Set<Id> {
+  const ziele = new Set<Id>()
+  for (const { block } of durchlaufe(p.ablauf)) {
+    if (block.typ === 'entscheidung') for (const z of block.zweige) if (z.zurueckZu) ziele.add(z.zurueckZu)
+  }
+  return ziele
+}
+
+/**
+ * Räumt nach Änderungen auf: Rücksprungbereiche, auf die kein Ausgang mehr
+ * zeigt, werden aufgelöst; Rücksprünge auf nicht mehr vorhandene Bereiche
+ * werden entfernt.
+ */
+export function normalisiere(p: Prozess): Prozess {
+  const ziele = ruecksprungZielIds(p)
+  let geaendert = false
+  const aufgeloest = abbildeAblauf(p, (schritte) => {
+    if (!schritte.some((b) => b.typ === 'wiederholung' && b.modus === 'ruecksprung' && !ziele.has(b.id))) return schritte
+    geaendert = true
+    return schritte.flatMap((b) => (b.typ === 'wiederholung' && b.modus === 'ruecksprung' && !ziele.has(b.id) ? b.koerper.schritte : [b]))
+  })
+  const bereiche = new Set<Id>()
+  for (const { block } of durchlaufe(aufgeloest.ablauf)) if (block.typ === 'wiederholung' && block.modus === 'ruecksprung') bereiche.add(block.id)
+  const verwaist = [...ziele].filter((id) => !bereiche.has(id))
+  if (verwaist.length === 0) return geaendert ? aufgeloest : p
+  return abbildeAblauf(aufgeloest, (schritte) =>
+    schritte.map((b) =>
+      b.typ === 'entscheidung' && b.zweige.some((z) => z.zurueckZu && verwaist.includes(z.zurueckZu))
+        ? { ...b, zweige: b.zweige.map((z) => (z.zurueckZu && verwaist.includes(z.zurueckZu) ? { ...z, zurueckZu: null } : z)) }
+        : b,
+    ),
+  )
+}
+
+/** Verlässt der Ablauf den Block vorzeitig (Prozessende oder Rücksprung nach außen)? */
+export function verlaesstBlock(b: Block): boolean {
+  const innen = new Set<Id>()
+  const sammle = (x: Block) => {
+    if (x.typ === 'wiederholung') innen.add(x.id)
+    for (const s of kinderSequenzen(x)) s.schritte.forEach(sammle)
+  }
+  sammle(b)
+  const pruefe = (x: Block): boolean => {
+    if (x.typ === 'entscheidung' && x.zweige.some((z) => z.ende !== null || (z.zurueckZu !== null && !innen.has(z.zurueckZu)))) return true
+    return kinderSequenzen(x).some((s) => s.schritte.some(pruefe))
+  }
+  return pruefe(b)
 }

@@ -1,4 +1,4 @@
-import { beispielProjekt } from '../../modell/beispiel'
+import { beispielOnlineProjekt, beispielProjekt } from '../../modell/beispiel'
 import type { AusloeserArt } from '../../modell/typen'
 import { Auswahl, Feld, ZahlEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
@@ -29,6 +29,9 @@ export function RahmenSchritt() {
           <div className="knopfreihe">
             <button type="button" className="knopf knopf-haupt" onClick={() => dispatch({ typ: 'laden', projekt: beispielProjekt(), schritt: 'pruefen' })}>
               Mit dem Beispiel „Lieferdienst“ starten
+            </button>
+            <button type="button" className="knopf" onClick={() => dispatch({ typ: 'laden', projekt: beispielOnlineProjekt(), schritt: 'ablauf' })}>
+              Beispiel „Onlinebestellung“ mit Rücksprung
             </button>
             <span className="oder">oder unten den eigenen Prozess anlegen</span>
           </div>

@@ -7,7 +7,7 @@
  * (u. a. Reijers & Limam Mansar 2005: Parallelisierung, Zusammenlegen von
  * Aufgaben, Kontrollen reduzieren, Integration statt Medienbruch).
  */
-import { bereichTitel, blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, kinderSequenzen, mediumName, rolleName } from '../modell/operationen'
+import { bereichTitel, blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, kinderSequenzen, mediumName, rolleName, verlaesstBlock } from '../modell/operationen'
 import { istDigital, type Aufgabe, type Block, type Id, type Prozess, type Sequenz } from '../modell/typen'
 import { formatiereDauer, formatiereProzent } from '../modell/zeit'
 import { berechneKennzahlen, type Kennzahlen } from './kennzahlen'
@@ -52,11 +52,6 @@ function rollenIn(b: Block): Set<Id | null> {
   return rollen
 }
 
-function kannEnden(b: Block): boolean {
-  if (b.typ === 'entscheidung' && b.zweige.some((z) => z.ende !== null)) return true
-  return kinderSequenzen(b).some((s) => s.schritte.some(kannEnden))
-}
-
 function alleSequenzen(p: Prozess): Sequenz[] {
   const liste: Sequenz[] = [p.ablauf]
   for (const { block } of durchlaufe(p.ablauf)) liste.push(...kinderSequenzen(block))
@@ -84,7 +79,7 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
       const a = i > 0 ? seq.schritte[i - 1] : null
 
       // 1. Gleichzeitig ausführen
-      if (a && b.typ === 'aufgabe' && b.brauchtVorgaenger === false && b.rolleId !== null && !rollenIn(a).has(b.rolleId) && !kannEnden(a)) {
+      if (a && b.typ === 'aufgabe' && b.brauchtVorgaenger === false && b.rolleId !== null && !rollenIn(a).has(b.rolleId) && !verlaesstBlock(a)) {
         const parId = `par_${b.id}`
         vorschlaege.push({
           schluessel: `parallelisieren:${a.id}:${b.id}`,
@@ -176,7 +171,7 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
       }
 
       // 4. Nacharbeit senken
-      if (b.typ === 'wiederholung' && b.anteilWiederholung >= NACHARBEIT_REGEL_SCHWELLE && b.anteilWiederholung < 1) {
+      if (b.typ === 'wiederholung' && b.modus === 'anteil' && b.anteilWiederholung >= NACHARBEIT_REGEL_SCHWELLE && b.anteilWiederholung < 1) {
         const neu = b.anteilWiederholung / 2
         vorschlaege.push({
           schluessel: `nacharbeit:${b.id}`,

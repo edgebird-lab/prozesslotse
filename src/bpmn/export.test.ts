@@ -1,11 +1,10 @@
 import { BpmnModdle } from 'bpmn-moddle'
 import { describe, expect, it } from 'vitest'
-import { zufallMitStartwert } from '../analyse/simulation'
-import { neueAufgabe, neueEntscheidung, neueParallel, neuerProzess, neueRolle, neuerZweig, neuesMedium, neuesWarten, neueWiederholung } from '../modell/bausteine'
+import { neuerProzess } from '../modell/bausteine'
 import { beispielLieferdienst } from '../modell/beispiel'
-import type { Block, Prozess, Sequenz } from '../modell/typen'
 import { erzeugeBpmn } from './export'
 import type { Layout, Rechteck } from './layout'
+import { zufallsProzess } from '../testhilfen/zufallsprozess'
 
 async function pruefeSchema(xml: string): Promise<void> {
   const moddle = BpmnModdle()
@@ -27,7 +26,7 @@ function segmentSchneidet(p: { x: number; y: number }, q: { x: number; y: number
 }
 
 /** Prüft die geometrischen Zusagen des Layouts und gibt Verstöße als Text zurück. */
-function geometrieFehler(l: Layout): string[] {
+export function geometrieFehler(l: Layout): string[] {
   const fehler: string[] = []
   const nachId = new Map(l.knoten.map((k) => [k.id, k]))
   for (let i = 0; i < l.knoten.length; i++) {
@@ -52,44 +51,6 @@ function geometrieFehler(l: Layout): string[] {
     if (!nachId.has(e.von) || !nachId.has(e.nach)) fehler.push(`${e.id} verweist ins Leere`)
   }
   return fehler
-}
-
-// Zufällige, gültige Prozesse für einen Belastungstest des Layouts
-function zufallsProzess(startwert: number): Prozess {
-  const zufall = zufallMitStartwert(startwert)
-  const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
-  const rollen = [neueRolle('A'), neueRolle('B'), neueRolle('C')]
-  const medien = [neuesMedium('Papier', 'papier'), neuesMedium('ERP', 'erp')]
-  let nr = 0
-  const aufgabe = () => neueAufgabe({ name: `Schritt ${++nr} erledigen`, rolleId: wahl(rollen).id, mediumId: wahl(medien).id, bearbeitungMin: 5 })
-
-  function sequenz(tiefe: number, inParallel: boolean, mindestens = 0): Block[] {
-    const anzahl = Math.max(mindestens, Math.floor(zufall() * 4))
-    return Array.from({ length: anzahl }, () => block(tiefe, inParallel))
-  }
-  function block(tiefe: number, inParallel: boolean): Block {
-    const r = zufall()
-    if (tiefe >= 3 || r < 0.45) return aufgabe()
-    if (r < 0.52) return neuesWarten({ name: 'Warten', dauerMin: 30 })
-    if (r < 0.75) {
-      const n = 2 + Math.floor(zufall() * 2)
-      const zweige = Array.from({ length: n }, (_, i) =>
-        neuerZweig(`Fall ${i + 1}`, 1 / n, {
-          schritte: sequenz(tiefe + 1, inParallel),
-          ende: !inParallel && i > 0 && zufall() < 0.3 ? `Ende ${i}` : null,
-        }),
-      )
-      return neueEntscheidung({ frage: 'Welcher Fall?', zweige })
-    }
-    if (r < 0.9) {
-      const par = neueParallel(2 + Math.floor(zufall() * 2))
-      par.zweige = par.zweige.map((z: Sequenz) => ({ ...z, schritte: sequenz(tiefe + 1, true, 1) }))
-      return par
-    }
-    return neueWiederholung({ frage: 'Nochmal?', koerper: { id: `k${++nr}`, schritte: sequenz(tiefe + 1, inParallel, 1) } })
-  }
-
-  return neuerProzess({ name: `Zufall ${startwert}`, rollen, medien, ablauf: { id: 'haupt', schritte: sequenz(0, false, 1) } })
 }
 
 describe('BPMN-Export', () => {

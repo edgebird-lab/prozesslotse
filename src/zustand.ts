@@ -2,7 +2,7 @@
  * Zustand der Oberfläche. Das Projekt (Ist, Soll, Maßnahmen) ist
  * rückgängig machbar; Schritt, Ansicht, Einfügeposition und Auswahl nicht.
  */
-import { findeBlock, findeSequenz } from './modell/operationen'
+import { findeBlock, findeSequenz, normalisiere } from './modell/operationen'
 import type { Cursor, Id, Projekt, Prozess } from './modell/typen'
 
 export type { Cursor }
@@ -96,7 +96,8 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
   switch (a.typ) {
     case 'prozess': {
       const alt = aktiverProzess(z)
-      const prozess = typeof a.aenderung === 'function' ? a.aenderung(alt) : a.aenderung
+      // Aufräumen: Rücksprungbereiche ohne Rücksprung auflösen (z. B. nach dem Löschen einer Entscheidung)
+      const prozess = normalisiere(typeof a.aenderung === 'function' ? a.aenderung(alt) : a.aenderung)
       if (prozess === alt) return { ...z, cursor: a.cursor !== undefined ? a.cursor : z.cursor, auswahl: a.auswahl !== undefined ? a.auswahl : z.auswahl }
       const projekt = z.ansicht === 'soll' && z.projekt.soll ? { ...z.projekt, soll: prozess } : { ...z.projekt, ist: prozess }
       const neu = mitVerlauf(z, projekt, a.zeit, a.gruppe)

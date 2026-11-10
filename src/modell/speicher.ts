@@ -37,11 +37,16 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       fordere(x.uebertragung === null || (istObj(x.uebertragung) && istZahl(x.uebertragung.minuten)), `${wo}: Übertragung ungültig.`)
       return
     case 'entscheidung':
-      fordere(istText(x.frage) && Array.isArray(x.zweige), `${wo}: Entscheidung unvollständig.`)
+      fordere(istText(x.frage) && Array.isArray(x.zweige) && (x.art === 'daten' || x.art === 'ereignis'), `${wo}: Entscheidung unvollständig.`)
       x.zweige.forEach((z, i) => {
         pruefeSequenz(z, `${wo}, Ausgang ${i + 1}`)
         const zweig = z as unknown as Obj
         fordere(istText(zweig.bezeichnung) && istZahl(zweig.anteil) && (zweig.ende === null || istText(zweig.ende)), `${wo}, Ausgang ${i + 1}: Angaben fehlen.`)
+        fordere(zweig.zurueckZu === null || istText(zweig.zurueckZu), `${wo}, Ausgang ${i + 1}: Rücksprung ungültig.`)
+        fordere(
+          zweig.ereignis === null || (istObj(zweig.ereignis) && istZahl(zweig.ereignis.dauerMin) && (zweig.ereignis.art === 'zeit' || zweig.ereignis.art === 'nachricht')),
+          `${wo}, Ausgang ${i + 1}: Ereignis ungültig.`,
+        )
       })
       return
     case 'parallel':
@@ -49,7 +54,7 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       x.zweige.forEach((z, i) => pruefeSequenz(z, `${wo}, Zweig ${i + 1}`))
       return
     case 'wiederholung':
-      fordere(istText(x.frage) && istZahl(x.anteilWiederholung), `${wo}: Wiederholung unvollständig.`)
+      fordere(istText(x.frage) && istZahl(x.anteilWiederholung) && (x.modus === 'anteil' || x.modus === 'ruecksprung'), `${wo}: Wiederholung unvollständig.`)
       pruefeSequenz(x.koerper, `${wo}, Körper`)
       return
     case 'warten':
@@ -70,9 +75,34 @@ function pruefeProzess(x: unknown, wo: string): asserts x is Prozess {
   pruefeSequenz(x.ablauf, `${wo}, Ablauf`)
 }
 
-/** Prüft geladene Daten und gibt sie als Projekt zurück; wirft `Formatfehler`. */
+/**
+ * Format 1 → 2: Entscheidungen bekommen eine Art und Ausgänge die Felder für
+ * Rücksprung und Ereignis, Wiederholungen einen Modus. Ändert die Daten an Ort und Stelle.
+ */
+function migriereVon1(prozess: unknown): void {
+  if (!istObj(prozess)) return
+  prozess.formatVersion = FORMAT_VERSION
+  const besuche = (x: unknown) => {
+    if (Array.isArray(x)) return x.forEach(besuche)
+    if (!istObj(x)) return
+    if (x.typ === 'entscheidung') {
+      x.art ??= 'daten'
+      if (Array.isArray(x.zweige)) for (const z of x.zweige) if (istObj(z)) Object.assign(z, { zurueckZu: z.zurueckZu ?? null, ereignis: z.ereignis ?? null })
+    }
+    if (x.typ === 'wiederholung') x.modus ??= 'anteil'
+    for (const wert of Object.values(x)) if (typeof wert === 'object' && wert !== null) besuche(wert)
+  }
+  besuche(prozess.ablauf)
+}
+
+/** Prüft geladene Daten und gibt sie als Projekt zurück; wirft `Formatfehler`. Ältere Formate werden umgestellt. */
 export function leseProjekt(daten: unknown): Projekt {
   fordere(istObj(daten), 'Die Datei enthält kein Prozesslotse-Projekt.')
+  if (daten.formatVersion === 1) {
+    migriereVon1(daten.ist)
+    if (daten.soll !== null) migriereVon1(daten.soll)
+    daten.formatVersion = FORMAT_VERSION
+  }
   fordere(daten.formatVersion === FORMAT_VERSION, `Dateiformat ${String(daten.formatVersion)} wird nicht unterstützt.`)
   pruefeProzess(daten.ist, 'Ist-Prozess')
   if (daten.soll !== null) pruefeProzess(daten.soll, 'Soll-Prozess')

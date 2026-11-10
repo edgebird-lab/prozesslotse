@@ -5,7 +5,7 @@
  * die geschätzten Durchschnittswerte; die Streuung entsteht also nur aus dem
  * Ablauf selbst. Mit festem Startwert ist das Ergebnis reproduzierbar.
  */
-import type { Block, Prozess } from '../modell/typen'
+import type { Block, Id, Prozess } from '../modell/typen'
 
 export interface Simulationsergebnis {
   anzahl: number
@@ -34,6 +34,8 @@ const MAX_WIEDERHOLUNGEN = 10_000
 interface Lauf {
   zeit: number
   beendet: boolean
+  /** Rücksprung zum Anfang dieses Bereichs */
+  rueck: Id | null
 }
 
 function laufeSequenz(schritte: Block[], zufall: () => number): Lauf {
@@ -41,19 +43,19 @@ function laufeSequenz(schritte: Block[], zufall: () => number): Lauf {
   for (const b of schritte) {
     const r = laufeBlock(b, zufall)
     zeit += r.zeit
-    if (r.beendet) return { zeit, beendet: true }
+    if (r.beendet || r.rueck) return { zeit, beendet: r.beendet, rueck: r.rueck }
   }
-  return { zeit, beendet: false }
+  return { zeit, beendet: false, rueck: null }
 }
 
 function laufeBlock(b: Block, zufall: () => number): Lauf {
   switch (b.typ) {
     case 'aufgabe':
-      return { zeit: b.liegezeitMin + b.bearbeitungMin, beendet: false }
+      return { zeit: b.liegezeitMin + b.bearbeitungMin, beendet: false, rueck: null }
     case 'warten':
-      return { zeit: b.dauerMin, beendet: false }
+      return { zeit: b.dauerMin, beendet: false, rueck: null }
     case 'entscheidung': {
-      if (b.zweige.length === 0) return { zeit: 0, beendet: false }
+      if (b.zweige.length === 0) return { zeit: 0, beendet: false, rueck: null }
       const summe = b.zweige.reduce((s, z) => s + Math.max(0, z.anteil), 0)
       let wurf = zufall() * (summe > 0 ? summe : 1)
       let gewaehlt = b.zweige[b.zweige.length - 1]
@@ -64,8 +66,10 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
           break
         }
       }
+      const warten = b.art === 'ereignis' && gewaehlt.ereignis ? gewaehlt.ereignis.dauerMin : 0
       const r = laufeSequenz(gewaehlt.schritte, zufall)
-      return { zeit: r.zeit, beendet: r.beendet || gewaehlt.ende !== null }
+      if (r.beendet || r.rueck) return { zeit: warten + r.zeit, beendet: r.beendet, rueck: r.rueck }
+      return { zeit: warten + r.zeit, beendet: gewaehlt.ende !== null, rueck: gewaehlt.ende === null ? gewaehlt.zurueckZu : null }
     }
     case 'parallel': {
       let zeit = 0
@@ -75,17 +79,18 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
         zeit = Math.max(zeit, r.zeit)
         beendet ||= r.beendet
       }
-      return { zeit, beendet }
+      return { zeit, beendet, rueck: null }
     }
     case 'wiederholung': {
       let zeit = 0
       for (let i = 0; i < MAX_WIEDERHOLUNGEN; i++) {
         const r = laufeSequenz(b.koerper.schritte, zufall)
         zeit += r.zeit
-        if (r.beendet) return { zeit, beendet: true }
-        if (zufall() >= b.anteilWiederholung) break
+        if (r.beendet) return { zeit, beendet: true, rueck: null }
+        if (r.rueck && r.rueck !== b.id) return { zeit, beendet: false, rueck: r.rueck }
+        if (b.modus === 'ruecksprung' ? r.rueck !== b.id : zufall() >= b.anteilWiederholung) break
       }
-      return { zeit, beendet: false }
+      return { zeit, beendet: false, rueck: null }
     }
   }
 }

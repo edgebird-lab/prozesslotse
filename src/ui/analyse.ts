@@ -66,6 +66,9 @@ const KURZ: Record<string, string> = {
   rolle: 'Keine Rolle',
   name: 'Ohne Namen',
   zeit: 'Ohne Zeit',
+  rueckziel: 'Rücksprung ins Leere',
+  doppelt: 'Endet und springt',
+  ereignis: 'Ereignis fehlt',
 }
 
 /** Befunde, die im Diagramm ein Abzeichen bekommen (Benennungshinweise nicht). */

@@ -79,6 +79,8 @@ export interface Kennzahlen {
   paare: Map<string, number>
   /** Arbeitsminuten pro Vorgang in Aufgaben ohne gültige Rolle. */
   arbeitOhneRolleMin: number
+  /** Je Rücksprungbereich: Wahrscheinlichkeit pro Durchlauf, dass zurückgesprungen wird. */
+  ruecksprungAnteil: Map<Id, number>
 }
 
 // ---------------------------------------------------------------------------
@@ -119,15 +121,47 @@ function skaliere(f: Fluss, faktor: number): Fluss {
 
 interface Kontext {
   aufgaben: Map<Id, Aufgabe>
+  /** je Rücksprungbereich: Wahrscheinlichkeit pro Durchlauf, dass zurückgesprungen wird */
+  ruecksprungAnteil: Map<Id, number>
 }
 
-function flussSequenz(schritte: Block[], f: Fluss, z: Zaehler, ctx: Kontext): Fluss {
-  let aktuell = f
-  for (const b of schritte) aktuell = flussBlock(b, aktuell, z, ctx)
-  return aktuell
+interface Ergebnis {
+  /** Fluss, der hinter dem Block normal weitergeht */
+  aus: Fluss
+  /** Fluss, der zum Anfang eines Rücksprungbereichs zurückspringt, je Bereich */
+  rueck: Map<Id, Fluss>
 }
 
-function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Fluss {
+function leererFluss(): Fluss {
+  return { anteil: 0, letzte: new Map() }
+}
+
+function addiere(ziel: Fluss, f: Fluss): void {
+  ziel.anteil += f.anteil
+  for (const [k, w] of f.letzte) plus(ziel.letzte, k, w)
+}
+
+function addiereRueck(ziel: Map<Id, Fluss>, quelle: Map<Id, Fluss>, ohne?: Id): void {
+  for (const [id, f] of quelle) {
+    if (id === ohne) continue
+    const alt = ziel.get(id) ?? leererFluss()
+    addiere(alt, f)
+    ziel.set(id, alt)
+  }
+}
+
+function flussSequenz(schritte: Block[], f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
+  let aus = f
+  const rueck = new Map<Id, Fluss>()
+  for (const b of schritte) {
+    const e = flussBlock(b, aus, z, ctx)
+    addiereRueck(rueck, e.rueck)
+    aus = e.aus
+  }
+  return { aus, rueck }
+}
+
+function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
   switch (b.typ) {
     case 'aufgabe': {
       plus(z.haeufigkeit, b.id, f.anteil)
@@ -142,51 +176,58 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Fluss {
         z.medienbrueche += f.anteil
         z.uebertragungMin += f.anteil * b.uebertragung.minuten
       }
-      return { anteil: f.anteil, letzte: new Map([[b.id, f.anteil]]) }
+      return { aus: { anteil: f.anteil, letzte: new Map([[b.id, f.anteil]]) }, rueck: new Map() }
     }
     case 'warten':
-      return f
+      return { aus: f, rueck: new Map() }
     case 'entscheidung': {
-      const aus: Fluss = { anteil: 0, letzte: new Map() }
+      const aus = leererFluss()
+      const rueck = new Map<Id, Fluss>()
       for (const zweig of b.zweige) {
         const o = flussSequenz(zweig.schritte, skaliere(f, zweig.anteil), z, ctx)
-        if (zweig.ende !== null) {
-          plus(z.enden, zweig.ende, o.anteil)
-          continue
-        }
-        aus.anteil += o.anteil
-        for (const [k, w] of o.letzte) plus(aus.letzte, k, w)
+        addiereRueck(rueck, o.rueck)
+        if (zweig.ende !== null) plus(z.enden, zweig.ende, o.aus.anteil)
+        else if (zweig.zurueckZu !== null) addiereRueck(rueck, new Map([[zweig.zurueckZu, o.aus]]))
+        else addiere(aus, o.aus)
       }
-      return aus
+      return { aus, rueck }
     }
     case 'parallel': {
-      if (b.zweige.length === 0) return f
+      if (b.zweige.length === 0) return { aus: f, rueck: new Map() }
       let anteil = Infinity
       const letzte = new Map<string, number>()
+      const rueck = new Map<Id, Fluss>()
       for (const zweig of b.zweige) {
         const o = flussSequenz(zweig.schritte, f, z, ctx)
-        anteil = Math.min(anteil, o.anteil)
-        for (const [k, w] of o.letzte) {
+        addiereRueck(rueck, o.rueck)
+        anteil = Math.min(anteil, o.aus.anteil)
+        for (const [k, w] of o.aus.letzte) {
           // Läuft derselbe Vorgänger durch mehrere Zweige ohne Aufgabe, zählt er einmal.
           if (f.letzte.has(k)) letzte.set(k, Math.max(letzte.get(k) ?? 0, w))
           else plus(letzte, k, w)
         }
       }
-      return { anteil, letzte }
+      return { aus: { anteil, letzte }, rueck }
     }
     case 'wiederholung': {
-      const p = Math.min(Math.max(b.anteilWiederholung, 0), 0.999)
       // Antwort des Körpers auf einen Einheitsfluss, ohne zu zählen.
       const sonde = flussSequenz(b.koerper.schritte, { anteil: 1, letzte: new Map([[SONDE, 1]]) }, neueZaehler(), ctx)
-      const c = sonde.anteil
-      const q = sonde.letzte.get(SONDE) ?? 0
-      // Gesamter Zufluss in den Körper über alle Durchläufe: E = F + p · Körper(E)
-      const eingangAnteil = f.anteil / (1 - p * c)
+      // Wiederholungsfluss je Einheit Zufluss: bei „anteil“ p · normaler Ausgang,
+      // bei „ruecksprung“ alles, was in den Ausgängen auf diesen Bereich zurückspringt.
+      const p = b.modus === 'anteil' ? Math.min(Math.max(b.anteilWiederholung, 0), 0.999) : 0
+      const wieder = b.modus === 'anteil' ? skaliere(sonde.aus, p) : (sonde.rueck.get(b.id) ?? leererFluss())
+      if (b.modus === 'ruecksprung') ctx.ruecksprungAnteil.set(b.id, wieder.anteil)
+      const r = Math.min(wieder.anteil, 0.999)
+      const q = Math.min(wieder.letzte.get(SONDE) ?? 0, 0.999)
+      // Gesamter Zufluss in den Körper über alle Durchläufe: E = F + Wiederholung(E)
+      const eingangAnteil = f.anteil / (1 - r)
       const letzte = new Map<string, number>()
-      for (const [k, w] of f.letzte) plus(letzte, k, w / (1 - p * q))
-      for (const [k, w] of sonde.letzte) if (k !== SONDE) plus(letzte, k, (p * eingangAnteil * w) / (1 - p * q))
+      for (const [k, w] of f.letzte) plus(letzte, k, w / (1 - q))
+      for (const [k, w] of wieder.letzte) if (k !== SONDE) plus(letzte, k, (eingangAnteil * w) / (1 - q))
       const o = flussSequenz(b.koerper.schritte, { anteil: eingangAnteil, letzte }, z, ctx)
-      return skaliere(o, 1 - p)
+      const rueck = new Map<Id, Fluss>()
+      addiereRueck(rueck, o.rueck, b.id)
+      return { aus: b.modus === 'anteil' ? skaliere(o.aus, 1 - p) : o.aus, rueck }
     }
   }
 }
@@ -202,8 +243,10 @@ interface Beitrag {
 interface Dauer {
   gesamt: number
   arbeit: number
-  /** Wahrscheinlichkeit, dass der Ablauf hinter dem Block weitergeht. */
+  /** Wahrscheinlichkeit, dass der Ablauf hinter dem Block normal weitergeht. */
   weiter: number
+  /** Wahrscheinlichkeit, dass er zum Anfang eines Rücksprungbereichs zurückspringt, je Bereich. */
+  rueck: Map<Id, number>
   beitraege: Map<Id, Beitrag>
 }
 
@@ -215,11 +258,12 @@ function addiereBeitraege(ziel: Map<Id, Beitrag>, quelle: Map<Id, Beitrag>, fakt
 }
 
 function dauerSequenz(schritte: Block[]): Dauer {
-  const d: Dauer = { gesamt: 0, arbeit: 0, weiter: 1, beitraege: new Map() }
+  const d: Dauer = { gesamt: 0, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map() }
   for (const b of schritte) {
     const x = dauerBlock(b)
     d.gesamt += d.weiter * x.gesamt
     d.arbeit += d.weiter * x.arbeit
+    for (const [id, r] of x.rueck) plus(d.rueck, id, d.weiter * r)
     addiereBeitraege(d.beitraege, x.beitraege, d.weiter)
     d.weiter *= x.weiter
   }
@@ -233,34 +277,53 @@ function dauerBlock(b: Block): Dauer {
         gesamt: b.liegezeitMin + b.bearbeitungMin,
         arbeit: b.bearbeitungMin,
         weiter: 1,
+        rueck: new Map(),
         beitraege: new Map([[b.id, { warten: b.liegezeitMin, arbeit: b.bearbeitungMin }]]),
       }
     case 'warten':
-      return { gesamt: b.dauerMin, arbeit: 0, weiter: 1, beitraege: new Map([[b.id, { warten: b.dauerMin, arbeit: 0 }]]) }
+      return { gesamt: b.dauerMin, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map([[b.id, { warten: b.dauerMin, arbeit: 0 }]]) }
     case 'entscheidung': {
-      const d: Dauer = { gesamt: 0, arbeit: 0, weiter: 0, beitraege: new Map() }
+      const d: Dauer = { gesamt: 0, arbeit: 0, weiter: 0, rueck: new Map(), beitraege: new Map() }
       for (const z of b.zweige) {
         const x = dauerSequenz(z.schritte)
-        d.gesamt += z.anteil * x.gesamt
+        // Bei einer Ereignis-Entscheidung wartet der Vorgang, bis das Ereignis dieses Ausgangs eintritt.
+        const warten = b.art === 'ereignis' && z.ereignis ? z.ereignis.dauerMin : 0
+        d.gesamt += z.anteil * (warten + x.gesamt)
         d.arbeit += z.anteil * x.arbeit
-        d.weiter += z.ende !== null ? 0 : z.anteil * x.weiter
+        if (warten > 0) addiereBeitraege(d.beitraege, new Map([[z.id, { warten, arbeit: 0 }]]), z.anteil)
         addiereBeitraege(d.beitraege, x.beitraege, z.anteil)
+        for (const [id, r] of x.rueck) plus(d.rueck, id, z.anteil * r)
+        if (z.ende !== null) continue
+        if (z.zurueckZu !== null) plus(d.rueck, z.zurueckZu, z.anteil * x.weiter)
+        else d.weiter += z.anteil * x.weiter
       }
       return d
     }
     case 'parallel': {
       const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
-      if (zweige.length === 0) return { gesamt: 0, arbeit: 0, weiter: 1, beitraege: new Map() }
+      if (zweige.length === 0) return { gesamt: 0, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map() }
       const laengster = zweige.reduce((a, x) => (x.gesamt > a.gesamt ? x : a))
-      return { ...laengster, weiter: Math.min(...zweige.map((x) => x.weiter)) }
+      // Rücksprünge aus „Gleichzeitig“ heraus meldet die Prüfung als Fehler.
+      return { ...laengster, weiter: Math.min(...zweige.map((x) => x.weiter)), rueck: new Map() }
     }
     case 'wiederholung': {
-      const p = Math.min(Math.max(b.anteilWiederholung, 0), 0.999)
       const x = dauerSequenz(b.koerper.schritte)
-      const n = 1 / (1 - p * x.weiter)
+      let n: number
+      let weiter: number
+      if (b.modus === 'anteil') {
+        const p = Math.min(Math.max(b.anteilWiederholung, 0), 0.999)
+        n = 1 / (1 - p * x.weiter)
+        weiter = x.weiter * (1 - p) * n
+      } else {
+        const r = Math.min(x.rueck.get(b.id) ?? 0, 0.999)
+        n = 1 / (1 - r)
+        weiter = x.weiter * n
+      }
+      const rueck = new Map<Id, number>()
+      for (const [id, r] of x.rueck) if (id !== b.id) rueck.set(id, r * n)
       const beitraege = new Map<Id, Beitrag>()
       addiereBeitraege(beitraege, x.beitraege, n)
-      return { gesamt: x.gesamt * n, arbeit: x.arbeit * n, weiter: x.weiter * (1 - p) * n, beitraege }
+      return { gesamt: x.gesamt * n, arbeit: x.arbeit * n, weiter, rueck, beitraege }
     }
   }
 }
@@ -277,7 +340,8 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   for (const { block } of durchlaufe(p.ablauf)) if (block.typ === 'aufgabe') aufgaben.set(block.id, block)
 
   const z = neueZaehler()
-  const ende = flussSequenz(p.ablauf.schritte, { anteil: 1, letzte: new Map() }, z, { aufgaben })
+  const ruecksprungAnteil = new Map<Id, number>()
+  const ende = flussSequenz(p.ablauf.schritte, { anteil: 1, letzte: new Map() }, z, { aufgaben, ruecksprungAnteil }).aus
   const dauer = dauerSequenz(p.ablauf.schritte)
 
   const rollenNachId = new Map(p.rollen.map((r) => [r.id, r]))
@@ -300,9 +364,16 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
     schritte.set(a.id, { id: a.id, haeufigkeit, arbeitMin, kosten, beitragWartenMin: beitrag.warten, beitragArbeitMin: beitrag.arbeit })
   }
   for (const { block } of durchlaufe(p.ablauf)) {
-    if (block.typ !== 'warten') continue
-    const beitrag = dauer.beitraege.get(block.id) ?? { warten: 0, arbeit: 0 }
-    schritte.set(block.id, { id: block.id, haeufigkeit: 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
+    if (block.typ === 'warten') {
+      const beitrag = dauer.beitraege.get(block.id) ?? { warten: 0, arbeit: 0 }
+      schritte.set(block.id, { id: block.id, haeufigkeit: 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
+    } else if (block.typ === 'entscheidung' && block.art === 'ereignis') {
+      // Wartezeit bis zum Ereignis eines Ausgangs, unter der Kennung des Ausgangs
+      for (const zweig of block.zweige) {
+        const beitrag = dauer.beitraege.get(zweig.id)
+        if (beitrag) schritte.set(zweig.id, { id: zweig.id, haeufigkeit: 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
+      }
+    }
   }
 
   const rollen: RollenKennzahl[] = p.rollen.map((rolle) => {
@@ -345,5 +416,6 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
     engpass,
     paare: z.paare,
     arbeitOhneRolleMin,
+    ruecksprungAnteil,
   }
 }

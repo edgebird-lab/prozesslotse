@@ -13,6 +13,8 @@ export type LernThema =
   | 'beteiligte'
   | 'aufgabe'
   | 'entscheidung'
+  | 'ereignis'
+  | 'ruecksprung'
   | 'parallel'
   | 'wiederholung'
   | 'warten'
@@ -42,7 +44,19 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     titel: 'Entscheidung',
     bpmn: 'Exklusives Gateway (XOR)',
     symbol: 'xor',
-    text: 'Eine Raute mit X: Genau ein Ausgang wird genommen. Die Anteile sagen, wie oft welcher Fall vorkommt, und ergeben zusammen 100 %. Hinter den Ausgängen führt eine zweite Raute die Wege wieder zusammen, außer ein Ausgang beendet den Prozess.',
+    text: 'Eine Raute mit X: Genau ein Ausgang wird genommen. Die Anteile sagen, wie oft welcher Fall vorkommt, und ergeben zusammen 100 %. Hinter den Ausgängen führt eine zweite Raute die Wege wieder zusammen. Ein Ausgang kann den Prozess auch beenden oder zu einem früheren Schritt zurückführen.',
+  },
+  ereignis: {
+    titel: 'Was zuerst passiert',
+    bpmn: 'Ereignisbasiertes Gateway',
+    symbol: 'ereignisgateway',
+    text: 'Eine Raute mit Fünfeck im Doppelkreis: Der Vorgang wartet, bis eines von mehreren Ereignissen eintritt, z. B. eine Antwort des Kunden oder das Ende einer Frist. Es geht in dem Ausgang weiter, dessen Ereignis zuerst kommt. Im Diagramm beginnt jeder Ausgang mit seinem Ereignis.',
+  },
+  ruecksprung: {
+    titel: 'Zurück zu einem früheren Schritt',
+    bpmn: 'Schleife über ein exklusives Gateway',
+    symbol: 'ruecksprung',
+    text: 'Führt ein Ausgang zurück, z. B. nach einer Korrektur zurück zur Erfassung, entsteht eine Schleife: Eine Raute vor dem Zielschritt führt den Rückweg mit dem normalen Weg zusammen. Der Bereich dazwischen läuft so oft, wie zurückgesprungen wird.',
   },
   parallel: {
     titel: 'Gleichzeitig',

@@ -30,7 +30,7 @@ test('legt einen eigenen Prozess vollständig über den Assistenten an', async (
   await page.getByLabel('Welche Frage wird entschieden?').fill('Antrag vollständig?')
   await page.getByLabel('Anteil von „Ja“').fill('80')
   await page.getByLabel('Anteil von „Nein“').fill('20')
-  await page.getByRole('checkbox', { name: 'endet den Prozess' }).nth(1).check()
+  await page.getByLabel('Wie es nach „Nein“ weitergeht').selectOption('ende')
   await page.getByLabel('Ergebnis, wenn „Nein“').fill('Antrag zurückgewiesen')
   await page.getByRole('button', { name: 'Hinzufügen' }).click()
 

@@ -18,6 +18,8 @@ export type SymbolArt =
   | 'bahn'
   | 'kennzahl'
   | 'verbessern'
+  | 'ereignisgateway'
+  | 'ruecksprung'
 
 export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
   return (
@@ -139,6 +141,22 @@ function inhalt(art: SymbolArt) {
       )
     case 'ende':
       return <circle cx="16" cy="16" r="11" {...strich} strokeWidth={3.4} />
+    case 'ereignisgateway':
+      return raute(
+        <>
+          <circle cx="16" cy="16" r="6.4" {...strich} strokeWidth={1.2} />
+          <circle cx="16" cy="16" r="5" {...strich} strokeWidth={1.2} />
+          <path d="M16 12.8 19 15l-1.1 3.4h-3.8L13 15Z" {...strich} strokeWidth={1.1} />
+        </>,
+      )
+    case 'ruecksprung':
+      return (
+        <>
+          <path d="M25 9H11a6 6 0 0 0 0 12h14" {...strich} />
+          <path d="M14 5 10 9l4 4" {...strich} />
+          <path d="M22 18l3 3-3 3" {...strich} />
+        </>
+      )
     case 'kennzahl':
       return (
         <>

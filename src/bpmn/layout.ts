@@ -35,7 +35,7 @@ export const MASSE = {
 
 export const OHNE_ROLLE = '__ohne_rolle__'
 
-export type KnotenArt = 'start' | 'ende' | 'aufgabe' | 'xor' | 'und' | 'warten'
+export type KnotenArt = 'start' | 'ende' | 'aufgabe' | 'xor' | 'und' | 'ereignisgateway' | 'warten'
 
 export interface Rechteck {
   x: number
@@ -77,8 +77,12 @@ export interface LayoutKante {
   doku: string
   /** Weg über eine reservierte Spur (leerer Zweig). */
   ueber?: Spur
-  /** Rückfluss einer Wiederholung über die Extraspur. */
+  /** Rückfluss einer Wiederholung über die Extraspur (von der Frage am Ende). */
   rueck?: Spur
+  /** Rücksprung aus einem Ausgang zum Anfang eines Rücksprungbereichs, über dessen Extraspur. */
+  sprung?: Spur
+  /** Wahrscheinlichkeit, mit der dieser Fluss an seiner Verzweigung gewählt wird. */
+  anteil?: number
   punkte: Punkt[]
   beschriftung?: Rechteck
 }
@@ -110,11 +114,22 @@ interface Austritt {
   name: string
   doku: string
   ueber?: Spur
+  anteil?: number
+}
+
+/** Noch offener Rücksprung aus einem Ausgang; der Bereich mit `ziel` zeichnet die Kante. */
+interface Sprung {
+  von: string
+  ziel: Id
+  name: string
+  doku: string
+  anteil?: number
 }
 
 interface Teil {
   knoten: LayoutKnoten[]
   kanten: LayoutKante[]
+  spruenge: Sprung[]
   breite: number
   /** Belegte Spuren je Bahn, relativ zum Band dieses Teils. */
   hoehe: Map<string, number>
@@ -129,7 +144,7 @@ interface Kontext {
 }
 
 function neuerTeil(bahn: string): Teil {
-  return { knoten: [], kanten: [], breite: 0, hoehe: new Map(), eintritt: null, austritt: null, austrittsBahn: bahn }
+  return { knoten: [], kanten: [], spruenge: [], breite: 0, hoehe: new Map(), eintritt: null, austritt: null, austrittsBahn: bahn }
 }
 
 function belege(t: Teil, bahn: string, spuren: number): void {
@@ -140,9 +155,34 @@ function knoten(werte: Omit<LayoutKnoten, 'x' | 'y' | 'breite' | 'hoehe'>): Layo
   return { x: 0, y: 0, breite: 0, hoehe: 0, ...werte }
 }
 
-function kante(ctx: Kontext, von: string, nach: string, name = '', doku = '', ueber?: Spur, rueck?: Spur): LayoutKante {
+interface KantenOptionen {
+  name?: string
+  doku?: string
+  ueber?: Spur
+  rueck?: Spur
+  sprung?: Spur
+  anteil?: number
+}
+
+function kante(ctx: Kontext, von: string, nach: string, o: KantenOptionen = {}): LayoutKante {
   ctx.kantenNr += 1
-  return { id: `Fluss_${ctx.kantenNr}`, von, nach, name, doku, ueber: ueber && { ...ueber }, rueck: rueck && { ...rueck }, punkte: [] }
+  return {
+    id: `Fluss_${ctx.kantenNr}`,
+    von,
+    nach,
+    name: o.name ?? '',
+    doku: o.doku ?? '',
+    ueber: o.ueber && { ...o.ueber },
+    rueck: o.rueck && { ...o.rueck },
+    sprung: o.sprung && { ...o.sprung },
+    anteil: o.anteil,
+    punkte: [],
+  }
+}
+
+/** Kante, die einen offenen Austritt (ggf. mit Beschriftung eines leeren Zweigs) fortsetzt. */
+function kanteAus(ctx: Kontext, a: Austritt, nach: string): LayoutKante {
+  return kante(ctx, a.knoten, nach, { name: a.name, doku: a.doku, ueber: a.ueber, anteil: a.anteil })
 }
 
 function verschiebeSpur(s: Spur | undefined, dSpur: Map<string, number>): void {
@@ -157,6 +197,7 @@ function verschiebe(t: Teil, dSpalte: number, dSpur: Map<string, number>): void 
   for (const e of t.kanten) {
     verschiebeSpur(e.ueber, dSpur)
     verschiebeSpur(e.rueck, dSpur)
+    verschiebeSpur(e.sprung, dSpur)
   }
   verschiebeSpur(t.austritt?.ueber, dSpur)
 }
@@ -164,6 +205,7 @@ function verschiebe(t: Teil, dSpalte: number, dSpur: Map<string, number>): void 
 function uebernimm(ziel: Teil, quelle: Teil): void {
   ziel.knoten.push(...quelle.knoten)
   ziel.kanten.push(...quelle.kanten)
+  ziel.spruenge.push(...quelle.spruenge)
   for (const [bahn, h] of quelle.hoehe) belege(ziel, bahn, h)
 }
 
@@ -180,7 +222,7 @@ function layoutSequenz(schritte: Block[], bahn: string, ctx: Kontext): Teil {
     verschiebe(bt, t.breite, new Map())
     uebernimm(t, bt)
     if (i === 0) t.eintritt = bt.eintritt
-    else if (austritt && bt.eintritt) t.kanten.push(kante(ctx, austritt.knoten, bt.eintritt, austritt.name, austritt.doku, austritt.ueber))
+    else if (austritt && bt.eintritt) t.kanten.push(kanteAus(ctx, austritt, bt.eintritt))
     austritt = bt.austritt
     bahnJetzt = bt.austrittsBahn
     t.breite += bt.breite
@@ -225,39 +267,65 @@ interface ZweigLayout {
   teil: Teil
   name: string
   doku: string
+  anteil?: number
   leer: boolean
   endet: boolean
+  springt: boolean
   linie?: Spur
 }
 
 function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' }>, bahn: string, ctx: Kontext): Teil {
   const xor = b.typ === 'entscheidung'
-  const art = xor ? 'xor' : 'und'
+  const ereignisse = b.typ === 'entscheidung' && b.art === 'ereignis'
+  const artAuf: KnotenArt = ereignisse ? 'ereignisgateway' : xor ? 'xor' : 'und'
+  const artZu: KnotenArt = xor ? 'xor' : 'und'
   const t = neuerTeil(bahn)
   const aufId = xmlId(`${b.id}_auf`)
-  t.knoten.push(knoten({ id: aufId, art, name: xor ? b.frage : '', blockId: b.id, bahn, spalte: 0, spur: 0, richtung: 'auf' }))
+  t.knoten.push(knoten({ id: aufId, art: artAuf, name: xor ? b.frage : '', blockId: b.id, bahn, spalte: 0, spur: 0, richtung: 'auf' }))
   t.eintritt = aufId
 
   const zweige: ZweigLayout[] = (b.zweige as (Sequenz | EntscheidungsZweig)[]).map((z) => {
     const ez = xor ? (z as EntscheidungsZweig) : null
-    const teil = layoutSequenz(z.schritte, bahn, ctx)
+    let teil = layoutSequenz(z.schritte, bahn, ctx)
+    if (ereignisse && ez) {
+      // Jeder Ausgang einer Ereignis-Entscheidung beginnt mit seinem Ereignis.
+      const ereignisId = xmlId(`${z.id}_ereignis`)
+      const mitEreignis = neuerTeil(bahn)
+      mitEreignis.knoten.push(knoten({ id: ereignisId, art: 'warten', name: ez.bezeichnung, blockId: b.id, bahn, spalte: 0, spur: 0, ereignis: ez.ereignis?.art ?? 'nachricht' }))
+      belege(mitEreignis, bahn, 1)
+      verschiebe(teil, 1, new Map())
+      uebernimm(mitEreignis, teil)
+      if (teil.eintritt) mitEreignis.kanten.push(kante(ctx, ereignisId, teil.eintritt))
+      mitEreignis.eintritt = ereignisId
+      mitEreignis.austritt = teil.eintritt ? teil.austritt : { knoten: ereignisId, name: '', doku: '' }
+      mitEreignis.austrittsBahn = teil.eintritt ? teil.austrittsBahn : bahn
+      mitEreignis.breite = teil.breite + 1
+      teil = mitEreignis
+    }
     const leer = teil.eintritt === null
     const zl: ZweigLayout = {
       teil,
-      name: ez?.bezeichnung ?? '',
+      name: ereignisse ? '' : (ez?.bezeichnung ?? ''),
       doku: ez ? `Anteil: ${formatiereProzent(ez.anteil, 1)}` : '',
+      anteil: ez?.anteil,
       leer,
       endet: ez?.ende != null,
+      springt: ez?.ende == null && ez?.zurueckZu != null,
     }
-    if (leer) belege(teil, bahn, 1) // Spur für die Linie des leeren Zweigs
+    if (leer && !zl.springt) belege(teil, bahn, 1) // Spur für die Linie des leeren Zweigs
     if (ez?.ende != null) {
       const endeId = xmlId(`${z.id}_ende`)
       const endBahn = teil.austrittsBahn
       teil.knoten.push(knoten({ id: endeId, art: 'ende', name: ez.ende, blockId: b.id, bahn: endBahn, spalte: teil.breite, spur: 0 }))
       belege(teil, endBahn, 1)
-      if (teil.austritt) teil.kanten.push(kante(ctx, teil.austritt.knoten, endeId, teil.austritt.name, teil.austritt.doku, teil.austritt.ueber))
+      if (teil.austritt) teil.kanten.push(kanteAus(ctx, teil.austritt, endeId))
       if (leer) teil.eintritt = endeId
       teil.breite += 1
+      teil.austritt = null
+    } else if (zl.springt && ez?.zurueckZu) {
+      // Die Kante zeichnet der Rücksprungbereich; bei leerem Zweig beginnt sie an der Verzweigung.
+      if (leer) t.spruenge.push({ von: aufId, ziel: ez.zurueckZu, name: zl.name, doku: zl.doku, anteil: zl.anteil })
+      else if (teil.austritt) teil.spruenge.push({ von: teil.austritt.knoten, ziel: ez.zurueckZu, name: teil.austritt.name, doku: teil.austritt.doku, anteil: teil.austritt.anteil })
       teil.austritt = null
     }
     return zl
@@ -269,36 +337,34 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
     const d = new Map<string, number>()
     for (const bahnZ of z.teil.hoehe.keys()) d.set(bahnZ, versatz.get(bahnZ) ?? 0)
     verschiebe(z.teil, 1, d)
-    if (z.leer && !z.endet) z.linie = { bahn, spur: d.get(bahn) ?? 0 }
+    if (z.leer && !z.endet && !z.springt) z.linie = { bahn, spur: d.get(bahn) ?? 0 }
     for (const [bahnZ, h] of z.teil.hoehe) versatz.set(bahnZ, (versatz.get(bahnZ) ?? 0) + h)
   }
   const maxBreite = Math.max(1, ...zweige.map((z) => z.teil.breite))
 
   for (const z of zweige) {
-    if (z.teil.eintritt) t.kanten.push(kante(ctx, aufId, z.teil.eintritt, z.name, z.doku))
+    if (z.teil.eintritt) t.kanten.push(kante(ctx, aufId, z.teil.eintritt, { name: z.name, doku: z.doku, anteil: z.anteil }))
     t.knoten.push(...z.teil.knoten)
     t.kanten.push(...z.teil.kanten)
+    t.spruenge.push(...z.teil.spruenge)
   }
   for (const [bahnZ, h] of versatz) belege(t, bahnZ, h)
   belege(t, bahn, 1)
 
-  const fortsetzend = zweige.filter((z) => !z.endet && (z.leer || z.teil.austritt !== null))
+  const fortsetzend = zweige.filter((z) => !z.endet && !z.springt && (z.leer || z.teil.austritt !== null))
   if (!xor || fortsetzend.length >= 2) {
     const zuId = xmlId(`${b.id}_zu`)
-    t.knoten.push(knoten({ id: zuId, art, name: '', blockId: b.id, bahn, spalte: 1 + maxBreite, spur: 0, richtung: 'zu' }))
+    t.knoten.push(knoten({ id: zuId, art: artZu, name: '', blockId: b.id, bahn, spalte: 1 + maxBreite, spur: 0, richtung: 'zu' }))
     for (const z of fortsetzend) {
-      if (z.leer) t.kanten.push(kante(ctx, aufId, zuId, z.name, z.doku, z.linie))
-      else if (z.teil.austritt) {
-        const a = z.teil.austritt
-        t.kanten.push(kante(ctx, a.knoten, zuId, a.name, a.doku, a.ueber))
-      }
+      if (z.leer) t.kanten.push(kante(ctx, aufId, zuId, { name: z.name, doku: z.doku, ueber: z.linie, anteil: z.anteil }))
+      else if (z.teil.austritt) t.kanten.push(kanteAus(ctx, z.teil.austritt, zuId))
     }
     t.austritt = { knoten: zuId, name: '', doku: '' }
     t.austrittsBahn = bahn
     t.breite = maxBreite + 2
   } else if (fortsetzend.length === 1) {
     const z = fortsetzend[0]
-    t.austritt = z.leer ? { knoten: aufId, name: z.name, doku: z.doku, ueber: z.linie } : z.teil.austritt
+    t.austritt = z.leer ? { knoten: aufId, name: z.name, doku: z.doku, ueber: z.linie, anteil: z.anteil } : z.teil.austritt
     t.austrittsBahn = z.leer ? bahn : z.teil.austrittsBahn
     t.breite = maxBreite + 1
   } else {
@@ -311,23 +377,34 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
 function layoutWiederholung(b: Wiederholung, bahn: string, ctx: Kontext): Teil {
   const t = neuerTeil(bahn)
   const einId = xmlId(`${b.id}_ein`)
-  const frageId = xmlId(`${b.id}_frage`)
   const koerper = layoutSequenz(b.koerper.schritte, bahn, ctx)
   verschiebe(koerper, 1, new Map())
   const breite = Math.max(1, koerper.breite)
   t.knoten.push(knoten({ id: einId, art: 'xor', name: '', blockId: b.id, bahn, spalte: 0, spur: 0, richtung: 'zu' }))
-  t.knoten.push(knoten({ id: frageId, art: 'xor', name: b.frage, blockId: b.id, bahn, spalte: 1 + breite, spur: 0, richtung: 'auf' }))
   uebernimm(t, koerper)
-  t.kanten.push(kante(ctx, einId, koerper.eintritt ?? frageId))
-  if (koerper.austritt) {
-    const a = koerper.austritt
-    t.kanten.push(kante(ctx, a.knoten, frageId, a.name, a.doku, a.ueber))
-  }
+  // Extraspur unter dem Körper für Rückkanten
   const rueckSpur = Math.max(1, koerper.hoehe.get(bahn) ?? 0)
-  t.kanten.push(kante(ctx, frageId, einId, 'Ja', `Wiederholung in ${formatiereProzent(b.anteilWiederholung, 1)} der Durchläufe`, undefined, { bahn, spur: rueckSpur }))
   belege(t, bahn, rueckSpur + 1)
   t.eintritt = einId
-  t.austritt = { knoten: frageId, name: 'Nein', doku: '' }
+
+  if (b.modus === 'ruecksprung') {
+    if (koerper.eintritt) t.kanten.push(kante(ctx, einId, koerper.eintritt))
+    const eigene = t.spruenge.filter((s) => s.ziel === b.id)
+    t.spruenge = t.spruenge.filter((s) => s.ziel !== b.id)
+    for (const s of eigene) t.kanten.push(kante(ctx, s.von, einId, { name: s.name, doku: s.doku, anteil: s.anteil, sprung: { bahn, spur: rueckSpur } }))
+    t.austritt = koerper.eintritt ? koerper.austritt : { knoten: einId, name: '', doku: '' }
+    t.austrittsBahn = koerper.eintritt ? koerper.austrittsBahn : bahn
+    t.breite = breite + 1
+    return t
+  }
+
+  const frageId = xmlId(`${b.id}_frage`)
+  t.knoten.push(knoten({ id: frageId, art: 'xor', name: b.frage, blockId: b.id, bahn, spalte: 1 + breite, spur: 0, richtung: 'auf' }))
+  t.kanten.push(kante(ctx, einId, koerper.eintritt ?? frageId))
+  if (koerper.austritt) t.kanten.push(kanteAus(ctx, koerper.austritt, frageId))
+  const p = b.anteilWiederholung
+  t.kanten.push(kante(ctx, frageId, einId, { name: 'Ja', doku: `Wiederholung in ${formatiereProzent(p, 1)} der Durchläufe`, rueck: { bahn, spur: rueckSpur }, anteil: p }))
+  t.austritt = { knoten: frageId, name: 'Nein', doku: '', anteil: 1 - p }
   t.breite = breite + 2
   return t
 }
@@ -350,9 +427,13 @@ function feldUm(cx: number, cy: number, text: string): Rechteck {
   return { x: cx - breite / 2, y: cy - hoehe / 2, breite, hoehe }
 }
 
+function istGateway(art: KnotenArt): boolean {
+  return art === 'xor' || art === 'und' || art === 'ereignisgateway'
+}
+
 function groesse(art: KnotenArt): { breite: number; hoehe: number } {
   if (art === 'aufgabe') return MASSE.aufgabe
-  if (art === 'xor' || art === 'und') return MASSE.gateway
+  if (istGateway(art)) return MASSE.gateway
   return MASSE.ereignis
 }
 
@@ -383,7 +464,7 @@ export function berechneLayout(p: Prozess): Layout {
       const a = haupt.austritt
       t.knoten.push(knoten({ id: 'Ende', art: 'ende', name: p.ergebnis, blockId: null, bahn: haupt.austrittsBahn, spalte: 1 + haupt.breite, spur: 0 }))
       belege(t, haupt.austrittsBahn, 1)
-      t.kanten.push(kante(ctx, a.knoten, 'Ende', a.name, a.doku, a.ueber))
+      t.kanten.push(kanteAus(ctx, a, 'Ende'))
     }
   }
 
@@ -401,7 +482,7 @@ export function berechneLayout(p: Prozess): Layout {
       anzahl = Math.max(anzahl, k.spur + 1)
     }
     for (const e of t.kanten) {
-      for (const s of [e.ueber, e.rueck]) if (s && s.bahn === bahn) anzahl = Math.max(anzahl, s.spur + 1)
+      for (const s of [e.ueber, e.rueck, e.sprung]) if (s && s.bahn === bahn) anzahl = Math.max(anzahl, s.spur + 1)
     }
     spurHoehen.set(bahn, Array.from({ length: anzahl }, (_, i) => (mitKnoten.has(i) ? MASSE.spur : MASSE.spurDuenn)))
   }
@@ -436,7 +517,7 @@ export function berechneLayout(p: Prozess): Layout {
     const cy = spurMitte({ bahn: k.bahn, spur: k.spur })
     Object.assign(k, { x: cx - g.breite / 2, y: cy - g.hoehe / 2, breite: g.breite, hoehe: g.hoehe })
     if (k.name && k.art !== 'aufgabe') {
-      const oben = k.art === 'xor' || k.art === 'und'
+      const oben = istGateway(k.art)
       const h = zeilen(k.name) * MASSE.zeile
       k.beschriftung = feldUm(cx, oben ? k.y - 6 - h / 2 : k.y + k.hoehe + 6 + h / 2, k.name)
     }
@@ -464,6 +545,18 @@ function gleich(a: number, b: number): boolean {
 function wegpunkte(e: LayoutKante, a: LayoutKnoten, z: LayoutKnoten, spurMitte: (s: Spur) => number): Punkt[] {
   const ma = mitte(a)
   const mz = mitte(z)
+  if (e.sprung) {
+    // aus dem Zweig nach rechts in die Spaltenlücke, hinunter zur Extraspur, zurück und von unten in die Zusammenführung
+    const y = spurMitte(e.sprung)
+    const g = ma.x + MASSE.spalte / 2
+    return [
+      { x: a.x + a.breite, y: ma.y },
+      { x: g, y: ma.y },
+      { x: g, y },
+      { x: mz.x, y },
+      { x: mz.x, y: z.y + z.hoehe },
+    ]
+  }
   if (e.rueck) {
     const y = spurMitte(e.rueck)
     return [
@@ -505,6 +598,7 @@ function beschriftungFuer(e: LayoutKante, a: LayoutKnoten, ueberY: number | null
   const hoehe = zeilen(e.name) * MASSE.zeile
   const ueber = (p: Punkt) => feldUm(p.x + 4 + breite / 2, p.y - 3 - hoehe / 2, e.name)
   if (e.rueck) return feldUm(pts[0].x + 6 + breite / 2, a.y + a.hoehe + 4 + hoehe / 2, e.name)
+  if (e.sprung) return ueber(pts[0])
   // leerer Zweig: über dem waagerechten Stück auf der reservierten Spur
   if (ueberY !== null && pts.length > 2 && !gleich(pts[0].y, ueberY)) return ueber(pts[2])
   if (pts.length === 2 || ueberY !== null) return ueber(pts[0])

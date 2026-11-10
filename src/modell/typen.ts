@@ -10,8 +10,10 @@
 
 export type Id = string
 
-/** Version des Dateiformats. Bei inkompatiblen Änderungen erhöhen. */
-export const FORMAT_VERSION = 1
+/** Version des Dateiformats. Bei inkompatiblen Änderungen erhöhen; ältere Dateien migriert speicher.ts. */
+export const FORMAT_VERSION = 2
+
+export type WarteArt = 'zeit' | 'nachricht'
 
 export type MediumArt =
   | 'papier'
@@ -76,19 +78,41 @@ export interface Sequenz {
   schritte: Block[]
 }
 
+/** Ereignis am Anfang eines Ausgangs einer Ereignis-Entscheidung. */
+export interface ZweigEreignis {
+  art: WarteArt
+  /** Wie lange es im Schnitt dauert, bis dieses Ereignis eintritt (wenn es das erste ist). */
+  dauerMin: number
+}
+
 export interface EntscheidungsZweig extends Sequenz {
-  /** Antwort auf die Frage, z. B. „Ja“. */
+  /** Antwort auf die Frage, z. B. „Ja“; bei einer Ereignis-Entscheidung der Name des Ereignisses. */
   bezeichnung: string
   /** Anteil der Fälle, die diesen Zweig nehmen (0–1). */
   anteil: number
   /** Wenn gesetzt, endet der Prozess am Ende dieses Zweigs mit diesem Ergebnis. */
   ende: string | null
+  /**
+   * Wenn gesetzt, springt der Ablauf am Ende dieses Zweigs zurück an den Anfang
+   * des Rücksprungbereichs mit dieser Kennung (eine Wiederholung im Modus
+   * „ruecksprung“, die den Zweig umschließt).
+   */
+  zurueckZu: Id | null
+  /** Nur bei Ereignis-Entscheidungen: welches Ereignis diesen Ausgang auslöst. */
+  ereignis: ZweigEreignis | null
 }
 
-/** Entweder-oder: genau ein Zweig wird genommen (exklusives Gateway). */
+/**
+ * „daten“: Entweder-oder nach einer Prüfung oder Angabe (exklusives Gateway).
+ * „ereignis“: Es geht dort weiter, wo zuerst etwas eintritt (ereignisbasiertes Gateway).
+ */
+export type EntscheidungsArt = 'daten' | 'ereignis'
+
+/** Entweder-oder: genau ein Zweig wird genommen. */
 export interface Entscheidung {
   typ: 'entscheidung'
   id: Id
+  art: EntscheidungsArt
   /** Frage, z. B. „Ware vorrätig?“ */
   frage: string
   zweige: EntscheidungsZweig[]
@@ -101,18 +125,24 @@ export interface Parallel {
   zweige: Sequenz[]
 }
 
-/** Wiederholung: der Körper läuft mindestens einmal und wird mit einer Wahrscheinlichkeit wiederholt. */
+/**
+ * „anteil“: Nach jedem Durchlauf entscheidet eine Frage mit festem Anteil über die Wiederholung.
+ * „ruecksprung“: Rücksprungbereich; wiederholt wird, wenn ein Ausgang darin mit
+ * `zurueckZu` auf diesen Bereich zeigt. Der Assistent legt solche Bereiche selbst an.
+ */
+export type WiederholungsModus = 'anteil' | 'ruecksprung'
+
+/** Wiederholung: der Körper läuft mindestens einmal und wird unter Umständen wiederholt. */
 export interface Wiederholung {
   typ: 'wiederholung'
   id: Id
-  /** Frage nach jedem Durchlauf; „Ja“ bedeutet wiederholen, z. B. „Nacharbeit nötig?“ */
+  modus: WiederholungsModus
+  /** Frage nach jedem Durchlauf; „Ja“ bedeutet wiederholen, z. B. „Nacharbeit nötig?“ (nur Modus „anteil“) */
   frage: string
-  /** Wahrscheinlichkeit, dass nach einem Durchlauf wiederholt wird (0 bis unter 1). */
+  /** Wahrscheinlichkeit, dass nach einem Durchlauf wiederholt wird, 0 bis unter 1 (nur Modus „anteil“). */
   anteilWiederholung: number
   koerper: Sequenz
 }
-
-export type WarteArt = 'zeit' | 'nachricht'
 
 /** Warten auf einen Zeitpunkt oder eine Nachricht (Zwischenereignis). */
 export interface Warten {

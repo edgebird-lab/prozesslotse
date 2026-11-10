@@ -2,7 +2,7 @@
  * Schwachstellen, die sich aus den Kennzahlen ergeben. Anders als die
  * Prüfregeln des Modells sind das keine Fehler, sondern begründete Hinweise.
  */
-import { blockTitel, durchlaufe, mediumName, rolleName } from '../modell/operationen'
+import { bereichTitel, blockTitel, durchlaufe, mediumName, rolleName } from '../modell/operationen'
 import { sortiereBefunde, type Befund } from '../modell/pruefung'
 import type { Aufgabe, Id, Prozess } from '../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
@@ -90,6 +90,39 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           text: `„${blockTitel(block)}“ macht ${formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)} der Durchlaufzeit aus.`,
           blockId: block.id,
         })
+      }
+    } else if (block.typ === 'wiederholung' && block.modus === 'ruecksprung') {
+      const r = k.ruecksprungAnteil.get(block.id) ?? 0
+      const ziel = block.koerper.schritte[0] ? bereichTitel(block.koerper.schritte[0]) : 'Anfang'
+      if (r >= 0.999) {
+        add({
+          schluessel: `endlos:${block.id}`,
+          schwere: 'fehler',
+          titel: 'Endlosschleife',
+          text: `Jeder Durchlauf springt zurück zu „${ziel}“; der Vorgang kommt nie weiter. Mindestens ein Ausgang muss weiterführen oder enden.`,
+          blockId: block.id,
+        })
+      } else if (r >= NACHARBEIT_SCHWELLE) {
+        add({
+          schluessel: `nacharbeit:${block.id}`,
+          schwere: 'hinweis',
+          titel: 'Nacharbeit durch Rücksprung',
+          text: `In ${formatiereProzent(r)} der Durchläufe geht es zurück zu „${ziel}“; die Schritte laufen im Schnitt ${formatiereZahl(1 / (1 - r), 2)}-mal. Fehler an der Quelle zu vermeiden spart Arbeit und Zeit.`,
+          blockId: block.id,
+        })
+      }
+    } else if (block.typ === 'entscheidung' && block.art === 'ereignis') {
+      for (const zweig of block.zweige) {
+        const kz = k.schritte.get(zweig.id)
+        if (kz && k.durchlaufzeitMin > 0 && kz.beitragWartenMin / k.durchlaufzeitMin >= LIEGEZEIT_SCHWELLE) {
+          add({
+            schluessel: `warten:${zweig.id}`,
+            schwere: 'hinweis',
+            titel: 'Lange Wartezeit',
+            text: `Das Warten auf „${zweig.bezeichnung}“ macht ${formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)} der Durchlaufzeit aus.`,
+            blockId: block.id,
+          })
+        }
       }
     } else if (block.typ === 'wiederholung' && block.anteilWiederholung >= NACHARBEIT_SCHWELLE && block.anteilWiederholung < 1) {
       const mal = 1 / (1 - block.anteilWiederholung)

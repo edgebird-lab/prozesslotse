@@ -905,8 +905,43 @@ fieldset {
   width: auto;
 }
 .zweig-zeile .zweig-ende {
-  flex-basis: 100%;
-  margin-left: 16px;
+  flex: 1 1 200px;
+  width: auto;
+}
+.zweig-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  background: var(--karte);
+}
+.zweig-unter {
+  padding-left: 4px;
+}
+.zweig-unter select {
+  width: auto;
+  max-width: 100%;
+}
+.danach {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.danach select {
+  flex: 1;
+  min-width: 0;
+}
+.quellen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .kontroll {
   display: inline-flex;

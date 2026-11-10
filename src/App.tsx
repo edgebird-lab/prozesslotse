@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from 'react'
 import { neuerProzess, neuesProjekt } from './modell/bausteine'
-import { beispielProjekt } from './modell/beispiel'
+import { beispielOnlineProjekt, beispielProjekt } from './modell/beispiel'
 import { alsJson, ladeAusBrowser, ladeEinstellungen, leseProjektText, speichereEinstellungen, speichereImBrowser } from './modell/speicher'
 import type { Id, Prozess } from './modell/typen'
 import { aktiverProzess, reduziere, SCHRITTE, startZustand } from './zustand'
@@ -154,6 +154,15 @@ function Kopfzeile() {
               }}
             >
               Beispiel „Lieferdienst“ laden
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                schliesse()
+                if (verwerfenOk()) dispatch({ typ: 'laden', projekt: beispielOnlineProjekt(), schritt: 'ablauf' })
+              }}
+            >
+              Beispiel „Onlinebestellung“ laden
             </button>
             <button
               type="button"

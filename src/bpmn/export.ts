@@ -97,6 +97,9 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
       const richtung = k.richtung === 'auf' ? 'Diverging' : 'Converging'
       return `${e}<${typ} id="${k.id}"${attrName(k.name)} gatewayDirection="${richtung}">\n${flussRefs}${e}</${typ}>\n`
     }
+    case 'ereignisgateway':
+      // Es geht dort weiter, wo zuerst ein Ereignis eintritt (Workflow-Pattern „Deferred Choice“).
+      return `${e}<bpmn:eventBasedGateway id="${k.id}"${attrName(k.name)} gatewayDirection="Diverging" instantiate="false" eventGatewayType="Exclusive">\n${flussRefs}${e}</bpmn:eventBasedGateway>\n`
   }
 }
 

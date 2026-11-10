@@ -61,12 +61,12 @@ export function pruefeProzess(p: Prozess): Befund[] {
 
   function pruefeSequenz(schritte: Block[]) {
     schritte.forEach((b, i) => {
-      if (b.typ === 'entscheidung' && i < schritte.length - 1 && b.zweige.length > 0 && b.zweige.every((z) => z.ende !== null)) {
+      if (b.typ === 'entscheidung' && i < schritte.length - 1 && b.zweige.length > 0 && b.zweige.every((z) => z.ende !== null || z.zurueckZu !== null)) {
         add({
           schluessel: `unerreichbar:${b.id}`,
           schwere: 'fehler',
           titel: 'Unerreichbare Schritte',
-          text: `Alle Zweige von „${blockTitel(b)}“ beenden den Prozess. Die ${schritte.length - 1 - i} folgenden Schritte werden nie erreicht.`,
+          text: `Kein Ausgang von „${blockTitel(b)}“ führt weiter: Alle beenden den Prozess oder springen zurück. Die ${schritte.length - 1 - i} folgenden Schritte werden nie erreicht.`,
           blockId: schritte[i + 1].id,
         })
       }
@@ -128,6 +128,24 @@ export function pruefeProzess(p: Prozess): Befund[] {
           if (z.ende !== null && liegtInParallele([...vorfahren, b])) {
             add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
           }
+          if (z.ende !== null && z.zurueckZu !== null) {
+            add({ schluessel: `doppelt:${z.id}`, schwere: 'fehler', titel: 'Ausgang endet und springt zurück', text: `Der Ausgang „${z.bezeichnung}“ kann nicht zugleich den Prozess beenden und zurückspringen.`, blockId: b.id })
+          }
+          if (z.zurueckZu !== null) {
+            const t = vorfahren.findIndex((v) => v.id === z.zurueckZu && v.typ === 'wiederholung' && v.modus === 'ruecksprung')
+            if (t < 0) {
+              add({ schluessel: `rueckziel:${z.id}`, schwere: 'fehler', titel: 'Rücksprung ins Leere', text: `Der Ausgang „${z.bezeichnung}“ springt zu einem Schritt zurück, der nicht vor dieser Entscheidung liegt.`, blockId: b.id })
+            } else if (vorfahren.slice(t + 1).some((v) => v.typ === 'parallel')) {
+              add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ springt aus „Gleichzeitig“ heraus zurück. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
+            }
+          }
+          if (b.art === 'ereignis') {
+            if (!z.ereignis) {
+              add({ schluessel: `ereignis:${z.id}`, schwere: 'fehler', titel: 'Ereignis fehlt', text: `Der Ausgang „${z.bezeichnung || i + 1}“ einer Ereignis-Entscheidung braucht ein Ereignis (Nachricht oder Zeitpunkt).`, blockId: b.id })
+            } else if (z.ereignis.dauerMin <= 0) {
+              add({ schluessel: `ereignisdauer:${z.id}`, schwere: 'hinweis', titel: 'Wartezeit ist 0', text: `Bis „${z.bezeichnung}“ eintritt, vergeht laut Modell keine Zeit.`, blockId: b.id })
+            }
+          }
         })
         pruefeSequenzen(b.zweige.map((z) => z.schritte))
         break
@@ -147,6 +165,11 @@ export function pruefeProzess(p: Prozess): Befund[] {
       case 'wiederholung': {
         if (b.koerper.schritte.length === 0) {
           add({ schluessel: `leer:${b.id}`, schwere: 'fehler', titel: 'Leere Wiederholung', text: 'Lege fest, welche Schritte wiederholt werden.', blockId: b.id })
+        }
+        if (b.modus === 'ruecksprung') {
+          // Wiederholt wird über Ausgänge mit Rücksprung; Endlosschleifen erkennt die Analyse.
+          pruefeSequenzen([b.koerper.schritte])
+          break
         }
         if (b.anteilWiederholung >= 1) {
           add({ schluessel: `endlos:${b.id}`, schwere: 'fehler', titel: 'Endlosschleife', text: `„${blockTitel(b)}“ wird immer wiederholt und endet nie. Der Anteil muss unter 100 % liegen.`, blockId: b.id })

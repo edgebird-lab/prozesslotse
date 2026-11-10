@@ -134,6 +134,14 @@ export function Zeitverteilung({ p, k }: { p: Prozess; k: Kennzahlen }) {
   const std = p.arbeitsstundenProTag
   const zeilen: Zeile[] = []
   for (const { block } of durchlaufe(p.ablauf)) {
+    if (block.typ === 'entscheidung' && block.art === 'ereignis') {
+      // Wartezeit bis zum Ereignis eines Ausgangs
+      for (const z of block.zweige) {
+        const kz = k.schritte.get(z.id)
+        if (kz && kz.beitragWartenMin > 0.01) zeilen.push({ id: z.id, name: `Warten auf „${z.bezeichnung}“`, warten: kz.beitragWartenMin, arbeit: 0 })
+      }
+      continue
+    }
     const kz = k.schritte.get(block.id)
     if (!kz || (block.typ !== 'aufgabe' && block.typ !== 'warten')) continue
     if (kz.beitragWartenMin + kz.beitragArbeitMin <= 0.01) continue

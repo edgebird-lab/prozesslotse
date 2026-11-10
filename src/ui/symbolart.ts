@@ -10,11 +10,11 @@ export function symbolFuer(b: Block, p: Prozess): SymbolArt {
       return m.art === 'papier' || m.art === 'telefon' ? 'manuell' : 'benutzer'
     }
     case 'entscheidung':
-      return 'xor'
+      return b.art === 'ereignis' ? 'ereignisgateway' : 'xor'
     case 'parallel':
       return 'und'
     case 'wiederholung':
-      return 'wiederholung'
+      return b.modus === 'ruecksprung' ? 'ruecksprung' : 'wiederholung'
     case 'warten':
       return b.art === 'zeit' ? 'warten-zeit' : 'warten-nachricht'
   }
