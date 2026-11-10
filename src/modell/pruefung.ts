@@ -3,7 +3,7 @@
  * und Benennung nach den Seven Process Modeling Guidelines (7PMG,
  * Mendling, Reijers, van der Aalst 2010).
  */
-import { anzahlBloecke, blockTitel, durchlaufe, liegtInParallele } from './operationen'
+import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, kannWeiterlaufen, liegtInParallele } from './operationen'
 import type { Block, Id, Prozess } from './typen'
 
 export type Schwere = 'fehler' | 'warnung' | 'hinweis'
@@ -60,17 +60,19 @@ export function pruefeProzess(p: Prozess): Befund[] {
   pruefeSequenz(p.ablauf.schritte)
 
   function pruefeSequenz(schritte: Block[]) {
-    schritte.forEach((b, i) => {
-      if (b.typ === 'entscheidung' && i < schritte.length - 1 && b.zweige.length > 0 && b.zweige.every((z) => z.ende !== null || z.zurueckZu !== null)) {
-        add({
-          schluessel: `unerreichbar:${b.id}`,
-          schwere: 'fehler',
-          titel: 'Unerreichbare Schritte',
-          text: `Kein Ausgang von „${blockTitel(b)}“ führt weiter: Alle beenden den Prozess oder springen zurück. Die ${schritte.length - 1 - i} folgenden Schritte werden nie erreicht.`,
-          blockId: schritte[i + 1].id,
-        })
-      }
-    })
+    // Rekursiv: führt aus einem Block kein Weg normal weiter (auch über verschachtelte Entscheidungen,
+    // Wiederholungen und Rücksprungbereiche), wird alles dahinter nie erreicht.
+    const i = schritte.findIndex((b, k) => k < schritte.length - 1 && !kannWeiterlaufen(b))
+    if (i >= 0) {
+      const b = schritte[i]
+      add({
+        schluessel: `unerreichbar:${b.id}`,
+        schwere: 'fehler',
+        titel: 'Unerreichbare Schritte',
+        text: `Hinter „${blockTitel(b)}“ geht es nie normal weiter: Alle Wege darin beenden den Prozess oder springen zurück. Die ${schritte.length - 1 - i} folgenden Schritte werden nie erreicht.`,
+        blockId: schritte[i + 1].id,
+      })
+    }
   }
 
   for (const { block: b, vorfahren } of durchlaufe(p.ablauf)) {
@@ -128,6 +130,16 @@ export function pruefeProzess(p: Prozess): Befund[] {
           if (z.ende !== null && liegtInParallele([...vorfahren, b])) {
             add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
           }
+          if ((z.ende !== null || z.zurueckZu !== null) && z.schritte.length > 0 && !ausgaengeSequenz(z.schritte).has('weiter')) {
+            add({
+              schluessel: `totesende:${z.id}`,
+              // Ein nie erreichtes Ende stünde ohne Zufluss im Diagramm; ein nie genommener Rücksprung erzeugt keine Kante.
+              schwere: z.ende !== null ? 'fehler' : 'warnung',
+              titel: z.ende !== null ? 'Ende wird nie erreicht' : 'Rücksprung wird nie erreicht',
+              text: `Im Ausgang „${z.bezeichnung || i + 1}“ geht es vor dem ${z.ende !== null ? `Ende „${z.ende}“` : 'Rücksprung'} nie normal weiter; ${z.ende !== null ? 'dieses Ende' : 'dieser Rücksprung'} kommt nie vor.`,
+              blockId: b.id,
+            })
+          }
           if (z.ende !== null && z.zurueckZu !== null) {
             add({ schluessel: `doppelt:${z.id}`, schwere: 'fehler', titel: 'Ausgang endet und springt zurück', text: `Der Ausgang „${z.bezeichnung}“ kann nicht zugleich den Prozess beenden und zurückspringen.`, blockId: b.id })
           }
@@ -167,9 +179,15 @@ export function pruefeProzess(p: Prozess): Befund[] {
           add({ schluessel: `leer:${b.id}`, schwere: 'fehler', titel: 'Leere Wiederholung', text: 'Lege fest, welche Schritte wiederholt werden.', blockId: b.id })
         }
         if (b.modus === 'ruecksprung') {
-          // Wiederholt wird über Ausgänge mit Rücksprung; Endlosschleifen erkennt die Analyse.
+          // Wiederholt wird über Ausgänge mit Rücksprung; führt gar kein Weg heraus, ist es eine Endlosschleife.
+          if (ausgaengeBlock(b).size === 0) {
+            add({ schluessel: `ausweglos:${b.id}`, schwere: 'fehler', titel: 'Endlosschleife', text: `Aus „${blockTitel(b)}“ führt kein Weg heraus: Jeder Ausgang darin springt zurück.`, blockId: b.id })
+          }
           pruefeSequenzen([b.koerper.schritte])
           break
+        }
+        if (b.koerper.schritte.length > 0 && !ausgaengeSequenz(b.koerper.schritte).has('weiter')) {
+          add({ schluessel: `fragelos:${b.id}`, schwere: 'fehler', titel: 'Frage wird nie erreicht', text: `Jeder Durchlauf von „${blockTitel(b)}“ endet oder springt vorher heraus; die Frage am Ende wird nie gestellt.`, blockId: b.id })
         }
         if (b.anteilWiederholung >= 1) {
           add({ schluessel: `endlos:${b.id}`, schwere: 'fehler', titel: 'Endlosschleife', text: `„${blockTitel(b)}“ wird immer wiederholt und endet nie. Der Anteil muss unter 100 % liegen.`, blockId: b.id })

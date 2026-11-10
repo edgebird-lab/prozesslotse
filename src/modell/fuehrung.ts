@@ -2,7 +2,7 @@
  * Führung durch den Ablauf: Wo steht die Einfügeposition, wohin springt sie
  * nach dem Einfügen und was passiert bei „Abschnitt fertig“.
  */
-import { bereichTitel, blockTitel, findeBlock, findeSequenz, liegtInParallele } from './operationen'
+import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, liegtInParallele } from './operationen'
 import type { Block, Cursor, Prozess } from './typen'
 
 export interface Ort {
@@ -37,9 +37,7 @@ export function beschreibeCursor(p: Prozess, c: Cursor): Ort {
   const f = findeSequenz(p, c.sequenzId)
   const schritte = f?.sequenz.schritte ?? []
   const vorgaenger = c.index > 0 ? (schritte[c.index - 1] ?? null) : null
-  const unerreichbar = schritte
-    .slice(0, c.index)
-    .some((b) => b.typ === 'entscheidung' && b.zweige.length > 0 && b.zweige.every((z) => z.ende !== null || z.zurueckZu !== null))
+  const unerreichbar = !stelleErreichbar(p, c)
   const ziel = abschnittFertig(p, c)
   let weiterText = 'Ablauf fertig, weiter zum Prüfen'
   if (ziel !== 'fertig') {
@@ -55,6 +53,21 @@ export function beschreibeCursor(p: Prozess, c: Cursor): Ort {
     vorgaenger,
     weiterText,
   }
+}
+
+/** Erreicht der Ablauf diese Stelle? Prüft die eigene Sequenz und alle umgebenden. */
+export function stelleErreichbar(p: Prozess, c: Cursor): boolean {
+  let seq = findeSequenz(p, c.sequenzId)
+  let bis = c.index
+  while (seq) {
+    if (seq.sequenz.schritte.slice(0, bis).some((b) => !kannWeiterlaufen(b))) return false
+    if (!seq.besitzer) return true
+    const ort = findeBlock(p, seq.besitzer.id)
+    if (!ort) return true
+    seq = findeSequenz(p, ort.sequenz.id)
+    bis = ort.index
+  }
+  return true
 }
 
 export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {

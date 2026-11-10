@@ -4,6 +4,8 @@ import { beispielLieferdienst } from '../modell/beispiel'
 import type { Aufgabe, Block, Prozess, Rolle } from '../modell/typen'
 import { berechneKennzahlen } from './kennzahlen'
 import { simuliere } from './simulation'
+import { zufallsProzess } from '../testhilfen/zufallsprozess'
+import { durchlaufe } from '../modell/operationen'
 
 const R = neueRolle('Team', { stundensatz: 60, personen: 1, verfuegbarProzent: 100 })
 const R2 = neueRolle('Prüfung', { stundensatz: 60 })
@@ -72,11 +74,26 @@ describe('Kennzahlen', () => {
     par.zweige[0].schritte.push(y)
     par.zweige[1].schritte.push(z)
     const k = berechneKennzahlen(prozess([x, par, w], { medien: [papier, erp] }))
-    expect(k.durchlaufzeitMin).toBeCloseTo(85, 10) // 10 + max(70, 30) + 5
-    expect(k.kritischeArbeitMin).toBeCloseTo(25, 10)
+    expect(k.durchlaufzeitMin).toBeCloseTo(85, 6) // 10 + max(70, 30) + 5
+    // TCT: dieselbe Rechnung nur mit Bearbeitungszeiten: 10 + max(10, 30) + 5
+    expect(k.kritischeArbeitMin).toBeCloseTo(45, 6)
     expect(k.arbeitszeitMin).toBeCloseTo(55, 10)
     expect(k.uebergaben).toBeCloseTo(2, 10) // X→Y und Y→W wechseln die Rolle
     expect(k.systemwechsel).toBeCloseTo(2, 10) // X→Z und Z→W wechseln das System
+  })
+
+  it('rechnet bei „Gleichzeitig“ mit dem Erwartungswert des Maximums, nicht mit dem Maximum der Erwartungswerte', () => {
+    // Gegenbeispiel aus der Prüfung: Zweig A dauert je zur Hälfte 100 oder 0 Min., Zweig B 60 Min.
+    const a = aufgabe('A erledigen', 100)
+    const b = aufgabe('B erledigen', 60)
+    const ent = neueEntscheidung({ frage: 'A nötig?', zweige: [neuerZweig('Ja', 0.5, { schritte: [a] }), neuerZweig('Nein', 0.5)] })
+    const par = neueParallel()
+    par.zweige[0].schritte.push(ent)
+    par.zweige[1].schritte.push(b)
+    const p = prozess([par])
+    // exakt: 0,5 · max(100, 60) + 0,5 · max(0, 60) = 80; das Maximum der Erwartungswerte wäre 60
+    expect(berechneKennzahlen(p).durchlaufzeitMin).toBeCloseTo(80, 6)
+    expect(simuliere(p, 40_000, 11).mittelMin).toBeCloseTo(80, 0)
   })
 
   it('zählt Übergaben in Wiederholungen über alle Durchläufe', () => {
@@ -130,4 +147,19 @@ describe('Kennzahlen', () => {
     // Simulation und Formel liegen nah beieinander (hier läuft nichts parallel)
     expect(Math.abs(s.mittelMin - k.durchlaufzeitMin) / k.durchlaufzeitMin).toBeLessThan(0.02)
   })
+
+  it('stimmt auch mit „Gleichzeitig“ im Mittel mit der Simulation überein (zufällige Prozesse)', () => {
+    const abweichungen: string[] = []
+    let mitParallele = 0
+    for (let s = 1; s <= 80; s++) {
+      const p = zufallsProzess(s)
+      if (![...durchlaufe(p.ablauf)].some((f) => f.block.typ === 'parallel')) continue
+      mitParallele++
+      const formel = berechneKennzahlen(p).durchlaufzeitMin
+      const sim = simuliere(p, 20_000, s).mittelMin
+      if (Math.abs(formel - sim) > 0.025 * Math.max(formel, 1)) abweichungen.push(`Startwert ${s}: Formel ${formel.toFixed(1)}, Simulation ${sim.toFixed(1)}`)
+    }
+    expect(mitParallele).toBeGreaterThan(20)
+    expect(abweichungen).toEqual([])
+  }, 60_000)
 })

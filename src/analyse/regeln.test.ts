@@ -44,7 +44,9 @@ describe('Verbesserungsregeln', () => {
     const q = v.anwenden(p)
     expect(findeBlock(q, 'par_auf_tour')?.block.typ).toBe('parallel')
     // Kommissionieren mit Kontrolle: (128 + 17) / (1 − 0,2) = 181,25 Min.; Tour planen: 241,5 Min.
-    expect(v.wirkung.durchlaufzeitMin).toBeCloseTo(-181.25 * 0.976, 6)
+    // exakt mit Erwartungswert des Maximums: Kommissionieren dauert 145 Min. je Durchlauf, im Schnitt 1,25 Durchläufe;
+    // E[max(145·N, 241,5)] = 0,8 · 241,5 + (181,25 − 0,8 · 145) = 258,45 statt 241,5 bei der alten Näherung
+    expect(v.wirkung.durchlaufzeitMin).toBeCloseTo(-(181.25 + 241.5 - 258.45) * 0.976, 1)
     expect(v.wirkung.kostenProVorgang).toBeCloseTo(0, 10)
   })
 
@@ -75,14 +77,14 @@ describe('Verbesserungsregeln', () => {
     expect(ohne).toHaveLength(alle.length - 1)
   })
 
-  it('senkt im Fallbeispiel mit zwei Vorschlägen die Durchlaufzeit von 6,7 auf 4,4 Arbeitstage (wie in der README)', () => {
+  it('senkt im Fallbeispiel mit zwei Vorschlägen die Durchlaufzeit von 6,7 auf 4,5 Arbeitstage (wie in der README)', () => {
     const p = beispielLieferdienst()
     const tag = 8 * 60
     expect(berechneKennzahlen(p).durchlaufzeitMin / tag).toBeCloseTo(6.74, 2)
     const q = bewerteVorschlaege(p)[0].anwenden(p) // Freigabe streichen
     const r = bewerteVorschlaege(q)[0].anwenden(q) // Tour planen parallel zur Kommissionierung
     expect(findeBlock(r, 'par_auf_tour')?.block.typ).toBe('parallel')
-    expect(berechneKennzahlen(r).durchlaufzeitMin / tag).toBeCloseTo(4.42, 2)
+    expect(berechneKennzahlen(r).durchlaufzeitMin / tag).toBeCloseTo(4.45, 2)
   })
 
   it('verbindet Namen mit gemeinsamem Objekt', () => {

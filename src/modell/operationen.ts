@@ -336,3 +336,66 @@ export function verlaesstBlock(b: Block): boolean {
   }
   return pruefe(b)
 }
+
+// ---------------------------------------------------------------------------
+// Struktur: Welche Wege führen aus einem Block heraus?
+
+/** „weiter“ = normal hinter dem Block, „ende“ = Prozessende, „rueck:<id>“ = Rücksprung zu Bereich <id>. */
+export type Ausgang = string
+
+function vereinige(ziel: Set<Ausgang>, quelle: Set<Ausgang>, ohne?: Ausgang): void {
+  for (const a of quelle) if (a !== ohne) ziel.add(a)
+}
+
+/** Alle Wege, auf denen der Ablauf eine Folge von Schritten verlassen kann (strukturell, ohne Anteile). */
+export function ausgaengeSequenz(schritte: Block[]): Set<Ausgang> {
+  const aus = new Set<Ausgang>()
+  for (const b of schritte) {
+    const a = ausgaengeBlock(b)
+    vereinige(aus, a, 'weiter')
+    if (!a.has('weiter')) return aus // dahinter kommt der Ablauf nie an
+  }
+  aus.add('weiter')
+  return aus
+}
+
+export function ausgaengeBlock(b: Block): Set<Ausgang> {
+  switch (b.typ) {
+    case 'aufgabe':
+    case 'warten':
+      return new Set(['weiter'])
+    case 'entscheidung': {
+      const aus = new Set<Ausgang>()
+      for (const z of b.zweige) {
+        const a = ausgaengeSequenz(z.schritte)
+        vereinige(aus, a, 'weiter')
+        if (a.has('weiter')) aus.add(z.ende !== null ? 'ende' : z.zurueckZu !== null ? `rueck:${z.zurueckZu}` : 'weiter')
+      }
+      return aus
+    }
+    case 'parallel': {
+      const aus = new Set<Ausgang>()
+      let alleWeiter = b.zweige.length > 0
+      for (const z of b.zweige) {
+        const a = ausgaengeSequenz(z.schritte)
+        vereinige(aus, a, 'weiter')
+        alleWeiter &&= a.has('weiter')
+      }
+      if (alleWeiter) aus.add('weiter')
+      return aus
+    }
+    case 'wiederholung': {
+      const a = ausgaengeSequenz(b.koerper.schritte)
+      const aus = new Set<Ausgang>()
+      // Rücksprünge auf den eigenen Bereich bleiben innen
+      vereinige(aus, a, b.modus === 'ruecksprung' ? `rueck:${b.id}` : undefined)
+      if (b.modus === 'anteil' && b.anteilWiederholung >= 1) aus.delete('weiter')
+      return aus
+    }
+  }
+}
+
+/** Kann der Ablauf hinter diesem Block normal weiterlaufen? */
+export function kannWeiterlaufen(b: Block): boolean {
+  return ausgaengeBlock(b).has('weiter')
+}

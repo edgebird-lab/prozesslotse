@@ -12,10 +12,15 @@
  *    ohne Prozessende durchlaufen wird.
  *
  * 2. **Dauer**: erwartete Durchlaufzeit. Hintereinander wird addiert,
- *    Entweder-oder gewichtet gemittelt, bei Gleichzeitig zählt der Zweig mit
- *    der längsten erwarteten Dauer (Näherung; die Simulation rechnet genau).
+ *    Entweder-oder gewichtet gemittelt, Wiederholungen mit 1 / (1 − p).
+ *    Bei Gleichzeitig zählt der Erwartungswert des Maximums der Zweige, aus
+ *    den Verteilungen der Zweigdauern berechnet (verteilung.ts); das
+ *    Maximum der Erwartungswerte wäre zu optimistisch, sobald Zweige streuen.
+ *    Die Flusseffizienz ist TCT / CT (Dumas u. a.): dieselben Regeln, einmal
+ *    nur mit Bearbeitungszeiten (TCT) und einmal mit allen Zeiten (CT).
  */
 import { durchlaufe } from '../modell/operationen'
+import { erwartungMaximum } from './verteilung'
 import type { Aufgabe, Block, Id, Prozess, Rolle } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
@@ -53,9 +58,9 @@ export interface Ende {
 export interface Kennzahlen {
   /** Erwartete Durchlaufzeit vom Auslöser bis zum Ende. */
   durchlaufzeitMin: number
-  /** Bearbeitungszeit auf dem zeitbestimmenden Pfad. */
+  /** Theoretische Durchlaufzeit (TCT): dieselbe Rechnung nur mit Bearbeitungszeiten. */
   kritischeArbeitMin: number
-  /** Anteil der Durchlaufzeit, in dem tatsächlich gearbeitet wird. */
+  /** Flusseffizienz TCT / CT: Anteil der Durchlaufzeit, der aus Bearbeitung besteht. */
   flusseffizienz: number
   /** Gesamte Arbeitszeit aller Rollen pro Vorgang. */
   arbeitszeitMin: number
@@ -303,8 +308,15 @@ function dauerBlock(b: Block): Dauer {
       const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
       if (zweige.length === 0) return { gesamt: 0, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map() }
       const laengster = zweige.reduce((a, x) => (x.gesamt > a.gesamt ? x : a))
+      // Erwartungswert des Maximums aus den Verteilungen der Zweige (CT), ebenso nur für Bearbeitungszeiten (TCT)
+      const folgen = b.zweige.map((z) => z.schritte)
+      const gesamt = erwartungMaximum(folgen, 'gesamt')
+      const arbeit = erwartungMaximum(folgen, 'arbeit')
+      // Beiträge zur Durchlaufzeit: der im Mittel längste Zweig, auf den exakten Erwartungswert hochgerechnet
+      const beitraege = new Map<Id, Beitrag>()
+      addiereBeitraege(beitraege, laengster.beitraege, laengster.gesamt > 0 ? gesamt / laengster.gesamt : 1)
       // Rücksprünge aus „Gleichzeitig“ heraus meldet die Prüfung als Fehler.
-      return { ...laengster, weiter: Math.min(...zweige.map((x) => x.weiter)), rueck: new Map() }
+      return { gesamt, arbeit, weiter: Math.min(...zweige.map((x) => x.weiter)), rueck: new Map(), beitraege }
     }
     case 'wiederholung': {
       const x = dauerSequenz(b.koerper.schritte)

@@ -118,6 +118,24 @@ describe('Neue Konstrukte: Rücksprung und Ereignis-Entscheidung', () => {
     expect(e.fehler).toEqual([])
   })
 
+  it('Prüfung und Tokenspiel stimmen überein: kein Fehler ⇒ sound, nicht sound ⇒ Fehler', () => {
+    const widersprueche: string[] = []
+    let ungueltig = 0
+    for (let s = 1; s <= 400; s++) {
+      const p = zufallsProzess(s, { auchUngueltig: true })
+      const fehler = pruefeProzess(p).filter((b) => b.schwere === 'fehler')
+      if (fehler.length > 0) ungueltig++
+      const e = pruefeSoundness(graphAusLayout(erzeugeBpmn(p).layout), 2_000)
+      if (!e.vollstaendig) continue
+      if (fehler.length === 0 && !e.sound) widersprueche.push(`Startwert ${s}: kein Prüffehler, aber ${e.fehler[0]}`)
+      if (fehler.length > 0 && e.sound && fehler.some((f) => /unerreichbar|ausweglos|fragelos|verklemmung|totesende/.test(f.schluessel)))
+        widersprueche.push(`Startwert ${s}: Prüffehler ${fehler[0].schluessel}, aber sound`)
+    }
+    expect(widersprueche.slice(0, 10)).toEqual([])
+    // der Generator erzeugt tatsächlich ungültige Modelle
+    expect(ungueltig).toBeGreaterThan(30)
+  }, 60_000)
+
   it('zählt im Tokenspiel dieselben Häufigkeiten wie die Formeln', () => {
     expect(haeufigkeitsAbweichungen(beispielLieferdienst(), 20_000, 1)).toEqual([])
     expect(haeufigkeitsAbweichungen(beispielOnlinebestellung(), 20_000, 2)).toEqual([])

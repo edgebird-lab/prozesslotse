@@ -9,7 +9,9 @@ import type { Block, Prozess, Sequenz } from '../modell/typen'
  * vorzeitige Enden und Rücksprünge, die über `setzeRuecksprung` entstehen wie
  * in der Oberfläche.
  */
-export function zufallsProzess(startwert: number): Prozess {
+export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: boolean } = {}): Prozess {
+  // auchUngueltig: jeder Ausgang darf enden oder zurückspringen, also auch alle; dann entstehen unerreichbare Schritte und Endlosschleifen
+  const frei = optionen.auchUngueltig ?? false
   const zufall = zufallMitStartwert(startwert)
   const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
   const rollen = [neueRolle('A'), neueRolle('B'), neueRolle('C')]
@@ -31,7 +33,7 @@ export function zufallsProzess(startwert: number): Prozess {
       const zweige = Array.from({ length: n }, (_, i) =>
         neuerZweig(`Fall ${i + 1}`, 1 / n, {
           schritte: sequenz(tiefe + 1, inParallel),
-          ende: !inParallel && i > 0 && zufall() < 0.3 ? `Ende ${i}` : null,
+          ende: !inParallel && (frei || i > 0) && zufall() < 0.3 ? `Ende ${i}` : null,
           ereignis: ereignisse ? { art: zufall() < 0.5 ? 'nachricht' : 'zeit', dauerMin: 60 } : null,
         }),
       )
@@ -56,11 +58,20 @@ export function zufallsProzess(startwert: number): Prozess {
     if (zufall() >= 0.4) continue
     const ort = findeBlock(p, id)
     if (!ort || ort.block.typ !== 'entscheidung') continue
-    const zweige = ort.block.zweige.slice(1).filter((z) => z.ende === null)
+    const zweige = ort.block.zweige.slice(frei ? 0 : 1).filter((z) => z.ende === null)
     if (zweige.length === 0) continue
     const ziele = ruecksprungZiele(p, ort.sequenz.id, ort.index, true)
     if (ziele.length === 0) continue
     p = setzeRuecksprung(p, id, wahl(zweige).id, wahl(ziele).id)
+    if (frei && zufall() < 0.3) {
+      // noch einen zweiten Ausgang derselben Entscheidung zurückspringen lassen
+      const neu = findeBlock(p, id)
+      if (neu?.block.typ === 'entscheidung') {
+        const rest = neu.block.zweige.filter((z) => z.ende === null && z.zurueckZu === null)
+        const ziele2 = ruecksprungZiele(p, neu.sequenz.id, neu.index, true)
+        if (rest.length > 0 && ziele2.length > 0) p = setzeRuecksprung(p, id, wahl(rest).id, wahl(ziele2).id)
+      }
+    }
   }
   return p
 }

@@ -201,8 +201,9 @@ function durchsuche(g: TokenGraph, maxZustaende: number, reduziert: boolean): So
     if (gefangen.length > 0) fehler.push(`${gefangen.length} Zustände können nicht mehr enden, z. B. ${gefangen[0]}`)
   }
 
+  // Keine toten Elemente: Jede Aktivität, jedes Gateway und jedes Ende muss in einem Ablauf vorkommen.
   for (const k of g.knoten) {
-    if (k.typ === 'aktivitaet' && !gefeuert.has(k.id)) fehler.push(`Aktivität ${k.id} wird nie ausgeführt`)
+    if (k.typ !== 'start' && !gefeuert.has(k.id)) fehler.push(`${k.typ === 'aktivitaet' ? 'Aktivität' : 'Element'} ${k.id} wird nie ausgeführt`)
   }
   return { sound: fehler.length === 0, vollstaendig: true, fehler, zustaende: index.size, reduziert }
 }
