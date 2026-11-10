@@ -187,7 +187,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
           Einpassen
         </button>
       </div>
-      <div ref={behaelter} className="diagramm-flaeche" role="img" aria-label={beschriftung} />
+      <div ref={behaelter} className="diagramm-flaeche" role="figure" aria-label={beschriftung} />
       {fehler && (
         <p className="diagramm-fehler" role="alert">
           Das Diagramm konnte nicht gezeichnet werden: {fehler}

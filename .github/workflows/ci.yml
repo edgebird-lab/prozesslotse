@@ -18,3 +18,11 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # Browsertests mit dem vorinstallierten Chrome des Runners
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-ergebnisse
+          path: test-results
+          retention-days: 7
