@@ -4,7 +4,7 @@
  * Ist-Soll-Vergleich auf.
  */
 import { neuerRuecksprungBereich } from './bausteine'
-import type { Aufgabe, Block, Id, Prozess, Sequenz } from './typen'
+import type { Aufgabe, Block, Entscheidung, EntscheidungsZweig, Id, Prozess, Sequenz } from './typen'
 
 export interface Fundstelle {
   block: Block
@@ -335,6 +335,55 @@ export function verlaesstBlock(b: Block): boolean {
     return kinderSequenzen(x).some((s) => s.schritte.some(pruefe))
   }
   return pruefe(b)
+}
+
+// ---------------------------------------------------------------------------
+// Kontrollen und ihre Folge
+
+/**
+ * Greift eine Entscheidung das Ergebnis des Schritts auf? Das ist der Fall,
+ * wenn direkt danach eine Entscheidung kommt (auch am Anfang eines
+ * Rücksprungbereichs) oder der Schritt eine Wiederholung abschließt, deren
+ * Frage dann entscheidet. Am Ende eines Zweigs zählt, was nach dem Block folgt.
+ */
+export function folgtEntscheidung(p: Prozess, f: Fundstelle): boolean {
+  const naechster = f.sequenz.schritte[f.index + 1]
+  if (naechster) {
+    if (naechster.typ === 'wiederholung' && naechster.modus === 'ruecksprung') return naechster.koerper.schritte[0]?.typ === 'entscheidung'
+    return naechster.typ === 'entscheidung'
+  }
+  const besitzer = f.vorfahren[f.vorfahren.length - 1]
+  if (!besitzer) return false
+  if (besitzer.typ === 'wiederholung' && besitzer.modus === 'anteil') return true
+  const ort = findeBlock(p, besitzer.id)
+  return ort ? folgtEntscheidung(p, ort) : false
+}
+
+/** Ausgang, der nach einer Freigabe als „freigegeben“ gilt: der häufigste, der normal weiterführt. */
+export function freigabeAusgang(e: Entscheidung): EntscheidungsZweig | null {
+  const weiter = e.zweige.filter((z) => z.ende === null && z.zurueckZu === null)
+  return weiter.length === 0 ? null : weiter.reduce((a, z) => (z.anteil > a.anteil ? z : a))
+}
+
+export interface FreigabeQuote {
+  /** Anteil der Fälle, in denen freigegeben wird */
+  quote: number
+  /** Ausgang der direkt folgenden Entscheidung, aus dem die Quote stammt, sonst null */
+  ausgang: EntscheidungsZweig | null
+  entscheidung: Entscheidung | null
+}
+
+/**
+ * Quote einer Freigabe. Folgt direkt eine Entscheidung, gilt deren
+ * „freigegeben“-Ausgang, damit Modell und Angabe nicht auseinanderlaufen;
+ * sonst die Angabe am Schritt.
+ */
+export function freigabeQuote(f: Fundstelle): FreigabeQuote {
+  const angabe = f.block.typ === 'aufgabe' ? f.block.freigabeQuote : 1
+  const naechster = f.sequenz.schritte[f.index + 1]
+  const entscheidung = naechster?.typ === 'entscheidung' ? naechster : null
+  const ausgang = entscheidung ? freigabeAusgang(entscheidung) : null
+  return { quote: ausgang ? ausgang.anteil : angabe, ausgang, entscheidung: ausgang ? entscheidung : null }
 }
 
 // ---------------------------------------------------------------------------

@@ -121,7 +121,7 @@ describe('Onlinebestellung (Rücksprung und Ereignis-Entscheidung)', () => {
     // je Durchlauf: Fehler 12 %, davon 70 % Korrektur → zurück; 20 % Storno, 10 % Frist → Ende
     const n = 1 / (1 - 0.12 * 0.7)
     expect(k.schritte.get('auf_erfassen')?.haeufigkeit).toBeCloseTo(n, 10)
-    expect(k.ruecksprungAnteil.get('rsp_daten')).toBeCloseTo(0.084, 10)
+    expect(k.wiederholAnteil.get('rsp_daten')).toBeCloseTo(0.084, 10)
     const ende = Object.fromEntries(k.enden.map((e) => [e.ergebnis, e.anteil]))
     expect(ende['Bestellung storniert']).toBeCloseTo(0.12 * 0.2 * n, 10)
     expect(ende['Bestellung verfallen']).toBeCloseTo(0.12 * 0.1 * n, 10)

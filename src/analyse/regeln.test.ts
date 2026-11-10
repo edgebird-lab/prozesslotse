@@ -6,7 +6,7 @@ import { berechneKennzahlen } from './kennzahlen'
 import { bewerteVorschlaege, findeVorschlaege, verbindeNamen } from './regeln'
 
 describe('Verbesserungsregeln', () => {
-  it('findet im Fallbeispiel sieben Vorschläge aus allen fünf Regeln', () => {
+  it('findet im Fallbeispiel sieben Vorschläge aus fünf Regeln', () => {
     const schluessel = findeVorschlaege(beispielLieferdienst()).map((v) => v.schluessel)
     expect(schluessel.sort()).toEqual(
       [

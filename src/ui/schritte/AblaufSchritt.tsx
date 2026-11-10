@@ -10,6 +10,7 @@ import {
   entferneRuecksprung,
   ersetzeBlock,
   findeBlock,
+  findeSequenz,
   fuegeEin,
   kinderSequenzen,
   liegtInParallele,
@@ -28,7 +29,7 @@ import { Lernhinweis } from '../Lernhinweis'
 import { Symbol, type SymbolArt } from '../Symbol'
 import { fehltNoch } from '../entwurf'
 import { symbolFuer } from '../symbolart'
-import { BlockFormular, type Danach } from './BlockFormulare'
+import { BlockFormular, ZweckWahl, type Danach } from './BlockFormulare'
 
 const WAHL: { typ: BlockTyp; text: string; beschreibung: string; symbol: SymbolArt }[] = [
   { typ: 'aufgabe', text: 'Eine Aufgabe', beschreibung: 'Jemand erledigt etwas', symbol: 'aufgabe' },
@@ -190,7 +191,13 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
       <BlockFormular
         block={entwurf}
         onAendern={setEntwurf}
-        kontext={{ vorgaenger: ort.vorgaenger, inParallele: ort.inParallele, neu: true, ziele: ruecksprungZiele(p, cursor.sequenzId, cursor.index, false) }}
+        kontext={{
+          vorgaenger: ort.vorgaenger,
+          nachfolger: findeSequenz(p, cursor.sequenzId)?.sequenz.schritte[cursor.index] ?? null,
+          inParallele: ort.inParallele,
+          neu: true,
+          ziele: ruecksprungZiele(p, cursor.sequenzId, cursor.index, false),
+        }}
       />
       {fehlt && <p className="feld-hilfe">{fehlt}</p>}
       <div className="knopfreihe">
@@ -229,6 +236,7 @@ function BlockBearbeiten() {
         onAendern={(neu) => aendere((q) => normalisiere(ersetzeBlock(q, neu)), { gruppe: `block:${b.id}` })}
         kontext={{
           vorgaenger,
+          nachfolger: fund.sequenz.schritte[fund.index + 1] ?? null,
           inParallele: liegtInParallele(fund.vorfahren),
           neu: false,
           ziele: b.typ === 'entscheidung' ? ruecksprungZiele(p, fund.sequenz.id, fund.index, true) : undefined,
@@ -290,6 +298,7 @@ function BereichBearbeiten({ bereichId }: { bereichId: Id }) {
       <p>
         Die Schritte ab „{start}“ laufen erneut, wenn einer dieser Ausgänge gewählt wird. Ändern lässt sich das in der jeweiligen Entscheidung unter „Danach“.
       </p>
+      <ZweckWahl w={bereich} onAendern={(neu) => aendere((q) => ersetzeBlock(q, neu), { gruppe: `block:${bereich.id}` })} />
       <ul className="quellen">
         {quellen.map((q) => (
           <li key={q.zweigId}>

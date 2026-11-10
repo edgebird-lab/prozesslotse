@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
-import { blockTitel } from '../../modell/operationen'
+import { blockTitel, freigabeAusgang } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
 import type { RuecksprungZiel } from '../../modell/operationen'
 import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Parallel, type Warten, type Wiederholung } from '../../modell/typen'
@@ -14,6 +14,8 @@ export type Danach = { art: 'weiter' } | { art: 'ende' } | { art: 'zurueck'; zie
 
 export interface FormularKontext {
   vorgaenger: Block | null
+  /** Block direkt danach, falls bekannt (z. B. die Entscheidung nach einer Freigabe) */
+  nachfolger?: Block | null
   inParallele: boolean
   neu: boolean
   /** Mögliche Ziele für „zurück zu …“ */
@@ -182,6 +184,10 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
   const setze = (w: Partial<Aufgabe>) => onAendern({ ...a, ...w })
   const tipp = a.name.trim() && !istObjektVerbName(a.name) ? 'Tipp: Objekt und Verb lesen sich am klarsten, z. B. „Rechnung prüfen“.' : 'Objekt und Verb, z. B. „Bestellung erfassen“.'
   const andereQuelle = p.medien.find((m) => m.id !== a.mediumId)?.id ?? null
+  // Folgt eine Entscheidung, bestimmt deren „freigegeben“-Ausgang die Quote (siehe freigabeQuote).
+  const naechste = kontext.nachfolger?.typ === 'entscheidung' ? kontext.nachfolger : null
+  const ausgang = naechste ? freigabeAusgang(naechste) : null
+  const folge = naechste && ausgang ? { entscheidung: naechste, ausgang } : null
 
   return (
     <>
@@ -249,11 +255,16 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
         ]}
         onAendern={(art) => setze({ art })}
       />
-      {a.art === 'freigabe' && (
-        <Feld label="In wie viel Prozent der Fälle wird freigegeben?">
+      {a.art === 'freigabe' && (folge ? (
+        <p className="feld-hilfe">
+          Wie oft freigegeben wird, ergibt sich aus der folgenden Entscheidung „{blockTitel(folge.entscheidung)}“: Ausgang „{folge.ausgang.bezeichnung}“ mit{' '}
+          {formatiereProzent(folge.ausgang.anteil)}.
+        </p>
+      ) : (
+        <Feld label="In wie viel Prozent der Fälle wird freigegeben?" hilfe="Was bei einer Ablehnung passiert, zeigt eine Entscheidung direkt danach.">
           {(id) => <ProzentEingabe id={id} anteil={a.freigabeQuote} onAendern={(freigabeQuote) => setze({ freigabeQuote })} />}
         </Feld>
-      )}
+      ))}
     </>
   )
 }
@@ -443,10 +454,27 @@ function ParallelFormular({ block: b, onAendern }: Props<Parallel>) {
   )
 }
 
+/** Auswahl, wozu wiederholt wird; nur Nacharbeit gilt als Schwachstelle. */
+export function ZweckWahl({ w, onAendern }: { w: Wiederholung; onAendern: (w: Wiederholung) => void }) {
+  return (
+    <Auswahl
+      label="Wozu wird wiederholt?"
+      wert={w.zweck ?? 'nacharbeit'}
+      spalten={2}
+      optionen={[
+        { wert: 'nacharbeit', text: 'Korrektur', beschreibung: 'Fehler beheben, Nacharbeit' },
+        { wert: 'menge', text: 'Mehrere Durchgänge', beschreibung: 'z. B. je Position, gewollt' },
+      ]}
+      onAendern={(zweck) => onAendern({ ...w, zweck })}
+    />
+  )
+}
+
 function WiederholungFormular({ block: w, onAendern, kontext }: Props<Wiederholung>) {
   const mal = w.anteilWiederholung < 1 ? 1 / (1 - w.anteilWiederholung) : Infinity
   return (
     <>
+      <ZweckWahl w={w} onAendern={onAendern} />
       <Feld label="Welche Frage entscheidet nach jedem Durchlauf, ob wiederholt wird?" hilfe="„Ja“ heißt: noch einmal. Z. B. „Nacharbeit nötig?“">
         {(id) => <input id={id} type="text" autoFocus={kontext.neu} value={w.frage} onChange={(e) => onAendern({ ...w, frage: e.target.value })} />}
       </Feld>

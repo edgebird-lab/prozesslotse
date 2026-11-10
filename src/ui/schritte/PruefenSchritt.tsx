@@ -1,4 +1,4 @@
-import { ENGPASS_SCHWELLE } from '../../analyse/hinweise'
+import { WARTEFAKTOR_SCHWELLE } from '../../analyse/hinweise'
 import type { Kennzahlen } from '../../analyse/kennzahlen'
 import type { Simulationsergebnis } from '../../analyse/simulation'
 import { blockTitel, durchlaufe } from '../../modell/operationen'
@@ -99,10 +99,10 @@ export function Kennzahlkacheln({ p, k, sim, vergleich }: { p: Prozess; k: Kennz
         zusatz={`${formatiereEuro(k.kostenProTag)} pro Arbeitstag`}
       />
       <Kachel
-        label="Offene Vorgänge"
-        wert={formatiereZahl(k.offeneVorgaenge, 0)}
-        d={v ? delta(v.offeneVorgaenge, k.offeneVorgaenge, (n) => formatiereZahl(n, 0)) : undefined}
-        zusatz="gleichzeitig in Arbeit (Gesetz von Little)"
+        label="Vorgänge in Arbeit"
+        wert={k.stabil ? formatiereZahl(k.offeneVorgaenge, 0) : 'wächst'}
+        d={v && v.stabil && k.stabil ? delta(v.offeneVorgaenge, k.offeneVorgaenge, (n) => formatiereZahl(n, 0)) : undefined}
+        zusatz={k.stabil ? 'gleichzeitig, im Schnitt (Gesetz von Little)' : 'Eine Rolle ist überlastet; der Bestand wächst jeden Tag.'}
       />
       <Kachel
         label="Medienbrüche je Vorgang"
@@ -117,6 +117,47 @@ export function Kennzahlkacheln({ p, k, sim, vergleich }: { p: Prozess; k: Kennz
         zusatz={`${formatiereZahl(k.systemwechsel, 1)} Systemwechsel`}
       />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Durchlaufzeit je Ergebnis
+
+export function ErgebnisDauern({ p, k, sim }: { p: Prozess; k: Kennzahlen; sim: Simulationsergebnis }) {
+  const zeilen = k.enden.filter((e) => e.anteil > 1e-6)
+  if (zeilen.length < 2) return null
+  const std = p.arbeitsstundenProTag
+  return (
+    <section aria-labelledby="ergebnisse-titel">
+      <h3 id="ergebnisse-titel">Durchlaufzeit je Ergebnis</h3>
+      <p className="leise">Der Schnitt oben mischt alle Ausgänge. Getrennt nach Ergebnis (Dauer aus der Simulation):</p>
+      <div className="tabelle-wrap">
+        <table className="bericht-tabelle">
+          <thead>
+            <tr>
+              <th scope="col">Ergebnis</th>
+              <th scope="col">Anteil</th>
+              <th scope="col">Dauer im Schnitt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {zeilen.map((e) => {
+              const s = sim.ergebnisse.find((x) => x.ergebnis === e.ergebnis && x.regulaer === e.regulaer)
+              return (
+                <tr key={`${e.regulaer}:${e.ergebnis}`}>
+                  <th scope="row">
+                    {e.ergebnis}
+                    {e.regulaer ? '' : ' (vorzeitig)'}
+                  </th>
+                  <td>{formatiereProzent(e.anteil)}</td>
+                  <td>{s ? formatiereDauer(s.mittelMin, std) : '–'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -238,10 +279,13 @@ export function Auslastung({ k }: { k: Kennzahlen }) {
   return (
     <section className="auslastung" aria-labelledby="auslastung-titel">
       <h3 id="auslastung-titel">Auslastung je Rolle</h3>
-      <p className="leise">Benötigte Zeit pro Arbeitstag im Verhältnis zur verfügbaren Zeit. Die Markierung steht bei {formatiereProzent(ENGPASS_SCHWELLE)}.</p>
+      <p className="leise">
+        Benötigte Zeit pro Arbeitstag im Verhältnis zur verfügbaren Zeit. Die Markierung zeigt, ab wann Arbeit im Schnitt viermal so lange wartet, wie sie dauert: bei einer Person ab
+        80 %, bei größeren Teams später (Warteschlangenmodell M/M/c).
+      </p>
       <ul className="meterliste">
         {rollen.map((r) => {
-          const zustand = r.auslastung > 1 ? 'kritisch' : r.auslastung >= ENGPASS_SCHWELLE ? 'warnung' : 'normal'
+          const zustand = r.auslastung > 1 ? 'kritisch' : r.wartefaktor >= WARTEFAKTOR_SCHWELLE ? 'warnung' : 'normal'
           const prozent = Number.isFinite(r.auslastung) ? Math.round(r.auslastung * 100) : 999
           return (
             <li key={r.rolle.id} className={`meter meter-${zustand}`}>
@@ -251,7 +295,7 @@ export function Auslastung({ k }: { k: Kennzahlen }) {
               </div>
               <div className="meter-spur" role="meter" aria-label={`Auslastung ${r.rolle.name}`} aria-valuemin={0} aria-valuemax={Math.max(100, prozent)} aria-valuenow={prozent}>
                 <div className="meter-fuellung" style={{ width: `${Math.min(1, r.auslastung) * 100}%` }} />
-                <span className="meter-schwelle" style={{ left: `${ENGPASS_SCHWELLE * 100}%` }} />
+                <span className="meter-schwelle" style={{ left: `${r.engpassSchwelle * 100}%` }} title={`Engpass ab etwa ${formatiereProzent(r.engpassSchwelle)}`} />
               </div>
               <div className="meter-fuss">
                 <span>
@@ -328,6 +372,7 @@ export function PruefenSchritt() {
             </p>
           )}
           <Kennzahlkacheln p={p} k={a.kennzahlen} sim={sim} vergleich={vergleich} />
+          <ErgebnisDauern p={p} k={a.kennzahlen} sim={sim} />
           <Zeitverteilung p={p} k={a.kennzahlen} />
           <Auslastung k={a.kennzahlen} />
         </>

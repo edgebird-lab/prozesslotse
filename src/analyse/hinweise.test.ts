@@ -10,9 +10,10 @@ function arten(p: Prozess): string[] {
 }
 
 describe('Schwachstellen im Fallbeispiel', () => {
-  it('findet Engpass, Medienbrüche, Liegezeit, Nacharbeit, Freigabe, Hin und Her und niedrige Flusseffizienz', () => {
+  it('findet Engpässe, Medienbrüche, Liegezeit, Nacharbeit, Freigabe, Hin und Her und niedrige Flusseffizienz', () => {
+    // Engpässe: Niederlassungsleitung (98 %) und Buchhaltung (81 %), beide mit einer Person
     expect(arten(beispielLieferdienst()).sort()).toEqual(
-      ['engpass', 'flusseffizienz', 'freigabe', 'liegezeit', 'medienbruch', 'medienbruch', 'medienbruch', 'nacharbeit', 'pingpong', 'pingpong'].sort(),
+      ['engpass', 'engpass', 'flusseffizienz', 'freigabe', 'liegezeit', 'medienbruch', 'medienbruch', 'medienbruch', 'nacharbeit', 'pingpong', 'pingpong'].sort(),
     )
   })
 

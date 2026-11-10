@@ -159,6 +159,17 @@ export function pruefeProzess(p: Prozess): Befund[] {
             }
           }
         })
+        // Zwei Ausgänge ohne eigene Schritte, die beide normal weiterführen, unterscheiden sich im Ablauf nicht.
+        const ohneUnterschied = b.zweige.filter((z) => z.schritte.length === 0 && z.ende === null && z.zurueckZu === null)
+        if (b.art === 'daten' && ohneUnterschied.length >= 2) {
+          add({
+            schluessel: `gleiche-ausgaenge:${b.id}`,
+            schwere: 'hinweis',
+            titel: 'Ausgänge ohne Unterschied',
+            text: `Die Ausgänge ${ohneUnterschied.map((z, i) => `„${z.bezeichnung || i + 1}“`).join(' und ')} von „${blockTitel(b)}“ führen ohne eigene Schritte weiter. Für den Ablauf macht die Antwort dann keinen Unterschied: Ausgänge zusammenfassen oder die fehlenden Schritte ergänzen.`,
+            blockId: b.id,
+          })
+        }
         pruefeSequenzen(b.zweige.map((z) => z.schritte))
         break
       }

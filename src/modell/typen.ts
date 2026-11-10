@@ -133,10 +133,15 @@ export interface Parallel {
 export type WiederholungsModus = 'anteil' | 'ruecksprung'
 
 /** Wiederholung: der Körper läuft mindestens einmal und wird unter Umständen wiederholt. */
+/** Wozu wiederholt wird: Korrektur eines Fehlers oder mehrere gleiche Durchgänge (z. B. je Position). */
+export type WiederholungsZweck = 'nacharbeit' | 'menge'
+
 export interface Wiederholung {
   typ: 'wiederholung'
   id: Id
   modus: WiederholungsModus
+  /** Fehlt die Angabe, gilt „nacharbeit“. Nur Nacharbeit gilt als Schwachstelle. */
+  zweck?: WiederholungsZweck
   /** Frage nach jedem Durchlauf; „Ja“ bedeutet wiederholen, z. B. „Nacharbeit nötig?“ (nur Modus „anteil“) */
   frage: string
   /** Wahrscheinlichkeit, dass nach einem Durchlauf wiederholt wird, 0 bis unter 1 (nur Modus „anteil“). */

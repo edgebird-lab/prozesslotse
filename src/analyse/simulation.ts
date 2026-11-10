@@ -3,9 +3,20 @@
  * Entscheidungen einen Ausgang nach den Anteilen, würfelt Wiederholungen aus
  * und nimmt bei „Gleichzeitig“ den längsten Zweig. Die Zeiten je Schritt sind
  * die geschätzten Durchschnittswerte; die Streuung entsteht also nur aus dem
- * Ablauf selbst. Mit festem Startwert ist das Ergebnis reproduzierbar.
+ * Ablauf selbst (Entscheidungen, Wiederholungen), nicht aus schwankenden
+ * Bearbeitungszeiten. Das 90-%-Quantil ist deshalb eher zu niedrig. Mit
+ * festem Startwert ist das Ergebnis reproduzierbar.
  */
 import type { Block, Id, Prozess } from '../modell/typen'
+
+export interface ErgebnisDauer {
+  ergebnis: string
+  regulaer: boolean
+  /** Anteil der Läufe mit diesem Ergebnis */
+  anteil: number
+  /** Mittlere Durchlaufzeit der Läufe mit diesem Ergebnis */
+  mittelMin: number
+}
 
 export interface Simulationsergebnis {
   anzahl: number
@@ -15,6 +26,8 @@ export interface Simulationsergebnis {
   maxMin: number
   /** Alle Durchlaufzeiten, aufsteigend sortiert. */
   zeiten: Float64Array
+  /** Je Ergebnis (reguläres Ende zuerst): Anteil und mittlere Durchlaufzeit */
+  ergebnisse: ErgebnisDauer[]
 }
 
 /** Kleiner, schneller Zufallsgenerator mit Startwert (mulberry32). */
@@ -33,7 +46,8 @@ const MAX_WIEDERHOLUNGEN = 10_000
 
 interface Lauf {
   zeit: number
-  beendet: boolean
+  /** Ergebnis eines vorzeitigen Endes, sonst null */
+  ende: string | null
   /** Rücksprung zum Anfang dieses Bereichs */
   rueck: Id | null
 }
@@ -43,19 +57,19 @@ function laufeSequenz(schritte: Block[], zufall: () => number): Lauf {
   for (const b of schritte) {
     const r = laufeBlock(b, zufall)
     zeit += r.zeit
-    if (r.beendet || r.rueck) return { zeit, beendet: r.beendet, rueck: r.rueck }
+    if (r.ende !== null || r.rueck) return { zeit, ende: r.ende, rueck: r.rueck }
   }
-  return { zeit, beendet: false, rueck: null }
+  return { zeit, ende: null, rueck: null }
 }
 
 function laufeBlock(b: Block, zufall: () => number): Lauf {
   switch (b.typ) {
     case 'aufgabe':
-      return { zeit: b.liegezeitMin + b.bearbeitungMin, beendet: false, rueck: null }
+      return { zeit: b.liegezeitMin + b.bearbeitungMin, ende: null, rueck: null }
     case 'warten':
-      return { zeit: b.dauerMin, beendet: false, rueck: null }
+      return { zeit: b.dauerMin, ende: null, rueck: null }
     case 'entscheidung': {
-      if (b.zweige.length === 0) return { zeit: 0, beendet: false, rueck: null }
+      if (b.zweige.length === 0) return { zeit: 0, ende: null, rueck: null }
       const summe = b.zweige.reduce((s, z) => s + Math.max(0, z.anteil), 0)
       let wurf = zufall() * (summe > 0 ? summe : 1)
       let gewaehlt = b.zweige[b.zweige.length - 1]
@@ -68,29 +82,29 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
       }
       const warten = b.art === 'ereignis' && gewaehlt.ereignis ? gewaehlt.ereignis.dauerMin : 0
       const r = laufeSequenz(gewaehlt.schritte, zufall)
-      if (r.beendet || r.rueck) return { zeit: warten + r.zeit, beendet: r.beendet, rueck: r.rueck }
-      return { zeit: warten + r.zeit, beendet: gewaehlt.ende !== null, rueck: gewaehlt.ende === null ? gewaehlt.zurueckZu : null }
+      if (r.ende !== null || r.rueck) return { zeit: warten + r.zeit, ende: r.ende, rueck: r.rueck }
+      return { zeit: warten + r.zeit, ende: gewaehlt.ende, rueck: gewaehlt.ende === null ? gewaehlt.zurueckZu : null }
     }
     case 'parallel': {
       let zeit = 0
-      let beendet = false
+      let ende: string | null = null
       for (const z of b.zweige) {
         const r = laufeSequenz(z.schritte, zufall)
         zeit = Math.max(zeit, r.zeit)
-        beendet ||= r.beendet
+        ende ??= r.ende
       }
-      return { zeit, beendet, rueck: null }
+      return { zeit, ende, rueck: null }
     }
     case 'wiederholung': {
       let zeit = 0
       for (let i = 0; i < MAX_WIEDERHOLUNGEN; i++) {
         const r = laufeSequenz(b.koerper.schritte, zufall)
         zeit += r.zeit
-        if (r.beendet) return { zeit, beendet: true, rueck: null }
-        if (r.rueck && r.rueck !== b.id) return { zeit, beendet: false, rueck: r.rueck }
+        if (r.ende !== null) return { zeit, ende: r.ende, rueck: null }
+        if (r.rueck && r.rueck !== b.id) return { zeit, ende: null, rueck: r.rueck }
         if (b.modus === 'ruecksprung' ? r.rueck !== b.id : zufall() >= b.anteilWiederholung) break
       }
-      return { zeit, beendet: false, rueck: null }
+      return { zeit, ende: null, rueck: null }
     }
   }
 }
@@ -106,12 +120,21 @@ export function simuliere(p: Prozess, anzahl = 5000, startwert = 20261110): Simu
   const zufall = zufallMitStartwert(startwert)
   const zeiten = new Float64Array(anzahl)
   let summe = 0
+  const jeEnde = new Map<string | null, { anzahl: number; summe: number }>([[null, { anzahl: 0, summe: 0 }]])
   for (let i = 0; i < anzahl; i++) {
-    const t = laufeSequenz(p.ablauf.schritte, zufall).zeit
+    const lauf = laufeSequenz(p.ablauf.schritte, zufall)
+    const t = lauf.zeit
     zeiten[i] = t
     summe += t
+    const e = jeEnde.get(lauf.ende) ?? { anzahl: 0, summe: 0 }
+    e.anzahl++
+    e.summe += t
+    jeEnde.set(lauf.ende, e)
   }
   zeiten.sort()
+  const ergebnisse: ErgebnisDauer[] = [...jeEnde]
+    .filter(([, e]) => e.anzahl > 0)
+    .map(([ende, e]) => ({ ergebnis: ende ?? (p.ergebnis || 'Ende'), regulaer: ende === null, anteil: e.anzahl / anzahl, mittelMin: e.summe / e.anzahl }))
   return {
     anzahl,
     mittelMin: anzahl > 0 ? summe / anzahl : 0,
@@ -119,5 +142,6 @@ export function simuliere(p: Prozess, anzahl = 5000, startwert = 20261110): Simu
     p90Min: quantil(zeiten, 0.9),
     maxMin: anzahl > 0 ? zeiten[anzahl - 1] : 0,
     zeiten,
+    ergebnisse,
   }
 }

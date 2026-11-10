@@ -2,20 +2,24 @@
  * Schwachstellen, die sich aus den Kennzahlen ergeben. Anders als die
  * Prüfregeln des Modells sind das keine Fehler, sondern begründete Hinweise.
  */
-import { bereichTitel, blockTitel, durchlaufe, mediumName, rolleName } from '../modell/operationen'
+import { bereichTitel, blockTitel, durchlaufe, folgtEntscheidung, freigabeQuote, mediumName, rolleName } from '../modell/operationen'
 import { sortiereBefunde, type Befund } from '../modell/pruefung'
 import type { Aufgabe, Id, Prozess } from '../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
 import type { Kennzahlen } from './kennzahlen'
+import { bedienende, WARTEFAKTOR_SCHWELLE } from './warteschlange'
 
-/** Ab dieser Auslastung staut sich Arbeit spürbar (Faustregel der Warteschlangentheorie). */
-export const ENGPASS_SCHWELLE = 0.85
+export { WARTEFAKTOR_SCHWELLE }
 /** Ab diesem Anteil an der Durchlaufzeit gilt eine Liegezeit als auffällig. */
 export const LIEGEZEIT_SCHWELLE = 0.2
 export const FLUSSEFFIZIENZ_SCHWELLE = 0.1
 export const NACHARBEIT_SCHWELLE = 0.1
 export const FREIGABE_SCHWELLE = 0.9
 const PINGPONG_SCHWELLE = 0.05
+
+function personenText(n: number, dativ = false): string {
+  return n === 1 ? (dativ ? 'einer Person' : 'eine Person') : `${n} Personen`
+}
 
 export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
   const befunde: Befund[] = []
@@ -25,26 +29,32 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
 
   for (const r of k.rollen) {
     if (r.stundenProTag <= 0) continue
+    const name = r.rolle.name || 'Rolle'
     if (r.auslastung > 1) {
       add({
         schluessel: `ueberlastet:${r.rolle.id}`,
         schwere: 'fehler',
-        titel: `${r.rolle.name || 'Rolle'} ist überlastet`,
+        titel: `${name} ist überlastet`,
         text: `Gebraucht werden ${formatiereZahl(r.stundenProTag)} Std. pro Tag, verfügbar sind ${formatiereZahl(r.kapazitaetStundenProTag)} Std. (${formatiereProzent(r.auslastung)}). Der Rückstau wächst jeden Tag.`,
         rolleId: r.rolle.id,
       })
-    } else if (r.auslastung >= ENGPASS_SCHWELLE) {
+    } else if (r.wartefaktor >= WARTEFAKTOR_SCHWELLE) {
+      const team = personenText(bedienende(r.rolle.personen), true)
+      const warten = Number.isFinite(r.wartefaktor)
+        ? `Arbeit wartet hier im Schnitt ${formatiereZahl(r.wartefaktor, 1)}-mal so lange, bis jemand frei ist, wie sie dauert; jede Schwankung und jeder Ausfall erzeugt Rückstau.`
+        : 'Ohne jeden Puffer staut sich jede Schwankung auf.'
       add({
         schluessel: `engpass:${r.rolle.id}`,
         schwere: 'warnung',
-        titel: `Engpass: ${r.rolle.name || 'Rolle'}`,
-        text: `Auslastung ${formatiereProzent(r.auslastung)}. Ab etwa ${formatiereProzent(ENGPASS_SCHWELLE)} steigen Wartezeiten stark an, weil jede Schwankung sofort Rückstau erzeugt.`,
+        titel: `Engpass: ${name}`,
+        text: `Auslastung ${formatiereProzent(r.auslastung)} bei ${team}. ${warten} Bei dieser Teamgröße beginnt das ab etwa ${formatiereProzent(r.engpassSchwelle)} (Warteschlangenmodell M/M/c).`,
         rolleId: r.rolle.id,
       })
     }
   }
 
-  for (const { block } of durchlaufe(p.ablauf)) {
+  for (const fund of durchlaufe(p.ablauf)) {
+    const block = fund.block
     const kz = k.schritte.get(block.id)
     if (block.typ === 'aufgabe') {
       aufgaben.set(block.id, block)
@@ -53,7 +63,7 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           schluessel: `liegezeit:${block.id}`,
           schwere: 'warnung',
           titel: 'Lange Liegezeit',
-          text: `Vor „${blockTitel(block)}“ liegt der Vorgang ${formatiereDauer(block.liegezeitMin, std)}. Das sind ${formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)} der Durchlaufzeit. Ursache klären: Stapelbearbeitung, Vertretung, feste Termine?`,
+          text: `Vor „${blockTitel(block)}“ liegt der Vorgang ${formatiereDauer(block.liegezeitMin, std)}, das sind ${formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)} der Durchlaufzeit. Ursache klären: Stapelbearbeitung, Vertretung, feste Termine?`,
           blockId: block.id,
         })
       }
@@ -72,14 +82,30 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           blockId: block.id,
         })
       }
-      if (block.art === 'freigabe' && block.freigabeQuote >= FREIGABE_SCHWELLE) {
-        add({
-          schluessel: `freigabe:${block.id}`,
-          schwere: 'hinweis',
-          titel: 'Freigabe fast immer erteilt',
-          text: `„${blockTitel(block)}“ wird in ${formatiereProzent(block.freigabeQuote)} der Fälle erteilt, kostet aber ${formatiereDauer(block.liegezeitMin + block.bearbeitungMin, std)} Durchlaufzeit je Ausführung. Lohnt sie sich, oder reicht eine Schwelle oder Stichprobe?`,
-          blockId: block.id,
-        })
+      if (block.art !== 'normal') {
+        const kontrolle = block.art === 'freigabe' ? 'Freigabe' : 'Prüfung'
+        const folge = folgtEntscheidung(p, fund)
+        const ohneFolge = folge
+          ? ''
+          : ` Danach folgt keine Entscheidung: Was geschieht, wenn ${block.art === 'freigabe' ? 'nicht freigegeben wird' : 'die Prüfung einen Fehler findet'}?`
+        const quote = block.art === 'freigabe' ? freigabeQuote(fund) : null
+        if (quote && quote.quote >= FREIGABE_SCHWELLE) {
+          add({
+            schluessel: `freigabe:${block.id}`,
+            schwere: 'hinweis',
+            titel: 'Freigabe fast immer erteilt',
+            text: `„${blockTitel(block)}“ wird in ${formatiereProzent(quote.quote)} der Fälle erteilt, kostet aber ${formatiereDauer(block.liegezeitMin + block.bearbeitungMin, std)} Durchlaufzeit je Ausführung.${ohneFolge} Lohnt sie sich, oder reicht eine Schwelle oder Stichprobe?`,
+            blockId: block.id,
+          })
+        } else if (!folge) {
+          add({
+            schluessel: `ohnefolge:${block.id}`,
+            schwere: 'hinweis',
+            titel: `${kontrolle} ohne Folge`,
+            text: `Nach „${blockTitel(block)}“ folgt keine Entscheidung. Was geschieht, wenn ${block.art === 'freigabe' ? 'nicht freigegeben wird' : 'die Prüfung einen Fehler findet'}? Ohne Folge ist die Kontrolle nur Aufwand: den Weg für den Fehlerfall ergänzen oder die Kontrolle streichen.`,
+            blockId: block.id,
+          })
+        }
       }
     } else if (block.typ === 'warten') {
       if (kz && k.durchlaufzeitMin > 0 && kz.beitragWartenMin / k.durchlaufzeitMin >= LIEGEZEIT_SCHWELLE) {
@@ -91,10 +117,12 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           blockId: block.id,
         })
       }
-    } else if (block.typ === 'wiederholung' && block.modus === 'ruecksprung') {
-      const r = k.ruecksprungAnteil.get(block.id) ?? 0
+    } else if (block.typ === 'wiederholung') {
+      // Anteil der Durchläufe, nach denen wiederholt wird; bei „anteil“ ohne die, die vorher enden
+      const r = k.wiederholAnteil.get(block.id) ?? 0
       const ziel = block.koerper.schritte[0] ? bereichTitel(block.koerper.schritte[0]) : 'Anfang'
-      if (r >= 0.999) {
+      const name = block.modus === 'ruecksprung' ? `ab „${ziel}“` : `bei „${block.frage || 'Wiederholung'}“`
+      if (block.modus === 'ruecksprung' && r >= 0.999) {
         add({
           schluessel: `endlos:${block.id}`,
           schwere: 'fehler',
@@ -102,12 +130,12 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           text: `Jeder Durchlauf springt zurück zu „${ziel}“; der Vorgang kommt nie weiter. Mindestens ein Ausgang muss weiterführen oder enden.`,
           blockId: block.id,
         })
-      } else if (r >= NACHARBEIT_SCHWELLE) {
+      } else if (block.zweck !== 'menge' && r >= NACHARBEIT_SCHWELLE && r < 0.999) {
         add({
           schluessel: `nacharbeit:${block.id}`,
           schwere: 'hinweis',
-          titel: 'Nacharbeit durch Rücksprung',
-          text: `In ${formatiereProzent(r)} der Durchläufe geht es zurück zu „${ziel}“; die Schritte laufen im Schnitt ${formatiereZahl(1 / (1 - r), 2)}-mal. Fehler an der Quelle zu vermeiden spart Arbeit und Zeit.`,
+          titel: block.modus === 'ruecksprung' ? 'Nacharbeit durch Rücksprung' : 'Nacharbeit',
+          text: `Die Schritte ${name} werden in ${formatiereProzent(r)} der Durchläufe wiederholt und laufen im Schnitt ${formatiereZahl(1 / (1 - r), 2)}-mal. Fehler an der Quelle zu vermeiden spart Arbeit und Zeit.`,
           blockId: block.id,
         })
       }
@@ -124,15 +152,26 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           })
         }
       }
-    } else if (block.typ === 'wiederholung' && block.anteilWiederholung >= NACHARBEIT_SCHWELLE && block.anteilWiederholung < 1) {
-      const mal = 1 / (1 - block.anteilWiederholung)
-      add({
-        schluessel: `nacharbeit:${block.id}`,
-        schwere: 'hinweis',
-        titel: 'Nacharbeit',
-        text: `Bei „${block.frage || 'Wiederholung'}“ wird in ${formatiereProzent(block.anteilWiederholung)} der Durchläufe wiederholt; die Schritte laufen im Schnitt ${formatiereZahl(mal, 2)}-mal. Fehler an der Quelle zu vermeiden spart Arbeit und Zeit.`,
-        blockId: block.id,
-      })
+    } else if (block.typ === 'parallel') {
+      // Dieselbe Rolle in mehr Zweigen, als sie Personen hat: Sie kann nicht an zwei Stellen zugleich arbeiten.
+      const zweigeJeRolle = new Map<Id, number>()
+      for (const z of block.zweige) {
+        const rollen = new Set<Id>()
+        for (const { block: x } of durchlaufe(z)) if (x.typ === 'aufgabe' && x.rolleId) rollen.add(x.rolleId)
+        for (const id of rollen) zweigeJeRolle.set(id, (zweigeJeRolle.get(id) ?? 0) + 1)
+      }
+      for (const [id, anzahl] of zweigeJeRolle) {
+        const rolle = p.rollen.find((r) => r.id === id)
+        if (!rolle || anzahl < 2 || anzahl <= bedienende(rolle.personen)) continue
+        add({
+          schluessel: `parallelrolle:${block.id}:${id}`,
+          schwere: 'hinweis',
+          titel: 'Gleichzeitig, aber dieselben Leute',
+          text: `In ${anzahl} Zweigen von „Gleichzeitig“ arbeitet ${rolle.name || 'dieselbe Rolle'}, die Rolle hat aber nur ${personenText(bedienende(rolle.personen))}. Wer an zwei Stellen zugleich arbeiten müsste, arbeitet tatsächlich nacheinander; die berechnete Durchlaufzeit ist dann zu niedrig.`,
+          blockId: block.id,
+          rolleId: id,
+        })
+      }
     }
   }
 

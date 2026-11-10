@@ -21,6 +21,7 @@
  */
 import { durchlaufe } from '../modell/operationen'
 import { erwartungMaximum } from './verteilung'
+import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
 import type { Aufgabe, Block, Id, Prozess, Rolle } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,12 @@ export interface RollenKennzahl {
   /** Benötigte durch verfügbare Zeit; über 1 heißt überlastet. */
   auslastung: number
   kostenProVorgang: number
+  /** Mittlere Bearbeitungszeit je Ausführung eines Schritts dieser Rolle. */
+  bedienzeitMin: number
+  /** Mittlere Wartezeit je Schritt nach M/M/c als Vielfaches der Bearbeitungszeit (unendlich bei Überlast). */
+  wartefaktor: number
+  /** Auslastung, ab der eine Rolle als Engpass gilt (Wartefaktor erreicht WARTEFAKTOR_SCHWELLE); hängt von der Teamgröße ab. */
+  engpassSchwelle: number
 }
 
 export interface Ende {
@@ -66,8 +73,10 @@ export interface Kennzahlen {
   arbeitszeitMin: number
   kostenProVorgang: number
   kostenProTag: number
-  /** Gleichzeitig offene Vorgänge nach dem Gesetz von Little. */
+  /** Gleichzeitig offene Vorgänge nach dem Gesetz von Little; nur aussagekräftig, wenn `stabil`. */
   offeneVorgaenge: number
+  /** Keine Rolle ist überlastet; sonst wächst der Bestand ohne Grenze, und Little gilt nicht. */
+  stabil: boolean
   /** Erwartete manuelle Datenübertragungen pro Vorgang. */
   medienbrueche: number
   uebertragungMin: number
@@ -84,8 +93,8 @@ export interface Kennzahlen {
   paare: Map<string, number>
   /** Arbeitsminuten pro Vorgang in Aufgaben ohne gültige Rolle. */
   arbeitOhneRolleMin: number
-  /** Je Rücksprungbereich: Wahrscheinlichkeit pro Durchlauf, dass zurückgesprungen wird. */
-  ruecksprungAnteil: Map<Id, number>
+  /** Je Wiederholung und Rücksprungbereich: Wahrscheinlichkeit pro Durchlauf, dass wiederholt wird. */
+  wiederholAnteil: Map<Id, number>
 }
 
 // ---------------------------------------------------------------------------
@@ -126,8 +135,8 @@ function skaliere(f: Fluss, faktor: number): Fluss {
 
 interface Kontext {
   aufgaben: Map<Id, Aufgabe>
-  /** je Rücksprungbereich: Wahrscheinlichkeit pro Durchlauf, dass zurückgesprungen wird */
-  ruecksprungAnteil: Map<Id, number>
+  /** je Wiederholung: Wahrscheinlichkeit pro Durchlauf, dass wiederholt wird */
+  wiederholAnteil: Map<Id, number>
 }
 
 interface Ergebnis {
@@ -221,7 +230,7 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
       // bei „ruecksprung“ alles, was in den Ausgängen auf diesen Bereich zurückspringt.
       const p = b.modus === 'anteil' ? Math.min(Math.max(b.anteilWiederholung, 0), 0.999) : 0
       const wieder = b.modus === 'anteil' ? skaliere(sonde.aus, p) : (sonde.rueck.get(b.id) ?? leererFluss())
-      if (b.modus === 'ruecksprung') ctx.ruecksprungAnteil.set(b.id, wieder.anteil)
+      ctx.wiederholAnteil.set(b.id, wieder.anteil)
       const r = Math.min(wieder.anteil, 0.999)
       const q = Math.min(wieder.letzte.get(SONDE) ?? 0, 0.999)
       // Gesamter Zufluss in den Körper über alle Durchläufe: E = F + Wiederholung(E)
@@ -352,13 +361,14 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   for (const { block } of durchlaufe(p.ablauf)) if (block.typ === 'aufgabe') aufgaben.set(block.id, block)
 
   const z = neueZaehler()
-  const ruecksprungAnteil = new Map<Id, number>()
-  const ende = flussSequenz(p.ablauf.schritte, { anteil: 1, letzte: new Map() }, z, { aufgaben, ruecksprungAnteil }).aus
+  const wiederholAnteil = new Map<Id, number>()
+  const ende = flussSequenz(p.ablauf.schritte, { anteil: 1, letzte: new Map() }, z, { aufgaben, wiederholAnteil }).aus
   const dauer = dauerSequenz(p.ablauf.schritte)
 
   const rollenNachId = new Map(p.rollen.map((r) => [r.id, r]))
   const schritte = new Map<Id, SchrittKennzahl>()
   const arbeitJeRolle = new Map<Id, number>()
+  const ausfuehrungenJeRolle = new Map<Id, number>()
   let arbeitszeitMin = 0
   let kostenProVorgang = 0
   let arbeitOhneRolleMin = 0
@@ -368,7 +378,10 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
     const arbeitMin = haeufigkeit * a.bearbeitungMin
     const rolle = a.rolleId ? rollenNachId.get(a.rolleId) : undefined
     const kosten = rolle ? (arbeitMin / 60) * rolle.stundensatz : 0
-    if (rolle) plus(arbeitJeRolle, rolle.id, arbeitMin)
+    if (rolle) {
+      plus(arbeitJeRolle, rolle.id, arbeitMin)
+      plus(ausfuehrungenJeRolle, rolle.id, haeufigkeit)
+    }
     else arbeitOhneRolleMin += arbeitMin
     arbeitszeitMin += arbeitMin
     kostenProVorgang += kosten
@@ -393,6 +406,8 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
     const stundenProTag = (p.vorgaengeProTag * arbeitMinProVorgang) / 60
     const kapazitaet = kapazitaetStundenProTag(rolle, p.arbeitsstundenProTag)
     const auslastung = kapazitaet > 0 ? stundenProTag / kapazitaet : stundenProTag > 0 ? Infinity : 0
+    const ausfuehrungen = ausfuehrungenJeRolle.get(rolle.id) ?? 0
+    const c = bedienende(rolle.personen)
     return {
       rolle,
       arbeitMinProVorgang,
@@ -400,6 +415,9 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
       kapazitaetStundenProTag: kapazitaet,
       auslastung,
       kostenProVorgang: (arbeitMinProVorgang / 60) * rolle.stundensatz,
+      bedienzeitMin: ausfuehrungen > 0 ? arbeitMinProVorgang / ausfuehrungen : 0,
+      wartefaktor: wartefaktor(c, auslastung),
+      engpassSchwelle: engpassSchwelle(c, WARTEFAKTOR_SCHWELLE),
     }
   })
   const engpass = rollen
@@ -418,6 +436,7 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
     kostenProVorgang,
     kostenProTag: kostenProVorgang * p.vorgaengeProTag,
     offeneVorgaenge: minutenProTag > 0 ? (p.vorgaengeProTag * dauer.gesamt) / minutenProTag : 0,
+    stabil: rollen.every((r) => r.stundenProTag <= 0 || r.auslastung <= 1),
     medienbrueche: z.medienbrueche,
     uebertragungMin: z.uebertragungMin,
     uebergaben: z.uebergaben,
@@ -428,6 +447,6 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
     engpass,
     paare: z.paare,
     arbeitOhneRolleMin,
-    ruecksprungAnteil,
+    wiederholAnteil,
   }
 }

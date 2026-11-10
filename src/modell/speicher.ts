@@ -55,6 +55,7 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       return
     case 'wiederholung':
       fordere(istText(x.frage) && istZahl(x.anteilWiederholung) && (x.modus === 'anteil' || x.modus === 'ruecksprung'), `${wo}: Wiederholung unvollständig.`)
+      fordere(x.zweck === undefined || x.zweck === 'nacharbeit' || x.zweck === 'menge', `${wo}: Zweck der Wiederholung ungültig.`)
       pruefeSequenz(x.koerper, `${wo}, Körper`)
       return
     case 'warten':

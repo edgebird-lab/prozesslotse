@@ -80,7 +80,7 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     titel: 'Was die Zahlen bedeuten',
     bpmn: 'Prozesskennzahlen',
     symbol: 'kennzahl',
-    text: 'Die Durchlaufzeit ist der Erwartungswert über alle Wege. Die Flusseffizienz zeigt, welcher Anteil davon echte Arbeit ist. Offene Vorgänge folgen aus dem Gesetz von Little: Vorgänge pro Tag mal Durchlaufzeit in Tagen. Ab etwa 85 % Auslastung staut sich Arbeit, weil jede Schwankung sofort Wartezeit erzeugt.',
+    text: 'Die Durchlaufzeit ist der Erwartungswert über alle Wege. Die Flusseffizienz zeigt, welcher Anteil davon echte Arbeit ist. Die Vorgänge in Arbeit folgen aus dem Gesetz von Little: Vorgänge pro Tag mal Durchlaufzeit in Tagen. Je voller eine Rolle ausgelastet ist, desto stärker staut sich Arbeit, weil jede Schwankung sofort Wartezeit erzeugt. Eine einzelne Person ist ab etwa 80 % am Limit, ein Team erst später (Warteschlangenmodell M/M/c).',
   },
   verbessern: {
     titel: 'Woher die Vorschläge kommen',

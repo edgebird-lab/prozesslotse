@@ -157,7 +157,7 @@ export function beispielOnlinebestellung(): Prozess {
     rollen: [
       { id: 'rol_service', name: 'Kundenservice', stundensatz: 40, personen: 3, verfuegbarProzent: 100 },
       { id: 'rol_lager', name: 'Lager', stundensatz: 34, personen: 6, verfuegbarProzent: 100 },
-      { id: 'rol_buchhaltung', name: 'Buchhaltung', stundensatz: 48, personen: 1, verfuegbarProzent: 100 },
+      { id: 'rol_buchhaltung', name: 'Buchhaltung', stundensatz: 48, personen: 2, verfuegbarProzent: 100 },
     ],
     medien: [
       { id: 'med_shop', name: 'Shopsystem', art: 'fachanwendung' },

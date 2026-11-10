@@ -31,10 +31,10 @@ Der Assistent führt eine **Einfügeposition**: Er fragt immer an einer bestimmt
 
 | Antwort | Folgefragen | Danach |
 | --- | --- | --- |
-| Eine Aufgabe | Name (Objekt + Verb) · Wer? (Rolle) · Womit? (System) · Wie lange dauert die Bearbeitung? · Wie lange liegt der Vorgang vorher? · Braucht dieser Schritt das Ergebnis des vorherigen? (nur wenn es einen gibt) · Werden Daten von Hand übertragen? Wenn ja: aus welchem System, wie viele Minuten davon? · Ist es eine Prüfung oder eine Freigabe? Bei Freigabe: Wie oft wird freigegeben? | weiter hinter der Aufgabe |
+| Eine Aufgabe | Name (Objekt + Verb) · Wer? (Rolle) · Womit? (System) · Wie lange dauert die Bearbeitung? · Wie lange liegt der Vorgang vorher? · Braucht dieser Schritt das Ergebnis des vorherigen? (nur wenn es einen gibt) · Werden Daten von Hand übertragen? Wenn ja: aus welchem System, wie viele Minuten davon? · Ist es eine Prüfung oder eine Freigabe? Bei Freigabe: Wie oft wird freigegeben? (Folgt direkt eine Entscheidung, gilt deren Ausgang, und die Frage entfällt.) | weiter hinter der Aufgabe |
 | Eine Entscheidung | Wovon hängt ab, wie es weitergeht: von einer Prüfung oder Angabe, oder davon, was zuerst passiert? · Welche Frage wird entschieden bzw. worauf wird gewartet? · Welche Ausgänge gibt es (Bezeichnung, Anteil in %)? Bei „was zuerst passiert“ je Ausgang: Nachricht oder Frist, nach welcher Zeit im Schnitt? · Danach: weiter im Ablauf, Prozess endet (mit welchem Ergebnis?) oder zurück zu einem früheren Schritt (Auswahl aus den Schritten davor) | weiter im ersten Ausgang |
 | Mehrere Dinge gleichzeitig | Wie viele Zweige? | weiter im ersten Zweig |
-| Etwas wird wiederholt | Welche Frage entscheidet über die Wiederholung? · In wie viel Prozent der Durchläufe wird wiederholt? | weiter im Körper der Wiederholung |
+| Etwas wird wiederholt | Wozu wird wiederholt: Korrektur oder mehrere Durchgänge? · Welche Frage entscheidet über die Wiederholung? · In wie viel Prozent der Durchläufe wird wiederholt? | weiter im Körper der Wiederholung |
 | Warten | Worauf wird gewartet? · Auf einen Zeitpunkt oder auf eine Nachricht? · Wie lange im Schnitt? | weiter hinter dem Warten |
 | Dieser Abschnitt ist fertig | – | nächster Ausgang oder Zweig; nach dem letzten hinter den Baustein; im Hauptablauf zu „Prüfen“ |
 

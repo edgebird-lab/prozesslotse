@@ -13,6 +13,7 @@ const REGELNAME: Record<BewerteterVorschlag['regel'], string> = {
   zusammenlegen: 'Zusammenlegen',
   nacharbeit: 'Nacharbeit senken',
   freigabe: 'Kontrolle reduzieren',
+  knockout: 'Knock-out-Reihenfolge',
 }
 
 function anzahl(n: number, eins: string, viele: string): string {

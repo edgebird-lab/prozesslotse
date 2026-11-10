@@ -5,14 +5,15 @@
  *
  * Die Regeln folgen bekannten Heuristiken der Prozessverbesserung
  * (u. a. Reijers & Limam Mansar 2005: Parallelisierung, Zusammenlegen von
- * Aufgaben, Kontrollen reduzieren, Integration statt Medienbruch).
+ * Aufgaben, Kontrollen reduzieren, Knock-out-Reihenfolge, Integration statt
+ * Medienbruch).
  */
-import { bereichTitel, blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, kinderSequenzen, mediumName, rolleName, verlaesstBlock } from '../modell/operationen'
-import { istDigital, type Aufgabe, type Block, type Id, type Prozess, type Sequenz } from '../modell/typen'
+import { bereichTitel, blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, freigabeQuote, kinderSequenzen, mediumName, rolleName, verlaesstBlock } from '../modell/operationen'
+import { istDigital, type Aufgabe, type Block, type Entscheidung, type Id, type Prozess, type Sequenz } from '../modell/typen'
 import { formatiereDauer, formatiereProzent } from '../modell/zeit'
 import { berechneKennzahlen, type Kennzahlen } from './kennzahlen'
 
-export type RegelId = 'parallelisieren' | 'medienbruch' | 'zusammenlegen' | 'nacharbeit' | 'freigabe'
+export type RegelId = 'parallelisieren' | 'medienbruch' | 'zusammenlegen' | 'nacharbeit' | 'freigabe' | 'knockout'
 
 export interface Vorschlag {
   schluessel: string
@@ -128,7 +129,9 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
           begruendung:
             `Beide Schritte erledigt ${rolleName(p, a.rolleId)}. In einem Zug entfällt die Liegezeit von ${formatiereDauer(b.liegezeitMin, std)} dazwischen` +
             (abtippenEntfaellt ? `, und die Daten aus „${mediumName(p, a.mediumId)}“ müssen nicht mehr abgetippt werden.` : '.'),
-          annahme: null,
+          annahme:
+            `Angenommen wird, dass dieselbe Person beide Schritte direkt nacheinander erledigen kann; die Liegezeit von „${blockTitel(b)}“ entfällt ganz, die Bearbeitungszeiten addieren sich` +
+            (abtippenEntfaellt ? ' (ohne die Minuten fürs Abtippen).' : '.'),
           blockIds: [a.id, b.id],
           anwenden: (q) => ersetzeBereichFuer(q, seq.id, a.id, 2, [zusammen]),
         })
@@ -156,22 +159,26 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
           })
         }
 
-        // 5. Freigabe streichen
-        if (b.art === 'freigabe' && b.freigabeQuote >= FREIGABE_REGEL_SCHWELLE) {
+        // 5. Freigabe streichen; eine direkt folgende Entscheidung über die Freigabe entfällt mit
+        const fq = b.art === 'freigabe' ? freigabeQuote({ block: b, sequenz: seq, index: i, vorfahren: [] }) : null
+        if (fq && fq.quote >= FREIGABE_REGEL_SCHWELLE) {
+          const { entscheidung, ausgang } = fq
           vorschlaege.push({
             schluessel: `freigabe:${b.id}`,
             regel: 'freigabe',
             titel: `Freigabe „${blockTitel(b)}“ streichen`,
-            begruendung: `Sie wird in ${formatiereProzent(b.freigabeQuote)} der Fälle erteilt, kostet aber ${formatiereDauer(b.liegezeitMin + b.bearbeitungMin, std)} Durchlaufzeit je Ausführung. Alternativ nur ab einem Betrag oder stichprobenartig freigeben.`,
+            begruendung:
+              `Sie wird in ${formatiereProzent(fq.quote)} der Fälle erteilt, kostet aber ${formatiereDauer(b.liegezeitMin + b.bearbeitungMin, std)} Durchlaufzeit je Ausführung. Alternativ nur ab einem Betrag oder stichprobenartig freigeben.` +
+              (entscheidung && ausgang ? ` Mit ihr entfällt die Entscheidung „${blockTitel(entscheidung)}“; es geht immer wie bei „${ausgang.bezeichnung}“ weiter.` : ''),
             annahme: 'Angenommen wird, dass die Kontrolle ohne Nachteil entfallen kann, weil Fehler selten sind und später auffallen.',
-            blockIds: [b.id],
-            anwenden: (q) => entferneBlock(q, b.id),
+            blockIds: entscheidung ? [b.id, entscheidung.id] : [b.id],
+            anwenden: (q) => (entscheidung && ausgang ? ersetzeBereichFuer(q, seq.id, b.id, 2, ausgang.schritte) : entferneBlock(q, b.id)),
           })
         }
       }
 
-      // 4. Nacharbeit senken
-      if (b.typ === 'wiederholung' && b.modus === 'anteil' && b.anteilWiederholung >= NACHARBEIT_REGEL_SCHWELLE && b.anteilWiederholung < 1) {
+      // 4. Nacharbeit senken (nicht bei Mengenschleifen wie „für jede Position“)
+      if (b.typ === 'wiederholung' && b.modus === 'anteil' && b.zweck !== 'menge' && b.anteilWiederholung >= NACHARBEIT_REGEL_SCHWELLE && b.anteilWiederholung < 1) {
         const neu = b.anteilWiederholung / 2
         vorschlaege.push({
           schluessel: `nacharbeit:${b.id}`,
@@ -184,6 +191,72 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
         })
       }
     })
+    vorschlaege.push(...knockOut(seq))
+  }
+  return vorschlaege
+}
+
+// ---------------------------------------------------------------------------
+// 6. Knock-out-Reihenfolge
+
+/** Eine Prüfung mit direkt folgender Entscheidung, die einen Teil der Fälle beendet und den Rest ohne weitere Schritte durchlässt. */
+interface Pruefstufe {
+  aufgabe: Aufgabe
+  entscheidung: Entscheidung
+  /** Anteil der Fälle, die hier enden */
+  aus: number
+  /** Dauer der Prüfung je Fall (Liegezeit und Bearbeitung) */
+  dauer: number
+}
+
+function pruefstufe(a: Block | undefined, e: Block | undefined): Pruefstufe | null {
+  if (a?.typ !== 'aufgabe' || a.art === 'normal' || e?.typ !== 'entscheidung' || e.art !== 'daten') return null
+  const enden = e.zweige.filter((z) => z.ende !== null)
+  const durch = e.zweige.filter((z) => z.ende === null)
+  if (enden.length === 0 || durch.length === 0 || durch.some((z) => z.zurueckZu !== null || z.schritte.length > 0)) return null
+  // Schritte im Ablehnungszweig dürfen nicht zurückspringen, sonst hängt die Stufe an ihrer Umgebung.
+  if (enden.some((z) => z.schritte.some(verlaesstBlock))) return null
+  const aus = enden.reduce((s, z) => s + z.anteil, 0)
+  return aus > 0 ? { aufgabe: a, entscheidung: e, aus, dauer: a.liegezeitMin + a.bearbeitungMin } : null
+}
+
+/**
+ * Mehrere Prüfungen hintereinander, die jeweils Fälle aussortieren: Zuerst
+ * sollte die kommen, die je Minute am meisten aussortiert (aufsteigend nach
+ * Dauer / Ausfallquote). Das minimiert die erwartete Dauer, wenn die
+ * Prüfungen unabhängig sind (van der Aalst 2001, Knock-out-Prozesse).
+ */
+function knockOut(seq: Sequenz): Vorschlag[] {
+  const vorschlaege: Vorschlag[] = []
+  let i = 0
+  while (i < seq.schritte.length) {
+    const stufen: Pruefstufe[] = []
+    let j = i
+    for (let s = pruefstufe(seq.schritte[j], seq.schritte[j + 1]); s; s = pruefstufe(seq.schritte[j], seq.schritte[j + 1])) {
+      // Eine Prüfung, die ausdrücklich das Ergebnis der vorigen braucht, beendet die Kette.
+      if (stufen.length > 0 && s.aufgabe.brauchtVorgaenger === true) break
+      stufen.push(s)
+      j += 2
+    }
+    if (stufen.length >= 2) {
+      const neu = [...stufen].sort((a, b) => a.dauer / a.aus - b.dauer / b.aus)
+      if (neu.some((s, k) => s !== stufen[k])) {
+        const start = stufen[0].aufgabe.id
+        const liste = stufen.map((s) => `„${blockTitel(s.aufgabe)}“`).join(', ')
+        vorschlaege.push({
+          schluessel: `knockout:${stufen.map((s) => s.aufgabe.id).join(':')}`,
+          regel: 'knockout',
+          titel: `Prüfungen umsortieren: „${blockTitel(neu[0].aufgabe)}“ zuerst`,
+          begruendung:
+            `${liste} sortieren jeweils einen Teil der Fälle aus. Kommt die Prüfung zuerst, die schnell geht und oft aussortiert, entfällt bei den übrigen die Arbeit an Fällen, die ohnehin enden. ` +
+            `Neue Reihenfolge: ${neu.map((s) => `${blockTitel(s.aufgabe)} (${formatiereProzent(s.aus)} aussortiert)`).join(', ')}.`,
+          annahme: 'Angenommen wird, dass die Prüfungen unabhängig voneinander sind und in jeder Reihenfolge laufen können.',
+          blockIds: stufen.flatMap((s) => [s.aufgabe.id, s.entscheidung.id]),
+          anwenden: (q) => ersetzeBereichFuer(q, seq.id, start, stufen.length * 2, neu.flatMap((s) => [s.aufgabe, s.entscheidung])),
+        })
+      }
+    }
+    i = stufen.length > 0 ? j : i + 1
   }
   return vorschlaege
 }

@@ -46,7 +46,13 @@ export function BerichtSchritt() {
     { name: 'Arbeitszeit je Vorgang', ist: kI.arbeitszeitMin, soll: kS.arbeitszeitMin, format: dauer, kleinerBesser: true },
     { name: 'Kosten je Vorgang', ist: kI.kostenProVorgang, soll: kS.kostenProVorgang, format: formatiereEuro, kleinerBesser: true },
     { name: 'Kosten pro Arbeitstag', ist: kI.kostenProTag, soll: kS.kostenProTag, format: formatiereEuro, kleinerBesser: true },
-    { name: 'Offene Vorgänge (Little)', ist: kI.offeneVorgaenge, soll: kS.offeneVorgaenge, format: (n) => formatiereZahl(n, 0), kleinerBesser: true },
+    {
+      name: 'Vorgänge in Arbeit (Little)',
+      ist: kI.stabil ? kI.offeneVorgaenge : Infinity,
+      soll: kS.stabil ? kS.offeneVorgaenge : Infinity,
+      format: (n) => (Number.isFinite(n) ? formatiereZahl(n, 0) : 'wächst (Überlast)'),
+      kleinerBesser: true,
+    },
     { name: 'Medienbrüche je Vorgang', ist: kI.medienbrueche, soll: kS.medienbrueche, format: (n) => formatiereZahl(n, 1), kleinerBesser: true },
     { name: 'Übergaben je Vorgang', ist: kI.uebergaben, soll: kS.uebergaben, format: (n) => formatiereZahl(n, 1), kleinerBesser: true },
     { name: 'Höchste Auslastung einer Rolle', ist: kI.engpass?.auslastung ?? 0, soll: kS.engpass?.auslastung ?? 0, format: (n) => formatiereProzent(n), deltaFormat: (n) => `${formatiereZahl(n * 100, 0)} Pp.`, kleinerBesser: true },
@@ -92,7 +98,8 @@ export function BerichtSchritt() {
             <tbody>
               {zeilen.map((r) => {
                 const d = r.soll - r.ist
-                const gleich = Math.abs(d) < 1e-6 * Math.max(1, Math.abs(r.ist))
+                const vergleichbar = Number.isFinite(r.ist) && Number.isFinite(r.soll)
+                const gleich = vergleichbar && Math.abs(d) < 1e-6 * Math.max(1, Math.abs(r.ist))
                 const besser = r.kleinerBesser ? d < 0 : d > 0
                 return (
                   <tr key={r.name}>
@@ -100,9 +107,9 @@ export function BerichtSchritt() {
                     <td>{r.format(r.ist)}</td>
                     {soll && <td>{r.format(r.soll)}</td>}
                     {soll && (
-                      <td className={gleich ? 'leise' : besser ? 'delta-gut' : 'delta-schlecht'}>
-                        {gleich ? 'unverändert' : vorzeichen(d, (r.deltaFormat ?? r.format)(Math.abs(d)))}
-                        {!gleich && <span className="sr">{besser ? ' (besser)' : ' (schlechter)'}</span>}
+                      <td className={gleich || !vergleichbar ? 'leise' : besser ? 'delta-gut' : 'delta-schlecht'}>
+                        {!vergleichbar ? '–' : gleich ? 'unverändert' : vorzeichen(d, (r.deltaFormat ?? r.format)(Math.abs(d)))}
+                        {vergleichbar && !gleich && <span className="sr">{besser ? ' (besser)' : ' (schlechter)'}</span>}
                       </td>
                     )}
                   </tr>
@@ -186,9 +193,10 @@ export function BerichtSchritt() {
       <section aria-labelledby="bericht-methode">
         <h3 id="bericht-methode">Methode</h3>
         <ul className="methode">
-          <li>Der Prozess ist blockstrukturiert modelliert; Verklemmungen und unerreichbare Schritte sind dadurch ausgeschlossen.</li>
-          <li>Häufigkeiten folgen aus den Anteilen der Entscheidungen; eine Wiederholung mit Anteil p läuft im Schnitt 1 / (1 − p)-mal.</li>
-          <li>Flusseffizienz = Bearbeitungszeit auf dem zeitbestimmenden Pfad / Durchlaufzeit. Offene Vorgänge = Vorgänge pro Tag × Durchlaufzeit in Tagen (Gesetz von Little).</li>
+          <li>Der Prozess ist blockstrukturiert modelliert. Verklemmungen und unerreichbare Schritte, die die Bauweise nicht schon ausschließt, meldet die Prüfung als Fehler.</li>
+          <li>Häufigkeiten folgen aus den Anteilen der Entscheidungen; eine Wiederholung, die in r der Durchläufe wiederholt, läuft im Schnitt 1 / (1 − r)-mal. Bei „Gleichzeitig“ zählt der Erwartungswert der längsten Zweigdauer.</li>
+          <li>Flusseffizienz = Durchlaufzeit nur aus Bearbeitungszeiten / Durchlaufzeit. Vorgänge in Arbeit = Vorgänge pro Tag × Durchlaufzeit in Tagen (Gesetz von Little).</li>
+          <li>Engpass: Rolle, bei der Arbeit nach dem Warteschlangenmodell M/M/c im Schnitt mindestens viermal so lange wartet, wie sie dauert (bei einer Person ab 80 % Auslastung). Die Simulation würfelt die Wege, nicht die Zeiten.</li>
           <li>Vorschläge folgen Redesign-Heuristiken; ihre Wirkung ist durch Neuberechnung des umgeformten Prozesses ermittelt. Annahmen stehen bei der jeweiligen Maßnahme.</li>
         </ul>
       </section>
