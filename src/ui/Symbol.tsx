@@ -1,0 +1,139 @@
+import type { ReactNode } from 'react'
+
+/** Kleine BPMN-Symbole für Auswahl, Gliederung und Lernmodus. */
+export type SymbolArt =
+  | 'aufgabe'
+  | 'manuell'
+  | 'benutzer'
+  | 'xor'
+  | 'und'
+  | 'wiederholung'
+  | 'warten-zeit'
+  | 'warten-nachricht'
+  | 'start'
+  | 'start-nachricht'
+  | 'start-zeit'
+  | 'start-bedingung'
+  | 'ende'
+  | 'bahn'
+
+export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
+  return (
+    <svg className="symbol" width={groesse} height={groesse} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      {inhalt(art)}
+    </svg>
+  )
+}
+
+const strich = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const }
+
+function raute(innen: ReactNode) {
+  return (
+    <>
+      <path d="M16 3 29 16 16 29 3 16Z" {...strich} />
+      {innen}
+    </>
+  )
+}
+
+function brief(cx: number, cy: number) {
+  return (
+    <>
+      <rect x={cx - 5} y={cy - 3.5} width="10" height="7" rx="0.8" {...strich} strokeWidth={1.3} />
+      <path d={`M${cx - 5} ${cy - 3.2} ${cx} ${cy + 0.6} ${cx + 5} ${cy - 3.2}`} {...strich} strokeWidth={1.3} />
+    </>
+  )
+}
+
+function uhr(cx: number, cy: number) {
+  return (
+    <>
+      <circle cx={cx} cy={cy} r="5.2" {...strich} strokeWidth={1.3} />
+      <path d={`M${cx} ${cy - 3.4}V${cy}l2.4 1.6`} {...strich} strokeWidth={1.3} />
+    </>
+  )
+}
+
+function inhalt(art: SymbolArt) {
+  switch (art) {
+    case 'aufgabe':
+      return <rect x="3" y="7" width="26" height="18" rx="4" {...strich} />
+    case 'manuell':
+      return (
+        <>
+          <rect x="3" y="7" width="26" height="18" rx="4" {...strich} />
+          <path d="M7.5 15.5h5M7.5 13h6.5M8.5 18h4" {...strich} strokeWidth={1.2} />
+        </>
+      )
+    case 'benutzer':
+      return (
+        <>
+          <rect x="3" y="7" width="26" height="18" rx="4" {...strich} />
+          <circle cx="10" cy="12.6" r="2" {...strich} strokeWidth={1.2} />
+          <path d="M6.6 19c.6-2.4 2-3.4 3.4-3.4s2.8 1 3.4 3.4" {...strich} strokeWidth={1.2} />
+        </>
+      )
+    case 'xor':
+      return raute(<path d="M12 12 20 20M20 12 12 20" {...strich} strokeWidth={2} />)
+    case 'und':
+      return raute(<path d="M16 10.5v11M10.5 16h11" {...strich} strokeWidth={2} />)
+    case 'wiederholung':
+      return (
+        <>
+          <path d="M9 4 15 10 9 16 3 10Z" {...strich} />
+          <path d="M7 8 11 12M11 8 7 12" {...strich} strokeWidth={1.4} />
+          <path d="M15 10h7a5 5 0 0 1 0 10H9" {...strich} />
+          <path d="M12 17 9 20l3 3" {...strich} />
+        </>
+      )
+    case 'warten-zeit':
+      return (
+        <>
+          <circle cx="16" cy="16" r="12" {...strich} />
+          <circle cx="16" cy="16" r="9.6" {...strich} />
+          {uhr(16, 16)}
+        </>
+      )
+    case 'warten-nachricht':
+      return (
+        <>
+          <circle cx="16" cy="16" r="12" {...strich} />
+          <circle cx="16" cy="16" r="9.6" {...strich} />
+          {brief(16, 16)}
+        </>
+      )
+    case 'start':
+      return <circle cx="16" cy="16" r="12" {...strich} />
+    case 'start-nachricht':
+      return (
+        <>
+          <circle cx="16" cy="16" r="12" {...strich} />
+          {brief(16, 16)}
+        </>
+      )
+    case 'start-zeit':
+      return (
+        <>
+          <circle cx="16" cy="16" r="12" {...strich} />
+          {uhr(16, 16)}
+        </>
+      )
+    case 'start-bedingung':
+      return (
+        <>
+          <circle cx="16" cy="16" r="12" {...strich} />
+          <rect x="11.5" y="10" width="9" height="12" rx="0.8" {...strich} strokeWidth={1.3} />
+          <path d="M13.5 13.5h5M13.5 16h5M13.5 18.5h5" {...strich} strokeWidth={1.2} />
+        </>
+      )
+    case 'ende':
+      return <circle cx="16" cy="16" r="11" {...strich} strokeWidth={3.4} />
+    case 'bahn':
+      return (
+        <>
+          <rect x="3" y="6" width="26" height="20" rx="2" {...strich} />
+          <path d="M8 6v20M8 16h21" {...strich} />
+        </>
+      )
+  }
+}

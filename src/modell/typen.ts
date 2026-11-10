@@ -144,6 +144,12 @@ export interface Prozess {
   ablauf: Sequenz
 }
 
+/** Stelle, an der der Assistent als Nächstes einfügt. */
+export interface Cursor {
+  sequenzId: Id
+  index: number
+}
+
 /** Eine übernommene Verbesserung, wie sie im Bericht erscheint. */
 export interface Massnahme {
   schluessel: string

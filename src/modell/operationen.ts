@@ -175,6 +175,15 @@ export function mediumName(p: Prozess, id: Id | null): string {
   return p.medien.find((m) => m.id === id)?.name || 'ohne Angabe'
 }
 
+/** Name für Sätze wie „gleichzeitig mit …“: Wiederholungen heißen nach ihrem ersten Schritt. */
+export function bereichTitel(b: Block): string {
+  if (b.typ === 'wiederholung') {
+    const erste = b.koerper.schritte[0]
+    if (erste) return `${bereichTitel(erste)}${b.koerper.schritte.length > 1 ? ' …' : ''}`
+  }
+  return blockTitel(b)
+}
+
 /** Kurzer Anzeigename eines Blocks für Listen und Hinweise. */
 export function blockTitel(b: Block): string {
   switch (b.typ) {

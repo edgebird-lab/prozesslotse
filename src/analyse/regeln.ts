@@ -7,7 +7,7 @@
  * (u. a. Reijers & Limam Mansar 2005: Parallelisierung, Zusammenlegen von
  * Aufgaben, Kontrollen reduzieren, Integration statt Medienbruch).
  */
-import { blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, kinderSequenzen, mediumName, rolleName } from '../modell/operationen'
+import { bereichTitel, blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, kinderSequenzen, mediumName, rolleName } from '../modell/operationen'
 import { istDigital, type Aufgabe, type Block, type Id, type Prozess, type Sequenz } from '../modell/typen'
 import { formatiereDauer, formatiereProzent } from '../modell/zeit'
 import { berechneKennzahlen, type Kennzahlen } from './kennzahlen'
@@ -89,8 +89,8 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
         vorschlaege.push({
           schluessel: `parallelisieren:${a.id}:${b.id}`,
           regel: 'parallelisieren',
-          titel: `„${blockTitel(b)}“ gleichzeitig mit „${blockTitel(a)}“ erledigen`,
-          begruendung: `„${blockTitel(b)}“ braucht das Ergebnis des vorherigen Schritts nicht. ${rolleName(p, b.rolleId)} kann sofort beginnen, statt zu warten, bis „${blockTitel(a)}“ fertig ist.`,
+          titel: `„${blockTitel(b)}“ gleichzeitig mit „${bereichTitel(a)}“ erledigen`,
+          begruendung: `„${blockTitel(b)}“ braucht das Ergebnis des vorherigen Schritts nicht. ${rolleName(p, b.rolleId)} kann sofort beginnen, statt zu warten, bis „${bereichTitel(a)}“ fertig ist.`,
           annahme: null,
           blockIds: [a.id, b.id],
           anwenden: (q) =>
