@@ -6,7 +6,7 @@ import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type Id, typ
 import { formatiereProzent } from '../../modell/zeit'
 import { Auswahl, Feld, ProzentEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
-import { Symbol } from '../Symbol'
+import { Kreuz, Symbol } from '../Symbol'
 
 export interface FormularKontext {
   vorgaenger: Block | null
@@ -282,7 +282,7 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
                   onAendern({ ...e, zweige: e.zweige.filter((x) => x.id !== z.id) })
                 }}
               >
-                ✕
+                <Kreuz />
               </button>
             )}
             {z.ende !== null && (
@@ -333,7 +333,7 @@ function ParallelFormular({ block: b, onAendern }: Props<Parallel>) {
                 onAendern({ ...b, zweige: b.zweige.filter((x) => x.id !== z.id) })
               }}
             >
-              ✕
+              <Kreuz />
             </button>
           )}
         </div>

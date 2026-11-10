@@ -412,7 +412,8 @@ textarea {
   flex: 1;
   display: grid;
   place-items: center;
-  color: var(--text-2);
+  /* Das Diagrammpapier ist in beiden Modi hell, also feste dunkle Schrift */
+  color: #52514e;
   background: var(--papier);
 }
 
@@ -767,6 +768,8 @@ fieldset {
   cursor: not-allowed;
 }
 .knopf-icon {
+  display: inline-grid;
+  place-items: center;
   width: 32px;
   height: 32px;
   border: 1px solid transparent;
@@ -1536,8 +1539,30 @@ fieldset {
 }
 
 @media print {
-  :root {
+  /* Druck immer hell, auch wenn Bildschirm oder System dunkel sind */
+  :root:not([data-theme='__']),
+  :root[data-theme='dark'] {
     color-scheme: light;
+    --flaeche: #ffffff;
+    --karte: #ffffff;
+    --karte-2: #f1f0ec;
+    --linie: #e1e0d9;
+    --linie-stark: #c3c2b7;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --text-3: #6b6a65;
+    --akzent: #1c5cab;
+    --akzent-text: #1c5cab;
+    --akzent-hauch: #e9f1fb;
+    --serie-arbeit: #2a78d6;
+    --serie-liegen: #eb6834;
+    --gut-text: #006300;
+    --schlecht-text: #b42c2c;
+    --hinweis-farbe: #6b6a65;
+    --chip-gut: #e5f3e5;
+    --chip-schlecht: #fae5e5;
+    --papier: #ffffff;
+    --schatten: none;
   }
   body,
   .app,

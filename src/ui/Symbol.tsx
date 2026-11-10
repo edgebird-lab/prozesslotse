@@ -16,11 +16,22 @@ export type SymbolArt =
   | 'start-bedingung'
   | 'ende'
   | 'bahn'
+  | 'kennzahl'
+  | 'verbessern'
 
 export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
   return (
     <svg className="symbol" width={groesse} height={groesse} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
       {inhalt(art)}
+    </svg>
+  )
+}
+
+/** Kreuz für Entfernen-Knöpfe (statt Textzeichen, das je nach Schriftglättung farbig wirkt). */
+export function Kreuz() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+      <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   )
 }
@@ -128,6 +139,22 @@ function inhalt(art: SymbolArt) {
       )
     case 'ende':
       return <circle cx="16" cy="16" r="11" {...strich} strokeWidth={3.4} />
+    case 'kennzahl':
+      return (
+        <>
+          <path d="M5 27h22" {...strich} />
+          <rect x="7" y="16" width="4.5" height="9" rx="1" {...strich} />
+          <rect x="14" y="9" width="4.5" height="16" rx="1" {...strich} />
+          <rect x="21" y="13" width="4.5" height="12" rx="1" {...strich} />
+        </>
+      )
+    case 'verbessern':
+      return (
+        <>
+          <path d="M5 9 13 17l5-5 9 9" {...strich} />
+          <path d="M20 21h7v-7" {...strich} />
+        </>
+      )
     case 'bahn':
       return (
         <>

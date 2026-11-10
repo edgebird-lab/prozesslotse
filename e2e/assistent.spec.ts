@@ -88,3 +88,18 @@ test('lässt sich per Tastatur bedienen', async ({ page }) => {
   await page.keyboard.press('Control+z')
   await expect(page.getByRole('button', { name: /Post öffnen/ })).toHaveCount(0)
 })
+
+test('verschiebt und löscht Schritte über die Gliederung', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /Mit dem Beispiel/ }).click()
+  await page.getByRole('navigation', { name: 'Schritte' }).getByRole('button', { name: /Ablauf/ }).click()
+  const titel = page.locator('.gliederung > .sequenz > .sequenz-eintrag > .eintrag .eintrag-titel')
+  await expect(titel.nth(0)).toHaveText('Bestellung telefonisch annehmen')
+  await page.getByRole('button', { name: /^Bestellung telefonisch annehmen/ }).click()
+  await page.getByRole('button', { name: '↓ Nach unten' }).click()
+  await expect(titel.nth(0)).toHaveText('Bestellung in Warenwirtschaft erfassen')
+  await expect(titel.nth(1)).toHaveText('Bestellung telefonisch annehmen')
+  await page.getByRole('button', { name: 'Löschen' }).click()
+  await expect(page.getByRole('button', { name: /^Bestellung telefonisch annehmen/ })).toHaveCount(0)
+  await expect(titel.nth(0)).toHaveText('Bestellung in Warenwirtschaft erfassen')
+})

@@ -4,6 +4,7 @@ import { MEDIUM_ARTEN, type MediumArt } from '../../modell/typen'
 import { ZahlEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
 import { Lernhinweis } from '../Lernhinweis'
+import { Kreuz } from '../Symbol'
 
 export function BeteiligteSchritt() {
   const { p, aendere, dispatch } = useApp()
@@ -63,7 +64,7 @@ export function BeteiligteSchritt() {
                           aendere(entferneRolle(p, r.id))
                         }}
                       >
-                        ✕
+                        <Kreuz />
                       </button>
                     </td>
                   </tr>
@@ -121,7 +122,7 @@ export function BeteiligteSchritt() {
                   </td>
                   <td>
                     <button type="button" className="knopf-icon" aria-label={`System ${m.name || i + 1} entfernen`} title="Entfernen" onClick={() => aendere(entferneMedium(p, m.id))}>
-                      ✕
+                      <Kreuz />
                     </button>
                   </td>
                 </tr>

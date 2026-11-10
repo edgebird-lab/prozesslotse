@@ -17,7 +17,6 @@ interface Canvas {
   addMarker(id: string, klasse: string): void
   removeMarker(id: string, klasse: string): void
   resized(): void
-  scrollToElement(id: string, abstand?: number): void
 }
 interface Overlays {
   add(id: string, typ: string, overlay: { position: { top?: number; left?: number }; html: string }): string
@@ -55,6 +54,31 @@ const SYMBOL: Record<Markierung['art'], string> = {
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+interface Form {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Rückt alle genannten Elemente ins Bild: verschieben, wenn sie hineinpassen, sonst herauszoomen. */
+function zeigeElemente(canvas: Canvas, registry: ElementRegistry, ids: string[]): void {
+  const formen = ids.map((id) => registry.get(id) as Partial<Form> | undefined).filter((f): f is Form => typeof f?.x === 'number' && typeof f.width === 'number')
+  if (formen.length === 0) return
+  const rand = 60
+  const x1 = Math.min(...formen.map((f) => f.x)) - rand
+  const y1 = Math.min(...formen.map((f) => f.y)) - rand
+  const x2 = Math.max(...formen.map((f) => f.x + f.width)) + rand
+  const y2 = Math.max(...formen.map((f) => f.y + f.height)) + rand
+  const box = canvas.viewbox()
+  if (x1 >= box.x && y1 >= box.y && x2 <= box.x + box.width && y2 <= box.y + box.height) return
+  if (x2 - x1 <= box.width && y2 - y1 <= box.height) {
+    canvas.viewbox({ x: (x1 + x2 - box.width) / 2, y: (y1 + y2 - box.height) / 2, width: box.width, height: box.height })
+  } else {
+    canvas.viewbox({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 })
+  }
 }
 
 /** Ganzes Diagramm zeigen; ist es dafür zu klein, lesbar vergrößert am Anfang beginnen. */
@@ -149,7 +173,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
     }
     markiert.current = neu
     const schluessel = auswahl.join(',')
-    if (schluessel && schluessel !== letzteAuswahl.current) canvas.scrollToElement(auswahl[0], 80)
+    if (schluessel && schluessel !== letzteAuswahl.current) zeigeElemente(canvas, registry, auswahl)
     letzteAuswahl.current = schluessel
   }, [importNr, markierungen, ausgewaehlt])
 

@@ -65,13 +65,13 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
   pruefen: {
     titel: 'Was die Zahlen bedeuten',
     bpmn: 'Prozesskennzahlen',
-    symbol: 'aufgabe',
+    symbol: 'kennzahl',
     text: 'Die Durchlaufzeit ist der Erwartungswert über alle Wege. Die Flusseffizienz zeigt, welcher Anteil davon echte Arbeit ist. Offene Vorgänge folgen aus dem Gesetz von Little: Vorgänge pro Tag mal Durchlaufzeit in Tagen. Ab etwa 85 % Auslastung staut sich Arbeit, weil jede Schwankung sofort Wartezeit erzeugt.',
   },
   verbessern: {
     titel: 'Woher die Vorschläge kommen',
     bpmn: 'Redesign-Heuristiken',
-    symbol: 'und',
+    symbol: 'verbessern',
     text: 'Die Vorschläge folgen bekannten Regeln der Prozessverbesserung: unabhängige Schritte gleichzeitig ausführen, Schritte einer Rolle zusammenlegen, Kontrollen mit wenig Nutzen streichen, Fehler an der Quelle vermeiden, Daten nicht abtippen. Die Wirkung ist nicht geschätzt, sondern mit denselben Formeln neu berechnet.',
   },
 }

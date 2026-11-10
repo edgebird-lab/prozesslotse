@@ -20,13 +20,13 @@ import { type Aufgabe, type Block, type EntscheidungsZweig, type Id, type Prozes
 import { formatiereProzent } from '../modell/zeit'
 
 export const MASSE = {
-  spalte: 160,
+  spalte: 170,
   spur: 110,
   spurDuenn: 40,
   bahnPolster: 10,
   kopf: 30,
   rand: 20,
-  aufgabe: { breite: 100, hoehe: 80 },
+  aufgabe: { breite: 120, hoehe: 80 },
   gateway: { breite: 50, hoehe: 50 },
   ereignis: { breite: 36, hoehe: 36 },
   beschriftungBreite: 90,

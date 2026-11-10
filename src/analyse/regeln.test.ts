@@ -75,6 +75,16 @@ describe('Verbesserungsregeln', () => {
     expect(ohne).toHaveLength(alle.length - 1)
   })
 
+  it('senkt im Fallbeispiel mit zwei Vorschlägen die Durchlaufzeit von 6,7 auf 4,4 Arbeitstage (wie in der README)', () => {
+    const p = beispielLieferdienst()
+    const tag = 8 * 60
+    expect(berechneKennzahlen(p).durchlaufzeitMin / tag).toBeCloseTo(6.74, 2)
+    const q = bewerteVorschlaege(p)[0].anwenden(p) // Freigabe streichen
+    const r = bewerteVorschlaege(q)[0].anwenden(q) // Tour planen parallel zur Kommissionierung
+    expect(findeBlock(r, 'par_auf_tour')?.block.typ).toBe('parallel')
+    expect(berechneKennzahlen(r).durchlaufzeitMin / tag).toBeCloseTo(4.42, 2)
+  })
+
   it('verbindet Namen mit gemeinsamem Objekt', () => {
     expect(verbindeNamen('Rechnung erstellen', 'Rechnung versenden')).toBe('Rechnung erstellen und versenden')
     expect(verbindeNamen('Ware prüfen', 'Lieferschein drucken')).toBe('Ware prüfen und Lieferschein drucken')
