@@ -32,7 +32,7 @@ Der Assistent führt eine **Einfügeposition**: Er fragt immer an einer bestimmt
 | Antwort | Folgefragen | Danach |
 | --- | --- | --- |
 | Eine Aufgabe | Name (Objekt + Verb) · Wer? (Rolle) · Womit? (System) · Wie lange dauert die Bearbeitung? · Wie lange liegt der Vorgang vorher? · Braucht dieser Schritt das Ergebnis des vorherigen? (nur wenn es einen gibt) · Werden Daten von Hand übertragen? Wenn ja: aus welchem System, wie viele Minuten davon? · Ist es eine Prüfung oder eine Freigabe? Bei Freigabe: Wie oft wird freigegeben? | weiter hinter der Aufgabe |
-| Eine Entscheidung | Welche Frage wird entschieden? · Welche Ausgänge gibt es (Bezeichnung, Anteil in %)? · Endet der Prozess in einem Ausgang? Wenn ja: mit welchem Ergebnis? (nicht innerhalb von „Gleichzeitig“) | weiter im ersten Ausgang |
+| Eine Entscheidung | Wovon hängt ab, wie es weitergeht: von einer Prüfung oder Angabe, oder davon, was zuerst passiert? · Welche Frage wird entschieden bzw. worauf wird gewartet? · Welche Ausgänge gibt es (Bezeichnung, Anteil in %)? Bei „was zuerst passiert“ je Ausgang: Nachricht oder Frist, nach welcher Zeit im Schnitt? · Danach: weiter im Ablauf, Prozess endet (mit welchem Ergebnis?) oder zurück zu einem früheren Schritt (Auswahl aus den Schritten davor) | weiter im ersten Ausgang |
 | Mehrere Dinge gleichzeitig | Wie viele Zweige? | weiter im ersten Zweig |
 | Etwas wird wiederholt | Welche Frage entscheidet über die Wiederholung? · In wie viel Prozent der Durchläufe wird wiederholt? | weiter im Körper der Wiederholung |
 | Warten | Worauf wird gewartet? · Auf einen Zeitpunkt oder auf eine Nachricht? · Wie lange im Schnitt? | weiter hinter dem Warten |
@@ -49,3 +49,5 @@ Jeder Schritt lässt sich später in der Gliederung auswählen, ändern, verschi
 - **Datenübertragung von Hand** macht Medienbrüche sichtbar und bewertbar.
 - **Prüfung und Freigabe** kennzeichnen Kontrollen, die die Regeln „Nacharbeit senken“ und „Freigabe streichen“ betrachten. Prüfungen und Freigaben werden nie mit anderen Schritten zusammengelegt (Vier-Augen-Prinzip).
 - **Anteile an Entscheidungen** und der Wiederholungsanteil bestimmen, wie oft jeder Schritt im Schnitt läuft.
+- **„Zurück zu …“** bildet Korrekturschleifen ab, etwa: Daten fehlerhaft → Kunde fragen → bei Korrektur zurück zur Erfassung. Angeboten werden nur Schritte davor, und nie aus „Gleichzeitig“ heraus, damit keine Verklemmung entstehen kann.
+- **„Was zuerst passiert“** bildet Fälle ab, in denen nicht die Firma entscheidet, sondern ein Ereignis: Antwort des Kunden, Stornierung oder Ablauf einer Frist.
