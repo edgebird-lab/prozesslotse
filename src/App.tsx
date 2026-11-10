@@ -31,9 +31,10 @@ export default function App() {
 
   const aendere = useCallback<AppApi['aendere']>((aenderung, optionen = {}) => dispatch({ typ: 'prozess', aenderung, zeit: Date.now(), ...optionen }), [])
 
+  // Sofort speichern: Ein Projekt ist nur wenige Kilobyte groß, und ein verzögertes
+  // Speichern ginge verloren, wenn der Tab direkt nach einer Änderung geschlossen wird.
   useEffect(() => {
-    const t = setTimeout(() => speichereImBrowser(z.projekt), 300)
-    return () => clearTimeout(t)
+    speichereImBrowser(z.projekt)
   }, [z.projekt])
 
   useEffect(() => speichereEinstellungen({ lernmodus: z.lernmodus }), [z.lernmodus])
