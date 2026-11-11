@@ -123,3 +123,32 @@ test('Vorlagenhinweis nur im Entwurf; die freigegebene Fassung nennt Version, Fr
   expect(fussXml).not.toContain('Vorlage')
   expect(strFromU8(dateien['word/document.xml'])).toContain('Fachlich geprüft von Steuerberatung Muster am 10.11.2026.')
 })
+
+test('Seitensatz im Druck: neue Seite nur vor großen Kapiteln, 9.2 und Absätze nicht geteilt, „z. B.“ und „E-Mail“ zusammen (Sichtprüfung Mängel 3 und 7)', async ({ page }) => {
+  await start(page)
+  await page.emulateMedia({ media: 'print' })
+  const umbrueche = () =>
+    page.locator('.dokument-h1').evaluateAll((hs) => hs.filter((h) => getComputedStyle(h).breakBefore === 'page').map((h) => (h.textContent ?? '').split(/\s/)[0]))
+  expect(await umbrueche()).toEqual(['2', '3', '4', '9'])
+
+  // 9.2 Nachweis der Einweisung: das Formular bleibt auf einer Seite
+  const formular = page.locator('.tabelle-wrap', { hasText: 'Unterschrift' })
+  await expect(formular).toHaveCSS('break-inside', 'avoid')
+  // Absätze: keine einzelne Zeile am Seitenende oder -anfang (Edge beachtet widows hier nicht, deshalb ungeteilt)
+  const absatz = page.locator('.dokument p', { hasText: 'Für Kaufleute gelten zusätzlich' })
+  await expect(absatz).toHaveCSS('break-inside', 'avoid')
+  await expect(absatz).toHaveCSS('widows', '2')
+  await expect(absatz).toHaveCSS('orphans', '2')
+
+  const vd = await page.locator('.dokument').evaluate((d) => d.textContent ?? '')
+  expect(vd).toContain('z. B.')
+  expect(vd).not.toMatch(/z\. B\./)
+
+  await page.emulateMedia({ media: 'screen' })
+  await page.getByRole('tab', { name: 'Verarbeitungsverzeichnis' }).click()
+  await page.emulateMedia({ media: 'print' })
+  expect(await umbrueche()).toEqual(['B', 'C'])
+  const vvt = await page.locator('.dokument').evaluate((d) => d.textContent ?? '')
+  expect(vvt).toContain('E‑Mail')
+  expect(vvt).not.toContain('E-Mail')
+})

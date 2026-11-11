@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react'
 import { gliederung } from '../../compliance/dokument'
-import { festeLeerzeichen as fest } from '../../compliance/typografie'
+import { festeLeerzeichen as fest, neueSeiteVor } from '../../compliance/typografie'
 import type { Abschnitt, Dokument } from '../../compliance/typen'
 import type { Prozess } from '../../modell/typen'
 import { useBpmn } from '../analyse'
@@ -8,9 +8,9 @@ import { DiagrammDruck } from '../DiagrammDruck'
 import { DiagrammLazy as Diagramm } from '../DiagrammLazy'
 
 /**
- * Dokument → HTML für Vorschau und Druck. React maskiert alle Texte;
- * Kapitel der Ebene 1 beginnen im Druck auf einer neuen Seite. Nach §, Abs.,
- * Nr. usw. steht wie in der Word-Datei ein geschütztes Leerzeichen.
+ * Dokument → HTML für Vorschau und Druck. React maskiert alle Texte; die
+ * großen Kapitel beginnen im Druck auf einer neuen Seite (`neueSeiteVor`). Nach
+ * §, Abs., Nr. usw. steht wie in der Word-Datei ein geschütztes Leerzeichen.
  */
 export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; prozess: Prozess }) {
   const titelId = useId()
@@ -23,7 +23,13 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
     switch (a.art) {
       case 'ueberschrift': {
         const text = fest(`${a.nummer} ${a.text}`)
-        if (a.ebene === 1) return <h4 key={i} className="dokument-h1">{text}</h4>
+        // im Druck beginnen nur die großen Kapitel auf einer neuen Seite
+        if (a.ebene === 1)
+          return (
+            <h4 key={i} className={`dokument-h1${neueSeiteVor(dokument.art, a.nummer) ? ' neue-seite' : ''}`}>
+              {text}
+            </h4>
+          )
         if (a.ebene === 2) return <h5 key={i} className="dokument-h2">{text}</h5>
         return <h6 key={i} className="dokument-h3">{text}</h6>
       }
@@ -45,7 +51,8 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
         )
       case 'tabelle':
         return (
-          <div key={i} className="tabelle-wrap">
+          // Formular zum Ausfüllen (nur leere Zeilen, z. B. 9.2): im Druck nicht über zwei Seiten
+          <div key={i} className={`tabelle-wrap${a.zeilen.every((z) => z.every((t) => !t)) ? ' tabelle-formular' : ''}`}>
             <table className="dokument-tabelle">
               <thead>
                 <tr>
