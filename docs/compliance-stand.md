@@ -78,6 +78,115 @@ Zweig `compliance-programm`, geprüft am 11.11.2026 mit dem Debug-Build (`npx ta
 - [x] 8.2 Teilschritt „Dokumente“ im Programm: „Drucken“ und „Als PDF speichern“ über `alsPdf` (WebView2 `PrintToPdf`, A4, Rand 15 mm, Druck-CSS der Seite) mit dem Dateinamen des angezeigten Dokuments, z. B. `…-verfahrensdokumentation-v1-0.pdf`; die Word-Datei meldet „„…“ gespeichert.“. Im Browser bleibt „Drucken oder als PDF speichern“. PDF der Verfahrensdokumentation aus dem Programm angesehen: 16 Seiten A4, Fußzeile „Vorlage – vor Verwendung prüfen lassen · Verfahrensdokumentation · Version 1.0 · Seite X von 16“ auf jeder Seite, jedes Kapitel der Ebene 1 auf neuer Seite, Diagramm in 9.1, Tabellenzeilen ungeteilt, Tabellenköpfe wiederholt. Dabei gefunden und behoben: Tabelle 2.4 „Relevante Dokumente“ (sieben Spalten, mindestens 747 px breit) passte nicht in die Satzbreite (680 px bei 15 mm Rand, 718 px bei 10 mm) und war rechts abgeschnitten, mit gedrucktem Scrollbalken, im Programm wie beim Drucken im Browser. Neue Druckregeln: Tabellenschrift 8,5 pt, engere Zellen, kein Scrollbalken; die breiteste Tabelle braucht jetzt 640 px. Ein neuer Browsertest prüft alle Tabellen beider Dokumente bei 680 px.
 - [x] 8.3 `scripts/desktop-test.mjs`: 46 Prüfungen in drei Programmstarts (vorher 16 in einem). Start 1 wie bisher, von Speichern unter bis zur Rückfrage beim Schließen. Start 2: sicherer Kontext, `crypto.subtle`, Gegenprobe zur CSP, Beispiel mit Compliance-Angaben, „Dokumentieren“ > „Dokumente“, fünf falsche Aufrufe von `speichern_unter_bytes` werden abgelehnt und schreiben nichts, Freigabe 1.0, Word-Datei (`PROZESSLOTSE_TEST_SPEICHERN_DOCX`, Name ohne Endung und mit Umlaut) als ZIP mit `word/document.xml` samt Prozessname und Version, PDF der Verfahrensdokumentation (`PROZESSLOTSE_TEST_PDF`: `%PDF`, 16 Seiten, alle A4), Projekt speichern. Start 3: leeres Projekt, Datei öffnen, Version 1.0 und Unternehmensangaben sind da. Über alle Starts keine CSP-Meldung. Der Test beginnt jetzt auch dann mit dem Willkommen, wenn ein früherer Lauf ein Projekt im Speicher der WebView2 hinterlassen hat, und hinterlässt selbst ein leeres; `PROZESSLOTSE_EXE` wählt eine andere exe. `npm run desktop:test` grün ohne Admin-Rechte. Offen: der CI-Lauf, denn `windows.yml` (mit Installer-Test) läuft erst beim Push auf `main`.
 
+## Durchsicht vom 11.11.2026
+
+Fünf Prüfer (Abnahme, Recht, Daten, Logik, Bedienung) haben den Stand `96f7243` durchgesehen, jeder Fund wurde von ein bis zwei Gegenprüfern bestätigt oder verworfen: 82 bestätigte Funde, 3 strittige, 10 verworfene. Robin hat die Behebung freigegeben („Arbeite autonom und entscheide so, wie du es mir empfehlen würdest“). Die Funde wurden in sechs Paketen auf eigenen Zweigen behoben, jeder Fehler mit einem Test, der ohne die Behebung scheitert, und danach in dieser Reihenfolge in `compliance` zusammengeführt: `fix/daten` (`9d0fb66`), `fix/angaben` (`416eeb7`), `fix/texte` (`44c5c7a`), `fix/regeln` (`133f314`), `fix/druck` (`3d92f4e`), `fix/bedienung` (`8e65461`). Die Annahmen dazu stehen in [`compliance-entscheidungen.md`](compliance-entscheidungen.md), Abschnitt „Durchsicht vom 11.11.2026“.
+
+Was sich für die Nutzung ändert:
+
+- **Neue Angaben** (alle optional, ältere Dateien laden unverändert): Rollen im Ablauf mit „extern“ und Organisation, Ausnahme nach Art. 9 Abs. 2 DSGVO, Zugriffsschutz in Kapitel 3.4 und Verzeichnis C.3, je System „Wie findet man eine Unterlage wieder?“ und Datenzugriff bei Außenprüfung (neues Kapitel 3.5), Bewilligung des Finanzamts bei Aufbewahrung im Drittland, eigene Verfahrensdokumentation zum ersetzenden Scannen, mitgeltende Unterlagen mit Ablageort.
+- **Lückenprüfung mit 42 Regeln** (vorher 38): neu B10 „Keine Unterlagen angelegt“, B11 „Lieferschein: Frist nach HGB klären“, S7 „Aufbewahrung im Drittland ohne Bewilligung“, S8 „Wiederfinden und Datenzugriff offen“; viele Regeltexte genauer. Das Beispiel liefert weiter genau 7 Befunde (Spezifikation 9.5).
+- **Versionen:** Die Prüfsumme deckt jetzt auch den eingefrorenen Prozess (Diagramm der Anlage) und wird nach dem Laden nachgerechnet; „Gültig ab“ hat Grenzen und eine zulässige Vorgabe; eine Freigabe, die noch nicht gilt, lässt sich mit Begründung zurückziehen; „Inhalt der Änderung“ ist ab Version 2 Pflicht.
+- **Speichern:** Voller oder beschädigter Browser-Speicher, zwei Tabs und alte Programmfassungen verlieren keine Daten mehr still; beschädigte Compliance-Angaben in einer Datei sperren den Prozess nicht mehr.
+- **Druck und Word:** Anlage 9.1 als Übersicht und lesbare Ausschnitte, DOCX auf Deutsch mit Spaltenbreiten nach Inhalt, 9-pt-Tabellen und festen Leerzeichen; Fristentabelle und schmale Fenster ohne Abschneiden.
+- **Bedienung:** „Weiter“ und „Beheben“ springen an die richtige Stelle, Fokus geht nicht mehr verloren, Meldungen am Feld, Kapitelkürzel ausgeschrieben, leere Teilschritte neutral statt mit Häkchen; „Dokumentieren“ lädt erst im Schritt nach (Hauptteil 463 statt 582 kB).
+
+Beim Zusammenführen erledigt (`d437756`): Regelzahl 42 in Code, Spezifikation und README; `hatAngaben` kennt die neuen Angaben; „Beheben“ springt bei B10, B11, S7, S8 und D5 ohne Ausnahme nach Art. 9 auf die passende Frage (`feldZiel`, mit Test); der Freigabe-Dialog nutzt `kapitelText` aus `dokument.ts`; die Kopfzeilen-Meldung zu falschen Prüfsummen lädt `versionen.ts` erst bei Bedarf, sonst läge der Hauptteil wieder über 500 kB; Speichergrenzen neu gemessen (Version 1 rund 35 000 Zeichen, je Version rund 215 mehr; Browser-Speicher voll bei rund 105 Versionen, Projektdatei 20 MiB bei rund 185).
+
+Tests nach dem Zusammenführen: `npm run lint` ohne Befund, 496 Unit-Tests in 53 Dateien, `npm run build` ohne Chunk-Warnung (Hauptteil 463 kB, gzip 141 kB), 83 Browsertests mit `--workers=2` grün (der erste Lauf hatte 5 Fehlschläge aus widersprüchlichen Testerwartungen der Pakete, z. B. umbenannte Knöpfe und die nachgeladene Leiste; angepasst, zweiter Lauf 83 von 83 ohne Zeitüberschreitung), 6 Rust-Tests.
+
+Windows-Programm: `npx tauri build --debug --no-bundle` und `npm run desktop:test` grün, jetzt 48 Prüfungen in drei Programmstarts; neu geprüft wird, dass „Dokumentieren“ im Programm erst im Schritt nachlädt. Das PDF der Verfahrensdokumentation aus dem Programm hat 22 Seiten A4: Anlage 9.1 als Übersicht mit fünf nummerierten Rahmen und danach fünf Ausschnitte („Ausschnitt n von m“, Beschriftungen 5,75 bis 6,3 pt, lesbar); die Tabellen 3.4 (sechs Spalten mit Zugriffsschutz) und 3.5 passen in die Satzbreite. Die Word-Datei aus dem Programm öffnet in Word 16 ohne Reparaturhinweis (15 Seiten, Sprache Deutsch, als PDF exportiert): Tabellen in 9 pt mit Spaltenbreiten nach Inhalt, keine Daten oder Wörter mitten im Zeichen getrennt, die Fristentabelle mit dem Zusatz nach § 257 HGB beim Lieferschein und der Satz zu Instituten stehen vollständig.
+
+| Fund | Kurztitel | Stand |
+| --- | --- | --- |
+| abnahme-0 | PDF/Druck: Tabelle 2.4 rechts abgeschnitten, Spalte „Beispiel 2026“ fehlt | erledigt vor der Durchsicht in `9cc0f57` |
+| abnahme-1 | Kapitel 9.1: Ablaufdiagramm im Druck unlesbar klein | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| abnahme-2 | Teilschritt „Aufbewahrung und Löschung“: Fristentabelle abgeschnitten | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| abnahme-3 | Kapitel 4: Wiederholungssatz steht unter 4.5 „Bestellung stornieren“ | erledigt: texte, `0665cc5` (zusammengeführt in `44c5c7a`) |
+| abnahme-4 (strittig) | Diagramm: zwei Nachrichtenflüsse 10 px nebeneinander wirken wie eine Linie | offen: wird in `main` bei der Linienführung behandelt |
+| abnahme-5 | Bühne in „Dokumentieren“: die Markierung ist anfangs nicht zu sehen | erledigt: bedienung, `d8a2e27` (zusammengeführt in `8e65461`) |
+| abnahme-7 | Teilschritt-Leiste: Knöpfe einer Zeile ungleich hoch | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| abnahme-8 | „Belege und Daten“: Hinweis wiederholt die Beschreibung von „Weiß nicht“ | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| abnahme-9 | Ablage-Auswahl zeigt „Warenwirtschaft (Warenwirtschaft)“ | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| abnahme-10 | Feld „Benennung“: Platzhalter abgeschnitten | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| abnahme-11 | Build-Warnung: Hauptteil 571 kB (bekannt) | erledigt: bedienung, `fc29788` (zusammengeführt in `8e65461`) |
+| recht-0 | Lieferscheine: Frist nur nach AO, für Kaufleute fehlt § 257 HGB | erledigt: angaben, `ba28266`, `69066dd` (zusammengeführt in `416eeb7`) |
+| recht-1 | Drittland-Cloud mit aufbewahrungspflichtigen Unterlagen: § 146 Abs. 2b AO fehlt | erledigt: regeln, `cdc795a` (zusammengeführt in `133f314`) |
+| recht-2 | Kapitel 5 sagt „Entfällt“, obwohl die Vernichtung nach dem Scannen offen ist | erledigt: texte, `dff698b` (zusammengeführt in `44c5c7a`) |
+| recht-3 | Zugriffsschutz wird abgefragt, steht aber in keinem Dokument | erledigt: angaben, `ba28266`, `69066dd` (zusammengeführt in `416eeb7`) |
+| recht-4 | GoBD Rz. 152: Wiederfinden, Lesbarmachung und Datenzugriff fehlen | erledigt: angaben, `ba28266`, `69066dd` (zusammengeführt in `416eeb7`) |
+| recht-5 (strittig) | Freigegebene Fassung trägt weiter „Vorlage – vor Verwendung prüfen lassen“ | offen: Entscheidung vom 11.11.2026 steht in `compliance-entscheidungen.md`, Umsetzung folgt |
+| recht-6 | Verzeichnis B.5 sagt „findet nicht statt“, obwohl der Standort unbekannt ist | erledigt: angaben, `ba28266` (zusammengeführt in `416eeb7`) |
+| recht-7 | Art.-9-Daten: Ausnahme nach Art. 9 Abs. 2 DSGVO fehlt | erledigt: angaben, `ba28266`, `69066dd` (zusammengeführt in `416eeb7`) |
+| recht-8 | Breite Tabellen trennen Daten, Wörter und Prüfsummen mitten im Zeichen | erledigt: druck, `02850d1` (zusammengeführt in `3d92f4e`) |
+| recht-9 | Ersetzendes Scannen: Dokument behauptet eine vorhandene eigene Verfahrensdokumentation | erledigt: texte, `dff698b` (zusammengeführt in `44c5c7a`) |
+| recht-10 | Jahresabschluss und Eröffnungsbilanz: kein Hinweis auf Aufbewahrung im Original | erledigt: regeln, `cdc795a` (zusammengeführt in `133f314`) |
+| recht-11 | Feste Sätze sichern zu, was die Angaben nicht tragen | erledigt: texte, `e5545f7`, `d378657` (zusammengeführt in `44c5c7a`) |
+| recht-12 | Kapitel 4: Ablaufsatz steht unter der falschen Überschrift | erledigt: texte, `0665cc5` (zusammengeführt in `44c5c7a`) |
+| recht-14 | „nicht aufbewahrungspflichtig“ gilt nur steuerlich | erledigt: texte, `d378657` (zusammengeführt in `44c5c7a`) |
+| recht-15 | Verzeichnis B.3: besondere Kategorien fehlen in der Zeile der Unterlage | erledigt: angaben, `ba28266` (zusammengeführt in `416eeb7`) |
+| recht-16 | „Identifikationsdaten (Name, Kundennummer)“ auch bei Beschäftigten und Lieferanten | erledigt: angaben, `ba28266` (zusammengeführt in `416eeb7`) |
+| recht-17 | DOCX ohne Sprachangabe | erledigt: druck, `02850d1` (zusammengeführt in `3d92f4e`) |
+| recht-18 | Satzbild: Absätze ohne Abstand, „§“ allein am Zeilenende, „Un-named“ | erledigt: druck, `02850d1`, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| recht-19 | Beispiel: Microsoft 365 als lokaler Betrieb ohne Dienstleister | erledigt: angaben, `ba28266` (zusammengeführt in `416eeb7`) |
+| recht-20 | Sonderfall: 10 Jahre für Buchungsbelege bei Kredit-, Versicherungs- und Wertpapierinstituten | erledigt: angaben, `ba28266` (zusammengeführt in `416eeb7`) |
+| recht-21 | Oberfläche: Länderartikel im D8-Text, falscher Bezug im Lernhinweis zum Löschrecht | erledigt: regeln, `a355715`, `28e2916` (zusammengeführt in `133f314`) |
+| recht-23 | Sprache: Artikel, Großschreibung, „0 Tage“, „Herkunft“, Person in Spalte „Rolle“ | erledigt: texte, `d378657` (zusammengeführt in `44c5c7a`) |
+| daten-0 | Voller Browser-Speicher: Neustart zeigt einen alten Stand als unveränderte Datei, Speichern überschreibt die Datei | erledigt: daten, `d921b23` (zusammengeführt in `9d0fb66`) |
+| daten-1 | Zwei Tabs: freigegebene Versionen gehen verloren oder fremde Versionen landen im Projekt | erledigt: daten, `d921b23` (zusammengeführt in `9d0fb66`) |
+| daten-2 | Ungültiges Feld im Browser-Speicher: Projekt und Versionen werden ohne Meldung verworfen und überschrieben | erledigt: daten, `d921b23` (zusammengeführt in `9d0fb66`) |
+| daten-3 (strittig) | Strenge Prüfung sperrt die ganze Datei wegen einer Kleinigkeit im Compliance-Teil | erledigt: daten, `d0546c4` (zusammengeführt in `9d0fb66`) |
+| daten-4 | Prüfsumme wird nie nachgerechnet; die Oberfläche behauptet, sie erkenne Beschädigungen | erledigt: daten, `93614de` (zusammengeführt in `9d0fb66`) |
+| daten-5 | Vertipptes „Gültig ab“ einer Freigabe lässt sich nicht berichtigen | erledigt: daten, `16d6e88` (zusammengeführt in `9d0fb66`) |
+| daten-7 | Alter Versionsschlüssel überschreibt die Versionen, die eine andere Programmfassung im selben Browser geschrieben hat | erledigt: daten, `d921b23` (zusammengeführt in `9d0fb66`) |
+| daten-8 | Eingefrorene Dokumente teilen sich die Konstante FRISTEN_TABELLE | erledigt: texte, `d378657` (zusammengeführt in `44c5c7a`) |
+| daten-9 | Versionen wachsen mit der Historie; Speichergrenzen sind nicht dokumentiert | erledigt: daten, `32fcc05` (zusammengeführt in `9d0fb66`) |
+| logik-0 | Kapitel 4: „weiter mit“ und „zurück zu“ nennen Schritte, die nur bedingt laufen | erledigt: texte, `0665cc5` (zusammengeführt in `44c5c7a`) |
+| logik-1 | Externe Rollen lassen sich nirgends eintragen; Kanzlei erscheint als interner Empfänger | erledigt: angaben, `69066dd` (zusammengeführt in `416eeb7`) |
+| logik-2 | Tippfehler im „Gültig ab“ sperrt dauerhaft alle weiteren Freigaben | erledigt: daten, `16d6e88` (zusammengeführt in `9d0fb66`) |
+| logik-3 | Ausgeblendete Altangaben stehen weiter in Kapitel 3.4 und 6 | erledigt: texte, `ed6b64f` (zusammengeführt in `44c5c7a`) |
+| logik-4 | Lückenprüfung übersieht halb ausgefüllte Pflichtangaben | erledigt: regeln, `a355715` (zusammengeführt in `133f314`) |
+| logik-5 | Verzeichnis B.5 behauptet „findet nicht statt“, obwohl der Betrieb eines Systems offen ist | erledigt: angaben, `ba28266` (zusammengeführt in `416eeb7`) |
+| logik-6 | „Verbessern“: Hinweis auf gestrichene Kontrolle bei allen Vorschlägen, sobald das Soll sie nicht mehr hat | erledigt: regeln, `28e2916` (zusammengeführt in `133f314`) |
+| logik-7 | Laden lässt Datumsangaben zu, an denen Prüfung und Generatoren abstürzen | erledigt: daten, `d0546c4` (zusammengeführt in `9d0fb66`) |
+| logik-8 | Kapitel 2.5 widerspricht sich bei Einweisung „Keine“ mit Protokoll | erledigt: texte, `e5545f7` (zusammengeführt in `44c5c7a`) |
+| logik-9 | Ein Testdatum in der Zukunft unterdrückt S6 | erledigt: regeln, `a355715` (zusammengeführt in `133f314`) |
+| logik-10 | Spalte „Frühestens löschen“: Aufbewahrung und Löschfrist um einen Tag verschieden | erledigt: regeln, `28e2916` (zusammengeführt in `133f314`) |
+| logik-12 | B9 zählt eine Prüfung vor dem Abtippen als Erfassungskontrolle | erledigt: regeln, `a355715` (zusammengeführt in `133f314`) |
+| logik-13 | B6-Ausnahme „auf Papier versandt“ gilt auch für Bücher und sonstige Unterlagen | erledigt: regeln, `a355715` (zusammengeführt in `133f314`) |
+| logik-14 | B6-Hinweis sagt „nur auf Papier“, obwohl digital abgelegt (widerspricht B5 und B3) | erledigt: regeln, `a355715` (zusammengeführt in `133f314`) |
+| logik-16 | Kapitel 3.3 nennt Kontrollen in einem Zweig „bei jedem Vorgang“ | erledigt: texte, `0665cc5` (zusammengeführt in `44c5c7a`) |
+| logik-17 | Wiederholung behauptet, alle Schritte liefen mindestens einmal | erledigt: texte, `0665cc5` (zusammengeführt in `44c5c7a`) |
+| logik-18 | Zugriffsschutz wird abgefragt, aber nie ausgegeben; mitgeltende Unterlagen sind nicht eintragbar | erledigt: angaben, `ba28266`, `69066dd` (zusammengeführt in `416eeb7`) |
+| logik-19 | Prüfsumme wird nie nachgerechnet und deckt das Diagramm (eingefrorener Prozess) nicht ab | erledigt: daten, `93614de` (zusammengeführt in `9d0fb66`) |
+| logik-21 | T1 und Verzeichnis C uneinig bei Maßnahmen aus Leerzeichen (nur über Datei) | erledigt: regeln, `a355715` (zusammengeführt in `133f314`) |
+| bedienung-0 | „Weiter“ führt ans Ende des nächsten Teilschritts | erledigt: bedienung, `d8a2e27` (zusammengeführt in `8e65461`) |
+| bedienung-1 | Häkchen „vollständig“ bei Teilschritten ohne jede Angabe | erledigt: regeln, `7ceb295` (zusammengeführt in `133f314`) |
+| bedienung-2 | „Beheben“ landet mitten in der Karte, die zu beantwortende Frage liegt außerhalb des Bilds | erledigt: bedienung, `d8a2e27` (zusammengeführt in `8e65461`) |
+| bedienung-3 | Fokus geht verloren, wenn Knöpfe verschwinden oder gesperrt werden | erledigt: bedienung, `d8a2e27` (zusammengeführt in `8e65461`) |
+| bedienung-4 | Zweite Freigabe am selben Tag: Die Vorgabe für „Gültig ab“ ist ungültig | erledigt: daten, `16d6e88` (zusammengeführt in `9d0fb66`) |
+| bedienung-5 | Meldung bei Unterlage ohne Namen erscheint außerhalb des Bilds | erledigt: bedienung, `d8a2e27` (zusammengeführt in `8e65461`) |
+| bedienung-6 | Fristen-Tabelle ist breiter als das Panel, das Löschdatum ist abgeschnitten | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| bedienung-7 | Kapitelkürzel „VD 3.2“ und „VVT B.3“ werden nirgends erklärt | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-8 | Lernhinweis „Aufbewahren und Löschen“: „Bis dahin“ verweist auf den falschen Zeitpunkt | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-9 | Vorschlag „+ Kunde“ als Empfänger direkt über dem Hinweis, der Kunde sei kein Empfänger | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-10 | DOCX-Knopf in der Versionsliste: Der sichtbare Text fehlt im zugänglichen Namen (axe serious) | erledigt: bedienung, `f02a45e` (zusammengeführt in `8e65461`) |
+| bedienung-11 | Fokusring der Reiter „Verfahrensdokumentation“ und „Verarbeitungsverzeichnis“ ist abgeschnitten | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+| bedienung-12 | Ungültige Zahlen werden still verworfen oder gekappt | erledigt: bedienung, `d8a2e27` (zusammengeführt in `8e65461`) |
+| bedienung-16 | Fachbegriffe und Abkürzungen ohne Erklärung | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-17 | Verschiedene Wörter für dasselbe | erledigt: regeln, `a355715`, `28e2916` (zusammengeführt in `133f314`) |
+| bedienung-18 | Einweisung „Keine“: Befund sagt „nicht festgelegt“, das Dokument widerspricht sich | erledigt: texte, `e5545f7` (zusammengeführt in `44c5c7a`) |
+| bedienung-19 | „Inhalt der Änderung“ ist mit der Kapitelliste vorbelegt | erledigt: daten, `16d6e88` (zusammengeführt in `9d0fb66`) |
+| bedienung-20 | Grammatikfehler: „In „Ordner Lieferscheine“ liegen 1 Unterlagen.“ | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-21 | „kann einer nötig sein“ ohne Bezugswort | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-22 | Dokumenttexte: doppelter Punkt, „bei offen“, Rollen ohne Artikel | erledigt: texte, `d378657` (zusammengeführt in `44c5c7a`) |
+| bedienung-23 | Überschriftenfolge springt in „Schutzmaßnahmen“ von h2 auf h4 (axe heading-order) | erledigt: bedienung, `c38c40c` (zusammengeführt in `8e65461`) |
+| bedienung-24 | Kontaktfelder des Datenschutzbeauftragten ohne Gruppe: doppelte Feldnamen | erledigt: bedienung, `f02a45e` (zusammengeführt in `8e65461`) |
+| bedienung-25 | Gleichlautende Knöpfe ohne Bezug | erledigt: bedienung, `f02a45e` (zusammengeführt in `8e65461`) |
+| bedienung-26 | Bei schmalem Fenster scrollt nur dieser Schritt waagerecht | erledigt: druck, `91fcf78` (zusammengeführt in `3d92f4e`) |
+
+Verworfen (kein Handlungsbedarf): abnahme-6, recht-13, recht-22, daten-6, logik-11, logik-15, logik-20, bedienung-13, bedienung-14, bedienung-15.
+
 ## Zusammenführen mit `main`
 
 `FORMAT_VERSION` ist unverändert 3; `compliance` ist ein optionales Feld am Projekt. Neue Dateien liegen in `src/compliance`, `src/ui/compliance`, `src/ui/schritte/DokumentierenSchritt.tsx` und `e2e/dokumentieren.spec.ts`.
@@ -99,9 +208,17 @@ Geänderte gemeinsame Dateien (alle Änderungen ergänzend):
 | `scripts/readme-bilder.mjs` | Bild `dokumente.png` |
 | `src/plattform/typen.ts`, `browser.ts`, `desktop.ts` | Phase 8: `DateiArt` `docx`, `speichereBytes`; `rufe` reicht Optionen (Kopfwerte) an `invoke` durch |
 | `src-tauri/src/lib.rs`, `build.rs`, `capabilities/default.json`, `permissions/autogenerated/speichern_unter_bytes.toml` | Phase 8: Befehl `speichern_unter_bytes`, Dialogablauf `waehle_ziel` für beide Speichern-Befehle, `schreibe(&[u8])`, Recht `allow-speichern-unter-bytes` |
-| `scripts/desktop-test.mjs` | Phase 8: drei Programmstarts, Compliance-Teil, CSP-Beobachtung, Start ohne Rücksicht auf alte Speicherstände, `PROZESSLOTSE_EXE` |
+| `scripts/desktop-test.mjs` | Phase 8: drei Programmstarts, Compliance-Teil, CSP-Beobachtung, Start ohne Rücksicht auf alte Speicherstände, `PROZESSLOTSE_EXE`; mit der Durchsicht die Prüfung, dass „Dokumentieren“ nachlädt |
 | `package.json`, `package-lock.json` | `docx` 9.15.3 (exakt), `fflate` 0.8.3 (dev) |
 | `README.md`, `docs/datenmodell.md`, `docs/fragenkatalog.md` | neue Abschnitte |
+| `src/App.tsx` (Durchsicht) | „Dokumentieren“ per `lazy` mit `Suspense`, Markierungen über `ui/compliance/nachladen.ts`; Startstand aus `ladeBrowserStand`, Leiste zum Browser-Speicher, Rückfrage beim Schließen ohne Sicherung, Meldung falscher Prüfsummen, Knopf „{n} markiert – zeigen“ |
+| `src/modell/speicher.ts` (Durchsicht) | `leseProjekt` wirft `ComplianceFormatfehler`; Browser-Teil mit Merkmal der Versionen, `ladeBrowserStand`, `browserRohdaten`, `verwirfBrowserRohdaten`, `DokumentInfo.veraltet` |
+| `src/ui/datei.ts`, `src/plattform/browser.ts` | Rückfrage „Nur den Prozess öffnen?“ bei beschädigten Compliance-Angaben |
+| `src/zustand.ts` | Rückzug einer Freigabe leert den Verlauf wie eine Freigabe |
+| `src/ui/Diagramm.tsx`, neu `src/ui/DiagrammDruck.tsx`, `src/ui/druckausschnitte.ts` | `DiagrammApi.zeige`/`zeigeErstes`; Druckinhalt der Anlage 9.1 mit Übersicht und Ausschnitten |
+| `src/ui/Eingaben.tsx` | `Auswahl` mit Prop `id` |
+| `src/ui/schritte/DokumentierenSchritt.tsx`, `VerbessernSchritt.tsx` | Sprünge für „Weiter“ und „Beheben“; Vergleich gestrichener Kontrollen mit dem Soll |
+| `src/styles.css` (Durchsicht) | Regeln am Dateiende: Prüfsumme, zurückgezogene Version, Browser-Hinweis, Sprungziel, leerer Teilschritt, Fristentabelle, Reiter, Druckausschnitte |
 
 Beim Zusammenführen beachten:
 
@@ -115,10 +232,14 @@ Beim Zusammenführen beachten:
 
 - 8.3: Der CI-Lauf steht aus; `windows.yml` (Rust-Tests, Debug-Build, Installer-Test) startet erst beim Push auf `main`.
 - Die echten Dialoge (Speichern unter für Word, Als PDF speichern) beantwortet im Desktop-Test die Testantwort; einmal von Hand durchklicken steht aus (Robin).
-- Word bricht in den schmalen Spalten von Tabelle 2.4 Wörter ohne Trennstrich um („Aufbewahru|ng“, „Datensa|tz“, „31.12.20|32“); der Inhalt ist vollständig. Abhilfe wäre eine kleinere Tabellenschrift in `docx.ts` (wie im Druck), nicht Teil von Phase 8.
+- ~~Word bricht in den schmalen Spalten von Tabelle 2.4 Wörter ohne Trennstrich um~~: behoben mit recht-8 (Tabellen in 9 pt, Spaltenbreiten nach Inhalt, `02850d1`).
 - Im Druck braucht die breiteste Tabelle des Beispiels 640 von 680 px. Sehr lange Wörter in eigenen Angaben können darüber hinausragen; Silbentrennung (`hyphens: auto`) beherrscht Edge hier nicht zuverlässig.
 - Der Menüpunkt „Datei > Als PDF speichern …“ des Programms druckt weiter den Bericht, auch aus dem Teilschritt „Dokumente“; dort gibt es dafür den eigenen Knopf.
 - 7.3 und 7.4: fachliche Durchsicht durch Steuerberatung und Datenschutz steht aus (Robin).
 - Abnahme der Word-Dateien in Word (Navigationsbereich) durch Robin steht aus; geprüft sind der Inhalt des Pakets und, mit 8.1, das Öffnen in Word 16 ohne Reparaturhinweis samt Formatvorlagen und PDF-Export.
-- Der Hauptteil der App wuchs von 446 KB auf 570 KB (gzip 170 KB), weil Lückenprüfung und Generatoren schon für die Bühne geladen werden. `docx` liegt in einem eigenen Teil (224 KB, gzip 66 KB) und wird erst beim Export geladen.
+- ~~Der Hauptteil der App wuchs auf 570 KB~~: Mit abnahme-11 lädt „Dokumentieren“ samt Lückenprüfung und Generatoren erst im Schritt; der Hauptteil wiegt nach dem Zusammenführen 463 kB (gzip 141 kB), ein Browsertest hält ihn unter 500 kB. `docx` liegt weiter in einem eigenen Teil (224 KB) und wird erst beim Export geladen.
 - Der Vergleich mit dem Mustertext deckt die Sätze ab, die im Lieferdienst vorkommen; seltene Varianten (z. B. Kapitel 5 mit Scannen) sind nicht abgeglichen.
+- recht-5: Entschieden (11.11.2026, Claude im Auftrag von Robin), umgesetzt noch nicht: Nur Entwürfe tragen „Vorlage – vor Verwendung prüfen lassen“; freigegebene Fassungen tragen in der Fußzeile Version, Freigabedatum und Seitenzahl und auf dem Deckblatt den Satz zur Verantwortung (siehe `compliance-entscheidungen.md`).
+- abnahme-4 (zwei Nachrichtenflüsse 10 px nebeneinander): wird in `main` bei der Linienführung behandelt.
+- Anlage 9.1 im Druck: In den Ausschnitten 2 bis n fehlen die Bahnnamen (Rollen), man muss zur Übersicht zurückblättern. Vorschlag aus dem Paket „druck“: Bahnnamen am linken Rand jedes Ausschnitts wiederholen.
+- Die Browsertests mit axe und die Zufallstests (300 Prozesse) liegen unter Last knapp am Zeitlimit; einzeln laufen sie grün.

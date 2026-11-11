@@ -1,6 +1,6 @@
 # Compliance-Doku: Entscheidungen und Annahmen
 
-Stand 11.11.2026 · gehört zu [`compliance-spezifikation.md`](compliance-spezifikation.md) (Abschnitt 10.2 und Phase 0)
+Stand 11.11.2026 (ergänzt um die Durchsicht vom 11.11.2026) · gehört zu [`compliance-spezifikation.md`](compliance-spezifikation.md) (Abschnitt 10.2 und Phase 0)
 
 Robin hat die offenen Fragen noch nicht beantwortet. Damit die Umsetzung weitergehen kann, gilt jeweils der Vorschlag der Spezifikation. Jede Zeile ist eine **Annahme, bis Robin entscheidet**; wo eine andere Antwort Arbeit nach sich zieht, steht das dabei.
 
@@ -76,3 +76,81 @@ Wo die Spezifikation offen war oder ein Detail nicht passte, gilt Folgendes. Auc
 | Datumseingaben | übernommen werden nur gültige Daten zwischen 1900 und 2199; Zwischenstände beim Tippen bleiben in der Eingabe | Chromium lässt im Jahresfeld bis zu sechs Ziffern zu |
 | Rückgängig | eine Freigabe leert den Rückgängig-Verlauf | Versionen dürfen weder geändert noch gelöscht werden (5.4) |
 | Kapitelvergleich | über kanonisches JSON | Eine Datei mit anders sortierten Schlüsseln ist keine fachliche Änderung. |
+
+## Durchsicht vom 11.11.2026
+
+Robin hat die Behebung der 82 bestätigten Funde freigegeben („Arbeite autonom und entscheide so, wie du es mir empfehlen würdest“). Wo ein Fund eine Auslegung brauchte, galt die folgende Entscheidung. Jede Zeile **gilt, bis Robin entscheidet**. Die Funde selbst und wo sie erledigt sind: [`compliance-stand.md`](compliance-stand.md), Abschnitt „Durchsicht vom 11.11.2026“.
+
+### Entschieden für Robin
+
+| Fund | Entscheidung (gilt, bis Robin entscheidet) |
+| --- | --- |
+| recht-5 | **Entscheidung vom 11.11.2026 (Claude im Auftrag von Robin), Umsetzung durch einen Nachfolger:** Nur Entwürfe tragen „Vorlage – vor Verwendung prüfen lassen“. Freigegebene Fassungen tragen in der Fußzeile Version, Freigabedatum und Seitenzahl, auf dem Deckblatt den Satz „aus einer Vorlage erstellt, Verantwortung für den Inhalt beim Unternehmen, Prüfung durch Steuerberatung bzw. Datenschutz empfohlen“ und optional „fachlich geprüft von … am …“ aus dem Freigabe-Dialog. Bis zur Umsetzung trägt jede Fassung den Vorlagenhinweis wie spezifiziert. |
+| abnahme-4 | Der Abstand paralleler Nachrichtenflüsse (zwei Linien 10 px nebeneinander) wird in `main` bei der Linienführung behandelt, nicht auf `compliance`. |
+| daten-3 | Die strenge Prüfung beim Laden bleibt. Scheitert nur der Compliance-Teil, fragt die App „Die Compliance-Angaben in „{Datei}“ sind beschädigt ({Feld}: {Fehler}). Nur den Prozess öffnen?“; „Ja“ öffnet den Prozess ohne Compliance-Teil als neues, ungespeichertes Dokument ohne Pfad. Eine Prüfsumme in Großbuchstaben wird still klein geschrieben (einzige stille Korrektur). |
+| daten-4, logik-19 | Prüfsummen werden nach dem Laden asynchron nachgerechnet und je Version angezeigt; der eingefrorene Prozess gehört mit in die Prüfsumme (`[prozess, verfahrensdoku, verzeichnis]`). Echte Freigaben gab es noch nicht, ein Übergang ist nicht nötig. |
+| daten-5, logik-2, bedienung-4 | „Gültig ab“ darf in der Vergangenheit liegen (bestehende Praxis dokumentieren), muss aber nach dem der letzten wirksamen Version liegen; mehr als 30 Tage nach dem Freigabetag Rückfrage, mehr als ein Jahr Fehler. Die Vorgabe ist immer zulässig. „Freigabe zurückziehen“ für die letzte Version, solange ihr „Gültig ab“ in der Zukunft liegt, mit Pflicht-Begründung; sie bleibt als „zurückgezogen“ sichtbar, Nummern werden nicht wiederverwendet. |
+| bedienung-19 | „Inhalt der Änderung“ ab Version 2 leer mit Platzhalter und Pflicht; die geänderten Kapitel stehen ausgeschrieben daneben und in ihrer eigenen Spalte. Version 1 bleibt „Erstfassung“. |
+| daten-0, -1, -2, -7, -9, logik-7 | Nie gehen still Daten verloren, und nie gilt ein falscher Stand als gespeichert: Versionen sind über ein Merkmal an das Projekt im Browser gebunden, nicht übernehmbare Rohdaten bleiben bis zur Entscheidung liegen, ein veralteter Stand öffnet als neues Dokument; Datumsfelder beim Laden zwischen 1900 und 2199. |
+| abnahme-1 | Anlage 9.1 im Druck: Übersicht auf einer Seite, danach Ausschnitte in lesbarem Maßstab mit 40 px Überlappung und „Ausschnitt n von m“, dazu der Satz, dass die BPMN-Datei das Diagramm in Originalgröße enthält. Flache, breite Diagramme stehen quer; gedreht wird das Bild selbst, damit Browser-Druck und Windows-Programm gleich aussehen. |
+| recht-8, recht-17 | DOCX: Tabellen in 9 pt mit Spaltenbreiten nach Inhalt, kein Umbruch mitten in Daten und Prüfsummen; Sprache de-DE. |
+| abnahme-3, recht-12, logik-17 | Der Satz zur Wiederholung steht als erste Zeile im Unterkapitel des ersten Schritts der Wiederholung und behauptet nicht, dass bedingte Schritte mindestens einmal laufen. |
+| logik-16 | Kapitel 3.3 nennt bei Kontrollen in Zweigen „wenn {Bedingung} (siehe 4.k)“ statt „bei jedem Vorgang“. |
+| logik-8, bedienung-18 | K6 bei Einweisung „Keine“: Titel „Keine Einweisung vorgesehen“, Text „Wer im Prozess mitarbeitet, sollte das Verfahren kennen. Wähle „Einmalig vor Beginn“, sobald jemand mitarbeitet.“; im Ein-Personen-Betrieb entfällt K6. Kapitel 2.5 „Eine Einweisung ist nicht vorgesehen.“, der Schalter „schriftlich festgehalten“ ist bei „Keine“ ausgeblendet. |
+| recht-4 | Je System mit Ablage zwei Fragen (Wiederfinden, Datenzugriff bei Außenprüfung auch nach Vertragsende oder Systemwechsel), daraus Kapitel 3.5; leere Angaben „offen“ mit Hinweis S8. |
+| recht-7 | Bei besonderen Kategorien Auswahl der Ausnahme nach Art. 9 Abs. 2 lit. a bis j (oder „offen“), Ausgabe in B.2 und B.3; ohne Ausnahme warnt D5. Nationale Grundlagen (BDSG) nur als Hinweis „mit dem Datenschutz klären“. |
+| logik-18, recht-3 | Zugriffsschutz je System in Kapitel 3.4 (Spalte) und Verzeichnis C.3; mitgeltende Unterlagen mit Name und Ablageort im Teilschritt „Dokumente“. |
+| logik-1 | Teilschritt „Unternehmen“, Abschnitt „Rollen im Ablauf“ mit Schalter „extern“ und Feld „Organisation“. |
+| recht-0 | Kaufleute (e. K., OHG, KG, GmbH, UG, GmbH & Co. KG, eG oder Gewinnermittlung „Bilanz“): beim Lieferschein ohne Buchungsfunktion „handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären“ und Hinweis B11; D7 erst über 6 Jahren. |
+| recht-20 | Satz unter der Fristentabelle: gilt nicht für Kredit-, Versicherungs- und Wertpapierinstitute (Art. 97 § 19a Abs. 3 EGAO, § 257 Abs. 4 HGB). |
+| recht-19 | Beispiel mit „Excel 2024 (Kaufversion)“ im lokalen Betrieb statt Microsoft 365; damit es bei 7 Befunden bleibt, bewahrt die Beispiel-GmbH den Lieferschein 6 Jahre auf. |
+| logik-13 | Die Ausnahme „elektronisch erstellt, auf Papier versandt“ gilt nur für Handels- und Geschäftsbriefe und Buchungsbelege (GoBD Rz. 120); Lieferscheine zählen bei B6 als Handelsbriefe. |
+| recht-1 | Neue Regel S7: Aufbewahrungspflichtige Unterlagen bei einem Dienstleister im Drittland brauchen eine Bewilligung des Finanzamts (§ 146 Abs. 2b AO, § 14b Abs. 5 UStG); Feld „Bewilligung des Finanzamts vom“; bei unbekanntem Standort ein Hinweis. EWR-Staaten außerhalb der EU erkennt S7 nicht, weil der Katalog nur „EU oder EWR“ kennt. |
+| bedienung-1 | Leere Teilschritte neutral (grauer Kreis, „, noch nichts eingetragen“), Häkchen erst mit Angaben; „, keine offenen Punkte“ statt „, vollständig“; „Lücken“ ohne Versprechen. Neue Warnregel B10 „Keine Unterlagen angelegt“. |
+| Regelnummern | Neue Regeln bekommen die nächste freie Nummer ihrer Reihe: B10 und S7 (regeln), B11 und S8 (angaben); zusammen 42 Regeln. |
+| bedienung-0, bedienung-2 | „Weiter“ springt an den Anfang des nächsten Teilschritts (Überschrift fokussiert); „Beheben“ bringt die Frage ins Bild und setzt den Fokus auf ihr Feld. |
+| bedienung-7 | Kapitelkürzel ausgeschrieben („Verfahrensdokumentation 3.2 und 4; Verzeichnis B.3“), überall mit `kapitelText` aus `dokument.ts`. |
+| bedienung-9 | Empfänger-Vorschläge mit Erklärung und ohne Vorschläge, die einer angehakten Betroffenengruppe entsprechen; Hinweis „Wer nur seine eigenen Daten bekommt, etwa der Kunde seine Rechnung, ist kein Empfänger.“ |
+| abnahme-5 | Im Bühnenkopf „{n} markiert – zeigen“. |
+| abnahme-11 | „Dokumentieren“ samt Lückenprüfung und Generatoren per Lazy-Import nachgeladen; kurz „Dokumentieren wird geladen …“. |
+
+### Annahmen der Pakete
+
+| Paket | Annahme (gilt, bis Robin entscheidet) |
+| --- | --- |
+| daten | Die Meldung `role="alert"` steht am Feld, ohne `aria-describedby` (der Fokus springt ins Feld). |
+| daten | Ist eine Version schon ein Jahr im Voraus freigegeben, gibt es kein zulässiges „Gültig ab“ mehr; der Hinweis rät zum Zurückziehen. |
+| daten | Druck und DOCX einer zurückgezogenen Version zeigen das eingefrorene Dokument ohne Rückzugsvermerk; nur das Banner beim Ansehen nennt ihn. |
+| daten | Ein Rückzug ändert die Prüfsumme nicht (Metadaten außerhalb des eingefrorenen Inhalts). |
+| angaben | Neue Empfänger starten mit Standort „Weiß nicht“ (löst D8 aus, bis gewählt). |
+| angaben | Lieferschein mit gewählter Frist: Die Löschfrist nennt § 147 Abs. 3 AO nicht mehr. |
+| angaben | Neue Felder sind optional, `COMPLIANCE_VERSION` und `FORMAT_VERSION` bleiben; sind sie vorhanden, prüft `validiereCompliance` sie streng. |
+| texte | Stilpunkte aus recht-23, bedienung-22 und recht-11 b/c umgesetzt, obwohl Gegenprüfer sie teils für spezifiziert hielten (billige Satzumbauten). |
+| texte | Leerer Firmenname: eigener Satz mit „offen“ statt „[offen: Name des Unternehmens]“; Turnus „Kein fester Turnus“ als „Turnus: kein fester.“; Frist 0 als „bei Entstehung bzw. Eingang“ bzw. „mit Ende des Kalenderjahres der Entstehung“. |
+| texte | „Rassische und ethnische Herkunft“ (Wortlaut Art. 9 Abs. 1 DSGVO), auch in D5. |
+| texte | „Revisionssicheres Archiv“ heißt im Dokument „Archiv mit Schutz vor Änderung und Löschung“; in der Oberfläche bleibt der Begriff, mit Erklärung. |
+| texte | Ältere Dateien ohne `ersetzendesScannen` laden mit „Weiß nicht“. Neue Sätze gegen den Mustertext BStBK/DStV geprüft: keiner teilt 4 Wörter in Folge. |
+| regeln | „Besondere Kategorien“, Reiter „Verarbeitungsverzeichnis“, „es“ in den Fragen und „Datenobjekt“ im Lernhinweis bleiben; „heikle Daten“ heißt „besonders geschützte Daten“. |
+| regeln | Quelle von B10: GoBD Rz. 151, 152; Art. 30 Abs. 1 lit. c DSGVO. |
+| regeln | Das Fristende bleibt der letzte Tag der Frist; „Frühestens löschen“ ist Fristende plus ein Tag, bei Aufbewahrung und Löschfrist gleich. |
+| druck | Ausschnitte nur, wenn die Übersicht kleiner als Maßstab 0,6 wäre; Ausschnitte im Maßstab 0,6 bis 0,8 (Lieferdienst: 5 Ausschnitte, Schrift 5,75 bis 6,3 pt). |
+| druck | Satz zur BPMN-Datei und geschützte Leerzeichen nur bei der Ausgabe (Ansicht, Druck, DOCX), nicht im Dokumenttext: Prüfsumme und Versionsvergleich bleiben unberührt. |
+| druck | Word-Silbentrennung nur, wenn ein Wort sonst nicht in seine Spalte passt (trennt dann auch Fließtext). |
+| bedienung | Kein Link „Zurück zu den Lücken“; nach „Beheben“ ist die Frage 2,5 s umrandet (`data-sprungziel`). |
+| bedienung | Ungültige Zahlen werden nicht gekappt; gespeichert bleibt der letzte gültige Wert, die Meldung steht am Feld. |
+| bedienung | Nur der Knopf „{n} markiert – zeigen“ im Bühnenkopf; Unterlagen-Befunde markieren nicht die erzeugende Aufgabe. |
+| bedienung | TLS ist im Erklärungssatz erklärt; der Maßnahmentext heißt weiter so (gespeicherte Texte). |
+
+### Beim Zusammenführen entschieden
+
+| Stelle | Auslegung (gilt, bis Robin entscheidet) |
+| --- | --- |
+| B8 und Kapitel 5 | Beide Pakete gelten: „Vernichtung offen“ und die erfragte eigene Verfahrensdokumentation (texte) sowie der Satz zu Jahresabschlüssen und Eröffnungsbilanz (regeln). In Kapitel 5 steht „Ausgenommen sind Jahresabschlüsse …“ direkt nach „… gilt das ersetzende Scannen“, im Befund vor „Liegt sie vor, wähle …“. |
+| Freigabe-Dialog | „Inhalt der Änderung“ bleibt ab Version 2 leer (bedienung-19 aus daten) statt mit „Geändert: …“ vorbelegt (bedienung); die ausgeschriebenen Kapitel stehen darunter. |
+| Feld „Benennung“ | volle Breite (druck) mit der Hilfe aus bedienung „Bleibt das Feld leer, steht hier der Name des Prozesses.“ |
+| Neue Unterlage | Das Namensfeld behält `id="ziel-datenobjekt"` (Ziel von B10) und bekommt die Meldung am Feld (bedienung). |
+| Revisionssicheres Archiv | Katalogeintrag mit Erklärung für die Oberfläche (bedienung) und eigenem Dokumenttext (texte). |
+| Speichergrenzen | nach dem Zusammenführen neu gemessen: Version 1 rund 35 000 Zeichen, je Version rund 215 mehr; Browser-Speicher voll bei rund 105 Versionen (Paket daten vor dem Zusammenführen: 115), Projektdatei 20 MiB bei rund 185. |
+| Prüfsummen-Meldung | Die Kopfzeile lädt `versionen.ts` erst, wenn Versionen da sind; sonst wäre der Hauptteil 508 statt 463 kB. |
+| `hatAngaben` | Rollen im Ablauf (extern oder Organisation) zählen bei „Unternehmen“, mitgeltende Unterlagen bei „Dokumente“, die Antwort zum ersetzenden Scannen bei „Belege und Daten“; Zugriffsschutz, Wiederfinden, Datenzugriff, Bewilligung und Art.-9-Ausnahme zählen schon mit den Angaben ihres Systems bzw. ihrer Unterlage. |
+| „Beheben“ | B10 Namensfeld von „Neue Unterlage“, B11 gewählte Frist, S7 Bewilligung bzw. Standort, S8 Wiederfinden bzw. Datenzugriff, D5 ohne Ausnahme deren Auswahl. |

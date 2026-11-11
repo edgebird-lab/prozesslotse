@@ -73,17 +73,18 @@ Der Schritt „Dokumentieren“ erzeugt aus dem Ist-Prozess zwei Dokumente, die 
 
 | Teilschritt | Fragt nach |
 | --- | --- |
-| Unternehmen | Verantwortlicher, Geschäftsleitung, Datenschutzbeauftragter (§ 38 BDSG), Verarbeitungstätigkeit; Übernahme aus einer anderen Projektdatei |
-| Belege und Daten | je Unterlage: Einordnung nach § 147 AO, Form, Ablage, Personenbezug, Rechtsgrundlage, Empfänger; Zweck der Verarbeitung |
-| Systeme und Dienstleister | Version, Betrieb, Standort, Vertrag zur Auftragsverarbeitung, Schutz vor Änderung, Datensicherung |
+| Unternehmen | Verantwortlicher, Geschäftsleitung, Datenschutzbeauftragter (§ 38 BDSG), Rollen im Ablauf (intern oder extern mit Organisation), Verarbeitungstätigkeit; Übernahme aus einer anderen Projektdatei |
+| Belege und Daten | je Unterlage: Einordnung nach § 147 AO, Form, Ablage, ersetzendes Scannen, Personenbezug, Rechtsgrundlage samt Ausnahme nach Art. 9 Abs. 2 DSGVO, Empfänger; Zweck der Verarbeitung |
+| Systeme und Dienstleister | Version, Betrieb, Standort (im Drittland mit Bewilligung des Finanzamts), Vertrag zur Auftragsverarbeitung, Schutz vor Änderung, Wiederfinden und Datenzugriff bei einer Außenprüfung, Datensicherung, Zugriffsschutz |
 | Aufbewahrung und Löschung | gesetzliche und gewählte Frist, frühestes Löschdatum, Löschfristen, wer löscht |
 | Kontrollen | Prüfungen und Freigaben mit Vier-Augen-Status, weitere Kontrollen, Einweisung |
 | Schutzmaßnahmen | sechs Bereiche nach Art. 32 Abs. 1 DSGVO mit Vorschlägen |
-| Lücken | 38 Regeln mit Quelle und „Beheben“, z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Dienstleister ohne AV-Vertrag |
-| Dokumente | Vorschau, Druck als PDF (im Programm auch ohne Druckdialog), Word-Datei, Freigabe und Versionsliste |
+| Lücken | 42 Regeln mit Quelle und „Beheben“ (springt auf die offene Frage), z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Vertrag zur Auftragsverarbeitung fehlt, Aufbewahrung im Drittland ohne Bewilligung |
+| Dokumente | Vorschau, Druck als PDF (im Programm auch ohne Druckdialog), Word-Datei, Freigabe, Versionsliste mit nachgerechneter Prüfsumme, Zurückziehen einer Freigabe, die noch nicht gilt, mitgeltende Unterlagen |
 
-- **Fristen** nach § 147 AO: Bücher und Organisationsunterlagen 10 Jahre, Buchungsbelege 8, Geschäftsbriefe und sonstige Unterlagen 6, jeweils ab Ende des Kalenderjahres; Lieferscheine ohne Buchungsfunktion bis zur Rechnung.
-- **Versionen:** Eine Freigabe friert Ist-Prozess und beide Dokumente ein, mit Gültig-ab-Datum, Freigabe, geänderten Kapiteln und SHA-256-Prüfsumme über kanonisches JSON. Ändert sich danach etwas Fachliches, nennt die Lückenprüfung die betroffenen Kapitel; nach 365 Tagen erinnert sie an die Überprüfung.
+- **Fristen** nach § 147 AO: Bücher und Organisationsunterlagen 10 Jahre, Buchungsbelege 8, Geschäftsbriefe und sonstige Unterlagen 6, jeweils ab Ende des Kalenderjahres; Lieferscheine ohne Buchungsfunktion bis zur Rechnung, bei Kaufleuten mit dem Hinweis auf 6 Jahre als möglicher Handelsbrief (§ 257 HGB).
+- **Versionen:** Eine Freigabe friert Ist-Prozess und beide Dokumente ein, mit Gültig-ab-Datum, Freigabe, Inhalt der Änderung, geänderten Kapiteln und SHA-256-Prüfsumme über kanonisches JSON von Prozess und Dokumenten. Nach dem Laden rechnet die App jede Prüfsumme nach und zeigt deutlich, wenn eine Version verändert wurde. Ändert sich danach etwas Fachliches, nennt die Lückenprüfung die betroffenen Kapitel; nach 365 Tagen erinnert sie an die Überprüfung. Eine Freigabe, deren „Gültig ab“ noch in der Zukunft liegt, lässt sich mit Begründung zurückziehen; sie bleibt sichtbar.
+- **Speichergrenzen:** Jede Version enthält die ganze Änderungshistorie. Beim Beispiel (eine Freigabe im Monat) ist der Browser-Speicher bei rund 105 Versionen voll; dann meldet die App das, und nur die Projektdatei sichert weiter. Die Projektdatei erreicht die 20-MiB-Grenze des Windows-Programms bei rund 185 Versionen. Nichts geht dabei still verloren: Ein Stand, der nicht vollständig in den Browser-Speicher passt, öffnet beim nächsten Start als neues, ungespeichertes Dokument.
 - **Vertraulich behandeln:** Die Angaben beschreiben Schwachstellen wie eine fehlende Datensicherung. Projektdatei und Ausgaben gehören nicht an Dritte; die BPMN-Datei lässt sich ohne Compliance-Angaben exportieren, und „Daten im Browser löschen“ leert den Browser-Speicher.
 - **Keine Rechts- oder Steuerberatung:** Beide Dokumente sind Vorlagen zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten, keine Rechts- oder Steuerberatung. Die App prüft, ob die Angaben vollständig und widerspruchsfrei sind, nicht, ob sie stimmen.
 
@@ -109,14 +110,14 @@ Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur 
 
 ## Qualität
 
-- 102 Unit-Tests und 6 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen und Ereignis-Entscheidungen): keine Überlappung, keine Kante durch fremde Elemente, Schema-Prüfung mit bpmn-moddle.
+- 496 Unit-Tests (371 davon zur Compliance-Doku) und 6 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen und Ereignis-Entscheidungen): keine Überlappung, keine Kante durch fremde Elemente, Schema-Prüfung mit bpmn-moddle.
 - Tokenspiel nach den Ausführungsregeln von BPMN 2.0: Für beide Beispiele und alle 300 Zufallsprozesse ist das exportierte Diagramm sound (keine Verklemmung, jeder Vorgang kann enden, kein toter Schritt), und die Häufigkeiten aus dem Tokenspiel stimmen mit den Formeln überein.
-- 15 Browsertests: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen, BPMN wieder öffnen, Rückfrage bei ungespeicherten Änderungen.
-- Desktop-Test am echten Programm (`npm run desktop:test`): 46 Prüfungen in drei Programmstarts, von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4; dazu die Compliance-Doku mit Freigabe, Word-Datei als Rohdaten (falsche Aufrufe werden abgelehnt), PDF der Verfahrensdokumentation und Wiederöffnen nach Neustart; sicherer Kontext, Web Crypto und keine Meldung der Content Security Policy.
+- 83 Browsertests, davon 17 zum Prozess: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen, BPMN wieder öffnen, Rückfrage bei ungespeicherten Änderungen.
+- Desktop-Test am echten Programm (`npm run desktop:test`): 48 Prüfungen in drei Programmstarts, von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4; dazu die Compliance-Doku mit Freigabe, Word-Datei als Rohdaten (falsche Aufrufe werden abgelehnt), PDF der Verfahrensdokumentation, Nachladen des Schritts „Dokumentieren“ und Wiederöffnen nach Neustart; sicherer Kontext, Web Crypto und keine Meldung der Content Security Policy.
 - Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
-- Compliance-Doku: 38 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft. 15 Browsertests decken Lücken und „Beheben“, Freigabe, Word-Datei, Druck (alle Tabellen passen auf A4), Tastatur und axe hell und dunkel ab.
+- Compliance-Doku: 42 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft; Speichern mit vollem oder beschädigtem Browser-Speicher, zwei Tabs und Prüfsummen. 66 Browsertests decken Lücken und „Beheben“, Freigabe und Rückzug, Word-Datei, Druck (alle Tabellen passen auf A4, Anlage 9.1 in lesbaren Ausschnitten), Fokus und Sprünge, schmale Fenster, Tastatur und axe hell und dunkel ab. Die 82 Funde einer unabhängigen Durchsicht sind behoben, jeder mit einem Test ([Stand](docs/compliance-stand.md#durchsicht-vom-11112026)).
 
 ## Entwickeln
 
