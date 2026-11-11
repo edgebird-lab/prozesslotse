@@ -237,9 +237,15 @@ describe('Daten D1–D9', () => {
     expect(regeln(pruefe(mitAngaben((c) => (c.datenobjekte.dob_rechnung.aufbewahrungJahre = 8))), 'D7')).toEqual([])
   })
 
-  it('D7 zählt beim Lieferschein jede gewählte Frist als länger', () => {
-    const b = finde(pruefe(mitAngaben((c) => (c.datenobjekte.dob_lieferschein.aufbewahrungJahre = 2))), 'compliance:D7:dob_lieferschein')
+  it('D7 zählt beim Lieferschein jede gewählte Frist als länger, bei Kaufleuten erst eine über 6 Jahren', () => {
+    const einzel = mitAngaben((c) => {
+      Object.assign(c.unternehmen, { rechtsform: 'einzelunternehmen', gewinnermittlung: 'euer' })
+      c.datenobjekte.dob_lieferschein.aufbewahrungJahre = 2
+    })
+    const b = finde(pruefe(einzel), 'compliance:D7:dob_lieferschein')
     expect(b?.text).toContain('„Lieferschein“ wird 2 Jahre statt bis zum Versand der Rechnung aufbewahrt.')
+    // Der Lieferdienst ist eine GmbH: 2 Jahre sind nicht länger als handelsrechtlich ggf. verlangt
+    expect(regeln(pruefe(mitAngaben((c) => (c.datenobjekte.dob_lieferschein.aufbewahrungJahre = 2))), 'D7')).toEqual([])
   })
 
   it('D8 meldet Empfänger ohne gesicherten Standort', () => {
@@ -262,8 +268,14 @@ describe('Daten D1–D9', () => {
 })
 
 describe('Systeme S1–S6', () => {
-  it('S1 fragt, wo das System läuft', () => {
-    expect(finde(pruefe(mitAngaben((c) => (c.systeme.med_excel.betrieb = null))), 'compliance:S1:med_excel')?.schwere).toBe('hinweis')
+  it('S1 fragt, wo das System läuft; mit Personenbezug als Warnung', () => {
+    expect(finde(pruefe(mitAngaben((c) => (c.systeme.med_excel.betrieb = null))), 'compliance:S1:med_excel')?.schwere).toBe('warnung')
+    const ohnePersonen = mitAngaben((c) => {
+      c.systeme.med_excel.betrieb = null
+      c.datenobjekte.dob_tourenliste.personenbezogen = false
+      c.datenobjekte.dob_bestellung.personenbezogen = false
+    })
+    expect(finde(pruefe(ohnePersonen), 'compliance:S1:med_excel')?.schwere).toBe('hinweis')
     expect(regeln(pruefe(), 'S1')).toEqual([])
   })
 

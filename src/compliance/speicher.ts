@@ -15,6 +15,7 @@ import { istIsoDatum, istPlausiblesDatum } from './datum'
 import {
   ABLAGEFORMEN,
   AUFBEWAHRUNGSARTEN,
+  AUSNAHMEN_ART9,
   AV_VERTRAEGE,
   BELEGFORMEN,
   BESONDERE_KATEGORIEN,
@@ -62,6 +63,11 @@ function text(o: Obj, feld: string, pfad: string): void {
 
 function texte(o: Obj, felder: string[], pfad: string): void {
   for (const f of felder) text(o, f, pfad)
+}
+
+/** Neuere Felder fehlen in älteren Dateien; sind sie da, gilt die strenge Prüfung. */
+function vorhanden(o: Obj, feld: string): boolean {
+  return o[feld] !== undefined
 }
 
 function textListe(o: Obj, feld: string, pfad: string): void {
@@ -177,6 +183,7 @@ function pruefeDatenobjekt(x: unknown, pfad: string, ablageorte: Set<Id>): void 
   wahrheit(d, 'strafrechtlich', pfad)
   werte(d, 'rechtsgrundlagen', RECHTSGRUNDLAGEN, pfad)
   text(d, 'berechtigtesInteresse', pfad)
+  if (vorhanden(d, 'ausnahmeArt9')) wert(d, 'ausnahmeArt9', AUSNAHMEN_ART9, pfad, true)
   if (d.loeschfrist !== null) pruefeFrist(d.loeschfrist, `${pfad}.loeschfrist`)
   const empfaenger = liste(d, 'externeEmpfaenger', pfad)
   eindeutigeIds(empfaenger, `${pfad}.externeEmpfaenger`)
@@ -192,6 +199,7 @@ function pruefeDatenobjekt(x: unknown, pfad: string, ablageorte: Set<Id>): void 
 function pruefeSystem(x: unknown, pfad: string): void {
   const s = obj(x, pfad)
   texte(s, ['hersteller', 'version', 'dienstleister', 'drittland', 'sicherungIntervall', 'zugriffsschutz'], pfad)
+  texte(s, ['wiederfinden', 'datenzugriff'].filter((f) => vorhanden(s, f)), pfad)
   datum(s, 'seit', pfad)
   wert(s, 'betrieb', BETRIEBE, pfad, true)
   wert(s, 'standort', STANDORTE, pfad)
@@ -353,6 +361,11 @@ export function validiereCompliance(x: unknown): asserts x is ComplianceProjekt 
     text(t, 'nichtZutreffend', `toms.${b}`)
   }
   textListe(x, 'mitgeltend', 'compliance')
+  if (vorhanden(x, 'mitgeltendeUnterlagen')) {
+    const mitgeltende = liste(x, 'mitgeltendeUnterlagen', 'compliance')
+    eindeutigeIds(mitgeltende, 'mitgeltendeUnterlagen')
+    mitgeltende.forEach((m, i) => texte(obj(m, `mitgeltendeUnterlagen.${i}`), ['name', 'ablageort'], `mitgeltendeUnterlagen.${i}`))
+  }
   pruefeVersionen(liste(x, 'versionen', 'compliance'))
   datum(x, 'zuletztGeprueft', 'compliance')
 }

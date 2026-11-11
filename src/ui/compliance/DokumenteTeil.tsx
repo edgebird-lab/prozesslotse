@@ -14,6 +14,7 @@ import { DokumentAnsicht } from './DokumentAnsicht'
 import { FreigabeDialog } from './FreigabeDialog'
 import { PRUEFSUMME_TEXT, usePruefsummen, type PruefsummenStand } from './pruefsummen'
 import { RueckzugDialog } from './RueckzugDialog'
+import { MitgeltendeListe } from './MitgeltendeListe'
 
 const REITER: { art: DokumentArt; name: string }[] = [
   { art: 'verfahrensdokumentation', name: 'Verfahrensdokumentation' },
@@ -162,6 +163,8 @@ export function DokumenteTeil() {
         zurueckziehbar={(v) => kannZurueckziehen(c, v, heute)}
         onZurueckziehen={setRueckzug}
       />
+
+      <MitgeltendeListe />
 
       <div className="reiter" role="tablist" aria-label="Dokument">
         {REITER.map((r, i) => (

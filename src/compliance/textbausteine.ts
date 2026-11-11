@@ -18,7 +18,7 @@ export function hinweisVerzeichnis(prozess: string, stand: IsoDatum, rechtsstand
 
 /** A.1, immer: Zuordnung nach GoBD Rz. 153 */
 export const AUFBAU_RZ153 =
-  'Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.4.'
+  'Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.5.'
 
 /** A.2, Kapitel 2.3 */
 export const GRUNDLAGEN =
@@ -35,6 +35,18 @@ export const FRISTEN_TABELLE: string[][] = [
   ['Sonstige Unterlagen, soweit sie für die Besteuerung von Bedeutung sind', '§ 147 Abs. 1 Nr. 5 AO', '6 Jahre'],
   ['Lieferscheine, die keine Buchungsbelege sind', '§ 147 Abs. 3 AO', 'bis zum Erhalt bzw. Versand der Rechnung'],
 ]
+
+/** Zusatz beim Lieferschein für Kaufleute (Kapitel 2.3, 2.4, 4.{n+1}, Verzeichnis B.3 und B.6) */
+export const LIEFERSCHEIN_HGB = 'handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären'
+
+/** Fristentabelle für Kapitel 2.3 als frische Kopie; bei Kaufleuten mit dem Zusatz zum Lieferschein. */
+export function fristenTabelle(kaufmann: boolean): string[][] {
+  return FRISTEN_TABELLE.map((z, i) => (kaufmann && i === FRISTEN_TABELLE.length - 1 ? [z[0], z[1], `${z[2]}; ${LIEFERSCHEIN_HGB}`] : [...z]))
+}
+
+/** Unter der Fristentabelle: Ausnahme für beaufsichtigte Institute (Art. 97 § 19a Abs. 3 EGAO, § 257 Abs. 4 Satz 2 HGB) */
+export const FRISTEN_INSTITUTE =
+  'Ausnahme: Für Kredit- und Finanzdienstleistungsinstitute, Versicherungsunternehmen und Wertpapierinstitute gelten für Buchungsbelege weiter 10 Jahre (Art. 97 § 19a Abs. 3 EGAO, § 257 Abs. 4 Satz 2 HGB).'
 
 /** A.3: Reihenfolge der 13 Anforderungen wie im Muster (Ziff. 2.3), Erklärungen eigene Kurzfassungen */
 export const KRITERIEN: [string, string][] = [
@@ -62,6 +74,10 @@ export const DATENSCHUTZ =
   'Zugriff auf die Unterlagen haben nur berechtigte Personen, vom Entstehen bis zur Vernichtung. Wann vernichtet und gelöscht wird, regelt das letzte Unterkapitel von Kapitel 4. Die Schutzmaßnahmen im Einzelnen nennt das Verzeichnis von Verarbeitungstätigkeiten in Abschnitt C.'
 
 export const SYSTEMWECHSEL = 'Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.'
+
+/** Kapitel 3.5 vor der Tabelle je System: was verlangt ist, ohne zuzusichern, dass es erfüllt ist */
+export const DATENZUGRIFF =
+  'Aufbewahrte Unterlagen müssen bis zum Ende der Frist eindeutig wiederzufinden, unverzüglich lesbar zu machen und maschinell auswertbar sein. Bei einer Außenprüfung kann die Finanzverwaltung die Daten im System einsehen, Auswertungen nach ihren Vorgaben verlangen oder die Daten in einem maschinell auswertbaren Format anfordern, auch wenn sie bei einem Dienstleister liegen (§ 147 Abs. 2, 5 und 6 AO; GoBD Rz. 152, 156–159).'
 
 export const HISTORIE = 'Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.'
 

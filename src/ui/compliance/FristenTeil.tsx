@@ -1,6 +1,6 @@
 import { angaben } from '../../compliance/ableitung'
 import { formatiereDatum, jahrVon } from '../../compliance/datum'
-import { fristEnde, laengerAlsVorgeschrieben, mindestJahre, vernichtungAb, wirksameJahre } from '../../compliance/fristen'
+import { fristEnde, istKaufmann, laengerAlsVorgeschrieben, mindestJahre, vernichtungAb, wirksameJahre } from '../../compliance/fristen'
 import { AUFBEWAHRUNGSARTEN, FRIST_BEGINNE, istPflichtig, LOESCH_TURNUS, neueFrist, textVon, ZEITEINHEITEN } from '../../compliance/standard'
 import type { DatenobjektAngaben, Frist, IsoDatum } from '../../compliance/typen'
 import { unterlagenNachEntstehung } from '../../compliance/verfahrensdoku'
@@ -35,7 +35,7 @@ export function FristenTeil() {
   const setzeFrist = (id: Id, f: Frist | null, feld: string) => setze(id, { loeschfrist: f }, `frist.${feld}`)
   const pflichtig = objekte.filter((o) => istPflichtig(o.d.aufbewahrungsart))
   const loeschen = objekte.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true)
-  const laenger = objekte.some((o) => laengerAlsVorgeschrieben(o.d))
+  const laenger = objekte.some((o) => laengerAlsVorgeschrieben(o.d, istKaufmann(c.unternehmen)))
   const l = c.loeschung
 
   return (

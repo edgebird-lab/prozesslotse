@@ -157,6 +157,25 @@ function SystemKarte({ m }: { m: Medium }) {
       {ablage.length > 0 && (
         <KatalogAuswahl label="Wie sind aufbewahrte Unterlagen vor Änderung geschützt?" katalog={UNVERAENDERBARKEIT} wert={s.unveraenderbarkeit} spalten={2} onAendern={(unveraenderbarkeit) => setze({ unveraenderbarkeit }, 'unveraenderbar')} />
       )}
+      {ablage.length > 0 && (
+        <>
+          <TextFeld
+            label="Wie findet man eine Unterlage wieder?"
+            platzhalter="z. B. Suche nach Rechnungs- oder Kundennummer"
+            hilfe="Ordnungsmerkmal, über das jede aufbewahrte Unterlage eindeutig zu finden ist."
+            wert={s.wiederfinden ?? ''}
+            onAendern={(wiederfinden) => setze({ wiederfinden }, 'wiederfinden')}
+          />
+          <TextFeld
+            label="Wie bekommt die Finanzverwaltung bei einer Außenprüfung Zugriff auf die Daten, auch nach Vertragsende oder Systemwechsel?"
+            mehrzeilig
+            platzhalter="z. B. Export aller Belege und Buchungsdaten als CSV und PDF"
+            hilfe="Etwa Einsicht im System, Auswertung nach Vorgaben der Prüfer oder Übergabe in einem maschinell auswertbaren Format (§ 147 Abs. 6 AO)."
+            wert={s.datenzugriff ?? ''}
+            onAendern={(datenzugriff) => setze({ datenzugriff }, 'datenzugriff')}
+          />
+        </>
+      )}
       <KatalogAuswahl label="Wie werden die Daten gesichert?" katalog={SICHERUNGEN} wert={s.sicherung} spalten={3} onAendern={(sicherung) => setze({ sicherung }, 'sicherung')} />
       {(s.sicherung === 'manuell' || s.sicherung === 'automatisch' || s.sicherung === 'anbieter') && (
         <div className="feldreihe">

@@ -78,12 +78,14 @@ export function complianceLieferdienst(): ComplianceProjekt {
         datenkategorien: ['kontakt', 'vertrag'],
         rechtsgrundlagen: ['vertrag', 'rechtspflicht'],
       }),
+      // Die GmbH ist Kaufmann: Der quittierte Lieferschein wird als möglicher Handelsbrief 6 Jahre aufbewahrt (§ 257 HGB)
       dob_lieferschein: objekt({
         aufbewahrungsart: 'lieferschein',
         form: 'papier',
         richtung: 'ausgang',
         ablageSpeicherIds: ['dsp_ordner'],
         ablageform: 'original',
+        aufbewahrungJahre: 6,
         datenkategorien: ['kontakt', 'vertrag'],
         rechtsgrundlagen: ['vertrag'],
       }),
@@ -109,15 +111,20 @@ export function complianceLieferdienst(): ComplianceProjekt {
         avVertrag: 'nein',
         unveraenderbarkeit: 'protokolliert',
         sicherung: 'anbieter',
+        zugriffsschutz: 'eigenes Konto je Person, Rechte nach Rolle',
+        wiederfinden: 'Suche nach Rechnungs-, Bestell- oder Kundennummer',
+        datenzugriff: 'Export aller Rechnungen und Buchungsdaten als CSV und PDF; bei Vertragsende Gesamtexport nach Vertrag',
       }),
+      // Kaufversion im lokalen Betrieb: kein Dienstleister, Version eindeutig (GoBD Rz. 154)
       med_excel: system({
         hersteller: 'Microsoft',
-        version: 'Microsoft 365',
-        seit: '2023-01-01',
+        version: 'Excel 2024 (Kaufversion)',
+        seit: '2025-01-01',
         betrieb: 'lokal',
         sicherung: 'automatisch',
         sicherungIntervall: 'täglich',
         wiederherstellungGetestet: '2026-06-30',
+        zugriffsschutz: 'eigenes Windows-Konto, Ordner nur für die Disposition',
       }),
     },
     kontrollen: {

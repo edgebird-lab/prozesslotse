@@ -10,7 +10,27 @@
  */
 import { addiereJahre, addiereMonate, addiereTage, formatiereDatum, jahrVon } from './datum'
 import { AUFBEWAHRUNGSARTEN, istPflichtig, ZEITEINHEITEN } from './standard'
-import type { Aufbewahrungsart, DatenobjektAngaben, Frist, IsoDatum, VersionKopf } from './typen'
+import { LIEFERSCHEIN_HGB } from './textbausteine'
+import type { Aufbewahrungsart, DatenobjektAngaben, Frist, IsoDatum, Rechtsform, Unternehmen, VersionKopf } from './typen'
+
+/** Frist für Handelsbriefe nach § 257 Abs. 4 HGB */
+export const HANDELSBRIEF_JAHRE = 6
+
+/** Rechtsformen, die stets Kaufleute sind: eingetragener Kaufmann, Handelsgesellschaften, Genossenschaft. */
+const KAUFLEUTE: ReadonlySet<Rechtsform> = new Set<Rechtsform>(['ek', 'ohg', 'kg', 'gmbh', 'ug', 'gmbh_co_kg', 'eg'])
+
+/** Kaufmann im Sinne des HGB: nach der Rechtsform oder, als Annahme, bei Gewinnermittlung durch Bilanz. */
+export function istKaufmann(u: Pick<Unternehmen, 'rechtsform' | 'gewinnermittlung'>): boolean {
+  return (u.rechtsform !== null && KAUFLEUTE.has(u.rechtsform)) || u.gewinnermittlung === 'bilanz'
+}
+
+/**
+ * Lieferschein eines Kaufmanns ohne gewählte Frist von mindestens 6 Jahren: Ist er ein Handelsbrief,
+ * verlangt § 257 HGB 6 Jahre, auch wenn die AO nur „bis zur Rechnung“ verlangt (Hinweis B11).
+ */
+export function lieferscheinHgb(d: DatenobjektAngaben, kaufmann: boolean): boolean {
+  return kaufmann && d.aufbewahrungsart === 'lieferschein' && (d.aufbewahrungJahre === null || d.aufbewahrungJahre < HANDELSBRIEF_JAHRE)
+}
 
 /** Gesetzliche Mindestfrist in Jahren; null bei Lieferschein, nicht pflichtig oder unklar. */
 export function mindestJahre(art: Aufbewahrungsart): number | null {
@@ -87,18 +107,27 @@ export function beispielBis(d: DatenobjektAngaben, bezugsjahr: number): string {
   return n === null ? '–' : `bis ${formatiereDatum(aufbewahrungBis(bezugsjahr, n))}`
 }
 
-/** Löschfrist im Verzeichnis (Art. 30 Abs. 1 lit. f DSGVO): bei pflichtigen Unterlagen das Ende der Aufbewahrung. */
-export function loeschText(d: DatenobjektAngaben): string {
-  if (d.aufbewahrungsart === 'lieferschein') return `${aufbewahrungText(d)} (§ 147 Abs. 3 AO)`
+/**
+ * Löschfrist im Verzeichnis (Art. 30 Abs. 1 lit. f DSGVO): bei pflichtigen Unterlagen das Ende der Aufbewahrung.
+ * Beim Lieferschein trägt § 147 Abs. 3 AO nur „bis zur Rechnung“; eine gewählte Frist steht ohne diese Fundstelle.
+ */
+export function loeschText(d: DatenobjektAngaben, kaufmann = false): string {
+  if (d.aufbewahrungsart === 'lieferschein') {
+    const hgb = lieferscheinHgb(d, kaufmann) ? `; ${LIEFERSCHEIN_HGB}` : ''
+    return d.aufbewahrungJahre === null ? `${aufbewahrungText(d)} (§ 147 Abs. 3 AO)${hgb}` : `nach Ablauf der Aufbewahrung: ${aufbewahrungText(d)}${hgb}`
+  }
   if (istPflichtig(d.aufbewahrungsart)) return `nach Ablauf der Aufbewahrung: ${aufbewahrungText(d)} (§ 147 AO)`
   if (d.aufbewahrungsart === 'keine') return d.loeschfrist ? fristText(d.loeschfrist) : 'offen'
   return 'offen'
 }
 
-/** Wird länger aufbewahrt als vorgeschrieben? Beim Lieferschein zählt jede gewählte Frist als länger (Regel D7). */
-export function laengerAlsVorgeschrieben(d: DatenobjektAngaben): boolean {
+/**
+ * Wird länger aufbewahrt als vorgeschrieben? Beim Lieferschein zählt jede gewählte Frist als länger (Regel D7),
+ * bei Kaufleuten erst eine über 6 Jahren, weil er als Handelsbrief so lange aufzubewahren sein kann (§ 257 HGB).
+ */
+export function laengerAlsVorgeschrieben(d: DatenobjektAngaben, kaufmann = false): boolean {
   if (d.aufbewahrungJahre === null) return false
-  if (d.aufbewahrungsart === 'lieferschein') return true
+  if (d.aufbewahrungsart === 'lieferschein') return !kaufmann || d.aufbewahrungJahre > HANDELSBRIEF_JAHRE
   const min = mindestJahre(d.aufbewahrungsart)
   return min !== null && d.aufbewahrungJahre > min
 }
