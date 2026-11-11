@@ -11,6 +11,7 @@ import {
   angaben,
   aufzaehlung,
   entstehtIn,
+  hatPersonenbezug,
   kontext,
   kontrollAngaben,
   mitDienstleister,
@@ -307,7 +308,15 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       ['System', 'Schutz vor Änderung', 'Datensicherung', 'Intervall', 'Rücksicherung getestet'],
       systeme.map((m) => {
         const s = systemAngaben(c, m.id)
-        return [m.name.trim() || 'Unbenanntes System', textVon(UNVERAENDERBARKEIT, s.unveraenderbarkeit, 'dok'), textVon(SICHERUNGEN, s.sicherung, 'dok'), s.sicherungIntervall.trim() || '–', s.wiederherstellungGetestet ? 'ja' : 'nein']
+        // Intervall und Test fragt die Oberfläche nur bei eingerichteter Sicherung ab; ausgeblendete Altangaben zählen nicht
+        const gesichert = s.sicherung === 'manuell' || s.sicherung === 'automatisch' || s.sicherung === 'anbieter'
+        return [
+          m.name.trim() || 'Unbenanntes System',
+          textVon(UNVERAENDERBARKEIT, s.unveraenderbarkeit, 'dok'),
+          textVon(SICHERUNGEN, s.sicherung, 'dok'),
+          (gesichert && s.sicherungIntervall.trim()) || '–',
+          gesichert && s.wiederherstellungGetestet ? 'ja' : 'nein',
+        ]
       }),
     )
   }
@@ -351,7 +360,8 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
     ...(scanDoku ? [`Verfahrensdokumentation zum ersetzenden Scannen, Stand ${c.ersetzendesScannen.stand ? formatiereDatum(c.ersetzendesScannen.stand) : 'offen'}`] : []),
     ...systeme
       .map((m) => ({ m, s: systemAngaben(c, m.id) }))
-      .filter(({ s }) => s.avVertrag === 'ja')
+      // nur, wenn die Frage nach dem Vertrag gestellt wird (wie S2); ausgeblendete Altangaben zählen nicht
+      .filter(({ m, s }) => mitDienstleister(s) && hatPersonenbezug(k, m.id) && s.auftragsverarbeitung !== false && s.avVertrag === 'ja')
       .map(({ m, s }) => `Vertrag zur Auftragsverarbeitung mit ${s.dienstleister.trim() || s.hersteller.trim() || `dem Anbieter von „${m.name.trim()}“`} vom ${s.avVertragVom ? formatiereDatum(s.avVertragVom) : 'offen'}`),
     ...c.mitgeltend.map((x) => x.trim()).filter(Boolean),
   ])
