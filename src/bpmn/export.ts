@@ -238,8 +238,9 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
     const mf = r.mehrfach ? findeBlock(p, r.blockId)?.block : undefined
     const text = mf?.typ === 'mehrfach' ? doku(mehrfachDoku(p, mf), `${e}  `) : doku(r.doku ?? '', `${e}  `)
     if (r.art === 'adhoc') {
-      // Ad-hoc: eine Person, ein Zweig nach dem anderen, fertig, wenn jeder Zweig erledigt ist
-      const bedingung = `${e}  <bpmn:completionCondition xsi:type="bpmn:tFormalExpression">alle Zweige erledigt</bpmn:completionCondition>\n`
+      // Ad-hoc: eine Person, ein Zweig nach dem anderen, fertig, wenn jeder Zweig erledigt ist. Die Bedingung ist Text in
+      // natürlicher Sprache, also ein einfacher Ausdruck (tExpression); ein formaler Ausdruck wäre ohne Angabe der Sprache XPath.
+      const bedingung = `${e}  <bpmn:completionCondition>alle Zweige erledigt</bpmn:completionCondition>\n`
       return `${e}<bpmn:adHocSubProcess id="${r.id}"${attrName(r.name)} ordering="Sequential">\n${text}${flussRefs}${ebene(r.id, `${e}  `)}${bedingung}${e}</bpmn:adHocSubProcess>\n`
     }
     return `${e}<bpmn:subProcess id="${r.id}"${attrName(r.name)}>\n${text}${flussRefs}${mehrfachXml(r.mehrfach, `${e}  `)}${ebene(r.id, `${e}  `)}${e}</bpmn:subProcess>\n`

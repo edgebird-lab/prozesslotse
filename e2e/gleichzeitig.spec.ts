@@ -109,7 +109,7 @@ test('legt „in beliebiger Reihenfolge“ mit einem Ende in einem Zweig an', as
   // BPMN-Export: Ad-hoc-Teilprozess, eine Aktivität nach der anderen, fertig, wenn alle erledigt sind
   const xml = await exportiereBpmn(page)
   expect(xml).toMatch(/<bpmn:adHocSubProcess id="par_[a-z0-9]+" name="In beliebiger Reihenfolge" ordering="Sequential">/)
-  expect(xml).toContain('<bpmn:completionCondition xsi:type="bpmn:tFormalExpression">alle Zweige erledigt</bpmn:completionCondition>')
+  expect(xml).toContain('<bpmn:completionCondition>alle Zweige erledigt</bpmn:completionCondition>')
   expect(xml).toMatch(/<bpmn:subProcess id="seq_[a-z0-9]+" name="Zweig 1">/)
 
   // Prüfen: keine Fehler; die Reihenfolge der Liste zählt für die Rechnung

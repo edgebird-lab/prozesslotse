@@ -348,6 +348,8 @@ describe('Arten von Gleichzeitig: BPMN', () => {
     expect(adhoc.$type).toBe('bpmn:AdHocSubProcess')
     expect(adhoc.ordering).toBe('Sequential')
     expect(adhoc.completionCondition?.body).toBe('alle Zweige erledigt')
+    // natürliche Sprache: einfacher Ausdruck, kein formaler (der wäre ohne Angabe der Sprache XPath)
+    expect((adhoc.completionCondition as unknown as { $type: string }).$type).toBe('bpmn:Expression')
     // je Zweig genau eine Aktivität, kein Sequenzfluss, kein Start und kein Ende direkt darin
     expect(kinder(adhoc).map((e) => e.$type).sort()).toEqual(['bpmn:SubProcess', 'bpmn:Task', 'bpmn:Task'].sort())
     const zweig = kinder(adhoc).find((e) => e.$type === 'bpmn:SubProcess') as MitDefinition & { name: string }
