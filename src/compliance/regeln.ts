@@ -1,5 +1,5 @@
 /**
- * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 38 Regeln.
+ * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 39 Regeln.
  * Die App prüft nicht, ob die Angaben stimmen, sondern ob sie vollständig und
  * widerspruchsfrei sind. Befunde sind Hinweise zum Prüfen und Klären, keine
  * Rechtsauskunft. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7).
@@ -284,14 +284,16 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
   }
   for (const o of objekte) {
     if (o.d.form === 'papier' && o.d.ablageform === 'scan' && o.d.originalVernichtet === true) {
+      // Abschlüsse und Eröffnungsbilanz dürfen nicht nur als Wiedergabe aufbewahrt werden
+      const buch = o.d.aufbewahrungsart === 'buecher'
       add({
         regel: 'B8',
         id: o.id,
         teilschritt: 'belege',
         schwere: 'hinweis',
         titel: 'Ersetzendes Scannen dokumentieren',
-        text: `„${o.name}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.`,
-        quelle: 'GoBD Rz. 136',
+        text: `„${o.name}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.${buch ? ' Jahresabschlüsse und Eröffnungsbilanz sind im Original aufzubewahren.' : ''}`,
+        quelle: buch ? 'GoBD Rz. 136, 140; § 147 Abs. 2 AO; § 257 Abs. 3 HGB' : 'GoBD Rz. 136',
         ziel: { art: 'datenobjekt', id: o.id },
       })
     }
@@ -552,6 +554,39 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
       quelle: 'Art. 32 Abs. 1 lit. c, d DSGVO',
       ziel: { art: 'system', id: m.id },
     })
+  }
+  // Steuerlich: Bücher, Aufzeichnungen und Rechnungen elektronisch außerhalb der EU nur mit Bewilligung des Finanzamts,
+  // unabhängig vom Personenbezug. Die Kataloge kennen nur „EU oder EWR“; EWR-Staaten außerhalb der EU fängt S7 nicht ab.
+  for (const { m, s, name } of systeme) {
+    if (!mitDienstleister(s) || (s.standort !== 'drittland' && s.standort !== 'unbekannt')) continue
+    const ablage = ablageVon(k, m.id)
+    if (ablage.length === 0 || (s.standort === 'drittland' && s.bewilligungVom)) continue
+    const was = aufzaehlung(ablage.map((id) => objektName(k, id)))
+    const land = s.drittland.trim()
+    const quelle = '§ 146 Abs. 2, 2b AO; § 14b Abs. 5 UStG'
+    add(
+      s.standort === 'drittland'
+        ? {
+            regel: 'S7',
+            id: m.id,
+            teilschritt: 'systeme',
+            schwere: 'warnung',
+            titel: 'Aufbewahrung im Drittland ohne Bewilligung',
+            text: `„${name}“ bewahrt ${was} ${land ? `im Drittland (${land})` : 'in einem Drittland'} auf. Elektronische Bücher, Aufzeichnungen und Rechnungen dürfen außerhalb der EU nur mit Bewilligung des Finanzamts aufbewahrt werden. Mit der Steuerberatung klären und das Datum der Bewilligung eintragen.`,
+            quelle,
+            ziel: { art: 'system', id: m.id },
+          }
+        : {
+            regel: 'S7',
+            id: m.id,
+            teilschritt: 'systeme',
+            schwere: 'hinweis',
+            titel: 'Ort der Aufbewahrung unklar',
+            text: `„${name}“ bewahrt ${was} auf, aber der Ort der Verarbeitung ist nicht bekannt. Liegen die Daten außerhalb der EU, braucht es eine Bewilligung des Finanzamts.`,
+            quelle,
+            ziel: { art: 'system', id: m.id },
+          },
+    )
   }
 }
 

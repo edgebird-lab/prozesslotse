@@ -179,6 +179,65 @@ describe('logik-21: Maßnahmen nur aus Leerzeichen', () => {
   })
 })
 
+describe('recht-1: aufbewahrungspflichtige Unterlagen außerhalb der EU (§ 146 Abs. 2b AO)', () => {
+  const imDrittland = (werte: Partial<SystemAngaben> = {}) =>
+    warenwirtschaft({ standort: 'drittland', drittland: 'USA', garantie: 'standardvertragsklauseln', avVertrag: 'ja', avVertragVom: '2025-01-15', ...werte })
+
+  it('S7 warnt, solange keine Bewilligung des Finanzamts eingetragen ist', () => {
+    const befunde = pruefe(imDrittland())
+    const b = finde(befunde, 'compliance:S7:med_erp')
+    expect(b?.schwere).toBe('warnung')
+    expect(b?.teilschritt).toBe('systeme')
+    expect(b?.titel).toBe('Aufbewahrung im Drittland ohne Bewilligung')
+    expect(b?.text).toBe(
+      '„Warenwirtschaft“ bewahrt „Bestellung“ und „Ausgangsrechnung“ im Drittland (USA) auf. Elektronische Bücher, Aufzeichnungen und Rechnungen dürfen außerhalb der EU nur mit Bewilligung des Finanzamts aufbewahrt werden. Mit der Steuerberatung klären und das Datum der Bewilligung eintragen.',
+    )
+    expect(b?.quelle).toBe('§ 146 Abs. 2, 2b AO; § 14b Abs. 5 UStG')
+    expect(b?.ziel).toEqual({ art: 'system', id: 'med_erp' })
+    // Datenschutz ist sauber gelöst: S7 ist die einzige Meldung zum System
+    expect(befunde.filter((x) => x.schluessel.endsWith(':med_erp') && x.schwere !== 'hinweis').map((x) => x.regel)).toEqual(['S7'])
+    expect(regeln(pruefe(imDrittland({ bewilligungVom: '2026-02-01' })), 'S7')).toEqual([])
+  })
+
+  it('S7 gilt auch ohne Personenbezug und ohne Ländernamen', () => {
+    const ohnePersonen = imDrittland({ drittland: '' })
+    for (const d of Object.values(ohnePersonen.datenobjekte)) d.personenbezogen = false
+    expect(finde(pruefe(ohnePersonen), 'compliance:S7:med_erp')?.text).toContain('„Warenwirtschaft“ bewahrt „Bestellung“ und „Ausgangsrechnung“ in einem Drittland auf.')
+  })
+
+  it('S7 fragt bei unbekanntem Standort nach, als Hinweis', () => {
+    const b = finde(pruefe(warenwirtschaft({ standort: 'unbekannt' })), 'compliance:S7:med_erp')
+    expect(b?.schwere).toBe('hinweis')
+    expect(b?.titel).toBe('Ort der Aufbewahrung unklar')
+    expect(b?.text).toBe('„Warenwirtschaft“ bewahrt „Bestellung“ und „Ausgangsrechnung“ auf, aber der Ort der Verarbeitung ist nicht bekannt. Liegen die Daten außerhalb der EU, braucht es eine Bewilligung des Finanzamts.')
+  })
+
+  it('kein S7 in der EU, ohne aufbewahrungspflichtige Ablage oder auf eigenen Geräten', () => {
+    expect(regeln(pruefe(), 'S7')).toEqual([])
+    expect(regeln(pruefe(warenwirtschaft({ standort: 'deutschland' })), 'S7')).toEqual([])
+    const ohneAblage = imDrittland()
+    for (const d of Object.values(ohneAblage.datenobjekte)) d.ablageSpeicherIds = []
+    expect(regeln(pruefe(ohneAblage), 'S7')).toEqual([])
+    // ausgeblendeter alter Standort zählt nicht
+    expect(regeln(pruefe(imDrittland({ betrieb: 'lokal' })), 'S7')).toEqual([])
+  })
+})
+
+describe('recht-10: Jahresabschluss und Eröffnungsbilanz im Original', () => {
+  const gescannt = (art: Aufbewahrungsart) => mitAngaben((c) => Object.assign(c.datenobjekte.dob_lieferschein, { aufbewahrungsart: art, ablageform: 'scan', originalVernichtet: true }))
+
+  it('B8 nennt die Ausnahme bei Büchern und Abschlüssen', () => {
+    const b = finde(pruefe(gescannt('buecher')), 'compliance:B8:dob_lieferschein')
+    expect(b?.text).toBe(
+      '„Lieferschein“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV. Jahresabschlüsse und Eröffnungsbilanz sind im Original aufzubewahren.',
+    )
+    expect(b?.quelle).toBe('GoBD Rz. 136, 140; § 147 Abs. 2 AO; § 257 Abs. 3 HGB')
+    const sonst = finde(pruefe(gescannt('lieferschein')), 'compliance:B8:dob_lieferschein')
+    expect(sonst?.text).not.toContain('Jahresabschlüsse')
+    expect(sonst?.quelle).toBe('GoBD Rz. 136')
+  })
+})
+
 describe('recht-21: Länder ohne Artikel in D8 und S3', () => {
   it('D8 setzt das Land in Klammern hinter „Drittland“', () => {
     expect(finde(pruefe(empfaenger({ standort: 'drittland', drittland: 'Schweiz', garantie: null, name: 'Beispiel AG' })), 'compliance:D8:emp_steuerberatung')?.text).toBe(

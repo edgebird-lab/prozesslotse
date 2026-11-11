@@ -10,7 +10,7 @@ Die Erweiterung erzeugt aus dem modellierten Ablauf die **GoBD-Verfahrensdokumen
 | --- | --- | --- |
 | Gliederung „des Musters von BStBK und DStV“ | Das gemeinsame Muster gilt nur für das **ersetzende Scannen** (Version 2.1, Stand 27.02.2026). Das Muster zur Belegablage stammt von der AWV (Muster, Ziff. 0.3). | Die Gliederung der Kapitel 1–3 und 6–9 ist allgemein und wird übernommen, die Texte nicht (3.4). Kapitel 4 beschreibt den modellierten Ablauf statt des Scannens. Das Muster sieht solche Ergänzungen vor (Ziff. 0.1 [9]). |
 | Aufbewahrung „nach BEG IV 8 Jahre“ (steht bei Idee 1, gilt hier ebenso) | Gilt für Buchungsbelege. Bücher und Organisationsunterlagen: 10 Jahre, Geschäftsbriefe und sonstige Unterlagen: 6 Jahre (§ 147 Abs. 3 AO). Das Muster empfiehlt einheitlich mindestens 10 Jahre (Ziff. 2.3 [2]). | Frist je Unterlagenart. Längere Aufbewahrung personenbezogener Daten braucht eine Begründung (Regel D7). |
-| Aufwand „S“ | Zwei Dokumente, Versionen, 38 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
+| Aufwand „S“ | Zwei Dokumente, Versionen, 39 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
 | (nicht in der Idee) Das Prozessmodell wächst parallel auf Dateiformat 3 (`docs/modellierung-v3.md`). ODER und externe Teilnehmer sind umgesetzt (Commits `4f8ee69`, `915e957`); Teilprozess, für jede Position, Unterbrechung und Abbruch folgen. | Kapitel 4 muss alle Bausteine beschreiben können. Datenobjekte gehören nicht zu Format 3 und sind auch sonst nirgends spezifiziert oder geplant. | Satzbausteine für alle Bausteine aus Format 3 (6.6.1); externe Teilnehmer erscheinen in Kapitel 2.6 und als Vorschläge für Empfänger. Unterlagen und Ablageorte führt die Erweiterung selbst (4.1). |
 | Angaben „über BPMN-`extensionElements`“ | Das ganze Projekt reist schon heute im BPMN-Export mit (`src/bpmn/einbettung.ts`). Damit stecken auch Compliance-Angaben und Versionen in jeder BPMN-Datei. | keine eigenen BPMN-Erweiterungen; BPMN-Export wahlweise ohne Compliance-Angaben (Abschnitt 8) |
 | Lokales LLM zum Formulieren | Widerspricht „ohne KI“ und macht Ausgaben schwer testbar | feste Satzbausteine, kein LLM |
@@ -30,7 +30,7 @@ In vielen Kleinbetrieben fehlen zwei Pflichtdokumente: die Verfahrensdokumentati
 3. **Unterlagen und Ablageorte** (fachlich Datenobjekte und Datenspeicher) mit „entsteht in“ und „genutzt in“ als eigene Tabellen in den Compliance-Angaben. Das BPMN-Diagramm zeigt sie im MVP nicht (4.1).
 4. **Verfahrensdokumentation** in der Gliederung des Musters von BStBK und DStV (Version 2.1); Kapitel 4 entsteht aus dem Ablauf.
 5. **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 lit. a–g im Aufbau des DSK-Musters, mit TOM-Übersicht in den sechs Bereichen nach Art. 32 Abs. 1 DSGVO.
-6. **Lückenprüfung** mit 38 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
+6. **Lückenprüfung** mit 39 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
 7. **Fristberechnung:** gesetzliche Mindestfrist je Unterlagenart, Fristende, frühestes Vernichtungs- bzw. Löschdatum.
 8. **Versionen:** Eine Freigabe friert beide Dokumente ein (gültig ab, freigegeben am und von, Änderung, geänderte Kapitel, SHA-256-Prüfsumme). Befunde, wenn sich seit der Freigabe etwas geändert hat oder sie älter als 365 Tage ist.
 9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Jede Ausgabe trägt den Hinweis „Vorlage zur Prüfung …“, nicht freigegebene Stände zusätzlich „Entwurf“.
@@ -63,6 +63,8 @@ Die App archiviert keine Belege und ist kein Archivsystem. Sie prüft nicht, ob 
 | --- | --- | --- |
 | GoBD, BMF-Schreiben vom 28.11.2019 (BStBl I S. 1269), geändert am 11.03.2024 (BStBl I S. 374) und am 14.07.2025 (GZ IV D 2 - S 0316/00128/005/088) | Fassung vom 14.07.2025, anzuwenden ab 14.07.2025 (Rz. 185); Volltext im Amtlichen AO-Handbuch 2026, Anhang 33 | Rz. 100–102 IKS, 103–106 Datensicherheit, 107–111 Unveränderbarkeit, 119–121, 131, 135 elektronische Aufbewahrung, 136 Scannen, 151–155 Verfahrensdokumentation |
 | § 147 AO | abgerufen 10.11.2026 | Unterlagenarten (Abs. 1), Fristen und Ablaufhemmung (Abs. 3), Fristbeginn (Abs. 4) |
+| § 147 Abs. 2 AO, § 257 Abs. 3 HGB | abgerufen 11.11.2026 | Jahresabschlüsse und Eröffnungsbilanz nicht nur als Wiedergabe aufbewahren (Regel B8, Kapitel 5) |
+| § 146 Abs. 2 bis 2c AO, § 14b Abs. 5 UStG | abgerufen 11.11.2026 | Ort der Aufbewahrung: im Inland; elektronisch auch in anderen EU-Staaten, wenn der Datenzugriff voll möglich bleibt (Abs. 2a); in Drittstaaten nur mit Bewilligung des Finanzamts auf Antrag (Abs. 2b), für Rechnungen ebenso (§ 14b Abs. 5 UStG); Regel S7 |
 | Muster-Verfahrensdokumentation zum ersetzenden Scannen, BStBK und DStV | Version 2.1, Stand 27.02.2026 | Gliederung, Freigabe- und Versionsangaben (Kap. 1), 13 Ordnungsmäßigkeitskriterien (2.3), Hard- und Software mit „seit“ und Version (3.1), Zuständigkeiten (3.2), IKS (3.3), Änderungshistorie (7) |
 | DSGVO, Verordnung (EU) 2016/679 (EUR-Lex, CELEX 32016R0679) | abgerufen 11.11.2026 | Art. 5 Abs. 1 lit. e, Art. 6 Abs. 1, Art. 9 Abs. 1, Art. 10, Art. 17 Abs. 3 lit. b, Art. 28 Abs. 3, Art. 30, Art. 32 Abs. 1, Art. 44–46 |
 | DSK: Hinweise zum Verzeichnis von Verarbeitungstätigkeiten | Februar 2018 | Ausnahme nach Art. 30 Abs. 5 greift selten (Ziff. 5); Rechtsgrundlage als sinnvolle Zusatzangabe (Ziff. 1); interne Empfänger als Rollen (Ziff. 6.4); Aussage zu Drittländern immer (Ziff. 6.4); Empfänger im Drittland konkret benennen (Ziff. 6.5); präzise Löschfristen (Ziff. 6.6); TOM in sechs Bereichen (Ziff. 6.7, 6.8) |
@@ -87,6 +89,8 @@ Die App hält den Rechtsstand als Konstante `RECHTSSTAND = '2026-11-11'` und dru
 - **Verfahrensdokumentation selbst:** Organisationsunterlage, also 10 Jahre. Sie läuft nicht ab, solange Unterlagen aufbewahrt werden, zu deren Verständnis sie nötig ist (GoBD Rz. 154).
 - **Elektronisch entstanden oder eingegangen:** in dieser Form aufbewahren, nicht nur ausgedruckt (GoBD Rz. 119); Eingänge im Eingangsformat (Rz. 131). Eine Umwandlung ist nur unter den Voraussetzungen der Rz. 135 zulässig. Bei E-Rechnungen genügt der strukturierte Teil (Rz. 119, 131 i. d. F. vom 14.07.2025).
 - **Ausnahme Papierversand:** Elektronisch erstellte, auf Papier versandte Handels- und Geschäftsbriefe dürfen nur auf Papier aufbewahrt werden. Das gilt nicht, wenn die Datei tatsächlich aufbewahrt wird oder ein Fakturierungssystem sie erzeugt hat (Rz. 119, 120). In der App betrifft das die Arten `geschaeftsbrief`, `buchungsbeleg` (Ausgangsrechnungen) und `lieferschein`, nicht Bücher und sonstige Unterlagen.
+- **Wiedergabe:** Jahresabschlüsse und Eröffnungsbilanz dürfen nicht nur als Wiedergabe auf einem Bild- oder Datenträger aufbewahrt werden (§ 147 Abs. 2 AO, § 257 Abs. 3 HGB).
+- **Ort der Aufbewahrung:** Bücher und Aufzeichnungen werden im Inland geführt und aufbewahrt (§ 146 Abs. 2 AO). Elektronisch sind auch andere EU-Staaten zulässig, wenn der Datenzugriff voll möglich bleibt (Abs. 2a), Drittstaaten nur mit Bewilligung des Finanzamts (Abs. 2b); für Rechnungen gilt das ebenso (§ 14b Abs. 5 UStG). Der Katalog `Standort` kennt nur „EU oder EWR“; EWR-Staaten außerhalb der EU (Island, Liechtenstein, Norwegen) unterscheidet die App nicht.
 - **E-Mails:** mit Beleg- oder Geschäftsbrieffunktion aufbewahrungspflichtig; als reines Transportmittel nicht (GoBD Rz. 121).
 - **Unveränderbarkeit:** Ablage in einem Dateisystem genügt regelmäßig nicht ohne zusätzliche Maßnahmen (GoBD Rz. 110).
 - **Datenschutz:** Für personenbezogene Daten in aufbewahrungspflichtigen Unterlagen gilt das Ende der Aufbewahrung als Löschfrist. Bis dahin tritt das Recht auf Löschung zurück (Art. 17 Abs. 3 lit. b DSGVO). Die Daten dienen dann nur noch der Aufbewahrung; der Zugriff wird entsprechend eingeschränkt. Für alle anderen personenbezogenen Daten braucht es eine eigene, konkrete Löschfrist (Art. 5 Abs. 1 lit. e DSGVO).
@@ -348,6 +352,8 @@ export interface SystemAngaben {
   auftragsverarbeitung: boolean | null
   avVertrag: 'ja' | 'nein' | 'unklar'
   avVertragVom: IsoDatum | null
+  /** Bewilligung des Finanzamts für die Aufbewahrung im Drittstaat (§ 146 Abs. 2b AO); fehlt in älteren Dateien */
+  bewilligungVom?: IsoDatum | null
   unveraenderbarkeit: Unveraenderbarkeit
   sicherung: Sicherung
   /** z. B. „täglich“ */
@@ -643,6 +649,7 @@ Eine Karte je digitalem Medium, das im Prozess vorkommt. Papier und Telefon ersc
 | Wo werden die Daten verarbeitet? | Standort; bei Drittland Land und Garantie | Dienstleister oder Cloud |
 | Verarbeitet der Anbieter personenbezogene Daten in Ihrem Auftrag? | Ja · Nein · Weiß nicht | Dienstleister oder Cloud und Personenbezug |
 | Gibt es einen Vertrag zur Auftragsverarbeitung? | Ja (Datum) · Nein · Weiß nicht | Auftragsverarbeitung nicht „Nein“ |
+| Bewilligung des Finanzamts vom | Datum | Standort Drittland und System ist Ablage einer aufbewahrungspflichtigen Unterlage (§ 146 Abs. 2b AO) |
 | Wie sind aufbewahrte Unterlagen vor Änderung geschützt? | Unveränderbarkeit | System ist Ablage einer aufbewahrungspflichtigen Unterlage |
 | Wie werden die Daten gesichert? | Sicherung, Intervall, „Rücksicherung zuletzt getestet am“ | – |
 | Zugriffsschutz | Kurztext | – |
@@ -795,7 +802,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | B5 | Ablage ohne Schutz vor Änderung | Warnung | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, B4 trifft nicht zu, mindestens ein digitaler Ablage-Speicher und keiner davon mit `revisionssicher` oder `protokolliert` | „„{d}“ liegt in {Systeme}, ohne dass Änderungen verhindert oder protokolliert werden. Eine einfache Dateiablage genügt dafür in der Regel nicht.“ | GoBD Rz. 108–110 | systeme |
 | B6 | Elektronische Unterlage auf Papier aufbewahrt | Fehler; Hinweis bei Art `geschaeftsbrief`, `buchungsbeleg` oder `lieferschein` (Handels- und Geschäftsbriefe, 3.2), Richtung `ausgang`, Form nicht `strukturiert` und erzeugender Aufgabe ohne Medium der Art `erp` oder `fachanwendung` | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, und Ablageform `ausdruck` oder alle Ablage-Speicher nicht digital | „„{d}“ entsteht oder kommt elektronisch an und muss elektronisch aufbewahrt werden. Ein Ausdruck reicht nicht.“ Hinweis, je nach Auslöser: „„{d}“ liegt nur in Papierablagen.“ bzw. „„{d}“ wird als Ausdruck aufbewahrt.“, dann „Nur zulässig, wenn „{d}“ auf Papier versandt und die Datei nicht aufbewahrt wird.“ | GoBD Rz. 119, 120 | belege |
 | B7 | Elektronisches Original nicht aufbewahrt | Fehler bei Form `strukturiert`, sonst Hinweis | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, Ablageform `umgewandelt` | `strukturiert`: „Bei „{d}“ muss der strukturierte Teil aufbewahrt werden, z. B. die XML-Datei. Nur ein PDF genügt nicht.“ Sonst: „„{d}“ liegt nur umgewandelt vor. Prüfen, ob die Voraussetzungen der GoBD Rz. 135 erfüllt sind; sonst das Original zusätzlich aufbewahren.“ | GoBD Rz. 119, 131, 135 (Fassung 14.07.2025) | belege |
-| B8 | Ersetzendes Scannen dokumentieren | Hinweis | Form `papier`, Ablageform `scan`, `originalVernichtet = true` | „„{d}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.“ | GoBD Rz. 136 | belege |
+| B8 | Ersetzendes Scannen dokumentieren | Hinweis | Form `papier`, Ablageform `scan`, `originalVernichtet = true` | „„{d}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.“ Bei Art `buecher` zusätzlich: „Jahresabschlüsse und Eröffnungsbilanz sind im Original aufzubewahren.“ | GoBD Rz. 136; bei `buecher`: GoBD Rz. 136, 140; § 147 Abs. 2 AO; § 257 Abs. 3 HGB | belege |
 | B9 | Abtippen ohne Erfassungskontrolle | Hinweis | Aufgabe A mit Übertragung schreibt ein Objekt d mit Art `buchungsbeleg` oder `buecher`; keine Prüfung oder Freigabe liest d nach A (spätere Position im Ablauf wie bei `nummern`); keine weitere Kontrolle mit `bezugAufgabeId = A.id` | „In „{A}“ wird „{d}“ von Hand übertragen, und keine Kontrolle prüft das Ergebnis.“ | GoBD Rz. 100 | kontrollen |
 | D1 | Personenbezug ungeklärt | Hinweis | `personenbezogen = null` | „Enthält „{d}“ Angaben zu Personen, z. B. Name, Anschrift oder Telefonnummer?“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D2 | Betroffene oder Datenkategorien fehlen | Warnung | personenbezogen und (Betroffene leer oder Datenkategorien leer) | „Für „{d}“ fehlen {betroffene Personen / Datenkategorien}.“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
@@ -812,6 +819,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | S4 | Programmversion fehlt | Hinweis | digital, im Einsatz, Version leer oder `seit = null` | „Für „{s}“ fehlen Version oder Einsatzbeginn. Die Dokumentation muss zu den eingesetzten Programmversionen passen.“ | GoBD Rz. 154; Muster 3.1 | systeme |
 | S5 | Datensicherung ungeklärt | Warnung | digital, `ablageVon` nicht leer, Sicherung `keine` oder `unklar` | „„{s}“ bewahrt {Liste} auf, eine Datensicherung ist {nicht eingerichtet / nicht bekannt}.“ | GoBD Rz. 103–106; Art. 32 Abs. 1 lit. c DSGVO | systeme |
 | S6 | Rücksicherung nicht getestet | Hinweis | Sicherung `manuell` oder `automatisch` und (`wiederherstellungGetestet = null` oder `getestet > heute` oder `tageZwischen(getestet, heute) > 365`) | „Für „{s}“ wurde {noch nie / seit {Datum} nicht} geprüft, ob sich die Sicherung zurückspielen lässt.“ Datum nach heute: „Für „{s}“ liegt der letzte Test der Rücksicherung in der Zukunft ({Datum}). Datum prüfen.“ | Art. 32 Abs. 1 lit. c, d DSGVO | systeme |
+| S7 | Aufbewahrung im Drittland ohne Bewilligung; Hinweis „Ort der Aufbewahrung unklar“ | Warnung; Hinweis bei Standort `unbekannt` | `mitDienstleister`, `ablageVon` nicht leer (unabhängig vom Personenbezug) und Standort `drittland` ohne `bewilligungVom`; Hinweis: Standort `unbekannt` | „„{s}“ bewahrt {Liste} im Drittland ({Land}) auf. Elektronische Bücher, Aufzeichnungen und Rechnungen dürfen außerhalb der EU nur mit Bewilligung des Finanzamts aufbewahrt werden. Mit der Steuerberatung klären und das Datum der Bewilligung eintragen.“ Hinweis: „„{s}“ bewahrt {Liste} auf, aber der Ort der Verarbeitung ist nicht bekannt. Liegen die Daten außerhalb der EU, braucht es eine Bewilligung des Finanzamts.“ | § 146 Abs. 2, 2b AO; § 14b Abs. 5 UStG | systeme |
 | K1 | Freigabe ohne Vier-Augen-Prinzip | Warnung oder Hinweis | Abschnitt 6.4 | Abschnitt 6.4 | GoBD Rz. 100; Muster 3.2 | kontrollen |
 | K2 | Kontrolle ohne Nachweis | Hinweis | Nachweis `keiner` oder `unklar` (Aufgabe oder weitere Kontrolle) | „„{k}“ wird nicht nachgewiesen. Kontrollen sind einzurichten, auszuüben und zu protokollieren, z. B. mit Kürzel und Datum.“ | GoBD Rz. 100 | kontrollen |
 | K3 | Kontrolle ohne Angaben | Hinweis | Aufgabe der Art Prüfung oder Freigabe ohne Eintrag in `kontrollen` | „Was prüft „{A}“, und wie wird es nachgewiesen?“ | GoBD Rz. 102 | kontrollen |
@@ -823,7 +831,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | V2 | Geändert seit der letzten Freigabe | Warnung | `geaenderteKapitel` gegenüber der letzten Version nicht leer (6.8) | „Seit Version {x} geändert: {Kapitel}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.“ | GoBD Rz. 154 | dokumente |
 | V3 | Überprüfung fällig | Hinweis | Versionen vorhanden, V2 trifft nicht zu, `tageZwischen(max(letzte freigegebenAm, zuletztGeprueft), heute) > 365` | „Die letzte Prüfung ist {n} Tage her. Einmal im Jahr prüfen, ob alles noch stimmt.“ | Art. 32 Abs. 1 lit. d DSGVO; 365 Tage als Annahme | dokumente |
 
-Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
+Zusammen 39 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
 
 ### 6.6 Verfahrensdokumentation erzeugen
 
@@ -845,12 +853,12 @@ Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 2.5 Einweisung in das Verfahren | einmalig: „Wer mitarbeitet, wird vor Beginn eingewiesen.“ · jährlich: „… vor Beginn und danach jährlich eingewiesen.“ · keine bzw. null: „Eine Einweisung ist nicht festgelegt.“ · Protokoll: „Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).“ | Einweisung |
 | 2.6 Abgrenzung der Bearbeitungsbereiche | externe Rollen, Dienstleister und externe Teilnehmer (Format 3) als Liste, sonst „Alle Schritte finden im Unternehmen statt.“; dazu „Mit externen Stellen ist diese Dokumentation abzustimmen.“ | Rollen, Systeme, Teilnehmer |
 | 3 Organisation und Sicherheit des IT-gestützten Verfahrens | – | – |
-| 3.1 Eingesetzte Hard- und Software | Tabelle System · Art · Hersteller · Version · im Einsatz seit · Betrieb · Dienstleister und Standort; Satz „Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.“ | digitale Medien im Einsatz, Reihenfolge wie `p.medien` |
+| 3.1 Eingesetzte Hard- und Software | Tabelle System · Art · Hersteller · Version · im Einsatz seit · Betrieb · Dienstleister und Standort; je System mit Dienstleister, Standort `drittland` und aufbewahrungspflichtiger Ablage: „„{s}“ bewahrt {Liste} im Drittland ({Land}) auf. Bewilligung des Finanzamts nach § 146 Abs. 2b AO vom {Datum}.“ bzw. „…: offen.“; Satz „Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.“ | digitale Medien im Einsatz, Reihenfolge wie `p.medien` |
 | 3.2 Zuständigkeiten | Tabelle Schritt (4.k Name) · Rolle · System; zwei Zeilen „Freigabe der Löschung nach Fristablauf“ und „Durchführung der Löschung“ | Aufgaben, Löschorganisation |
 | 3.3 Organisation und Internes Kontrollsystem | Textbaustein A.4; Tabelle Kontrolle · Art · Wer · Was geprüft wird · Nachweis · Häufigkeit (Aufgaben: „bei jedem Vorgang“) | Kontrollen |
 | 3.4 Datenschutz und Datensicherheit | Textbaustein A.5; Tabelle System · Schutz vor Änderung · Datensicherung · Intervall · Rücksicherung getestet („ja“ oder „nein“). Das Datum des letzten Tests steht nicht im Dokument, sonst löst jeder neue Test V2 aus; es dient nur Regel S6. | Systeme |
 | 4 Verfahren und Maßnahmen: {Prozess} | Ablaufbeschreibung 6.6.1; letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“ | Prozessbaum, Angaben |
-| 5 Ersetzendes Scannen | mit B8-Objekten: „Für {Liste} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.“ · sonst: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte |
+| 5 Ersetzendes Scannen | mit B8-Objekten: „Für {Liste} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.“ und „Ausgenommen sind Jahresabschlüsse und Eröffnungsbilanz; sie werden im Original aufbewahrt (§ 147 Abs. 2 AO, § 257 Abs. 3 HGB).“ · sonst: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte |
 | 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` | Systeme, Angaben |
 | 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“) | Historie |
 | 8 Glossar | Tabelle aus A.6 | fest |
@@ -971,7 +979,7 @@ src/compliance/            Fachlogik ohne React, vollständig getestet
   datum.ts                 ISO-Datum: prüfen, formatieren, addieren
   fristen.ts               Mindestfrist, Fristende, Texte
   ableitung.ts             Ersteller, Nutzer, Systeme mit Daten, vorigeAufgabe
-  regeln.ts                pruefeCompliance: Lückenprüfung (38 Regeln)
+  regeln.ts                pruefeCompliance: Lückenprüfung (39 Regeln)
   dokument.ts              Kapitelschlüssel, Vergleich
   ablauftext.ts            Kapitel 4 aus dem Baum
   verfahrensdoku.ts        Generator Verfahrensdokumentation
@@ -1177,6 +1185,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | Prüfung vor dem Abtippen liest den Beleg / Prüfung danach | B9 / kein B9 |
 | Form `bild`, Richtung `ausgang`, nur Papierablage, aus einer Tabelle, Art `sonstige` bzw. `buecher` / `geschaeftsbrief`, `buchungsbeleg`, `lieferschein` | B6 Fehler / B6 Hinweis |
 | Maßnahme nur aus Leerzeichen | T1 |
+| Warenwirtschaft im Drittland mit Garantie, ohne / mit Bewilligung; ohne Personenbezug; Standort unbekannt | S7 Warnung / kein S7; S7 Warnung; S7 Hinweis |
 
 ### 9.5 Gesamttest Testdaten
 
