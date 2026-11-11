@@ -187,6 +187,34 @@ Windows-Programm: `npx tauri build --debug --no-bundle` und `npm run desktop:tes
 
 Verworfen (kein Handlungsbedarf): abnahme-6, recht-13, recht-22, daten-6, logik-11, logik-15, logik-20, bedienung-13, bedienung-14, bedienung-15.
 
+## Nachprüfung vom 11.11.2026
+
+Drei Nachprüfer haben den zusammengeführten Stand `6911c8e` noch einmal geprüft: „regression“ (Rückschritte, auch im Probe-Merge mit `main`), „sicht“ (Oberfläche, Druck und PDF mit dem Auge) und „erledigt“ (sind die 82 Funde wirklich erledigt?). Die Berichte nannten 2 + 7 Mängel und 4 nur teilweise erledigte Funde. Auf `compliance` nachgebessert ist alles außer den Druck- und Dialogmängeln (sicht 1, 2, 3, 7), die auf einem eigenen Zweig behoben werden. Jeder Mangel hat einen Test, der ohne die Behebung scheitert; die Annahmen dazu stehen in [`compliance-entscheidungen.md`](compliance-entscheidungen.md), Abschnitt „Nachprüfung vom 11.11.2026“.
+
+| Mangel | Kurztitel | Stand |
+| --- | --- | --- |
+| regression 1 (hoch) | Prüfsumme kippt, wenn das Laden den eingefrorenen Prozess anpasst (Format 2; mit `main` jede Version mit „Warten auf Termin“; mit der Modellierung jede Version) | erledigt, `145978a`: Der eingefrorene Prozess bleibt als Rohstand in der Version, die Prüfsumme wird über ihn gerechnet, Speichern schreibt ihn unverändert zurück; Anzeige und Vergleich nutzen eine migrierte Kopie (`eingefrorenerProzess`). Test `pruefsumme-rohstand.test.ts` (Warten, Format 2, simulierter Sprung auf Format 4, Speichern und Laden zweimal) |
+| regression 2 | Lädt „Dokumentieren“ nicht nach, ist die ganze App weiß | erledigt, `02c55bb`: Fehlergrenze `Nachladegrenze` mit Meldung und „Neu laden“; Browsertest bricht das Nachladen von „Dokumentieren“, Lückenprüfung und Versionen mit `page.route` ab |
+| sicht 1 | Anlage 9.1: Aufgaben an Ausschnittgrenzen in keinem Ausschnitt ganz | offen auf `compliance`: Druck, eigener Zweig |
+| sicht 2 | Fehlermeldungen in „Version freigeben“ und „Freigabe zurückziehen“ grau statt rot | offen auf `compliance`: Dialoge, eigener Zweig |
+| sicht 3 | „9.2 Nachweis der Einweisung“ über zwei Seiten zerrissen | offen auf `compliance`: Druck, eigener Zweig |
+| sicht 4 | Versionsliste: Zelle „Version“ senkrecht mittig | erledigt, `70ab98a`; Browsertest misst die Oberkanten |
+| sicht 5 | „Rollen im Ablauf“: kleine Rollennamen, springende Spalten, schmales Feld „Organisation“, „extern“ doppelt | erledigt, `70ab98a`: feste Aufteilung, normale Zellschrift, Spalte Organisation reserviert, „extern“ sichtbar nur im Spaltenkopf; Browsertest |
+| sicht 6 | Falsche Prüfsumme: trotzdem „Gültige Version“, Häkchen, „Lücken“ meldet nichts | erledigt, `11cf47c`: Zustandszeile „– Prüfsumme stimmt nicht“, neue Regel V4 (Warnung) in „Lücken“, Zahl statt Häkchen am Teilschritt „Dokumente“; Unit- und Browsertest |
+| sicht 7 | Satz: „z. B.“ und „E-Mail“ brechen um, Hurenkind, fast leere Seiten | offen auf `compliance`: Druck und DOCX, eigener Zweig |
+| bedienung-6 (Rest) | Auswahl „Nachweis“ bei „Weitere Kontrolle“ abgeschnitten | erledigt, `d4f89bd`: „Nachweis“ und „Sichert ab“ in voller Breite; Browsertest misst Text und Feld |
+| bedienung-17 (Rest) | Verschiedene Wörter für dasselbe | erledigt, `2815507`: Ersatztexte aus dem Fund; der Reiter heißt weiter „Verarbeitungsverzeichnis“, die Einleitung führt die Kurzform ein; Browsertest |
+| abnahme-5 (Rest) | Befunde zu Unterlagen erscheinen nicht im Diagramm | erledigt, `cb2e6f7`: Hinweis-Abzeichen „Unterlage“ an der Aufgabe, in der die Unterlage entsteht; der Knopf im Bühnenkopf zählt mit („3 markiert – zeigen“ im Beispiel); Browsertest |
+| logik-9 (Rest) | Datumsangaben in der Zukunft bleiben unbemerkt | erledigt, `9cb4579`: neue Regel S9 „Datum in der Zukunft“ (Hinweis) für „Im Einsatz seit“, „Vertrag vom“, „Bewilligung des Finanzamts vom“ und „Eingeführt am“; das Beispiel liefert weiter 7 Befunde; Unit- und Browsertest |
+
+Damit hat die Lückenprüfung **44 Regeln** (V4 und S9 neu; V4 liefert die eigene Funktion `pruefsummenBefunde`, weil die Prüfsummen erst nach dem Laden asynchron nachgerechnet werden).
+
+Tests nach der Nachbesserung: `npm run lint` ohne Befund, 506 Unit-Tests in 56 Dateien (vorher 496 in 53), `npm run build` ohne Chunk-Warnung (Hauptteil 464 kB, gzip 141 kB), 93 Browsertests mit `--workers=2` im ersten Lauf grün (vorher 83; neu `e2e/dokumentieren-nachpruefung.spec.ts` mit 10 Tests), ohne Zeitüberschreitung. Das Windows-Programm wird erst nach dem Zusammenführen mit dem Zweig für Druck und Dialoge geprüft.
+
+Für das Zusammenführen mit `main` und der Modellierung: Wer eingefrorene Prozesse anzeigt oder vergleicht, nimmt `eingefrorenerProzess(v)`, nie `v.prozess` (Rohstand, kann ein älteres Format haben). Neue Migrationen oder Normalisierungen in `leseProjekt` brauchen für Versionen nichts Eigenes.
+
+Gemeinsame Dateien, die die Nachbesserung berührt: `src/App.tsx` (Fehlergrenze um den nachgeladenen Schritt), `src/styles.css` (Regeln neben `.banner-fehler`, `.versionsliste` und `.eingabe-tabelle`, keine Druckregeln), `README.md` (nur die Regelzahl), `docs/compliance-spezifikation.md`.
+
 ## Zusammenführen mit `main`
 
 `FORMAT_VERSION` ist unverändert 3; `compliance` ist ein optionales Feld am Projekt. Neue Dateien liegen in `src/compliance`, `src/ui/compliance`, `src/ui/schritte/DokumentierenSchritt.tsx` und `e2e/dokumentieren.spec.ts`.

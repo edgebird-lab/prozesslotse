@@ -39,7 +39,7 @@ Feldnamen in 4.1 stimmen mit dem Code überein. Die Ablaufbeschreibung (`src/com
 ## Technische Annahmen
 
 - **Prüfung beim Laden:** `leseProjekt` ruft `validiereCompliance` auf, wenn `compliance` vorhanden ist. Dafür importiert `src/modell/speicher.ts` aus `src/compliance/speicher.ts` und umgekehrt (`Formatfehler`, `leseProjekt`). Beide nutzen die Importe nur in Funktionen, nicht beim Laden des Moduls; der Kreis ist deshalb unschädlich.
-- **Eingefrorene Prozesse:** `validiereCompliance` schickt den Prozess einer Version durch `leseProjekt` (als Projekt mit nur einem Ist-Prozess). So gilt jede Formatmigration aus `main` automatisch auch für alte Versionen, ohne dass die Migration doppelt geschrieben wird.
+- **Eingefrorene Prozesse:** `validiereCompliance` schickt eine Kopie des Prozesses einer Version durch `leseProjekt` (als Projekt mit nur einem Ist-Prozess). So gilt jede Formatmigration aus `main` automatisch auch für alte Versionen, ohne dass die Migration doppelt geschrieben wird. Der Rohstand in der Version bleibt unverändert, weil die Prüfsumme über ihn gerechnet ist (seit der Nachprüfung vom 11.11.2026, siehe unten).
 - **Gliederung:** Sie wird beim Darstellen aus den Überschriften gebildet und nicht im Dokument gespeichert.
 - **Kapitel 7:** Die Tabelle hat zusätzlich die Spalte „aufbewahren bis“, weil der Satz darüber auf sie verweist; „freigegeben am“ und „von“ stehen in einer Spalte.
 - **Kapitel 4.{n+1}:** Neben den aufbewahrungspflichtigen Unterlagen nennt es auch personenbezogene Unterlagen ohne Aufbewahrungspflicht mit ihrer Löschfrist, weil das Kapitel „Löschung“ im Titel trägt.
@@ -130,7 +130,7 @@ Robin hat die Behebung der 82 bestätigten Funde freigegeben („Arbeite autonom
 | texte | „Rassische und ethnische Herkunft“ (Wortlaut Art. 9 Abs. 1 DSGVO), auch in D5. |
 | texte | „Revisionssicheres Archiv“ heißt im Dokument „Archiv mit Schutz vor Änderung und Löschung“; in der Oberfläche bleibt der Begriff, mit Erklärung. |
 | texte | Ältere Dateien ohne `ersetzendesScannen` laden mit „Weiß nicht“. Neue Sätze gegen den Mustertext BStBK/DStV geprüft: keiner teilt 4 Wörter in Folge. |
-| regeln | „Besondere Kategorien“, Reiter „Verarbeitungsverzeichnis“, „es“ in den Fragen und „Datenobjekt“ im Lernhinweis bleiben; „heikle Daten“ heißt „besonders geschützte Daten“. |
+| regeln | ~~„Besondere Kategorien“, Reiter „Verarbeitungsverzeichnis“, „es“ in den Fragen und „Datenobjekt“ im Lernhinweis bleiben;~~ „heikle Daten“ heißt „besonders geschützte Daten“. Der Rest ist mit der Nachprüfung (bedienung-17, siehe unten) geändert. |
 | regeln | Quelle von B10: GoBD Rz. 151, 152; Art. 30 Abs. 1 lit. c DSGVO. |
 | regeln | Das Fristende bleibt der letzte Tag der Frist; „Frühestens löschen“ ist Fristende plus ein Tag, bei Aufbewahrung und Löschfrist gleich. |
 | druck | Ausschnitte nur, wenn die Übersicht kleiner als Maßstab 0,6 wäre; Ausschnitte im Maßstab 0,6 bis 0,8 (Lieferdienst: 5 Ausschnitte, Schrift 5,75 bis 6,3 pt). |
@@ -138,7 +138,7 @@ Robin hat die Behebung der 82 bestätigten Funde freigegeben („Arbeite autonom
 | druck | Word-Silbentrennung nur, wenn ein Wort sonst nicht in seine Spalte passt (trennt dann auch Fließtext). |
 | bedienung | Kein Link „Zurück zu den Lücken“; nach „Beheben“ ist die Frage 2,5 s umrandet (`data-sprungziel`). |
 | bedienung | Ungültige Zahlen werden nicht gekappt; gespeichert bleibt der letzte gültige Wert, die Meldung steht am Feld. |
-| bedienung | Nur der Knopf „{n} markiert – zeigen“ im Bühnenkopf; Unterlagen-Befunde markieren nicht die erzeugende Aufgabe. |
+| bedienung | ~~Nur der Knopf „{n} markiert – zeigen“ im Bühnenkopf; Unterlagen-Befunde markieren nicht die erzeugende Aufgabe.~~ Ersetzt durch die Nachprüfung (abnahme-5, siehe unten). |
 | bedienung | TLS ist im Erklärungssatz erklärt; der Maßnahmentext heißt weiter so (gespeicherte Texte). |
 
 ### Beim Zusammenführen entschieden
@@ -154,3 +154,18 @@ Robin hat die Behebung der 82 bestätigten Funde freigegeben („Arbeite autonom
 | Prüfsummen-Meldung | Die Kopfzeile lädt `versionen.ts` erst, wenn Versionen da sind; sonst wäre der Hauptteil 508 statt 463 kB. |
 | `hatAngaben` | Rollen im Ablauf (extern oder Organisation) zählen bei „Unternehmen“, mitgeltende Unterlagen bei „Dokumente“, die Antwort zum ersetzenden Scannen bei „Belege und Daten“; Zugriffsschutz, Wiederfinden, Datenzugriff, Bewilligung und Art.-9-Ausnahme zählen schon mit den Angaben ihres Systems bzw. ihrer Unterlage. |
 | „Beheben“ | B10 Namensfeld von „Neue Unterlage“, B11 gewählte Frist, S7 Bewilligung bzw. Standort, S8 Wiederfinden bzw. Datenzugriff, D5 ohne Ausnahme deren Auswahl. |
+
+## Nachprüfung vom 11.11.2026
+
+Die Nachbesserung nach der Nachprüfung (Stand und Funde: [`compliance-stand.md`](compliance-stand.md), Abschnitt „Nachprüfung vom 11.11.2026“) hat diese Annahmen getroffen. Jede Zeile **gilt, bis Robin entscheidet**.
+
+| Stelle | Annahme (gilt, bis Robin entscheidet) |
+| --- | --- |
+| Prüfsumme (regression 1) | Der eingefrorene Prozess wird als Rohstand bewahrt: nachgerechnet wird über den Stand vor jeder Migration, Speichern schreibt ihn unverändert zurück. Anzeige und Vergleich nutzen eine migrierte Kopie (`eingefrorenerProzess`, je Rohstand einmal berechnet). Lässt sich die Kopie nicht bilden (nur bei einer Version aus dieser Sitzung denkbar), zeigt die App den Rohstand. Die strenge Prüfung des eingefrorenen Prozesses beim Laden bleibt. |
+| Nachladen (regression 2) | Die Meldung steht im Panel: „„Dokumentieren“ ließ sich nicht laden. Vielleicht ist die Verbindung unterbrochen, oder es gibt inzwischen eine neue Fassung der App. Die anderen Schritte funktionieren weiter.“ „Neu laden“ lädt die ganze Seite, weil React einen gescheiterten Import behält; der Stand kommt aus dem Browser-Speicher (passt er dort nicht mehr hinein, fragt der Browser bei ungespeicherten Änderungen vorher). Die Bühne bleibt dann ohne Markierungen, die Kopfzeile meldet bei fehlenden Versionen nichts („Prüfsumme nicht nachgerechnet“). Die Fehlergrenze gilt nur für „Dokumentieren“, nicht für das ebenfalls nachgeladene Diagramm. |
+| V4 (sicht 6) | Eine falsche Prüfsumme ist eine eigene Regel V4 „Prüfsumme stimmt nicht“ (Warnung, Teilschritt „Dokumente“, Quelle GoBD Rz. 154) und zählt in der Regelzahl mit. Sie gilt für jede Version, auch eine zurückgezogene. Text: „Version {x} passt nicht mehr zu ihrer Prüfsumme: Sie wurde außerhalb der App verändert oder ist beschädigt. Öffne eine unveränderte Projektdatei, etwa aus einer Sicherung.“ Weil sich eine beschädigte Version nicht reparieren lässt, bleibt der Befund, bis eine unveränderte Datei geöffnet ist. „Beheben“ springt auf „Version freigeben …“. |
+| Rollen im Ablauf (sicht 5) | Spalten 32 % · 4 rem · Rest; „Extern“ steht sichtbar nur im Spaltenkopf, der Schalter heißt für Screenreader weiter „{Rolle}: extern“. |
+| bedienung-6 | Statt des kürzeren Texts „Abgezeichnet (Datum, Kürzel)“ stehen „Nachweis“ und „Sichert ab“ in voller Breite untereinander: Der kürzere Text hätte mit dem Pfeil der Auswahl auch nicht ganz gepasst, und der Katalogtext bleibt wie in Dokumenten und Spezifikation. |
+| bedienung-17 | Im Formular „Neue Unterlage“ heißt es „In welchem Schritt entsteht die Unterlage?“ und passend „In welchen Schritten wird sie genutzt?“. Die Fragen in der Karte einer Unterlage („Wie kommt es an oder entsteht es?“, „Enthält es Angaben zu Personen?“) bleiben, weil der Kartenkopf die Unterlage nennt. |
+| abnahme-5 | Befunde mit Ziel „datenobjekt“ oder „frist“ und ohne eigenen Schritt erscheinen als Hinweis-Abzeichen „Unterlage“ an der ersten Aufgabe, die die Unterlage erstellt, auch wenn der Befund eine Warnung ist (das Problem liegt bei der Unterlage, nicht beim Schritt). Ohne erstellende Aufgabe kein Abzeichen. Der Knopf „{n} markiert – zeigen“ zählt Elemente, nicht Befunde. |
+| S9 (logik-9) | Eine Regel S9 „Datum in der Zukunft“ (Hinweis) in der S-Reihe, auch für „Eingeführt am“ der Verarbeitungstätigkeit (dann Teilschritt „Unternehmen“). Geprüft wird nur, was die Oberfläche gerade fragt: „Vertrag vom“ nur bei Vertrag „Ja“, „Bewilligung des Finanzamts vom“ nur bei Aufbewahrung im Drittland. Ein Befund je System nennt alle betroffenen Angaben; „Beheben“ springt auf die erste. Quelle: „Plausibilitätsprüfung der App“, weil keine Vorschrift ein Datum in der Zukunft verbietet. „Heute“ selbst zählt nicht als Zukunft. |
