@@ -5,7 +5,6 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { DokuVersion } from '../../compliance/typen'
-import { pruefsummeStimmt } from '../../compliance/versionen'
 
 /** „unbekannt“: Nachrechnen nicht möglich (z. B. ohne Web Crypto); das ist kein Befund. */
 export type PruefsummenStand = 'stimmt' | 'falsch' | 'offen' | 'unbekannt'
@@ -16,7 +15,8 @@ const ergebnisse = new WeakMap<DokuVersion, Promise<boolean>>()
 function pruefeVersion(v: DokuVersion): Promise<boolean> {
   let ergebnis = ergebnisse.get(v)
   if (!ergebnis) {
-    ergebnis = pruefsummeStimmt(v)
+    // Versionen samt Generatoren laden erst hier: Die Kopfzeile nutzt das Modul, der Hauptteil bleibt klein (abnahme-11)
+    ergebnis = import('../../compliance/versionen').then((m) => m.pruefsummeStimmt(v))
     ergebnisse.set(v, ergebnis)
   }
   return ergebnis

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { formatiereDatum } from '../../compliance/datum'
 import { docxEndung, erzeugeDocx } from '../../compliance/docx'
+import { kapitelText } from '../../compliance/dokument'
 import { aufbewahrenBisText, gueltigBisIn } from '../../compliance/fristen'
 import { RECHTSSTAND } from '../../compliance/standard'
 import { FUSSZEILE_VORLAGE, hinweisband } from '../../compliance/textbausteine'
@@ -108,6 +110,7 @@ export function DokumenteTeil() {
   return (
     <div className="teil dokumente">
       <style>{druckFuss(dokument)}</style>
+      <h3>Dokumente</h3>
       <p className="status-zeile">
         {letzte === null
           ? 'Entwurf, nicht freigegeben'
@@ -115,7 +118,7 @@ export function DokumenteTeil() {
             ? `Gültige Version ${gueltig.bezeichnung} seit ${formatiereDatum(gueltig.gueltigAb)}`
             : `Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}`}
         {letzte && gueltig && letzte !== gueltig && ` · Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}`}
-        {geaendert.length > 0 && ` · geändert seit der Freigabe: ${geaendert.join(', ')}`}
+        {geaendert.length > 0 && ` · geändert seit der Freigabe: ${kapitelText(geaendert)}`}
       </p>
       <p className="hinweis-band" role="note">
         {hinweisband(RECHTSSTAND)} Die Dokumente nennen Schutzmaßnahmen und Lücken. Vertraulich behandeln.
@@ -202,7 +205,15 @@ export function DokumenteTeil() {
             , freigegeben am {formatiereDatum(version.freigegebenAm)} von {version.freigegebenVon} · Prüfsumme{' '}
             <code>{version.pruefsumme.slice(0, 12)}</code> · <PruefsummenText stand={pruefsummeVon(version)} />
           </p>
-          <button type="button" className="knopf knopf-klein" onClick={() => setAnsicht(null)}>
+          <button
+            type="button"
+            className="knopf knopf-klein"
+            onClick={() => {
+              // Das Band verschwindet mit dem Knopf: Fokus auf den gewählten Reiter
+              flushSync(() => setAnsicht(null))
+              reiter.current[REITER.findIndex((r) => r.art === art)]?.focus()
+            }}
+          >
             Zurück zum aktuellen Entwurf
           </button>
         </div>
@@ -309,7 +320,7 @@ function Versionsliste({
                     <td>
                       {formatiereDatum(v.freigegebenAm)}, {v.freigegebenVon}
                     </td>
-                    <td>{v.geaenderteKapitel.join(', ') || '–'}</td>
+                    <td>{kapitelText(v.geaenderteKapitel) || '–'}</td>
                     <td>{rueckzug ? 'mit der Änderungshistorie' : aufbewahrenBisText(bis)}</td>
                     <td>
                       <code>{v.pruefsumme.slice(0, 12)}</code>
@@ -321,7 +332,8 @@ function Versionsliste({
                         <button type="button" className="knopf knopf-klein" aria-label={`Version ${v.bezeichnung} ansehen`} onClick={() => onAnsehen(v.nummer)}>
                           Ansehen
                         </button>
-                        <button type="button" className="knopf knopf-klein" aria-label={`Version ${v.bezeichnung} als Word-Datei (${art === 'verfahrensdokumentation' ? 'Verfahrensdokumentation' : 'Verarbeitungsverzeichnis'})`} onClick={() => onDocx(v)}>
+                        {/* Der Name beginnt mit dem sichtbaren Wort, damit Sprachsteuerung („Klick DOCX“) den Knopf findet */}
+                        <button type="button" className="knopf knopf-klein" aria-label={`DOCX: Version ${v.bezeichnung}, ${art === 'verfahrensdokumentation' ? 'Verfahrensdokumentation' : 'Verarbeitungsverzeichnis'} als Word-Datei`} onClick={() => onDocx(v)}>
                           DOCX
                         </button>
                         {zurueckziehbar(v) && (

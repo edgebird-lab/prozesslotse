@@ -29,6 +29,7 @@ import {
   type Kontext,
 } from './ableitung'
 import { formatiereDatum, tageZwischen } from './datum'
+import { kapitelText } from './dokument'
 import { aufbewahrungText, HANDELSBRIEF_JAHRE, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb, mindestJahre } from './fristen'
 import { BESONDERE_KATEGORIEN, istPflichtig, STRAFRECHTLICH_TEXT, TOM_BEREICHE } from './standard'
 import type { Aufbewahrungsart, ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt } from './typen'
@@ -219,7 +220,7 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
         teilschritt: 'belege',
         schwere: 'warnung',
         titel: 'E-Mail-Postfach als einziges Archiv',
-        text: `„${o.name}“ liegt nur ${namen.length === 1 ? 'im Postfach' : 'in den Postfächern'} ${aufzaehlung(namen)}. Dort kann jeder löschen oder verschieben; Unveränderbarkeit und Frist sind nicht gesichert. Archiv oder DMS ergänzen.`,
+        text: `„${o.name}“ liegt nur ${namen.length === 1 ? 'im Postfach' : 'in den Postfächern'} ${aufzaehlung(namen)}. Dort kann jeder löschen oder verschieben; Unveränderbarkeit und Frist sind nicht gesichert. Archiv oder Dokumentenmanagementsystem (DMS) ergänzen.`,
         quelle: 'GoBD Rz. 110, 119',
         ziel: { art: 'datenobjekt', id: o.id },
       })
@@ -520,7 +521,7 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
         id: m.id,
         teilschritt: 'systeme',
         schwere: 'warnung',
-        titel: 'Dienstleister ohne AV-Vertrag',
+        titel: 'Vertrag zur Auftragsverarbeitung fehlt',
         text: `${s.dienstleister.trim() || 'Der Anbieter'} verarbeitet in „${name}“ personenbezogene Daten. Dafür ist ein Vertrag zur Auftragsverarbeitung nötig.${s.auftragsverarbeitung === null ? ' Prüfe zuerst, ob im Auftrag verarbeitet wird.' : ''}`,
         quelle: 'Art. 28 Abs. 3 DSGVO',
         ziel: { art: 'system', id: m.id },
@@ -797,7 +798,7 @@ function pruefeVersionen(p: Prozess, c: ComplianceProjekt, heute: IsoDatum, add:
       teilschritt: 'dokumente',
       schwere: 'warnung',
       titel: 'Geändert seit der letzten Freigabe',
-      text: `Seit Version ${letzte.bezeichnung} geändert: ${kapitel.join(', ')}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.`,
+      text: `Seit Version ${letzte.bezeichnung} geändert: ${kapitelText(kapitel)}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.`,
       quelle: 'GoBD Rz. 154',
       ziel: { art: 'version' },
     })

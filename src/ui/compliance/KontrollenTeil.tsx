@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom'
 import { kontrollAngaben, schrittText } from '../../compliance/ableitung'
 import { EINWEISUNGEN, KONTROLLARTEN, NACHWEISE, neueKontrollAngaben, neueWeitereKontrolle } from '../../compliance/standard'
 import type { KontrollAngaben, WeitereKontrolle } from '../../compliance/typen'
@@ -7,6 +8,7 @@ import { useApp } from '../kontext'
 import { useAufgabenFilter, useCompliance, vierAugenStatus } from './analyse'
 import { FilterHinweis } from './BelegeTeil'
 import { CFeld, KatalogAuswahl, KatalogListe, TextFeld } from './Eingaben'
+import { erstesFeld, fokussiere, nachbar } from './fokus'
 
 export function KontrollenTeil() {
   const { c, k, aendere } = useCompliance()
@@ -55,7 +57,7 @@ export function KontrollenTeil() {
               Externe Stelle, z. B. Steuerberatung
             </Schalter>
             <div className="feldreihe">
-              <KatalogListe label="Nachweis" katalog={NACHWEISE} wert={w.nachweis} onAendern={(nachweis) => nachweis && setzeWeitere(w, { nachweis }, 'nachweis')} />
+              <KatalogListe id={`ziel-kontrolle-${w.id}-nachweis`} label="Nachweis" katalog={NACHWEISE} wert={w.nachweis} onAendern={(nachweis) => nachweis && setzeWeitere(w, { nachweis }, 'nachweis')} />
               <CFeld label="Sichert ab">
                 {(id) => (
                   <select id={id} value={w.bezugAufgabeId ?? ''} onChange={(e) => setzeWeitere(w, { bezugAufgabeId: e.target.value || null }, 'bezug')}>
@@ -69,13 +71,32 @@ export function KontrollenTeil() {
                 )}
               </CFeld>
             </div>
-            <button type="button" className="knopf knopf-klein knopf-leise" onClick={() => aendere((x) => ({ ...x, weitereKontrollen: x.weitereKontrollen.filter((y) => y.id !== w.id) }))}>
+            <button
+              type="button"
+              className="knopf knopf-klein knopf-leise"
+              onClick={(e) => {
+                // Danach auf die nächste Kontrolle, sonst die Überschrift des Abschnitts
+                const ersatz = nachbar(e.currentTarget.closest('fieldset'), 'fieldset.karte') ?? document.getElementById('weitere-titel')
+                flushSync(() => aendere((x) => ({ ...x, weitereKontrollen: x.weitereKontrollen.filter((y) => y.id !== w.id) })))
+                fokussiere(ersatz)
+              }}
+            >
               Kontrolle entfernen
             </button>
           </fieldset>
         ))}
         <div className="knopfreihe">
-          <button type="button" id="ziel-kontrolle-weitere" className="knopf" onClick={() => aendere((x) => ({ ...x, weitereKontrollen: [...x.weitereKontrollen, neueWeitereKontrolle()] }))}>
+          <button
+            type="button"
+            id="ziel-kontrolle-weitere"
+            className="knopf"
+            onClick={() => {
+              // Die neue Kontrolle steht über dem Knopf: Fokus in ihr Feld „Name“
+              const neu = neueWeitereKontrolle()
+              flushSync(() => aendere((x) => ({ ...x, weitereKontrollen: [...x.weitereKontrollen, neu] })))
+              fokussiere(erstesFeld(document.getElementById(`ziel-kontrolle-${neu.id}`)))
+            }}
+          >
             + Weitere Kontrolle
           </button>
         </div>
@@ -83,7 +104,7 @@ export function KontrollenTeil() {
 
       <section aria-labelledby="einweisung-titel" className="felder" id="ziel-einweisung" tabIndex={-1}>
         <h3 id="einweisung-titel">Einweisung</h3>
-        <KatalogAuswahl label="Wie werden Beteiligte eingewiesen?" katalog={EINWEISUNGEN} wert={c.einweisung.turnus} spalten={3} onAendern={(turnus) => aendere((x) => ({ ...x, einweisung: { ...x.einweisung, turnus } }))} />
+        <KatalogAuswahl id="ziel-einweisung-turnus" label="Wie werden Beteiligte eingewiesen?" katalog={EINWEISUNGEN} wert={c.einweisung.turnus} spalten={3} onAendern={(turnus) => aendere((x) => ({ ...x, einweisung: { ...x.einweisung, turnus } }))} />
         {/* Bei „Keine“ gibt es nichts festzuhalten; der gespeicherte Wert bleibt, zählt aber im Dokument nicht */}
         {c.einweisung.turnus !== 'keine' && (
           <Schalter an={c.einweisung.protokoll} onAendern={(protokoll) => aendere((x) => ({ ...x, einweisung: { ...x.einweisung, protokoll } }))}>
@@ -108,9 +129,9 @@ function KontrollKarte({ a, angabe }: { a: Aufgabe; angabe: KontrollAngaben | nu
       </div>
       <p className="leise klein">{vierAugenStatus(k, a)}</p>
       {!angabe && <p className="feld-hilfe">Noch keine Angaben zu dieser Kontrolle.</p>}
-      <KatalogAuswahl label="Art der Kontrolle" katalog={KONTROLLARTEN} wert={angabe?.art ?? null} spalten={2} onAendern={(art) => setze({ art }, 'art')} />
+      <KatalogAuswahl id={`ziel-kontrolle-${a.id}-art`} label="Art der Kontrolle" katalog={KONTROLLARTEN} wert={angabe?.art ?? null} spalten={2} onAendern={(art) => setze({ art }, 'art')} />
       <TextFeld label="Was wird geprüft?" platzhalter="z. B. Rechnung sachlich und rechnerisch richtig" wert={angabe?.ziel ?? ''} onAendern={(ziel) => setze({ ziel }, 'ziel')} />
-      <KatalogAuswahl label="Wie wird die Kontrolle nachgewiesen?" katalog={NACHWEISE} wert={angabe?.nachweis ?? null} spalten={2} onAendern={(nachweis) => setze({ nachweis }, 'nachweis')} />
+      <KatalogAuswahl id={`ziel-kontrolle-${a.id}-nachweis`} label="Wie wird die Kontrolle nachgewiesen?" katalog={NACHWEISE} wert={angabe?.nachweis ?? null} spalten={2} onAendern={(nachweis) => setze({ nachweis }, 'nachweis')} />
     </section>
   )
 }

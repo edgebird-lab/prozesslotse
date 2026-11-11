@@ -123,11 +123,11 @@ export interface Option<T extends string> {
   beschreibung?: string
 }
 
-/** Auswahl als Gruppe von Knöpfen (Radiogruppe). */
-export function Auswahl<T extends string>({ label, wert, optionen, onAendern, spalten }: { label: string; wert: T; optionen: Option<T>[]; onAendern: (w: T) => void; spalten?: number }) {
+/** Auswahl als Gruppe von Knöpfen (Radiogruppe); `id` z. B. als Sprungziel. */
+export function Auswahl<T extends string>({ label, wert, optionen, onAendern, spalten, id }: { label: string; wert: T; optionen: Option<T>[]; onAendern: (w: T) => void; spalten?: number; id?: string }) {
   const name = useId()
   return (
-    <fieldset className="auswahl" style={spalten ? { gridTemplateColumns: `repeat(${spalten}, minmax(0, 1fr))` } : undefined}>
+    <fieldset className="auswahl" id={id} style={spalten ? { gridTemplateColumns: `repeat(${spalten}, minmax(0, 1fr))` } : undefined}>
       <legend>{label}</legend>
       {optionen.map((o) => (
         <label key={o.wert} className={`auswahl-option${wert === o.wert ? ' an' : ''}`}>

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { formatiereDatum } from '../../compliance/datum'
+import { kapitelText } from '../../compliance/dokument'
 import type { ComplianceProjekt, DokuVersion, IsoDatum } from '../../compliance/typen'
 import {
   freigabeFehler,
@@ -16,14 +17,6 @@ import {
 import type { Prozess } from '../../modell/typen'
 import { useFrage } from '../frage'
 import { CFeld, DatumEingabe, TextFeld } from './Eingaben'
-
-/** Geänderte Kapitel ausgeschrieben, z. B. „Verfahrensdokumentation 3.2, 4; Verarbeitungsverzeichnis B.1“. */
-function kapitelText(kapitel: string[]): string {
-  const vd = kapitel.filter((k) => k.startsWith('VD ')).map((k) => k.slice(3))
-  const vvt = kapitel.filter((k) => k.startsWith('VVT ')).map((k) => k.slice(4))
-  const sonst = kapitel.filter((k) => !k.startsWith('VD ') && !k.startsWith('VVT '))
-  return [vd.length > 0 ? `Verfahrensdokumentation ${vd.join(', ')}` : '', vvt.length > 0 ? `Verarbeitungsverzeichnis ${vvt.join(', ')}` : '', ...sonst].filter(Boolean).join('; ')
-}
 
 /**
  * Freigabe einer neuen Version (Spezifikation 5.4). Der Dialog hält den Fokus

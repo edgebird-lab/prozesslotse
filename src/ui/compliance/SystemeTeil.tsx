@@ -29,7 +29,7 @@ export function SystemeTeil() {
 
       <section aria-labelledby="ablageorte-titel" className="felder">
         <h3 id="ablageorte-titel">Ablageorte</h3>
-        <p className="leise">Wo Unterlagen aufbewahrt werden, z. B. ein Archiv im DMS oder ein Ordner im Büro. Angelegt werden sie bei den Belegen.</p>
+        <p className="leise">Wo Unterlagen aufbewahrt werden, z. B. ein Archiv im Dokumentenmanagementsystem (DMS) oder ein Ordner im Büro. Angelegt werden sie bei den Belegen.</p>
         {c.ablageorte.length === 0 ? (
           <p className="leer-hinweis">Noch kein Ablageort.</p>
         ) : (
@@ -70,7 +70,9 @@ export function SystemeTeil() {
                         title="Entfernen"
                         onClick={async () => {
                           const n = genutzt(a.id)
-                          if (n > 0 && !(await bestaetige('Ablageort entfernen?', `In „${a.name}“ liegen ${n} Unterlagen. Sie verlieren diesen Ablageort.`, 'Entfernen'))) return
+                          const name = a.name.trim() || 'Unbenannter Ablageort'
+                          const text = n === 1 ? `„${name}“ ist Ablageort für 1 Unterlage. Bei ihr fällt dieser Ablageort weg.` : `„${name}“ ist Ablageort für ${n} Unterlagen. Bei ihnen fällt dieser Ablageort weg.`
+                          if (n > 0 && !(await bestaetige('Ablageort entfernen?', text, 'Entfernen'))) return
                           aendere((x) => loescheAblageort(x, a.id))
                         }}
                       >
@@ -113,9 +115,11 @@ function SystemKarte({ m }: { m: Medium }) {
   const ablage = ablageVon(k, m.id).map((id) => objektName(k, id))
   const personen = hatPersonenbezug(k, m.id)
   const titelId = `system-${m.id}-titel`
+  // Sprungziele für „Beheben“: die Karte und je Frage ein Feld
+  const ziel = `ziel-system-${m.id}`
 
   return (
-    <section className="karte felder" id={`ziel-system-${m.id}`} tabIndex={-1} aria-labelledby={titelId}>
+    <section className="karte felder" id={ziel} tabIndex={-1} aria-labelledby={titelId}>
       <div className="teil-kopf">
         <h4 id={titelId}>{name}</h4>
         <span className="leise klein">{MEDIUM_ARTEN.find((a) => a.art === m.art)?.name}</span>
@@ -125,33 +129,40 @@ function SystemKarte({ m }: { m: Medium }) {
       </p>
       <div className="feldreihe">
         <TextFeld label="Hersteller" wert={s.hersteller} onAendern={(hersteller) => setze({ hersteller }, 'hersteller')} />
-        <TextFeld label="Version" wert={s.version} onAendern={(version) => setze({ version }, 'version')} />
+        <TextFeld id={`${ziel}-version`} label="Version" wert={s.version} onAendern={(version) => setze({ version }, 'version')} />
       </div>
-      <DatumFeld label="Im Einsatz seit" wert={s.seit} onAendern={(seit) => setze({ seit }, 'seit')} />
-      <KatalogAuswahl label="Wo läuft das System?" katalog={BETRIEBE} wert={s.betrieb} spalten={3} onAendern={(betrieb) => setze({ betrieb }, 'betrieb')} />
+      <DatumFeld id={`${ziel}-seit`} label="Im Einsatz seit" wert={s.seit} onAendern={(seit) => setze({ seit }, 'seit')} />
+      <KatalogAuswahl id={`${ziel}-betrieb`} label="Wo läuft das System?" katalog={BETRIEBE} wert={s.betrieb} spalten={3} onAendern={(betrieb) => setze({ betrieb }, 'betrieb')} />
       {(s.betrieb === 'cloud' || s.betrieb === 'eigener_server') && (
         <TextFeld label="Wer betreibt es?" platzhalter="Name des Dienstleisters" wert={s.dienstleister} onAendern={(dienstleister) => setze({ dienstleister }, 'dienstleister')} />
       )}
       {mitDienstleister(s) && (
         <>
-          <KatalogListe label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={s.standort} onAendern={(standort) => standort && setze({ standort }, 'standort')} />
+          <KatalogListe id={`${ziel}-standort`} label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={s.standort} onAendern={(standort) => standort && setze({ standort }, 'standort')} />
           {s.standort === 'drittland' && (
             <div className="feldreihe">
               <TextFeld label="Land" wert={s.drittland} onAendern={(drittland) => setze({ drittland }, 'drittland')} />
-              <KatalogListe label="Garantie" katalog={GARANTIEN} wert={s.garantie} onAendern={(garantie) => setze({ garantie }, 'garantie')} />
+              <KatalogListe
+                id={`${ziel}-garantie`}
+                label="Absicherung der Übermittlung"
+                hilfe="Steht im Vertrag zur Auftragsverarbeitung oder in den Datenschutzhinweisen des Anbieters; frag im Zweifel nach."
+                katalog={GARANTIEN}
+                wert={s.garantie}
+                onAendern={(garantie) => setze({ garantie }, 'garantie')}
+              />
             </div>
           )}
           {s.standort === 'drittland' && ablage.length > 0 && (
-            <CFeld label="Bewilligung des Finanzamts vom" hilfe="Nötig, weil hier aufbewahrungspflichtige Unterlagen außerhalb der EU liegen (§ 146 Abs. 2b AO, § 14b Abs. 5 UStG).">
+            <CFeld id={`${ziel}-bewilligung`} label="Bewilligung des Finanzamts vom" hilfe="Nötig, weil hier aufbewahrungspflichtige Unterlagen außerhalb der EU liegen (§ 146 Abs. 2b AO, § 14b Abs. 5 UStG).">
               {(fid) => <DatumEingabe id={fid} wert={s.bewilligungVom ?? null} onAendern={(bewilligungVom) => setze({ bewilligungVom }, 'bewilligung')} />}
             </CFeld>
           )}
           {personen && (
             <>
-              <JaNeinOffen label="Verarbeitet der Anbieter personenbezogene Daten im Auftrag des Unternehmens?" wert={s.auftragsverarbeitung} onAendern={(auftragsverarbeitung) => setze({ auftragsverarbeitung }, 'av')} />
+              <JaNeinOffen id={`${ziel}-av`} label="Verarbeitet der Anbieter personenbezogene Daten im Auftrag des Unternehmens?" wert={s.auftragsverarbeitung} onAendern={(auftragsverarbeitung) => setze({ auftragsverarbeitung }, 'av')} />
               {s.auftragsverarbeitung !== false && (
                 <>
-                  <KatalogAuswahl label="Gibt es einen Vertrag zur Auftragsverarbeitung?" katalog={AV_VERTRAEGE} wert={s.avVertrag} spalten={3} onAendern={(avVertrag) => setze({ avVertrag }, 'avVertrag')} />
+                  <KatalogAuswahl id={`${ziel}-avvertrag`} label="Gibt es einen Vertrag zur Auftragsverarbeitung?" katalog={AV_VERTRAEGE} wert={s.avVertrag} spalten={3} onAendern={(avVertrag) => setze({ avVertrag }, 'avVertrag')} />
                   {s.avVertrag === 'ja' && <DatumFeld label="Vertrag vom" wert={s.avVertragVom} onAendern={(avVertragVom) => setze({ avVertragVom }, 'avVom')} />}
                 </>
               )}
@@ -160,11 +171,12 @@ function SystemKarte({ m }: { m: Medium }) {
         </>
       )}
       {ablage.length > 0 && (
-        <KatalogAuswahl label="Wie sind aufbewahrte Unterlagen vor Änderung geschützt?" katalog={UNVERAENDERBARKEIT} wert={s.unveraenderbarkeit} spalten={2} onAendern={(unveraenderbarkeit) => setze({ unveraenderbarkeit }, 'unveraenderbar')} />
+        <KatalogAuswahl id={`${ziel}-unveraenderbar`} label="Wie sind aufbewahrte Unterlagen vor Änderung geschützt?" katalog={UNVERAENDERBARKEIT} wert={s.unveraenderbarkeit} spalten={2} onAendern={(unveraenderbarkeit) => setze({ unveraenderbarkeit }, 'unveraenderbar')} />
       )}
       {ablage.length > 0 && (
         <>
           <TextFeld
+            id={`${ziel}-wiederfinden`}
             label="Wie findet man eine Unterlage wieder?"
             platzhalter="z. B. Suche nach Rechnungs- oder Kundennummer"
             hilfe="Ordnungsmerkmal, über das jede aufbewahrte Unterlage eindeutig zu finden ist."
@@ -172,6 +184,7 @@ function SystemKarte({ m }: { m: Medium }) {
             onAendern={(wiederfinden) => setze({ wiederfinden }, 'wiederfinden')}
           />
           <TextFeld
+            id={`${ziel}-datenzugriff`}
             label="Wie bekommt die Finanzverwaltung bei einer Außenprüfung Zugriff auf die Daten, auch nach Vertragsende oder Systemwechsel?"
             mehrzeilig
             platzhalter="z. B. Export aller Belege und Buchungsdaten als CSV und PDF"
@@ -181,11 +194,11 @@ function SystemKarte({ m }: { m: Medium }) {
           />
         </>
       )}
-      <KatalogAuswahl label="Wie werden die Daten gesichert?" katalog={SICHERUNGEN} wert={s.sicherung} spalten={3} onAendern={(sicherung) => setze({ sicherung }, 'sicherung')} />
+      <KatalogAuswahl id={`${ziel}-sicherung`} label="Wie werden die Daten gesichert?" katalog={SICHERUNGEN} wert={s.sicherung} spalten={3} onAendern={(sicherung) => setze({ sicherung }, 'sicherung')} />
       {(s.sicherung === 'manuell' || s.sicherung === 'automatisch' || s.sicherung === 'anbieter') && (
         <div className="feldreihe">
           <TextFeld label="Wie oft?" platzhalter="z. B. täglich" wert={s.sicherungIntervall} onAendern={(sicherungIntervall) => setze({ sicherungIntervall }, 'intervall')} />
-          <DatumFeld label="Rücksicherung zuletzt getestet am" wert={s.wiederherstellungGetestet} onAendern={(wiederherstellungGetestet) => setze({ wiederherstellungGetestet }, 'getestet')} />
+          <DatumFeld id={`${ziel}-getestet`} label="Rücksicherung zuletzt getestet am" wert={s.wiederherstellungGetestet} onAendern={(wiederherstellungGetestet) => setze({ wiederherstellungGetestet }, 'getestet')} />
         </div>
       )}
       <TextFeld label="Zugriffsschutz" platzhalter="z. B. eigenes Konto je Person, Zwei-Faktor-Anmeldung" wert={s.zugriffsschutz} onAendern={(zugriffsschutz) => setze({ zugriffsschutz }, 'zugriff')} />

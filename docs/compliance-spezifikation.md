@@ -585,7 +585,7 @@ export type Schritt = 'rahmen' | 'beteiligte' | 'ablauf' | 'pruefen' | 'verbesse
 | Ausnahme nach Art. 9 Abs. 2 | `einwilligung` „Ausdrückliche Einwilligung (lit. a)“ · `arbeitsrecht` „Arbeitsrecht und soziale Sicherheit (lit. b)“ · `lebenswichtig` (lit. c) · `organisation` (lit. d) · `oeffentlich_gemacht` (lit. e) · `rechtsansprueche` (lit. f) · `oeffentliches_interesse` (lit. g) · `gesundheitsversorgung` „Gesundheitsvorsorge, Arbeitsmedizin, Behandlung (lit. h)“ · `oeffentliche_gesundheit` (lit. i) · `forschung` (lit. j); leer „offen“. Nationale Grundlagen (BDSG) nennt die App nicht; die Hilfe verweist auf den Datenschutz. |
 | Standort | Deutschland · EU oder EWR · Anderes Land (Drittland) · Weiß nicht |
 | Garantie | Angemessenheitsbeschluss (Art. 45) · Standardvertragsklauseln (Art. 46) · andere Garantie · keine |
-| Unveränderbarkeit | „Revisionssicheres Archiv“ (im Dokument „Archiv mit Schutz vor Änderung und Löschung“, kein Rechtsbegriff) · „Änderungen werden protokolliert“ · „Keine, z. B. einfache Dateiablage“ · „Weiß nicht“ |
+| Unveränderbarkeit | „Revisionssicheres Archiv“ (Beschreibung „Archiv, das Ändern und Löschen technisch verhindert“; im Dokument „Archiv mit Schutz vor Änderung und Löschung“, kein Rechtsbegriff) · „Änderungen werden protokolliert“ · „Keine, z. B. einfache Dateiablage“ · „Weiß nicht“ |
 | Sicherung | Keine · Von Hand · Automatisch · Durch den Anbieter · Weiß nicht |
 | Kontrollart | „Vier-Augen-Prinzip“ · „Plausibilität und Vollständigkeit“ · „Abstimmung, z. B. Bank mit Buchhaltung“ · „Stichprobe“ · „Berechtigung im System“ · „Sonstige“ (angelehnt an GoBD Rz. 100) |
 | Nachweis | „Im System protokolliert“ · „Abgezeichnet mit Datum und Kürzel“ · „Kein Nachweis“ · „Weiß nicht“ (im Dokument klein: „im System protokolliert“, „abgezeichnet mit Datum und Kürzel“, „keiner“, „offen“) |
@@ -618,9 +618,10 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 
 - Schrittleiste: Rahmen · Beteiligte · Ablauf · Prüfen · Verbessern · **Dokumentieren** · Bericht.
 - Links das Panel mit einer Teilschritt-Leiste (`<nav aria-label="Teilschritte">`), rechts die Bühne mit dem Ist-Diagramm. Im Teilschritt „Dokumente“ nutzt der Inhalt die volle Breite wie der Bericht.
-- Beim Wechsel in „Dokumentieren“ schaltet die Ansicht auf Ist; der Ist-Soll-Umschalter ist dort ausgeblendet. Ein Satz erklärt: „Die Dokumentation beschreibt den Ist-Prozess.“
+- Beim Wechsel in „Dokumentieren“ schaltet die Ansicht auf Ist; der Ist-Soll-Umschalter ist dort ausgeblendet. Ein Satz erklärt: „Aus dem Ablauf entstehen zwei Dokumente: die Verfahrensdokumentation, die das Finanzamt nach den GoBD (Regeln für die elektronische Buchführung) erwartet, und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO. Beide beschreiben den Ist-Prozess.“
 - Jeder Teilschritt zeigt in der Leiste die Zahl offener Punkte (Fehler und Warnungen). Ohne offene Punkte zeigt er ein Häkchen, aber erst, wenn dort etwas eingetragen ist (`hatAngaben`, 6.10); sonst einen grauen Kreis. Screenreader: „Belege und Daten, 2 offene Punkte“, „…, keine offenen Punkte“ bzw. „…, noch nichts eingetragen“. Das Häkchen verspricht keine Vollständigkeit.
 - Ein Klick auf eine Aufgabe im Diagramm filtert im aktiven Teilschritt auf diese Aufgabe (Belege, Kontrollen).
+- Sind Schritte markiert, steht im Bühnenkopf der Knopf „{n} markiert – zeigen“. Er holt den ersten markierten Schritt (links, dann oben) mindestens in Originalgröße in die Mitte; markierte Schritte liegen oft außerhalb des Anfangsausschnitts.
 - Jeder Teilschritt hat einen Lernhinweis mit Quelle (eigene Liste `COMPLIANCE_LERNINHALTE`, Darstellung wie `Lernhinweis`, ohne BPMN-Symbol).
 - Alle Änderungen laufen über die Aktion `compliance` mit `gruppe` je Feld, damit Tippen ein Rückgängig-Schritt bleibt.
 - Für Eingaben werden `Feld`, `Auswahl`, `ZahlEingabe` und `Schalter` wiederverwendet. Neu sind `Chips` (Mehrfachauswahl als Gruppe von Kontrollkästchen) und `DatumEingabe` (`<input type="date">`).
@@ -667,7 +668,7 @@ Oben steht „Wozu werden die Daten in diesem Prozess verarbeitet?“ (Liste der
 
 | Frage | Antwort |
 | --- | --- |
-| Was ist „{Name}“? | Aufbewahrungsart mit Beispielen und Frist; Hinweis „Im Zweifel die Steuerberatung fragen“ |
+| Was ist „{Name}“? | Aufbewahrungsart mit Beispielen und Frist; Hinweis „Im Zweifel die Steuerberatung fragen“ als Beschreibung von „Weiß nicht“; ist das gewählt, nennt die Zeile darunter die Folge: „Solange das offen ist, meldet die Lückenprüfung „Aufbewahrungsfrist fehlt“.“ |
 | Wie kommt es an oder entsteht es? | Belegform; dazu Richtung |
 | Wo wird es aufbewahrt? | Mehrfachauswahl der Ablageorte; „+ Ablageort“ legt einen Ablageort mit System an |
 | In welcher Form? | Ablageform; bei Papier mit Scan: „Wird das Papier danach vernichtet?“; bei „Ja“ zusätzlich „Gibt es eine eigene Verfahrensdokumentation zum ersetzenden Scannen?“ (Ja · Nein · Weiß nicht, bei Ja „Stand“), eine Angabe für alle gescannten Unterlagen (`ersetzendesScannen`) |
@@ -675,7 +676,7 @@ Oben steht „Wozu werden die Daten in diesem Prozess verarbeitet?“ (Liste der
 | Wer ist betroffen? Welche Daten? | Chips Betroffene, Chips Datenkategorien, aufklappbar besondere Kategorien und Art. 10 |
 | Warum dürfen die Daten verarbeitet werden? | Chips Rechtsgrundlage; bei lit. f Textfeld „Welches Interesse?“ |
 | Welche Ausnahme nach Art. 9 Abs. 2 DSGVO gilt? (nur bei besonderen Kategorien) | Auswahl lit. a bis j, leer „offen“; Hilfe: zusätzlich zur Rechtsgrundlage, ob daneben eine Vorschrift des BDSG gilt, mit dem Datenschutz klären |
-| Wer bekommt die Daten außerhalb des Unternehmens? | Liste: Kategorie, Name, Standort, bei Drittland Land und Garantie. Bei Drittland ist der Name Pflicht. Externe Teilnehmer des Prozesses (Format 3) stehen als Vorschlag bereit; die betroffene Person selbst ist kein Empfänger. |
+| Wer bekommt die Daten außerhalb des Unternehmens? | Liste: Kategorie, Name, Standort, bei Drittland Land und Garantie. Bei Drittland ist der Name Pflicht. Hinweis „Wer nur seine eigenen Daten bekommt, etwa der Kunde seine Rechnung, ist kein Empfänger.“ Externe Teilnehmer des Prozesses (Format 3) stehen als Vorschlag bereit, eingeleitet mit „Externe aus dem Ablauf – nur, wenn sie Daten anderer Personen bekommen:“; nicht vorgeschlagen wird, wer zu einer angehakten Gruppe der Betroffenen gehört (Kunde ↔ Kunden, `empfaengerVorschlaege`). Die Auswahl der Garantie heißt „Absicherung der Übermittlung“ und sagt, wo sie steht. |
 
 Leerer Zustand: „Noch keine Belege oder Daten. Lege an, welche Unterlagen im Prozess entstehen.“
 
@@ -720,17 +721,18 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 
 **6 Schutzmaßnahmen**
 
-Sechs Abschnitte in der Reihenfolge von `TomBereich`. Jeder hat Kontrollkästchen für die Vorschläge, „+ Eigene Maßnahme“ und das Feld „Trifft nicht zu, weil …“.
+Überschrift „Schutzmaßnahmen“ (Ebene 3), darunter sechs Abschnitte (Ebene 4) in der Reihenfolge von `TomBereich`. Jeder hat einen Satz, was der Bereich meint (z. B. Pseudonymisierung: „Namen durch Nummern ersetzen, wo der Name nicht gebraucht wird.“), Kontrollkästchen für die Vorschläge, „+ Eigene Maßnahme“ und das Feld „Trifft nicht zu, weil …“.
 
 **7 Lücken**
 
 - Zählerzeile wie im Schritt „Prüfen“ (`zaehle`), dann Befunde nach Teilschritt gruppiert und nach Schwere sortiert.
-- Je Befund: Symbol, Titel, Text, Quelle in kleiner Schrift, Knopf „Beheben“. Er wechselt in den Teilschritt und setzt den Fokus auf das Ziel (Element-Id `ziel-{art}-{id}`).
+- Je Befund: Symbol, Titel, Text, Quelle in kleiner Schrift, Knopf „Beheben“. Er wechselt in den Teilschritt, bringt die Frage ins Bild, die den Befund behebt, und setzt den Fokus auf ihr Feld (`feldZiel`, Element-Id `ziel-{art}-{id}-{frage}`, z. B. `ziel-datenobjekt-{id}-art` bei B1; bei einer Auswahl auf die gewählte Option). Gibt es keine einzelne Frage (K1), gilt das Ziel selbst (`ziel-{art}-{id}`). Die Karte einer Unterlage ist dann offen, zugeklappte Bereiche um das Feld klappen auf. Fragen, die höher als das Fenster sind, beginnen oben, sonst stehen sie in der Mitte. Die Frage ist danach kurz umrandet (`data-sprungziel`), weil der Browser nach einem Mausklick keinen Fokusring zeigt.
+- „Weiter: …“ führt an den Anfang des nächsten Teilschritts: Die Teilschritt-Leiste steht oben im Bild, der Fokus auf der ersten Überschrift des Teilschritts. Jeder Teilschritt beginnt mit einer Überschrift der Ebene 3 („Lücken“ und „Dokumente“ eigens dafür). Ein Klick in der Leiste lässt den Fokus dort.
 - Befunde mit `blockId` werden im Diagramm markiert (`markierungen`).
 
 ### 5.4 Teilschritt „Dokumente“
 
-- Statuszeile: „Entwurf, nicht freigegeben“ oder „Gültige Version 1.0 seit 11.11.2026“; bei Regel V2 zusätzlich „geändert seit der Freigabe: VD 3.2, VD 4“.
+- Statuszeile: „Entwurf, nicht freigegeben“ oder „Gültige Version 1.0 seit 11.11.2026“; bei Regel V2 zusätzlich „geändert seit der Freigabe: Verfahrensdokumentation 3.2 und 4“ (Kapitel ausgeschrieben mit `kapitelText`, 6.8).
 - Hinweisband (`role="note"`): „Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten. Keine Rechts- oder Steuerberatung. Rechtsstand 11.11.2026.“ Zweiter Satz: „Die Dokumente nennen Schutzmaßnahmen und Lücken. Vertraulich behandeln.“
 - Umschalter (`role="tablist"`): Verfahrensdokumentation · Verarbeitungsverzeichnis.
 - Knöpfe: „Drucken oder als PDF speichern“ (Hauptknopf), „Als Word-Datei (DOCX)“, „Version freigeben …“, „Geprüft, keine Änderung“ (nur mit Versionen und ohne V2; setzt `zuletztGeprueft`).
@@ -757,6 +759,11 @@ Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem 
 - Teilschritte, Tabs und Dialog sind per Tastatur bedienbar; der Dialog hält den Fokus und schließt mit Escape.
 - Hell- und Dunkelmodus nutzen die bestehenden Farbvariablen; der Druck ist immer hell (bestehende Druckregeln).
 - axe meldet in keinem Teilschritt schwere oder kritische Befunde, hell wie dunkel.
+- Wiederholte Knöpfe nennen ihr Objekt im zugänglichen Namen; er beginnt mit dem sichtbaren Text (WCAG 2.5.3), z. B. „Beheben: Schutzmaßnahmen fehlen – Verschlüsselung“, „Angaben bearbeiten: Tourenliste“, „DOCX: Version 1.0, Verfahrensdokumentation als Word-Datei“.
+- Wiederholte Kontaktfelder (Datenschutzbeauftragter, gemeinsam Verantwortlicher, Vertreter) stehen in einem `fieldset` mit Legende „Kontakt: {wer}“ (für Screenreader).
+- Der Fokus fällt nie auf die Seite zurück: Nach dem Anlegen steht er im ersten Feld des neuen Eintrags (Empfänger, weitere Kontrolle, Löschfrist: „Anzahl“), bei einer neuen Unterlage auf ihrer Karte, bei einem neuen Ablageort auf seinem Kästchen. Nach dem Entfernen steht er auf dem nächsten Eintrag, sonst auf der Überschrift des Abschnitts; nach „Löschfrist entfernen“ auf „Löschfrist festlegen“, nach „Zurück zum aktuellen Entwurf“ auf dem gewählten Reiter.
+- Knöpfe zum Anlegen werden nicht gesperrt. Fehlt eine Angabe, steht die Meldung am Feld (`role="alert"`, `aria-invalid`, `aria-describedby`), und der Fokus geht ins Feld, z. B. „Gib der Unterlage einen Namen, z. B. „Ausgangsrechnung“.“
+- Zahlenfelder (`OptionaleZahl`) übernehmen nur ganze Zahlen im erlaubten Bereich. Alles andere bleibt sichtbar im Feld stehen, mit „Bitte eine ganze Zahl eingeben, z. B. 12.“ oder „Höchstens 30 Jahre.“, bis es korrigiert ist; gespeichert bleibt der letzte gültige Wert.
 
 ## 6. Regeln, Berechnungen und Prüfungen
 
@@ -847,7 +854,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | B1 | Aufbewahrungsfrist fehlt | Warnung | Art `unklar` | „Für „{d}“ ist keine Aufbewahrungsfrist festgelegt. Ordne die Unterlage ein; im Zweifel die Steuerberatung fragen.“ | § 147 Abs. 1, 3 AO | belege |
 | B2 | Frist kürzer als vorgeschrieben | Fehler | `aufbewahrungJahre ≠ null`, `mindestJahre ≠ null`, `aufbewahrungJahre < mindestJahre` | „„{d}“ soll {x} Jahre aufbewahrt werden, vorgeschrieben sind {y} Jahre.“ | § 147 Abs. 3 AO | fristen |
 | B3 | Ablageort fehlt | Warnung | Art in PFLICHTIG, keine gültige Speicher-Id in der Ablage | „Wo wird „{d}“ aufbewahrt? Ohne Ablageort ist die Aufbewahrung nicht nachweisbar.“ | § 147 Abs. 1 AO; GoBD Rz. 119 | belege |
-| B4 | E-Mail-Postfach als einziges Archiv | Warnung | Art in PFLICHTIG, Ablage nicht leer, jeder Ablage-Speicher gehört zu einem Medium der Art `email`, keines davon `revisionssicher` | „„{d}“ liegt nur im Postfach „{System}“. Dort kann jeder löschen oder verschieben; Unveränderbarkeit und Frist sind nicht gesichert. Archiv oder DMS ergänzen.“ | GoBD Rz. 110, 119 | belege |
+| B4 | E-Mail-Postfach als einziges Archiv | Warnung | Art in PFLICHTIG, Ablage nicht leer, jeder Ablage-Speicher gehört zu einem Medium der Art `email`, keines davon `revisionssicher` | „„{d}“ liegt nur im Postfach „{System}“. Dort kann jeder löschen oder verschieben; Unveränderbarkeit und Frist sind nicht gesichert. Archiv oder Dokumentenmanagementsystem (DMS) ergänzen.“ | GoBD Rz. 110, 119 | belege |
 | B5 | Ablage ohne Schutz vor Änderung | Warnung | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, B4 trifft nicht zu, mindestens ein digitaler Ablage-Speicher und keiner davon mit `revisionssicher` oder `protokolliert` | „„{d}“ liegt in {Systeme}, ohne dass Änderungen verhindert oder protokolliert werden. Eine einfache Dateiablage genügt dafür in der Regel nicht.“ | GoBD Rz. 108–110 | systeme |
 | B6 | Elektronische Unterlage auf Papier aufbewahrt | Fehler; Hinweis bei Art `geschaeftsbrief`, `buchungsbeleg` oder `lieferschein` (Handels- und Geschäftsbriefe, 3.2), Richtung `ausgang`, Form nicht `strukturiert` und erzeugender Aufgabe ohne Medium der Art `erp` oder `fachanwendung` | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, und Ablageform `ausdruck` oder alle Ablage-Speicher nicht digital | „„{d}“ entsteht oder kommt elektronisch an und muss elektronisch aufbewahrt werden. Ein Ausdruck reicht nicht.“ Hinweis, je nach Auslöser: „„{d}“ liegt nur in Papierablagen.“ bzw. „„{d}“ wird als Ausdruck aufbewahrt.“, dann „Nur zulässig, wenn „{d}“ auf Papier versandt und die Datei nicht aufbewahrt wird.“ | GoBD Rz. 119, 120 | belege |
 | B7 | Elektronisches Original nicht aufbewahrt | Fehler bei Form `strukturiert`, sonst Hinweis | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, Ablageform `umgewandelt` | `strukturiert`: „Bei „{d}“ muss der strukturierte Teil aufbewahrt werden, z. B. die XML-Datei. Nur ein PDF genügt nicht.“ Sonst: „„{d}“ liegt nur umgewandelt vor. Prüfen, ob die Voraussetzungen der GoBD Rz. 135 erfüllt sind; sonst das Original zusätzlich aufbewahren.“ | GoBD Rz. 119, 131, 135 (Fassung 14.07.2025) | belege |
@@ -865,7 +872,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | D8 | Empfänger ohne gesicherten Standort | Warnung | ein externer Empfänger mit Standort `unbekannt`, oder `drittland` und (Land leer oder Garantie `null` oder `keine` oder Name leer) | „Für „{Kategorie}“ ist {nicht bekannt, wo die Daten verarbeitet werden / das Drittland nicht angegeben / keine Garantie für die Übermittlung in das Drittland ({Land}) eingetragen / der Empfänger im Drittland ({Land}) nicht benannt}.“ Das Land steht in Klammern, weil es einen Artikel brauchen kann; ohne Land entfällt „in das Drittland“, nach der Garantie heißt es „der Empfänger dort“. | Art. 30 Abs. 1 lit. e, Art. 44–46 DSGVO; DSK-Hinweise Ziff. 6.5 | belege |
 | D9 | Zweck fehlt | Warnung | ein Objekt personenbezogen, kein nicht leerer Zweck | „Wozu werden die Daten in diesem Prozess verarbeitet?“ | Art. 30 Abs. 1 lit. b DSGVO | belege |
 | S1 | Betrieb des Systems unklar | Hinweis; Warnung bei `hatPersonenbezug` | digital, im Einsatz, `betrieb = null` | „Wo läuft „{s}“: auf eigenen Geräten, auf eigenem Server oder als Cloud-Dienst?“ Mit Personenbezug zusätzlich: „Davon hängen die Angaben zu Empfängern und Drittländern im Verzeichnis ab.“ | Muster, Kap. 3.1; mit Personenbezug zusätzlich Art. 30 Abs. 1 lit. d, e DSGVO | systeme |
-| S2 | Dienstleister ohne AV-Vertrag; Hinweis „Datum des AV-Vertrags fehlt“ | Warnung; Hinweis bei `avVertrag = 'ja'` ohne `avVertragVom` | `mitDienstleister`, `hatPersonenbezug`, `auftragsverarbeitung ≠ false`, `avVertrag ≠ 'ja'`; Hinweis: dieselben Voraussetzungen, `avVertrag = 'ja'`, `avVertragVom = null` | „{Dienstleister} verarbeitet in „{s}“ personenbezogene Daten. Dafür ist ein Vertrag zur Auftragsverarbeitung nötig.“ Bei `auftragsverarbeitung = null` zusätzlich: „Prüfe zuerst, ob im Auftrag verarbeitet wird.“ Hinweis: „Für „{s}“ ist ein Vertrag zur Auftragsverarbeitung ohne Datum eingetragen. Datum ergänzen; Kapitel 6 der Verfahrensdokumentation nennt den Vertrag mit Datum.“ | Art. 28 Abs. 3 DSGVO; Hinweis: Art. 28 Abs. 3, 9 DSGVO | systeme |
+| S2 | Vertrag zur Auftragsverarbeitung fehlt; Hinweis „Datum des AV-Vertrags fehlt“ | Warnung; Hinweis bei `avVertrag = 'ja'` ohne `avVertragVom` | `mitDienstleister`, `hatPersonenbezug`, `auftragsverarbeitung ≠ false`, `avVertrag ≠ 'ja'`; Hinweis: dieselben Voraussetzungen, `avVertrag = 'ja'`, `avVertragVom = null` | „{Dienstleister} verarbeitet in „{s}“ personenbezogene Daten. Dafür ist ein Vertrag zur Auftragsverarbeitung nötig.“ Bei `auftragsverarbeitung = null` zusätzlich: „Prüfe zuerst, ob im Auftrag verarbeitet wird.“ Hinweis: „Für „{s}“ ist ein Vertrag zur Auftragsverarbeitung ohne Datum eingetragen. Datum ergänzen; Kapitel 6 der Verfahrensdokumentation nennt den Vertrag mit Datum.“ | Art. 28 Abs. 3 DSGVO; Hinweis: Art. 28 Abs. 3, 9 DSGVO | systeme |
 | S3 | Speicherort unklar oder ohne Garantie | Warnung | `mitDienstleister`, `hatPersonenbezug`, Standort `unbekannt` oder (`drittland` und (Land leer oder Garantie `null` oder `keine`)) | „Wo verarbeitet „{s}“ die Daten? Liegt der Server im Drittland oder läuft der Mailversand darüber, ist das eine Übermittlung; Support von dort kann eine sein.“ Drittland: „„{s}“ verarbeitet die Daten im Drittland ({Land}), ohne dass eine Garantie für die Übermittlung eingetragen ist, z. B. Standardvertragsklauseln.“ Ohne Land: „… in einem Drittland, ohne dass das Land (und eine Garantie für die Übermittlung) eingetragen ist.“ | Art. 44–46 DSGVO; DSK-Hinweise Ziff. 6.4 | systeme |
 | S4 | Programmversion fehlt | Hinweis | digital, im Einsatz, Version leer oder `seit = null` | „Für „{s}“ fehlen Version oder Einsatzbeginn. Die Dokumentation muss zu den eingesetzten Programmversionen passen.“ | GoBD Rz. 154; Muster 3.1 | systeme |
 | S5 | Datensicherung ungeklärt | Warnung | digital, `ablageVon` nicht leer, Sicherung `keine` oder `unklar` | „„{s}“ bewahrt {Liste} auf, eine Datensicherung ist {nicht eingerichtet / nicht bekannt}.“ | GoBD Rz. 103–106; Art. 32 Abs. 1 lit. c DSGVO | systeme |
@@ -967,7 +974,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 
 ### 6.8 Versionen, geänderte Kapitel, Prüfsumme
 
-- **Kapitelschlüssel:** Nummer der nächsten Überschrift der Ebene 1 oder 2; Ebene 3 zählt zu ihrer Ebene 2. Ausnahme: alles in Kapitel 4 zählt zu „4“, weil sich sonst Nummern verschieben. Ausgenommen vom Vergleich sind Deckblatt, Gliederung und Kapitel 7 sowie im Verzeichnis Abschnitt D. Kapitel 1 wird verglichen, damit ein Wechsel der Geschäftsleitung V2 auslöst; seine Versionsangaben sind beim Vergleich gleich, weil der Kontext von v gilt. Präfixe: „VD “ und „VVT “.
+- **Kapitelschlüssel:** Nummer der nächsten Überschrift der Ebene 1 oder 2; Ebene 3 zählt zu ihrer Ebene 2. Ausnahme: alles in Kapitel 4 zählt zu „4“, weil sich sonst Nummern verschieben. Ausgenommen vom Vergleich sind Deckblatt, Gliederung und Kapitel 7 sowie im Verzeichnis Abschnitt D. Kapitel 1 wird verglichen, damit ein Wechsel der Geschäftsleitung V2 auslöst; seine Versionsangaben sind beim Vergleich gleich, weil der Kontext von v gilt. Präfixe: „VD “ und „VVT “. Sie sind nur Schlüssel: Oberfläche, Befund V2, Vorgabe im Freigabe-Dialog und Kapitel 7 schreiben sie mit `kapitelText` aus („Verfahrensdokumentation 3.2, 3.3 und 4; Verzeichnis B.1“, in Kapitel 7 ohne den Namen des eigenen Dokuments).
 - **Vergleich:** `geaenderteKapitel(v, projekt)` erzeugt beide Dokumente neu, und zwar mit dem Kontext von v: `version = v`, Historie bis v, `bezugsjahr = Jahr(v.gueltigAb)`, `heute = v.freigegebenAm`. Dann vergleicht es je Schlüssel die JSON-Darstellung der Abschnitte mit dem eingefrorenen Stand. So zählen nur fachliche Änderungen.
 - **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. So ändern Laden, Prüfen und Speichern die Prüfsumme nie. Gespeichert wird sie als Hex.
 - **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile. Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
@@ -1058,6 +1065,7 @@ src/ui/compliance/
   FreigabeDialog.tsx
   Chips.tsx  DatumEingabe.tsx
   lerninhalte.ts
+  nachladen.ts             Bühnenmarkierungen: lädt die Lückenprüfung erst im Schritt „Dokumentieren“
 e2e/dokumentieren.spec.ts
 ```
 
@@ -1067,13 +1075,15 @@ Außerdem ändern sich:
 - `src/modell/speicher.ts`: Prüfung beim Laden, Migration eingefrorener Prozesse, getrennte Ablage der Versionen, Meldung bei vollem Speicher
 - `src/zustand.ts`: Schritt, Teilschritt, Aktionen, Bereinigung
 - `src/ui/kontext.ts`: `aendereCompliance`
-- `src/App.tsx`: Schritt, Menüpunkt „Daten im Browser löschen“; Menü „Beispiel Lieferdienst“ lädt `beispielMitCompliance()`
+- `src/App.tsx`: Schritt (per `lazy` nachgeladen), Menüpunkt „Daten im Browser löschen“; Menü „Beispiel Lieferdienst“ lädt `beispielMitCompliance()`
 - `src/ui/schritte/VerbessernSchritt.tsx`: Hinweis aus 6.10
 - `src/bpmn/export.ts`: Option „ohne Compliance-Angaben“ für `bpmnFuerExport`
 - `src/plattform/typen.ts`, `browser.ts`, `desktop.ts` und `src-tauri/src/lib.rs`: Speichern von Bytes (7.5)
 - `src/styles.css`: Teilschritte, Dokumentansicht, Druck
 
 `src/modell/beispiel.ts` bleibt unverändert, damit die Fachlogik in `src/modell` nicht von `src/compliance` abhängt.
+
+Der Schritt „Dokumentieren“ mit Lückenprüfung und Generatoren bildet eigene Teile, die erst im Schritt laden (wie `DiagrammLazy` und `docx`). Im Hauptteil bleiben nur Typen, Standardwerte, Speichern und Laden; er bleibt so unter der Warnschwelle von 500 kB.
 
 ### 7.3 Speicherung
 
@@ -1354,14 +1364,15 @@ Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentit
 ### 9.10 Browsertests (Playwright, Uhr fest auf 11.11.2026)
 
 1. Beispiel „Lieferdienst“ laden, „Dokumentieren“ → „Lücken“: Zählerzeile „keine Fehler · 4 Warnungen · 3 Hinweise“ (Format von `zaehle`).
-2. „Beheben“ bei B1 öffnet „Belege und Daten“ mit Fokus auf „Bestellnotiz“. „Nicht aufbewahrungspflichtig“ und eine Löschfrist von 30 Tagen ab Entstehung wählen: „keine Fehler · 3 Warnungen · 3 Hinweise“.
+2. „Beheben“ bei B1 öffnet „Belege und Daten“ mit Fokus auf der Frage „Was ist „Bestellnotiz“?“ (Option „Weiß nicht“). „Nicht aufbewahrungspflichtig“ und eine Löschfrist von 30 Tagen ab Entstehung wählen: „keine Fehler · 3 Warnungen · 3 Hinweise“.
 3. Version freigeben: Liste zeigt „1.0 · gültig ab 11.11.2026“. Im Schritt „Ablauf“ eine Aufgabe umbenennen: „Lücken“ zeigt V2 mit „Seit Version 1.0 geändert“.
 4. „Als Word-Datei“: Download mit Namen `…-verfahrensdokumentation-v1-0.docx`, größer als 5 KB.
 5. Druckansicht (`emulateMedia print`): Hinweis sichtbar, Teilschritt-Leiste unsichtbar.
-6. axe in allen acht Teilschritten und im Freigabe-Dialog, hell und dunkel: keine schweren oder kritischen Befunde.
+6. axe in allen acht Teilschritten und im Freigabe-Dialog, hell und dunkel, sowie nach einer Freigabe (Versionsliste): keine schweren oder kritischen Befunde.
 7. Tastatur: Teilschritte, Chips und Dialog vollständig ohne Maus bedienbar.
 8. „Verbessern“: Vorschlag „Freigabe „Rechnung freigeben“ streichen“ zeigt den Hinweis auf die dokumentierte Kontrolle.
 9. Neues Projekt mit einer Aufgabe: Teilschritte ohne Angaben zeigen den grauen Kreis („noch nichts eingetragen“), „Belege und Daten“ einen offenen Punkt (B10); „Beheben“ setzt den Fokus auf das Namensfeld von „Neue Unterlage“. Im Beispiel ohne Befunde heißt es „Keine Lücken gefunden. Die Prüfung findet keine fehlenden oder widersprüchlichen Angaben; ob sie stimmen, prüft die App nicht.“
+10. Bedienung (`e2e/dokumentieren-bedienung.spec.ts`): „Weiter“ zeigt den Anfang des nächsten Teilschritts, „Beheben“ die Frage zum Befund; der Fokus bleibt nach Anlegen und Entfernen bei einem sinnvollen Element; fehlende Namen und ungültige Zahlen werden am Feld gemeldet; „1 markiert – zeigen“ holt den markierten Schritt ins Bild.
 
 ### 9.11 Fachliche Abnahme
 

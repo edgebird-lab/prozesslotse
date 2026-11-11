@@ -124,7 +124,7 @@ describe('Freigabe zurückziehen (daten-5)', () => {
     // Version 2.0 enthält die Änderung, wird aber zurückgezogen
     const v2: DokuVersion = await freigeben(p, c0, eingaben({ bezeichnung: '2.0', gueltigAb: '2027-01-01', aenderung: 'umbenannt' }), HEUTE)
     const c = zieheZurueck({ ...c0, versionen: [...c0.versionen, v2] }, 2, 'zu früh freigegeben', HEUTE)
-    expect(pruefeCompliance(p, c, HEUTE).find((b) => b.regel === 'V2')?.text).toBe('Seit Version 1.0 geändert: VD 3.2, VD 3.3, VD 4. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.')
+    expect(pruefeCompliance(p, c, HEUTE).find((b) => b.regel === 'V2')?.text).toBe('Seit Version 1.0 geändert: Verfahrensdokumentation 3.2, 3.3 und 4. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.')
   })
 
   it('der Rückzug lässt sich wie eine Freigabe nicht rückgängig machen', async () => {

@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom'
 import { angaben } from '../../compliance/ableitung'
 import { addiereTage, formatiereDatum, jahrVon } from '../../compliance/datum'
 import { fristEnde, istKaufmann, laengerAlsVorgeschrieben, mindestJahre, vernichtungAb, wirksameJahre } from '../../compliance/fristen'
@@ -8,6 +9,7 @@ import type { Id } from '../../modell/typen'
 import { ZahlEingabe } from '../Eingaben'
 import { useCompliance } from './analyse'
 import { CFeld, KatalogAuswahl, KatalogListe, OptionaleZahl, TextFeld } from './Eingaben'
+import { erstesFeld, fokussiere } from './fokus'
 
 /** Lange Wörter der Einordnung dürfen in der schmalen Spalte umbrechen („aufbewahrungs-pflichtig“). */
 const trennbar = (text: string) => text.replace(/(ufbewahrungs|rganisations)(?=\p{Ll})/gu, '$1\u00ad')
@@ -74,7 +76,7 @@ export function FristenTeil() {
                     <td>{gesetzlich(o.d)}</td>
                     <td>
                       {istPflichtig(o.d.aufbewahrungsart) ? (
-                        <OptionaleZahl id={`ziel-frist-${o.id}`} ariaLabel={`Gewählte Frist für ${o.name} in Jahren, leer heißt gesetzlich`} wert={o.d.aufbewahrungJahre} max={30} onAendern={(aufbewahrungJahre) => setze(o.id, { aufbewahrungJahre }, 'jahre')} />
+                        <OptionaleZahl id={`ziel-frist-${o.id}`} ariaLabel={`Gewählte Frist für ${o.name} in Jahren, leer heißt gesetzlich`} wert={o.d.aufbewahrungJahre} max={30} einheit="Jahre" onAendern={(aufbewahrungJahre) => setze(o.id, { aufbewahrungJahre }, 'jahre')} />
                       ) : (
                         '–'
                       )}
@@ -106,7 +108,7 @@ export function FristenTeil() {
                 Alle aufbewahrungspflichtigen Unterlagen einheitlich 10 Jahre
               </button>
             </div>
-            <p className="feld-hilfe">Das Muster von BStBK und DStV empfiehlt einheitlich mindestens 10 Jahre. Werden dabei personenbezogene Daten länger aufbewahrt als vorgeschrieben, braucht es eine Begründung.</p>
+            <p className="feld-hilfe">Das Muster der Bundessteuerberaterkammer und des Steuerberaterverbands (BStBK/DStV) empfiehlt einheitlich mindestens 10 Jahre. Werden dabei personenbezogene Daten länger aufbewahrt als vorgeschrieben, braucht es eine Begründung.</p>
           </div>
         )}
         {laenger && (
@@ -122,7 +124,7 @@ export function FristenTeil() {
 
       <section aria-labelledby="loeschfristen-titel" className="felder">
         <h3 id="loeschfristen-titel">Löschfristen</h3>
-        <p className="leise">Für personenbezogene Daten ohne Aufbewahrungspflicht. Ein allgemeiner Verweis genügt nicht; die Frist muss konkret sein.</p>
+        <p className="leise">Für personenbezogene Daten ohne Aufbewahrungspflicht. Ein Satz wie „wird gelöscht, wenn nicht mehr nötig“ genügt nicht; nenne eine Frist, z. B. 30 Tage nach Erledigung.</p>
         {loeschen.length === 0 && <p className="leer-hinweis">Keine personenbezogenen Unterlagen ohne Aufbewahrungspflicht.</p>}
         {loeschen.map((o) => {
           const f = o.d.loeschfrist
@@ -130,7 +132,16 @@ export function FristenTeil() {
             <fieldset key={o.id} className="karte felder" id={`ziel-frist-${o.id}`} tabIndex={-1}>
               <legend>{o.name}</legend>
               {f === null ? (
-                <button type="button" className="knopf knopf-klein" onClick={() => setzeFrist(o.id, neueFrist(), 'neu')}>
+                <button
+                  type="button"
+                  className="knopf knopf-klein"
+                  onClick={(e) => {
+                    // Der Knopf weicht den Feldern: Fokus auf „Anzahl“
+                    const karte = e.currentTarget.closest('fieldset')
+                    flushSync(() => setzeFrist(o.id, neueFrist(), 'neu'))
+                    fokussiere(erstesFeld(karte))
+                  }}
+                >
                   Löschfrist festlegen
                 </button>
               ) : (
@@ -141,7 +152,16 @@ export function FristenTeil() {
                   </div>
                   <KatalogAuswahl label="Ab wann?" katalog={FRIST_BEGINNE} wert={f.beginn} spalten={3} onAendern={(beginn) => setzeFrist(o.id, { ...f, beginn }, 'beginn')} />
                   {f.beginn === 'ereignis' && <TextFeld label="Nach welchem Ereignis?" platzhalter="z. B. Ende der Kundenbeziehung" wert={f.ereignis} onAendern={(ereignis) => setzeFrist(o.id, { ...f, ereignis }, 'ereignis')} />}
-                  <button type="button" className="knopf knopf-klein knopf-leise" onClick={() => setzeFrist(o.id, null, 'weg')}>
+                  <button
+                    type="button"
+                    className="knopf knopf-klein knopf-leise"
+                    onClick={(e) => {
+                      // Zurück auf „Löschfrist festlegen“
+                      const karte = e.currentTarget.closest('fieldset')
+                      flushSync(() => setzeFrist(o.id, null, 'weg'))
+                      fokussiere(karte?.querySelector('button'))
+                    }}
+                  >
                     Löschfrist entfernen
                   </button>
                 </>

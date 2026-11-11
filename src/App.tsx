@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { beispielMitCompliance } from './compliance/beispiel'
 import { neuesProjekt } from './modell/bausteine'
 import { beispielOnlineProjekt } from './modell/beispiel'
@@ -19,6 +19,7 @@ import { plattform, type MenueBefehl, type Zuletzt } from './plattform'
 import { aktiverProzess, istGeaendert, reduziere, SCHRITTE, startZustand } from './zustand'
 import { hauptElement, markierungen, useAnalyse, useBpmn } from './ui/analyse'
 import { useDateiBefehle, type FremdesBpmn } from './ui/datei'
+import type { DiagrammApi } from './ui/Diagramm'
 import { DiagrammLazy as Diagramm } from './ui/DiagrammLazy'
 import { Schalter } from './ui/Eingaben'
 import { useFrage } from './ui/frage'
@@ -28,8 +29,7 @@ import { AppKontext, useApp, type AppApi } from './ui/kontext'
 import { AblaufSchritt } from './ui/schritte/AblaufSchritt'
 import { BerichtSchritt } from './ui/schritte/BerichtSchritt'
 import { BeteiligteSchritt } from './ui/schritte/BeteiligteSchritt'
-import { DokumentierenSchritt } from './ui/schritte/DokumentierenSchritt'
-import { useComplianceMarkierungen } from './ui/compliance/analyse'
+import { useComplianceMarkierungen } from './ui/compliance/nachladen'
 import { useMeldeFalschePruefsummen } from './ui/compliance/pruefsummen'
 import { PruefenSchritt } from './ui/schritte/PruefenSchritt'
 import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
@@ -37,6 +37,9 @@ import { VerbessernSchritt } from './ui/schritte/VerbessernSchritt'
 import './styles.css'
 
 const VERSION = '0.2.0'
+
+// „Dokumentieren“ mit Lückenprüfung und Generatoren ist groß; der Schritt lädt erst, wenn er gebraucht wird
+const DokumentierenSchritt = lazy(() => import('./ui/schritte/DokumentierenSchritt').then((m) => ({ default: m.DokumentierenSchritt })))
 
 /** Hinweis zum Browser-Speicher; bleibt stehen, bis er erledigt ist. */
 interface BrowserHinweis {
@@ -325,7 +328,11 @@ function Hauptfenster() {
                   {z.schritt === 'ablauf' && <AblaufSchritt />}
                   {z.schritt === 'pruefen' && <PruefenSchritt />}
                   {z.schritt === 'verbessern' && <VerbessernSchritt />}
-                  {z.schritt === 'dokumentieren' && <DokumentierenSchritt />}
+                  {z.schritt === 'dokumentieren' && (
+                    <Suspense fallback={<p className="leise">Dokumentieren wird geladen …</p>}>
+                      <DokumentierenSchritt />
+                    </Suspense>
+                  )}
                 </section>
                 {!(z.schritt === 'dokumentieren' && z.teilschritt === 'dokumente') && <Buehne p={p} hervorhebung={hervorhebung} />}
               </main>
@@ -518,6 +525,7 @@ function FremdeAnsicht({ fremd, onSchliessen }: { fremd: FremdesBpmn; onSchliess
 
 function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
   const { z, dispatch } = useApp()
+  const diagramm = useRef<DiagrammApi>(null)
   const pDiagramm = useVerzoegert(p, 200)
   const bpmn = useBpmn(pDiagramm)
   const analyse = useAnalyse(pDiagramm)
@@ -558,9 +566,14 @@ function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
         )}
         <span className="buehne-name">{p.name || 'Unbenannter Prozess'}</span>
         {zeigeBefunde && marken && marken.size > 0 && <span className="leise klein">Markiert: Schwachstellen und Fehler</span>}
-        {dokumentieren && marken && marken.size > 0 && <span className="leise klein">Markiert: Lücken an Schritten</span>}
+        {/* Markierte Schritte liegen oft außerhalb des Anfangsausschnitts: der Knopf holt den ersten ins Bild */}
+        {dokumentieren && marken && marken.size > 0 && (
+          <button type="button" className="knopf knopf-klein" title="Lücken an Schritten im Diagramm zeigen" onClick={() => diagramm.current?.zeige([...marken.keys()])}>
+            {marken.size} markiert – zeigen
+          </button>
+        )}
       </div>
-      <Diagramm xml={bpmn.xml} markierungen={marken} ausgewaehlt={ausgewaehlt} onKlick={klick} beschriftung={`BPMN-Diagramm: ${p.name || 'Unbenannter Prozess'}`} />
+      <Diagramm ref={diagramm} xml={bpmn.xml} markierungen={marken} ausgewaehlt={ausgewaehlt} onKlick={klick} beschriftung={`BPMN-Diagramm: ${p.name || 'Unbenannter Prozess'}`} />
       <p className="buehne-fuss leise klein">
         Ziehen zum Verschieben, Strg + Mausrad zum Zoomen. {dokumentieren ? 'Ein Klick auf einen Schritt zeigt nur seine Angaben.' : 'Ein Klick auf einen Schritt öffnet ihn zum Bearbeiten.'}
       </p>

@@ -68,6 +68,26 @@ export function geaenderteKapitelIn(alt: Dokument, neu: Dokument): string[] {
   return schluessel.filter((k) => !regeln.ausgenommen.has(k) && kanonischesJson(a.get(k) ?? null) !== kanonischesJson(n.get(k) ?? null)).map((k) => `${regeln.praefix}${k}`)
 }
 
+const NAMEN: Record<DokumentArt, string> = { verfahrensdokumentation: 'Verfahrensdokumentation', verarbeitungsverzeichnis: 'Verzeichnis' }
+
+/**
+ * Geänderte Kapitel zum Lesen: aus „VD 3.2“, „VD 4“, „VVT B.1“ wird
+ * „Verfahrensdokumentation 3.2 und 4; Verzeichnis B.1“. Gespeichert bleiben
+ * die Schlüssel. Kapitel des Dokuments `eigenes` stehen ohne seinen Namen.
+ */
+export function kapitelText(schluessel: readonly string[], eigenes?: DokumentArt): string {
+  const gruppen: { art: DokumentArt | null; nummern: string[] }[] = []
+  for (const s of schluessel) {
+    const art = (Object.keys(REGELN) as DokumentArt[]).find((a) => s.startsWith(REGELN[a].praefix)) ?? null
+    const nummer = art ? s.slice(REGELN[art].praefix.length) : s
+    const gruppe = gruppen.find((g) => g.art === art)
+    if (gruppe) gruppe.nummern.push(nummer)
+    else gruppen.push({ art, nummern: [nummer] })
+  }
+  const aufzaehlen = (n: string[]) => (n.length <= 1 ? n.join('') : `${n.slice(0, -1).join(', ')} und ${n[n.length - 1]}`)
+  return gruppen.map((g) => (g.art === null ? g.nummern.join(', ') : `${g.art === eigenes ? '' : `${NAMEN[g.art]} `}${aufzaehlen(g.nummern)}`)).join('; ')
+}
+
 /** Gliederung für Druck und DOCX: Überschriften der Ebenen 1 und 2. */
 export function gliederung(d: Dokument): { ebene: 1 | 2; nummer: string; text: string }[] {
   return d.abschnitte.flatMap((a) => (a.art === 'ueberschrift' && a.ebene <= 2 ? [{ ebene: a.ebene as 1 | 2, nummer: a.nummer, text: a.text }] : []))

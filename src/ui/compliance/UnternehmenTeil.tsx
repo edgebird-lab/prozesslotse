@@ -12,8 +12,10 @@ import { CFeld, DatumFeld, JaNeinOffen, KatalogAuswahl, KatalogListe, OptionaleZ
 
 function KontaktFelder({ kontakt, onAendern, wer }: { kontakt: Kontakt; onAendern: (k: Kontakt, feld: string) => void; wer: string }) {
   const anschrift = (werte: Partial<Anschrift>, feld: string) => onAendern({ ...kontakt, anschrift: { ...kontakt.anschrift, ...werte } }, feld)
+  // Eigene Gruppe, damit sich „Straße und Hausnummer“ usw. von den Firmenfeldern unterscheiden lassen
   return (
-    <div className="eingerueckt felder">
+    <fieldset className="eingerueckt felder">
+      <legend className="sr">Kontakt: {wer}</legend>
       <TextFeld label={`Name (${wer})`} wert={kontakt.name} onAendern={(name) => onAendern({ ...kontakt, name }, 'name')} />
       <TextFeld label="Straße und Hausnummer" wert={kontakt.anschrift.strasse} onAendern={(strasse) => anschrift({ strasse }, 'strasse')} />
       <div className="feldreihe">
@@ -24,7 +26,7 @@ function KontaktFelder({ kontakt, onAendern, wer }: { kontakt: Kontakt; onAender
         <TextFeld label="Telefon" typ="tel" wert={kontakt.telefon} onAendern={(telefon) => onAendern({ ...kontakt, telefon }, 'telefon')} />
         <TextFeld label="E-Mail" typ="email" wert={kontakt.email} onAendern={(email) => onAendern({ ...kontakt, email }, 'email')} />
       </div>
-    </div>
+    </fieldset>
   )
 }
 
@@ -162,10 +164,10 @@ export function UnternehmenTeil() {
           </p>
         )}
         <p className="feld-hilfe">
-          Unabhängig von der Zahl kann einer nötig sein, etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören (Art. 37 Abs. 1 lit. b, c DSGVO) oder eine
+          Unabhängig von der Zahl kann ein Datenschutzbeauftragter nötig sein, etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören (Art. 37 Abs. 1 lit. b, c DSGVO) oder eine
           Datenschutz-Folgenabschätzung nötig ist (§ 38 Abs. 1 Satz 2 BDSG). Das prüft die App nicht.
         </p>
-        <div id="ziel-unternehmen-datenschutzbeauftragter" tabIndex={-1}>
+        <div id="ziel-unternehmen-datenschutzbeauftragter">
           <JaNeinOffen
             label="Ist ein Datenschutzbeauftragter benannt?"
             ohneOffen
@@ -205,7 +207,7 @@ export function UnternehmenTeil() {
         <h3 id="verarbeitung-titel">Verarbeitungstätigkeit im Verzeichnis</h3>
         <p className="leise">Dieser Prozess ist ein Eintrag im Verzeichnis von Verarbeitungstätigkeiten.</p>
         {/* volle Breite: Der Platzhalter zeigt den Prozessnamen, der bei leerem Feld im Verzeichnis steht */}
-        <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Leer: Name des Prozesses" onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
+        <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Bleibt das Feld leer, steht hier der Name des Prozesses." onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
         <div className="feldreihe">
           <TextFeld label="Laufende Nummer" wert={v.laufendeNummer} onAendern={(laufendeNummer) => setzeV({ laufendeNummer }, 'nummer')} />
           <DatumFeld label="Eingeführt am" wert={v.eingefuehrtAm} onAendern={(eingefuehrtAm) => setzeV({ eingefuehrtAm }, 'eingefuehrt')} />

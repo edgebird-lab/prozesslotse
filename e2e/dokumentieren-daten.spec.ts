@@ -185,7 +185,7 @@ test('zweite Freigabe am selben Tag: Die Vorgaben bestehen die eigene Prüfung, 
   const inhalt = dialog.getByLabel('Inhalt der Änderung')
   await expect(inhalt).toHaveValue('')
   await expect(inhalt).toHaveAttribute('placeholder', 'z. B. Rechnung wird jetzt zusätzlich von der Buchhaltung geprüft')
-  await expect(dialog).toContainText('Geänderte Kapitel: Verfahrensdokumentation 3.2, 3.3, 4 (werden automatisch eingetragen)')
+  await expect(dialog).toContainText('Geänderte Kapitel: Verfahrensdokumentation 3.2, 3.3 und 4 (werden automatisch eingetragen)')
   await dialog.getByRole('button', { name: 'Freigeben', exact: true }).click()
   await expect(dialog.getByRole('alert')).toHaveText('Bitte den Inhalt der Änderung beschreiben.')
   await expect(inhalt).toBeFocused()

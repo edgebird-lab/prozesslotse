@@ -220,7 +220,7 @@ export const BETRIEBE: Eintrag<Betrieb>[] = [
 ]
 
 export const UNVERAENDERBARKEIT: Eintrag<Unveraenderbarkeit>[] = [
-  { wert: 'revisionssicher', text: 'Revisionssicheres Archiv', dok: 'Archiv mit Schutz vor Änderung und Löschung' },
+  { wert: 'revisionssicher', text: 'Revisionssicheres Archiv', beschreibung: 'Archiv, das Ändern und Löschen technisch verhindert', dok: 'Archiv mit Schutz vor Änderung und Löschung' },
   { wert: 'protokolliert', text: 'Änderungen werden protokolliert' },
   { wert: 'keine', text: 'Keine, z. B. einfache Dateiablage', dok: 'keiner' },
   { wert: 'unklar', text: 'Weiß nicht', dok: 'offen' },

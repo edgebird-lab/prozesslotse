@@ -25,6 +25,7 @@ import {
 } from './ableitung'
 import { ablaufBeschreibung, wennText } from './ablauftext'
 import { formatiereDatum } from './datum'
+import { kapitelText } from './dokument'
 import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb } from './fristen'
 import { mitgeltendeUnterlagen, mitgeltendText } from './mitgeltend'
 import {
@@ -443,7 +444,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
           formatiereDatum(v.gueltigAb),
           rueckzug ? `zurückgezogen am ${formatiereDatum(rueckzug.am)}` : bis ? formatiereDatum(bis) : 'laufend',
           `${formatiereDatum(v.freigegebenAm)}, ${v.freigegebenVon.trim() || 'offen'}`,
-          v.geaenderteKapitel.join(', ') || '–',
+          kapitelText(v.geaenderteKapitel, 'verfahrensdokumentation') || '–',
           rueckzug ? `${v.aenderung.trim() || '–'}; zurückgezogen: ${rueckzug.grund.trim()}` : v.aenderung.trim() || '–',
           rueckzug ? 'mit der Änderungshistorie' : aufbewahrenBisText(bis),
           v.nummer === kx.version?.nummer || !v.pruefsumme ? '–' : v.pruefsumme.slice(0, 12),
