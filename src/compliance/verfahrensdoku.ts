@@ -22,6 +22,7 @@ import {
 } from './ableitung'
 import { ablaufAbschnitte } from './ablauftext'
 import { formatiereDatum } from './datum'
+import { kapitelText } from './dokument'
 import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, laengerAlsVorgeschrieben } from './fristen'
 import {
   ABLAGEFORMEN,
@@ -340,7 +341,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
           formatiereDatum(v.gueltigAb),
           bis ? formatiereDatum(bis) : 'laufend',
           `${formatiereDatum(v.freigegebenAm)}, ${v.freigegebenVon.trim() || 'offen'}`,
-          v.geaenderteKapitel.join(', ') || '–',
+          kapitelText(v.geaenderteKapitel, 'verfahrensdokumentation') || '–',
           v.aenderung.trim() || '–',
           aufbewahrenBisText(bis),
           v.nummer === kx.version?.nummer || !v.pruefsumme ? '–' : v.pruefsumme.slice(0, 12),

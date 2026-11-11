@@ -29,7 +29,7 @@ export function SystemeTeil() {
 
       <section aria-labelledby="ablageorte-titel" className="felder">
         <h3 id="ablageorte-titel">Ablageorte</h3>
-        <p className="leise">Wo Unterlagen aufbewahrt werden, z. B. ein Archiv im DMS oder ein Ordner im Büro. Angelegt werden sie bei den Belegen.</p>
+        <p className="leise">Wo Unterlagen aufbewahrt werden, z. B. ein Archiv im Dokumentenmanagementsystem (DMS) oder ein Ordner im Büro. Angelegt werden sie bei den Belegen.</p>
         {c.ablageorte.length === 0 ? (
           <p className="leer-hinweis">Noch kein Ablageort.</p>
         ) : (
@@ -70,7 +70,9 @@ export function SystemeTeil() {
                         title="Entfernen"
                         onClick={async () => {
                           const n = genutzt(a.id)
-                          if (n > 0 && !(await bestaetige('Ablageort entfernen?', `In „${a.name}“ liegen ${n} Unterlagen. Sie verlieren diesen Ablageort.`, 'Entfernen'))) return
+                          const name = a.name.trim() || 'Unbenannter Ablageort'
+                          const text = n === 1 ? `„${name}“ ist Ablageort für 1 Unterlage. Bei ihr fällt dieser Ablageort weg.` : `„${name}“ ist Ablageort für ${n} Unterlagen. Bei ihnen fällt dieser Ablageort weg.`
+                          if (n > 0 && !(await bestaetige('Ablageort entfernen?', text, 'Entfernen'))) return
                           aendere((x) => loescheAblageort(x, a.id))
                         }}
                       >
@@ -138,7 +140,13 @@ function SystemKarte({ m }: { m: Medium }) {
           {s.standort === 'drittland' && (
             <div className="feldreihe">
               <TextFeld label="Land" wert={s.drittland} onAendern={(drittland) => setze({ drittland }, 'drittland')} />
-              <KatalogListe label="Garantie" katalog={GARANTIEN} wert={s.garantie} onAendern={(garantie) => setze({ garantie }, 'garantie')} />
+              <KatalogListe
+                label="Absicherung der Übermittlung"
+                hilfe="Steht im Vertrag zur Auftragsverarbeitung oder in den Datenschutzhinweisen des Anbieters; frag im Zweifel nach."
+                katalog={GARANTIEN}
+                wert={s.garantie}
+                onAendern={(garantie) => setze({ garantie }, 'garantie')}
+              />
             </div>
           )}
           {personen && (

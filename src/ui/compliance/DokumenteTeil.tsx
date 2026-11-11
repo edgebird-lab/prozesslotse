@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { formatiereDatum } from '../../compliance/datum'
 import { docxEndung, erzeugeDocx } from '../../compliance/docx'
+import { kapitelText } from '../../compliance/dokument'
 import { aufbewahrenBisText, gueltigBisIn } from '../../compliance/fristen'
 import { RECHTSSTAND } from '../../compliance/standard'
 import { FUSSZEILE_VORLAGE, hinweisband } from '../../compliance/textbausteine'
@@ -109,7 +110,7 @@ export function DokumenteTeil() {
             ? `Gültige Version ${gueltig.bezeichnung} seit ${formatiereDatum(gueltig.gueltigAb)}`
             : `Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}`}
         {letzte && gueltig && letzte !== gueltig && ` · Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}`}
-        {geaendert.length > 0 && ` · geändert seit der Freigabe: ${geaendert.join(', ')}`}
+        {geaendert.length > 0 && ` · geändert seit der Freigabe: ${kapitelText(geaendert)}`}
       </p>
       <p className="hinweis-band" role="note">
         {hinweisband(RECHTSSTAND)} Die Dokumente nennen Schutzmaßnahmen und Lücken. Vertraulich behandeln.
@@ -243,7 +244,7 @@ function Versionsliste({ versionen, ansicht, onAnsehen, onDocx, art }: { version
                     <td>
                       {formatiereDatum(v.freigegebenAm)}, {v.freigegebenVon}
                     </td>
-                    <td>{v.geaenderteKapitel.join(', ') || '–'}</td>
+                    <td>{kapitelText(v.geaenderteKapitel) || '–'}</td>
                     <td>{aufbewahrenBisText(bis)}</td>
                     <td>
                       <code>{v.pruefsumme.slice(0, 12)}</code>

@@ -67,7 +67,7 @@ test('legt eine Unterlage an, ordnet sie ein und legt sie ab', async ({ page }) 
   await expect(karte).toContainText('entsteht in 4.16 Rechnung erstellen (Buchhaltung)')
   await karte.locator('label', { hasText: 'Buchungsbeleg' }).click()
   await expect(karte.getByRole('radio', { name: /^Buchungsbeleg/ })).toBeChecked()
-  await karte.getByRole('checkbox', { name: 'Warenwirtschaft (Warenwirtschaft)' }).check()
+  await karte.getByRole('checkbox', { name: 'Warenwirtschaft', exact: true }).check()
 
   await teil(page, 'Lücken').click()
   // neu: nur „Personenbezug ungeklärt“ als Hinweis
@@ -102,7 +102,7 @@ test('gibt eine Version frei; nach einer Änderung im Ablauf meldet „Lücken�
   await page.getByLabel('Was wird getan?').fill('Rechnung prüfen und freigeben')
   await schritt(page, 'Dokumentieren').click()
   await teil(page, 'Lücken').click()
-  await expect(page.getByText('Seit Version 1.0 geändert: VD 3.2, VD 3.3, VD 4.')).toBeVisible()
+  await expect(page.getByText('Seit Version 1.0 geändert: Verfahrensdokumentation 3.2, 3.3 und 4.')).toBeVisible()
 
   // Die Version bleibt nach dem Neuladen erhalten (eigener Schlüssel im Browser-Speicher)
   await page.reload()

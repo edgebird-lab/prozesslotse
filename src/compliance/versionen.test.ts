@@ -57,7 +57,7 @@ describe('Freigabe (9.7)', () => {
     expect(geaenderteKapitel(c.versionen[0], p, c)).toEqual(['VD 3.2', 'VD 3.3', 'VD 4'])
     const v2 = pruefeCompliance(p, c, HEUTE).find((b) => b.regel === 'V2')
     expect(v2?.schwere).toBe('warnung')
-    expect(v2?.text).toBe('Seit Version 1.0 geändert: VD 3.2, VD 3.3, VD 4. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.')
+    expect(v2?.text).toBe('Seit Version 1.0 geändert: Verfahrensdokumentation 3.2, 3.3 und 4. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.')
     // ohne Änderung kein V2
     expect(geaenderteKapitel(c.versionen[0], beispielLieferdienst(), c)).toEqual([])
   })

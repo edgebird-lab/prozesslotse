@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { formatiereDatum } from '../../compliance/datum'
+import { kapitelText } from '../../compliance/dokument'
 import type { ComplianceProjekt, DokuVersion, IsoDatum } from '../../compliance/typen'
 import { freigeben, naechsteBezeichnung, pruefeFreigabe, type FreigabeEingaben } from '../../compliance/versionen'
 import type { Prozess } from '../../modell/typen'
@@ -36,7 +37,7 @@ export function FreigabeDialog({
     bezeichnung: naechsteBezeichnung(c),
     gueltigAb: heute,
     freigegebenVon: c.unternehmen.geschaeftsleitung,
-    aenderung: erste ? 'Erstfassung' : geaendert.length > 0 ? `Geändert: ${geaendert.join(', ')}` : '',
+    aenderung: erste ? 'Erstfassung' : geaendert.length > 0 ? `Geändert: ${kapitelText(geaendert)}` : '',
   }))
   const [trotzdem, setTrotzdem] = useState(false)
   const [meldung, setMeldung] = useState<string | null>(null)

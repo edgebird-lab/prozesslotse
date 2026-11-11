@@ -1,6 +1,7 @@
 import { useId, useState, type FocusEvent } from 'react'
 import { angaben, ersteller, nutzer, schrittText, type Kontext } from '../../compliance/ableitung'
 import { jahrVon } from '../../compliance/datum'
+import { empfaengerVorschlaege } from '../../compliance/empfaenger'
 import { aufbewahrungText, beispielBis, wirksameJahre } from '../../compliance/fristen'
 import {
   ABLAGEFORMEN,
@@ -129,7 +130,7 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
     >
       <h4 id={`${nameId}-titel`}>Neue Unterlage</h4>
       <TextFeld label="Name, z. B. „Ausgangsrechnung“" wert={name} onAendern={setName} />
-      <CFeld label="In welchem Schritt entsteht es?">
+      <CFeld label="In welchem Schritt entsteht es?" hilfe="Die Nummer ist das Kapitel in der Verfahrensdokumentation.">
         {(id) => (
           <select id={id} value={entstehtIn} onChange={(e) => setEntstehtIn(e.target.value)}>
             <option value="">kommt von außen oder noch offen</option>
@@ -221,7 +222,7 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
               ? `Aufbewahrung: ${aufbewahrungText(d)}${jahre !== null ? `; aus ${jahrVon(heute)} also ${beispielBis(d, jahrVon(heute))}` : ''}.`
               : d.aufbewahrungsart === 'keine'
                 ? 'Keine Aufbewahrungspflicht; enthält es Angaben zu Personen, braucht es eine Löschfrist (Teilschritt „Aufbewahrung und Löschung“).'
-                : 'Im Zweifel die Steuerberatung fragen.'}
+                : 'Solange das offen ist, meldet die Lückenprüfung „Aufbewahrungsfrist fehlt“.'}
           </p>
           <KatalogAuswahl label="Wie kommt es an oder entsteht es?" katalog={BELEGFORMEN} wert={d.form} spalten={2} onAendern={(form) => setze({ form }, 'form')} />
           <KatalogAuswahl label="Woher kommt es, wohin geht es?" katalog={RICHTUNGEN} wert={d.richtung} spalten={3} onAendern={(richtung) => setze({ richtung }, 'richtung')} />
@@ -262,7 +263,12 @@ function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Pa
   const { c, ist, aendere } = useCompliance()
   const [name, setName] = useState('')
   const [medium, setMedium] = useState<Id>('')
-  const optionen: Eintrag<Id>[] = c.ablageorte.map((a) => ({ wert: a.id, text: `${a.name.trim() || 'Unbenannter Ablageort'} (${ist.medien.find((m) => m.id === a.mediumId)?.name.trim() || 'ohne System'})` }))
+  const optionen: Eintrag<Id>[] = c.ablageorte.map((a) => {
+    const name = a.name.trim() || 'Unbenannter Ablageort'
+    const system = ist.medien.find((m) => m.id === a.mediumId)?.name.trim() || 'ohne System'
+    // „Warenwirtschaft (Warenwirtschaft)“ sagt nichts Neues
+    return { wert: a.id, text: name.toLocaleLowerCase('de') === system.toLocaleLowerCase('de') ? name : `${name} (${system})` }
+  })
   const anlegen = () => {
     const n = name.trim()
     if (!n) return
@@ -279,7 +285,7 @@ function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Pa
       {optionen.length > 0 ? (
         <Chips legende="Wo wird es aufbewahrt?" optionen={optionen} werte={d.ablageSpeicherIds} onAendern={(ablageSpeicherIds) => setze({ ablageSpeicherIds }, 'ablage')} />
       ) : (
-        <p className="feld-hilfe">Noch kein Ablageort. Lege unten an, wo aufbewahrt wird, z. B. „Belegarchiv“ im DMS oder „Ordner Rechnungen“ auf Papier.</p>
+        <p className="feld-hilfe">Noch kein Ablageort. Lege unten an, wo aufbewahrt wird, z. B. „Belegarchiv“ im Dokumentenmanagementsystem (DMS) oder „Ordner Rechnungen“ auf Papier.</p>
       )}
       <details className="aufklapp">
         <summary>+ Ablageort</summary>
@@ -309,10 +315,12 @@ function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Pa
 function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setze: (w: Partial<DatenobjektAngaben>, feld: string) => void; teilnehmer: string[] }) {
   const aendereEmpfaenger = (e: Empfaenger, werte: Partial<Empfaenger>, feld: string) =>
     setze({ externeEmpfaenger: d.externeEmpfaenger.map((x) => (x.id === e.id ? { ...x, ...werte } : x)) }, `empfaenger.${e.id}.${feld}`)
-  const vorschlaege = teilnehmer.filter((t) => !d.externeEmpfaenger.some((e) => e.kategorie === t))
+  const vorschlaege = empfaengerVorschlaege(teilnehmer, d)
+  const vorschlagId = useId()
   return (
     <div className="felder">
       <p className="feld-titel">Wer bekommt die Daten außerhalb des Unternehmens?</p>
+      <p className="feld-hilfe">Wer nur seine eigenen Daten bekommt, etwa der Kunde seine Rechnung, ist kein Empfänger.</p>
       {d.externeEmpfaenger.map((e, i) => (
         <fieldset key={e.id} className="empfaenger eingerueckt">
           <legend>Empfänger {i + 1}</legend>
@@ -324,7 +332,13 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
           {e.standort === 'drittland' && (
             <div className="feldreihe">
               <TextFeld label="Land" wert={e.drittland} onAendern={(drittland) => aendereEmpfaenger(e, { drittland }, 'land')} />
-              <KatalogListe label="Garantie" katalog={GARANTIEN} wert={e.garantie} onAendern={(garantie) => aendereEmpfaenger(e, { garantie }, 'garantie')} />
+              <KatalogListe
+                label="Absicherung der Übermittlung"
+                hilfe="Steht im Vertrag oder in den Datenschutzhinweisen des Empfängers; frag im Zweifel nach."
+                katalog={GARANTIEN}
+                wert={e.garantie}
+                onAendern={(garantie) => aendereEmpfaenger(e, { garantie }, 'garantie')}
+              />
             </div>
           )}
           <button type="button" className="knopf knopf-klein knopf-leise" onClick={() => setze({ externeEmpfaenger: d.externeEmpfaenger.filter((x) => x.id !== e.id) }, 'empfaenger')}>
@@ -336,13 +350,19 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
         <button type="button" className="knopf knopf-klein" onClick={() => setze({ externeEmpfaenger: [...d.externeEmpfaenger, neuerEmpfaenger()] }, 'empfaenger')}>
           + Empfänger
         </button>
-        {vorschlaege.map((t) => (
-          <button key={t} type="button" className="knopf knopf-klein knopf-leise" onClick={() => setze({ externeEmpfaenger: [...d.externeEmpfaenger, neuerEmpfaenger({ kategorie: t })] }, 'empfaenger')}>
-            + {t}
-          </button>
-        ))}
       </div>
-      {vorschlaege.length > 0 && <p className="feld-hilfe">Die betroffene Person selbst, etwa der Kunde bei seinen eigenen Daten, ist kein Empfänger.</p>}
+      {vorschlaege.length > 0 && (
+        <div className="knopfreihe" role="group" aria-labelledby={vorschlagId}>
+          <span id={vorschlagId} className="feld-hilfe">
+            Externe aus dem Ablauf – nur, wenn sie Daten anderer Personen bekommen:
+          </span>
+          {vorschlaege.map((t) => (
+            <button key={t} type="button" className="knopf knopf-klein knopf-leise" onClick={() => setze({ externeEmpfaenger: [...d.externeEmpfaenger, neuerEmpfaenger({ kategorie: t })] }, 'empfaenger')}>
+              + {t}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

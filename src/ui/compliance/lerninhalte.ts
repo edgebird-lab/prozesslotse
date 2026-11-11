@@ -28,7 +28,7 @@ export const COMPLIANCE_LERNINHALTE: Record<ComplianceThema, ComplianceLerninhal
   fristen: {
     titel: 'Aufbewahren und Löschen',
     quelle: '§ 147 Abs. 3 und 4 AO; Art. 5 Abs. 1 lit. e, Art. 17 Abs. 3 DSGVO',
-    text: 'Die Frist beginnt mit dem Ende des Jahres, in dem die Unterlage entstanden ist. Bis dahin tritt das Recht auf Löschung zurück. Personenbezogene Daten ohne Aufbewahrungspflicht brauchen eine eigene Löschfrist; wer länger aufbewahrt als vorgeschrieben, braucht dafür einen Grund.',
+    text: 'Die Frist beginnt mit dem Ende des Jahres, in dem die Unterlage entstanden ist. Bis die Frist abgelaufen ist, tritt das Recht auf Löschung zurück. Personenbezogene Daten ohne Aufbewahrungspflicht brauchen eine eigene Löschfrist; wer länger aufbewahrt als vorgeschrieben, braucht dafür einen Grund.',
   },
   kontrollen: {
     titel: 'Internes Kontrollsystem',

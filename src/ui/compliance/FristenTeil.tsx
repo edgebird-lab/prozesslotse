@@ -96,7 +96,7 @@ export function FristenTeil() {
                 Alle aufbewahrungspflichtigen Unterlagen einheitlich 10 Jahre
               </button>
             </div>
-            <p className="feld-hilfe">Das Muster von BStBK und DStV empfiehlt einheitlich mindestens 10 Jahre. Werden dabei personenbezogene Daten länger aufbewahrt als vorgeschrieben, braucht es eine Begründung.</p>
+            <p className="feld-hilfe">Das Muster der Bundessteuerberaterkammer und des Steuerberaterverbands (BStBK/DStV) empfiehlt einheitlich mindestens 10 Jahre. Werden dabei personenbezogene Daten länger aufbewahrt als vorgeschrieben, braucht es eine Begründung.</p>
           </div>
         )}
         {laenger && (
@@ -112,7 +112,7 @@ export function FristenTeil() {
 
       <section aria-labelledby="loeschfristen-titel" className="felder">
         <h3 id="loeschfristen-titel">Löschfristen</h3>
-        <p className="leise">Für personenbezogene Daten ohne Aufbewahrungspflicht. Ein allgemeiner Verweis genügt nicht; die Frist muss konkret sein.</p>
+        <p className="leise">Für personenbezogene Daten ohne Aufbewahrungspflicht. Ein Satz wie „wird gelöscht, wenn nicht mehr nötig“ genügt nicht; nenne eine Frist, z. B. 30 Tage nach Erledigung.</p>
         {loeschen.length === 0 && <p className="leer-hinweis">Keine personenbezogenen Unterlagen ohne Aufbewahrungspflicht.</p>}
         {loeschen.map((o) => {
           const f = o.d.loeschfrist

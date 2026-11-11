@@ -164,9 +164,25 @@ export function KatalogAuswahl<T extends string>({ label, katalog, wert, onAende
 }
 
 /** Auswahlliste aus einem Katalog; `null` erscheint als „bitte wählen“. */
-export function KatalogListe<T extends string>({ label, katalog, wert, onAendern, id, leer = 'bitte wählen' }: { label: ReactNode; katalog: readonly Eintrag<T>[]; wert: T | null; onAendern: (w: T | null) => void; id?: string; leer?: string }) {
+export function KatalogListe<T extends string>({
+  label,
+  katalog,
+  wert,
+  onAendern,
+  id,
+  hilfe,
+  leer = 'bitte wählen',
+}: {
+  label: ReactNode
+  katalog: readonly Eintrag<T>[]
+  wert: T | null
+  onAendern: (w: T | null) => void
+  id?: string
+  hilfe?: ReactNode
+  leer?: string
+}) {
   return (
-    <CFeld label={label} id={id}>
+    <CFeld label={label} id={id} hilfe={hilfe}>
       {(fid) => (
         <select id={fid} value={wert ?? ''} onChange={(e) => onAendern(e.target.value === '' ? null : (e.target.value as T))}>
           <option value="">{leer}</option>

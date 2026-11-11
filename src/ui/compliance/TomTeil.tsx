@@ -4,9 +4,20 @@ import type { TomAngaben, TomBereich } from '../../compliance/typen'
 import { useCompliance } from './analyse'
 import { Chips, TextFeld } from './Eingaben'
 
+/** Was jeder Bereich meint (Art. 32 Abs. 1 DSGVO in eigenen Worten); nur in der Oberfläche. */
+const ERKLAERUNG: Record<TomBereich, string> = {
+  pseudonymisierung: 'Namen durch Nummern ersetzen, wo der Name nicht gebraucht wird.',
+  verschluesselung: 'Daten so speichern und übertragen, dass Unbefugte sie nicht lesen können, z. B. auf verschlüsselten Laptops und über https-Verbindungen (TLS).',
+  vertraulichkeit: 'Nur Befugte sehen die Daten, und niemand ändert sie unbemerkt.',
+  verfuegbarkeit: 'Die Daten sind da, wenn sie gebraucht werden, und die Systeme halten Störungen und Last stand.',
+  wiederherstellung: 'Nach einem Ausfall lassen sich Daten und Zugang rasch wiederherstellen.',
+  ueberpruefung: 'Die Maßnahmen werden regelmäßig geprüft, bewertet und verbessert.',
+}
+
 export function TomTeil() {
   return (
     <div className="teil">
+      <h3>Schutzmaßnahmen</h3>
       <p className="leise">Je Bereich mindestens eine Maßnahme wählen oder begründen, warum er nicht zutrifft. Die Vorschläge sind Beispiele; eigene Maßnahmen lassen sich ergänzen.</p>
       {TOM_BEREICHE.map((b) => (
         <TomBereichKarte key={b.wert} wert={b.wert} name={b.name} vorschlaege={b.vorschlaege} />
@@ -31,6 +42,7 @@ function TomBereichKarte({ wert, name, vorschlaege }: { wert: TomBereich; name: 
   return (
     <section className="karte felder" id={`ziel-tom-${wert}`} tabIndex={-1} aria-labelledby={titelId}>
       <h4 id={titelId}>{name}</h4>
+      <p className="leise klein">{ERKLAERUNG[wert]}</p>
       <Chips legende={`Maßnahmen: ${name}`} optionen={optionen} werte={t.massnahmen} onAendern={(massnahmen) => setze({ massnahmen }, 'massnahmen')} />
       <form
         className="inline-anlegen"

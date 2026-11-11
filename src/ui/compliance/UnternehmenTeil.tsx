@@ -110,7 +110,7 @@ export function UnternehmenTeil() {
           </p>
         )}
         <p className="feld-hilfe">
-          Unabhängig von der Zahl kann einer nötig sein, etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören (Art. 37 Abs. 1 lit. b, c DSGVO) oder eine
+          Unabhängig von der Zahl kann ein Datenschutzbeauftragter nötig sein, etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören (Art. 37 Abs. 1 lit. b, c DSGVO) oder eine
           Datenschutz-Folgenabschätzung nötig ist (§ 38 Abs. 1 Satz 2 BDSG). Das prüft die App nicht.
         </p>
         <div id="ziel-unternehmen-datenschutzbeauftragter" tabIndex={-1}>
@@ -153,7 +153,7 @@ export function UnternehmenTeil() {
         <h3 id="verarbeitung-titel">Verarbeitungstätigkeit im Verzeichnis</h3>
         <p className="leise">Dieser Prozess ist ein Eintrag im Verzeichnis von Verarbeitungstätigkeiten.</p>
         <div className="feldreihe">
-          <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Leer: Name des Prozesses" onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
+          <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Bleibt das Feld leer, steht hier der Name des Prozesses." onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
           <TextFeld label="Laufende Nummer" wert={v.laufendeNummer} onAendern={(laufendeNummer) => setzeV({ laufendeNummer }, 'nummer')} />
         </div>
         <div className="feldreihe">
