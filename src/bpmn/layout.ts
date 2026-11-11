@@ -100,8 +100,8 @@ export const RAND = {
   aufgabeRechts: 22,
   /** Erstes waagerechtes Stück unter der Unterkante des Schritts (unter den Kreisen, die 18 px hinunterreichen) */
   ersteStufe: 26,
-  /** Abstand der waagerechten Stücke unter einem Schritt */
-  stufe: 8,
+  /** Abstand der waagerechten Stücke unter einem Schritt; sie laufen oft über die ganze Breite eines Rahmens nebeneinander (`PARALLEL` in linien.ts) */
+  stufe: 20,
   /** Höchstens so viele Randereignisse an einer Aufgabe */
   maxAufgabe: 3,
 }
@@ -1428,7 +1428,7 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
       const noetig = RAHMEN.oben + RAHMEN.text + rahmenZeilen(r.name, breite) * RAHMEN.zeile + 6
       hoehen[r.spurVon] = Math.max(hoehen[r.spurVon], noetig)
     }
-    // Die Abgangsspur unter einem Schritt fasst alle waagerechten Stücke darunter (Abgänge und Nachrichten), 8 px auseinander
+    // Die Abgangsspur unter einem Schritt fasst alle waagerechten Stücke darunter (Abgänge und Nachrichten), RAND.stufe auseinander
     for (const k of t.knoten) {
       const lage = k.randLage
       if (k.art !== 'rand' || k.bahn !== bahn || lage?.abgangsspur === undefined) continue

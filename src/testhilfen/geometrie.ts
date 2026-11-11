@@ -1,4 +1,5 @@
 import { hatMarke, MASSE, RAHMEN, type Layout, type LayoutKnoten, type LayoutRahmen, type Punkt, type Rechteck } from '../bpmn/layout'
+import { PARALLEL } from '../bpmn/linien'
 
 function ueberlappen(a: Rechteck, b: Rechteck): boolean {
   return a.x < b.x + b.breite - 1 && b.x < a.x + a.breite - 1 && a.y < b.y + b.hoehe - 1 && b.y < a.y + a.hoehe - 1
@@ -45,6 +46,44 @@ export function gemeinsameStrecke(p1: Punkt, q1: Punkt, p2: Punkt, q2: Punkt): n
     return Math.min(Math.max(p1.y, q1.y), Math.max(p2.y, q2.y)) - Math.max(Math.min(p1.y, q1.y), Math.min(p2.y, q2.y))
   }
   return 0
+}
+
+/**
+ * Zwei gleich gerichtete Stücke: Abstand quer zur Richtung und Länge, auf der sie
+ * nebeneinander laufen (null bei verschiedener Richtung oder ohne Überdeckung).
+ */
+export function nebeneinander(p1: Punkt, q1: Punkt, p2: Punkt, q2: Punkt): { abstand: number; laenge: number } | null {
+  const waagerecht = (p: Punkt, q: Punkt) => Math.abs(p.y - q.y) < 0.01 && Math.abs(p.x - q.x) > 0.01
+  const senkrecht = (p: Punkt, q: Punkt) => Math.abs(p.x - q.x) < 0.01 && Math.abs(p.y - q.y) > 0.01
+  let ergebnis: { abstand: number; laenge: number } | null = null
+  if (waagerecht(p1, q1) && waagerecht(p2, q2)) ergebnis = { abstand: Math.abs(p1.y - p2.y), laenge: Math.min(Math.max(p1.x, q1.x), Math.max(p2.x, q2.x)) - Math.max(Math.min(p1.x, q1.x), Math.min(p2.x, q2.x)) }
+  if (senkrecht(p1, q1) && senkrecht(p2, q2)) ergebnis = { abstand: Math.abs(p1.x - p2.x), laenge: Math.min(Math.max(p1.y, q1.y), Math.max(p2.y, q2.y)) - Math.max(Math.min(p1.y, q1.y), Math.min(p2.y, q2.y)) }
+  return ergebnis && ergebnis.laenge > 0 ? ergebnis : null
+}
+
+/**
+ * Lange, dichte Parallelen: Zwei Flüsse, die länger als `PARALLEL.laenge` mit
+ * weniger als `PARALLEL.mindestens` Abstand nebeneinander laufen. Verkleinert
+ * („Einpassen“, Druck) sähen sie aus wie eine Linie (Begründung bei `PARALLEL`).
+ */
+export function langeParallelen(l: Layout): string[] {
+  const linien = [...l.kanten.map((e) => ({ id: e.id, punkte: e.punkte })), ...l.nachrichten.map((n) => ({ id: n.id, punkte: n.punkte }))]
+  const fehler: string[] = []
+  for (let i = 0; i < linien.length; i++) {
+    for (let j = i + 1; j < linien.length; j++) {
+      const a = linien[i].punkte
+      const b = linien[j].punkte
+      let schlimmste: { abstand: number; laenge: number } | null = null
+      for (let s = 1; s < a.length; s++) {
+        for (let t = 1; t < b.length; t++) {
+          const n = nebeneinander(a[s - 1], a[s], b[t - 1], b[t])
+          if (n && n.abstand < PARALLEL.mindestens - 0.01 && n.laenge > PARALLEL.laenge && (!schlimmste || n.laenge > schlimmste.laenge)) schlimmste = n
+        }
+      }
+      if (schlimmste) fehler.push(`${linien[i].id} und ${linien[j].id} laufen ${Math.round(schlimmste.laenge)} px mit nur ${Math.round(schlimmste.abstand * 10) / 10} px Abstand nebeneinander`)
+    }
+  }
+  return fehler
 }
 
 /** Liegt der Punkt auf dem Umriss des Knotens (Rechteck, Raute oder Kreis) bzw. des Rahmens? */
@@ -208,6 +247,8 @@ export function geometrieFehler(l: Layout): string[] {
       if (geteilt) fehler.push(`${a.id} und ${b.id} teilen sich eine Strecke`)
     }
   }
+  // Zwei Flüsse laufen nie lange dicht nebeneinander, sonst verschmelzen sie verkleinert zu einer Linie
+  fehler.push(...langeParallelen(l))
   // Keine Linie läuft auf einer Rahmenkante (senkrecht queren dürfen Nachrichtenflüsse)
   for (const a of linien) {
     for (const r of l.rahmen) {

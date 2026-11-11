@@ -512,9 +512,11 @@ describe('Dateiformat 4', () => {
     expect(neu).toEqual(projekt)
     expect(neu.formatVersion).toBe(4)
     expect(berechneKennzahlen(neu.ist).durchlaufzeitMin).toBeCloseTo(berechneKennzahlen(projekt.ist).durchlaufzeitMin, 12)
-    // Prüfsummen des exportierten BPMN, aufgenommen mit dem Stand von Format 3 (Commit 71820c2): Ohne Abschnitte ändert sich nichts.
-    expect(pruefsumme(erzeugeBpmn(beispielLieferdienst()).xml)).toBe('fe7d9917')
-    expect(pruefsumme(erzeugeBpmn(beispielOnlinebestellung()).xml)).toBe('eab2a465')
+    // Dasselbe BPMN vor und nach dem Lesen. Die Prüfsummen hielten bis zur Trennung langer Parallelen den Stand von Format 3
+    // fest (Commit 71820c2: fe7d9917 und eab2a465); seitdem liegen lange parallele Linien weiter auseinander, sonst ist alles gleich.
+    expect(erzeugeBpmn(neu.ist).xml).toBe(erzeugeBpmn(projekt.ist).xml)
+    expect(pruefsumme(erzeugeBpmn(beispielLieferdienst()).xml)).toBe('5a85386d')
+    expect(pruefsumme(erzeugeBpmn(beispielOnlinebestellung()).xml)).toBe('7dc759c0')
   })
 
   it('speichert Abschnitte und lädt sie unverändert', () => {
