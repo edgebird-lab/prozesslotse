@@ -1096,12 +1096,14 @@ Außerdem ändern sich:
 | Deckblatt | Titel, Untertitel, Versionszeile, Hinweis A.0 grau hinterlegt, Seitenumbruch |
 | Gliederung | Liste der Kapitel ohne Seitenzahlen, Seitenumbruch |
 | `ueberschrift` 1–3 | Formatvorlagen Überschrift 1–3, damit Navigation und Inhaltsverzeichnis in Word funktionieren |
-| `absatz`, `liste` | Standardabsatz, Aufzählung |
-| `tabelle` | Tabelle über die volle Breite, Kopfzeile wiederholt sich auf jeder Seite |
+| `absatz`, `liste` | Standardabsatz mit 6 pt Abstand danach, Aufzählung (Abstand nach dem letzten Punkt); Überschriften 2 und 3 mit Abstand davor |
+| `tabelle` | Tabelle über die volle Breite in 9 pt mit festen Spaltenbreiten nach dem Inhalt: Jede Spalte fasst ihr breitestes Wort, Daten, Zahlen und Prüfsummen brechen nie mitten im Zeichen um. Nur wenn ein Wort aus Buchstaben sonst nicht passt, schaltet die Datei die Silbentrennung ein. Kopfzeile wiederholt sich auf jeder Seite |
 | `hinweis` | Absatz grau hinterlegt |
 | `diagramm` | Absatz „Das Ablaufdiagramm liegt als BPMN-Datei bei und ist in der Druckfassung enthalten.“ |
 | Seite | A4 hoch (11 906 × 16 838 Twips), Ränder 2 cm (1 134 Twips) |
 | Fußzeile | „Vorlage – vor Verwendung prüfen lassen · {Titel} · {Version} · Seite X von Y“ |
+| Sprache, Eigenschaften | Dokumentsprache Deutsch (`de-DE` im Standardformat); Autor und letzter Bearbeiter „Prozesslotse“ |
+| Satz | Nach §, §§, Abs., Nr., Art., Rz., lit. und Ziff. steht ein geschütztes Leerzeichen (`festeLeerzeichen`), ebenso in der Druckansicht. Das gilt nur für die Ausgabe; der Dokumenttext für Prüfsumme und Versionsvergleich bleibt unverändert |
 
 Dateinamen über `dateiname(ist.name, …)`: `-verfahrensdokumentation-entwurf.docx` bzw. `-verfahrensdokumentation-v1-0.docx`, ebenso `-verarbeitungsverzeichnis-…`. MIME-Typ `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. Im Web lädt `ladeHerunter(name, blob)` die Datei herunter.
 
@@ -1110,7 +1112,8 @@ Dateinamen über `dateiname(ist.name, …)`: `-verfahrensdokumentation-entwurf.d
 - „Drucken oder als PDF speichern“ druckt das gewählte Dokument mit `window.print()`.
 - Druckregeln: Kapitel der Ebene 1 beginnen auf neuer Seite; Tabellenzeilen werden nicht geteilt; Tabellenköpfe wiederholen sich; Teilschritt-Leiste, Knöpfe und Bühne sind ausgeblendet.
 - Eine Fußzeile mit `position: fixed` trägt den Hinweis auf jeder Seite. Ein unterer Seitenrand in `@page` hält Platz frei, damit sie keinen Text verdeckt. Edge prüft das in Phase 6.
-- Kapitel 9.1 zeigt das Diagramm über `DiagrammLazy` (`klein`, `uebersicht`), bei alten Versionen aus `version.prozess`.
+- Kapitel 9.1 zeigt das Diagramm über `DiagrammLazy` (`klein`, `uebersicht`), bei alten Versionen aus `version.prozess`. Davor steht „Das Diagramm in Originalgröße enthält die BPMN-Datei des Ist-Prozesses (Kapitel 6).“
+- Im Druck zeigt 9.1 zuerst eine Übersicht des ganzen Diagramms auf Satzbreite. Wäre sie unlesbar klein (Maßstab unter 0,6), zeichnet sie nummerierte Rahmen ein, und es folgen Ausschnitte in lesbarem Maßstab (0,6 bis 0,8: Beschriftungen von 11 px werden etwa 5 bis 6,6 pt groß), die sich um 40 px überlappen, je mit „Ausschnitt n von m“ (`druckausschnitte.ts`, `DiagrammDruck.tsx`). Flache, breite Diagramme stehen quer, wenn das Seiten spart: Das Bild selbst ist um 90° gedreht („(quer)“), weil WebView2 immer A4 hoch druckt und `@page`-Ausrichtungen dort nicht sicher wirken.
 - Während des Drucks setzt die App `document.title` auf den Dateinamen ohne Endung, damit „Als PDF speichern“ ihn vorschlägt.
 
 ### 7.5 Windows-Programm (Tauri 2)

@@ -9,6 +9,14 @@ import { ZahlEingabe } from '../Eingaben'
 import { useCompliance } from './analyse'
 import { CFeld, KatalogAuswahl, KatalogListe, OptionaleZahl, TextFeld } from './Eingaben'
 
+/** Lange Wörter der Einordnung dürfen in der schmalen Spalte umbrechen („aufbewahrungs-pflichtig“). */
+const trennbar = (text: string) => text.replace(/(ufbewahrungs|rganisations)(?=\p{Ll})/gu, '$1\u00ad')
+/**
+ * Ein Wort, das breiter ist als die Spalte je werden kann, darf irgendwo umbrechen; kürzere Namen bleiben ganz.
+ * Gemessen im 520-px-Panel: Wörter bis 21 Zeichen passen (etwa 166 px), ab 22 Zeichen meist nicht mehr.
+ */
+const zuLang = (name: string) => name.split(/\s+/).some((w) => w.length > 21)
+
 function gesetzlich(d: DatenobjektAngaben): string {
   const n = mindestJahre(d.aufbewahrungsart)
   if (n !== null) return `${n} Jahre`
@@ -59,8 +67,10 @@ export function FristenTeil() {
               <tbody>
                 {objekte.map((o) => (
                   <tr key={o.id}>
-                    <th scope="row">{o.name}</th>
-                    <td>{textVon(AUFBEWAHRUNGSARTEN, o.d.aufbewahrungsart, 'dok')}</td>
+                    <th scope="row" className={zuLang(o.name) ? 'umbrechen' : undefined}>
+                      {o.name}
+                    </th>
+                    <td>{trennbar(textVon(AUFBEWAHRUNGSARTEN, o.d.aufbewahrungsart, 'dok'))}</td>
                     <td>{gesetzlich(o.d)}</td>
                     <td>
                       {istPflichtig(o.d.aufbewahrungsart) ? (

@@ -1817,6 +1817,10 @@ fieldset {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 4px;
 }
+/* Knöpfe so hoch wie ihre Rasterzeile, auch neben einem zweizeiligen Namen */
+.teilschritte li {
+  display: flex;
+}
 .teilschritte button {
   width: 100%;
   display: flex;
@@ -1948,6 +1952,13 @@ input[type='date'] {
   font-weight: 500;
   color: var(--text);
 }
+/* Zwei Ziffern brauchen keine 70 px; so passt die Tabelle samt Löschdatum ins Panel (520 px) */
+.fristen-tabelle .zahl input {
+  width: 4rem;
+}
+.fristen-tabelle .umbrechen {
+  overflow-wrap: anywhere;
+}
 .versionsliste td {
   text-align: left;
   vertical-align: top;
@@ -1994,12 +2005,16 @@ input[type='date'] {
 /* Dokumente */
 .reiter {
   display: inline-flex;
+  /* im schmalen Fenster untereinander statt breiter als die Seite */
+  flex-wrap: wrap;
+  max-width: 100%;
   border: 1px solid var(--linie-stark);
   border-radius: 8px;
   overflow: hidden;
   align-self: flex-start;
 }
 .reiter [role='tab'] {
+  flex: 1 1 auto;
   border: 0;
   background: transparent;
   padding: 6px 14px;
@@ -2009,6 +2024,19 @@ input[type='date'] {
   background: var(--knopf-haupt);
   color: #fff;
   font-weight: 600;
+}
+/* Die Leiste schneidet alles außerhalb ihrer runden Ecken ab; der Fokusring liegt deshalb innen,
+   auf dem gewählten (gefüllten) Reiter weiß */
+.reiter [role='tab']:focus-visible {
+  outline-offset: -4px;
+}
+.reiter [role='tab'][aria-selected='true']:focus-visible {
+  outline-color: #fff;
+}
+/* Lange Knopftexte brechen im schmalen Fenster um, statt die Seite zu verbreitern */
+.teil .knopfreihe .knopf {
+  white-space: normal;
+  text-align: center;
 }
 .version-banner {
   justify-content: space-between;
@@ -2098,6 +2126,10 @@ input[type='date'] {
 .dokument-diagramm {
   margin: 0.6rem 0;
 }
+/* Anlage 9.1: Ausschnitte des Diagramms gibt es nur im Druck */
+.druck-ausschnitt {
+  display: none;
+}
 .versionsliste code {
   font-size: 0.85rem;
 }
@@ -2175,5 +2207,31 @@ input[type='date'] {
   .dokument-h2,
   .dokument-h3 {
     break-after: avoid;
+  }
+  /* Anlage 9.1: Übersicht, dann je Ausschnitt eine Zeile „Ausschnitt n von m“ und das Bild; nichts abschneiden */
+  .dokument-diagramm .diagramm {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .dokument-diagramm .druck-bild,
+  .druck-ausschnitt img {
+    border: 1px solid #c3c2b7;
+  }
+  .druck-ausschnitt {
+    display: block;
+    margin: 0;
+    padding-top: 4mm;
+    break-inside: avoid;
+  }
+  .druck-ausschnitt figcaption {
+    font-size: 8.5pt;
+    color: #52514e;
+    margin-bottom: 1.5mm;
+  }
+  .druck-ausschnitt img {
+    display: block;
+    max-width: 100%;
+    height: auto;
   }
 }

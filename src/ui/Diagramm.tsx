@@ -1,7 +1,7 @@
 import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer'
 import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-js.css'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import type { Markierung } from './analyse'
 
 interface Box {
@@ -46,6 +46,8 @@ export interface DiagrammProps {
   uebersicht?: boolean
   /** Für den Druck ein Bild des ganzen Diagramms einsetzen, das sich der Seitenbreite anpasst. */
   druckbild?: boolean
+  /** Eigener Druckinhalt statt des einen Bilds, aus dem SVG des ganzen Diagramms (z. B. Übersicht und Ausschnitte). */
+  druckInhalt?: (svg: string) => ReactNode
 }
 
 const SYMBOL: Record<Markierung['art'], string> = {
@@ -92,7 +94,7 @@ function zeigeAnfang(canvas: Canvas): void {
   if (box.inner) canvas.viewbox({ x: box.inner.x - 24, y: box.inner.y - 24, width: box.width, height: box.height })
 }
 
-export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm({ xml, markierungen, ausgewaehlt, onKlick, beschriftung, klein, uebersicht, druckbild }, ref) {
+export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm({ xml, markierungen, ausgewaehlt, onKlick, beschriftung, klein, uebersicht, druckbild, druckInhalt }, ref) {
   const behaelter = useRef<HTMLDivElement>(null)
   const viewer = useRef<NavigatedViewer | null>(null)
   const klick = useRef(onKlick)
@@ -217,7 +219,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         </button>
       </div>
       <div ref={behaelter} className="diagramm-flaeche" role="figure" aria-label={beschriftung} />
-      {druckbild && druckSvg && <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />}
+      {druckbild && druckSvg && (druckInhalt ? druckInhalt(druckSvg) : <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />)}
       {fehler && (
         <p className="diagramm-fehler" role="alert">
           Das Diagramm konnte nicht gezeichnet werden: {fehler}
