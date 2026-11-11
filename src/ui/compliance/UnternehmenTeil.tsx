@@ -152,15 +152,16 @@ export function UnternehmenTeil() {
       <section aria-labelledby="verarbeitung-titel" className="felder">
         <h3 id="verarbeitung-titel">Verarbeitungstätigkeit im Verzeichnis</h3>
         <p className="leise">Dieser Prozess ist ein Eintrag im Verzeichnis von Verarbeitungstätigkeiten.</p>
+        {/* volle Breite: Der Platzhalter zeigt den Prozessnamen, der bei leerem Feld im Verzeichnis steht */}
+        <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Leer: Name des Prozesses" onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
         <div className="feldreihe">
-          <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Leer: Name des Prozesses" onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
           <TextFeld label="Laufende Nummer" wert={v.laufendeNummer} onAendern={(laufendeNummer) => setzeV({ laufendeNummer }, 'nummer')} />
+          <DatumFeld label="Eingeführt am" wert={v.eingefuehrtAm} onAendern={(eingefuehrtAm) => setzeV({ eingefuehrtAm }, 'eingefuehrt')} />
         </div>
         <div className="feldreihe">
-          <DatumFeld label="Eingeführt am" wert={v.eingefuehrtAm} onAendern={(eingefuehrtAm) => setzeV({ eingefuehrtAm }, 'eingefuehrt')} />
           <TextFeld label="Fachabteilung" wert={v.fachabteilung} onAendern={(fachabteilung) => setzeV({ fachabteilung }, 'abteilung')} />
+          <TextFeld label="Ansprechpartner" wert={v.ansprechpartner} onAendern={(ansprechpartner) => setzeV({ ansprechpartner }, 'ansprechpartner')} />
         </div>
-        <TextFeld label="Ansprechpartner" wert={v.ansprechpartner} onAendern={(ansprechpartner) => setzeV({ ansprechpartner }, 'ansprechpartner')} />
         <div className="feldreihe">
           <TextFeld label="Telefon des Ansprechpartners" typ="tel" wert={v.telefon} onAendern={(telefon) => setzeV({ telefon }, 'telefon')} />
           <TextFeld label="E-Mail des Ansprechpartners" typ="email" wert={v.email} onAendern={(email) => setzeV({ email }, 'email')} />
