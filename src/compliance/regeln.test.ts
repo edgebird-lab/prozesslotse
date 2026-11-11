@@ -257,11 +257,11 @@ describe('Daten D1–D9', () => {
     const empfaenger = (werte: object) => mitAngaben((c) => Object.assign(c.datenobjekte.dob_rechnung.externeEmpfaenger[0], werte))
     expect(finde(pruefe(empfaenger({ standort: 'unbekannt' })), 'compliance:D8:emp_steuerberatung')?.text).toBe('Für „Steuerberatung“ ist nicht bekannt, wo die Daten verarbeitet werden.')
     expect(finde(pruefe(empfaenger({ standort: 'drittland', drittland: 'USA', garantie: null })), 'compliance:D8:emp_steuerberatung')?.text).toBe(
-      'Für „Steuerberatung“ ist keine Garantie für die Übermittlung nach USA eingetragen.',
+      'Für „Steuerberatung“ ist keine Garantie für die Übermittlung in das Drittland (USA) eingetragen.',
     )
     // Grenzfall: Standardvertragsklauseln ohne Name ergibt D8, mit Name nicht
     const scc = { standort: 'drittland', drittland: 'USA', garantie: 'standardvertragsklauseln' }
-    expect(finde(pruefe(empfaenger({ ...scc, name: '' })), 'compliance:D8:emp_steuerberatung')?.text).toBe('Für „Steuerberatung“ ist der Empfänger in USA nicht benannt.')
+    expect(finde(pruefe(empfaenger({ ...scc, name: '' })), 'compliance:D8:emp_steuerberatung')?.text).toBe('Für „Steuerberatung“ ist der Empfänger im Drittland (USA) nicht benannt.')
     expect(regeln(pruefe(empfaenger({ ...scc, name: 'Beispiel Inc.' })), 'D8')).toEqual([])
     expect(regeln(pruefe(), 'D8')).toEqual([])
   })
@@ -290,7 +290,7 @@ describe('Systeme S1–S6', () => {
     )
     expect(finde(pruefe(mitAngaben((c) => (c.systeme.med_erp.auftragsverarbeitung = null))), 'compliance:S2:med_erp')?.text).toContain('Prüfe zuerst, ob im Auftrag verarbeitet wird.')
     expect(regeln(pruefe(mitAngaben((c) => (c.systeme.med_erp.auftragsverarbeitung = false))), 'S2')).toEqual([])
-    expect(regeln(pruefe(mitAngaben((c) => (c.systeme.med_erp.avVertrag = 'ja'))), 'S2')).toEqual([])
+    expect(regeln(pruefe(mitAngaben((c) => Object.assign(c.systeme.med_erp, { avVertrag: 'ja', avVertragVom: '2025-01-15' }))), 'S2')).toEqual([])
   })
 
   it('S3 meldet unklaren Speicherort oder fehlende Garantie', () => {

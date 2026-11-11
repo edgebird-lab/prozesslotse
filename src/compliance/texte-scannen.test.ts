@@ -7,6 +7,8 @@ import { pruefeCompliance } from './regeln'
 import type { Abschnitt, ComplianceProjekt, Dokument } from './typen'
 import { entwurfsKontext, erzeugeDokumente } from './versionen'
 
+const AUSGENOMMEN = 'Ausgenommen sind Jahresabschlüsse und Eröffnungsbilanz; sie werden im Original aufbewahrt (§ 147 Abs. 2 AO, § 257 Abs. 3 HGB).'
+
 // Durchsicht 11.11.2026: Kapitel 5 und 6 zum ersetzenden Scannen (recht-2, recht-9)
 
 const HEUTE = '2026-11-11'
@@ -43,7 +45,9 @@ describe('Kapitel 5, wenn offen ist, ob das Papier vernichtet wird (recht-2)', (
     const c = scan(true, (x) => Object.assign(x.datenobjekte.dob_bestellnotiz, { ablageform: 'scan', originalVernichtet: null }))
     const k5 = texte(vd(c), '5')
     expect(k5[0]).toMatch(/^Für „Lieferschein“ gilt das ersetzende Scannen\./)
-    expect(k5[1]).toBe('Ob die Papierbelege von „Bestellnotiz“ nach dem Scannen vernichtet werden, ist offen.')
+    // dazwischen der Satz zu Jahresabschlüssen aus recht-10 (fix/regeln)
+    expect(k5[1]).toBe(AUSGENOMMEN)
+    expect(k5[2]).toBe('Ob die Papierbelege von „Bestellnotiz“ nach dem Scannen vernichtet werden, ist offen.')
     expect(b8(c, 'dob_bestellnotiz')?.schwere).toBe('hinweis')
   })
 
@@ -56,7 +60,7 @@ describe('Kapitel 5, wenn offen ist, ob das Papier vernichtet wird (recht-2)', (
 describe('Eigene Verfahrensdokumentation zum Scannen wird erfragt, nicht behauptet (recht-9)', () => {
   it('ohne Antwort: Kapitel 5 nennt sie als nötig und offen, Kapitel 6 führt sie nicht, B8 warnt', () => {
     const d = vd(scan(true))
-    expect(texte(d, '5')).toEqual(['Für „Lieferschein“ gilt das ersetzende Scannen. Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.'])
+    expect(texte(d, '5')).toEqual(['Für „Lieferschein“ gilt das ersetzende Scannen. Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.', AUSGENOMMEN])
     expect(texte(d, '6').join(' ')).not.toContain('Scannen')
     expect(b8(scan(true))).toMatchObject({ schwere: 'warnung', titel: 'Verfahrensdokumentation zum Scannen ungeklärt' })
   })
@@ -70,7 +74,7 @@ describe('Eigene Verfahrensdokumentation zum Scannen wird erfragt, nicht behaupt
   it('„Ja“ mit Stand: Verweis in Kapitel 5, Eintrag in Kapitel 6, B8 nur als Hinweis', () => {
     const c = scan(true, (x) => (x.ersetzendesScannen = { verfahrensdoku: true, stand: '2026-03-01' }))
     const d = vd(c)
-    expect(texte(d, '5')).toEqual(['Für „Lieferschein“ gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).'])
+    expect(texte(d, '5')).toEqual(['Für „Lieferschein“ gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).', AUSGENOMMEN])
     expect(texte(d, '6')).toContain('Verfahrensdokumentation zum ersetzenden Scannen, Stand 01.03.2026')
     expect(b8(c)?.schwere).toBe('hinweis')
   })

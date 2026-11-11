@@ -274,6 +274,15 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
         ]
       }),
     )
+    // Aufbewahrung im Drittland nur mit Bewilligung des Finanzamts (§ 146 Abs. 2b AO, Regel S7)
+    for (const m of systeme) {
+      const s = systemAngaben(c, m.id)
+      const ablage = ablageVon(k, m.id)
+      if (!mitDienstleister(s) || s.standort !== 'drittland' || ablage.length === 0) continue
+      absatz(
+        `„${m.name.trim() || 'Unbenanntes System'}“ bewahrt ${aufzaehlung(ablage.map((id) => objektName(k, id)))} im Drittland (${s.drittland.trim() || 'offen'}) auf. Bewilligung des Finanzamts nach § 146 Abs. 2b AO${s.bewilligungVom ? ` vom ${formatiereDatum(s.bewilligungVom)}` : ': offen'}.`,
+      )
+    }
     absatz(SYSTEMWECHSEL)
   } else absatz('Im Prozess werden keine IT-Systeme eingesetzt.')
 
@@ -400,6 +409,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
     absatz(
       `Für ${aufzaehlung(scan.map((o) => o.name))} gilt das ersetzende Scannen. ${scanDoku ? 'Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).' : 'Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.'}`,
     )
+    absatz('Ausgenommen sind Jahresabschlüsse und Eröffnungsbilanz; sie werden im Original aufbewahrt (§ 147 Abs. 2 AO, § 257 Abs. 3 HGB).')
   }
   if (scanOffen.length > 0) absatz(`Ob die Papierbelege von ${aufzaehlung(scanOffen.map((o) => o.name))} nach dem Scannen vernichtet werden, ist offen.`)
   if (scan.length === 0 && scanOffen.length === 0) absatz('Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.')

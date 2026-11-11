@@ -129,7 +129,8 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
       }}
     >
       <h4 id={`${nameId}-titel`}>Neue Unterlage</h4>
-      <TextFeld label="Name, z. B. „Ausgangsrechnung“" wert={name} onAendern={setName} />
+      {/* Ziel von „Beheben“ bei Regel B10 (keine Unterlage angelegt) */}
+      <TextFeld id="ziel-datenobjekt" label="Name, z. B. „Ausgangsrechnung“" wert={name} onAendern={setName} />
       <CFeld label="In welchem Schritt entsteht es?">
         {(id) => (
           <select id={id} value={entstehtIn} onChange={(e) => setEntstehtIn(e.target.value)}>
@@ -160,7 +161,8 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
 /** Kurzfassung für eine eingeklappte Karte */
 function zusammenfassung(d: DatenobjektAngaben): string {
   const teile = [
-    textVon(AUFBEWAHRUNGSARTEN, d.aufbewahrungsart, 'dok'),
+    // „offen“ allein sagt nicht, was offen ist; Kapitel 2.4 hat dafür die Spalte „Einordnung“
+    d.aufbewahrungsart === 'unklar' ? 'Einordnung offen' : textVon(AUFBEWAHRUNGSARTEN, d.aufbewahrungsart, 'dok'),
     d.form ? textVon(BELEGFORMEN, d.form, 'dok') : 'Form offen',
     d.personenbezogen === true ? 'personenbezogen' : d.personenbezogen === false ? 'ohne Personenbezug' : 'Personenbezug offen',
   ]

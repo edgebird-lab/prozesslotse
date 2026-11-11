@@ -197,6 +197,11 @@ export interface SystemAngaben {
   auftragsverarbeitung: boolean | null
   avVertrag: AvVertrag
   avVertragVom: IsoDatum | null
+  /**
+   * Bewilligung des Finanzamts, Unterlagen elektronisch in einem Drittstaat aufzubewahren (§ 146 Abs. 2b AO);
+   * gefragt nur bei Standort „drittland“ mit aufbewahrungspflichtiger Ablage. Fehlt in älteren Dateien.
+   */
+  bewilligungVom?: IsoDatum | null
   unveraenderbarkeit: Unveraenderbarkeit
   sicherung: Sicherung
   /** z. B. „täglich“ */

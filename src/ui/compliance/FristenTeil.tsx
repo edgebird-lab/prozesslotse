@@ -1,5 +1,5 @@
 import { angaben } from '../../compliance/ableitung'
-import { formatiereDatum, jahrVon } from '../../compliance/datum'
+import { addiereTage, formatiereDatum, jahrVon } from '../../compliance/datum'
 import { fristEnde, istKaufmann, laengerAlsVorgeschrieben, mindestJahre, vernichtungAb, wirksameJahre } from '../../compliance/fristen'
 import { AUFBEWAHRUNGSARTEN, FRIST_BEGINNE, istPflichtig, LOESCH_TURNUS, neueFrist, textVon, ZEITEINHEITEN } from '../../compliance/standard'
 import type { DatenobjektAngaben, Frist, IsoDatum } from '../../compliance/typen'
@@ -16,14 +16,14 @@ function gesetzlich(d: DatenobjektAngaben): string {
   return d.aufbewahrungsart === 'keine' ? 'keine' : 'offen'
 }
 
-/** Frühestes Löschdatum für eine Unterlage, die heute entsteht. */
+/** Frühestes Löschdatum für eine Unterlage, die heute entsteht: der Tag nach dem Ende der Frist, bei Aufbewahrungs- und Löschfrist gleich. */
 function fruehestens(d: DatenobjektAngaben, heute: IsoDatum): string {
   const n = wirksameJahre(d)
   if (n !== null) return formatiereDatum(vernichtungAb(jahrVon(heute), n))
   if (d.aufbewahrungsart === 'lieferschein') return 'nach der Rechnung'
   if (d.aufbewahrungsart === 'keine' && d.loeschfrist) {
     const ende = fristEnde(heute, d.loeschfrist)
-    return ende ? formatiereDatum(ende) : `nach „${d.loeschfrist.ereignis.trim() || 'Ereignis'}“`
+    return ende ? formatiereDatum(addiereTage(ende, 1)) : `nach „${d.loeschfrist.ereignis.trim() || 'Ereignis'}“`
   }
   return 'offen'
 }

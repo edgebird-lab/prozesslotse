@@ -31,10 +31,12 @@ import {
 import { formatiereDatum, tageZwischen } from './datum'
 import { aufbewahrungText, HANDELSBRIEF_JAHRE, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb, mindestJahre } from './fristen'
 import { BESONDERE_KATEGORIEN, istPflichtig, STRAFRECHTLICH_TEXT, TOM_BEREICHE } from './standard'
-import type { ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt } from './typen'
+import type { Aufbewahrungsart, ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt } from './typen'
 import { geaenderteKapitel, letzteWirksame } from './versionen'
 
 const ELEKTRONISCH = new Set(['bild', 'strukturiert', 'datensatz'])
+/** Handels- und Geschäftsbriefe; Ausgangsrechnungen und Lieferscheine zählen dazu (Ausnahme nach GoBD Rz. 120, Regel B6). */
+const BRIEFE: ReadonlySet<Aufbewahrungsart> = new Set<Aufbewahrungsart>(['geschaeftsbrief', 'buchungsbeleg', 'lieferschein'])
 const RANG: Record<Schwere, number> = { fehler: 0, warnung: 1, hinweis: 2 }
 
 function jahre(n: number): string {
@@ -71,7 +73,8 @@ export function pruefeCompliance(p: Prozess, c: ComplianceProjekt, heute: IsoDat
   pruefeKontrollen(k, objekte, add)
   for (const b of TOM_BEREICHE) {
     const t = c.toms[b.wert]
-    if (t.massnahmen.length === 0 && !t.nichtZutreffend.trim()) {
+    // wie Verzeichnis C: Einträge nur aus Leerzeichen zählen nicht
+    if (!t.massnahmen.some((m) => m.trim()) && !t.nichtZutreffend.trim()) {
       add({
         regel: 'T1',
         id: b.wert,
@@ -93,21 +96,29 @@ type Objekt = { id: Id; name: string; d: DatenobjektAngaben }
 
 function pruefeUnternehmen(c: ComplianceProjekt, add: Add): void {
   const u = c.unternehmen
-  const fehlt: string[] = []
-  if (!u.name.trim()) fehlt.push('Name')
-  if (!u.anschrift.strasse.trim()) fehlt.push('Straße')
-  if (!u.anschrift.plz.trim()) fehlt.push('PLZ')
-  if (!u.anschrift.ort.trim()) fehlt.push('Ort')
-  if (!u.telefon.trim() && !u.email.trim()) fehlt.push('Telefon oder E-Mail')
+  // Was in Abschnitt A des Verzeichnisses fehlt, und wohin „Beheben“ springt
+  const fehlt: { was: string; ziel: string }[] = []
+  if (!u.name.trim()) fehlt.push({ was: 'Name', ziel: 'name' })
+  if (!u.anschrift.strasse.trim()) fehlt.push({ was: 'Straße', ziel: 'anschrift' })
+  if (!u.anschrift.plz.trim()) fehlt.push({ was: 'PLZ', ziel: 'anschrift' })
+  if (!u.anschrift.ort.trim()) fehlt.push({ was: 'Ort', ziel: 'anschrift' })
+  if (!u.telefon.trim() && !u.email.trim()) fehlt.push({ was: 'Telefon oder E-Mail', ziel: 'telefon' })
+  // Art. 30 Abs. 1 lit. a: auch Name und Kontaktdaten eines benannten Datenschutzbeauftragten
+  const dsb = u.datenschutzbeauftragter
+  if (dsb) {
+    const anschrift = dsb.anschrift.strasse.trim() && dsb.anschrift.plz.trim() && dsb.anschrift.ort.trim()
+    const teile = [dsb.name.trim() ? '' : 'Name', dsb.telefon.trim() || dsb.email.trim() || anschrift ? '' : 'Kontaktdaten'].filter(Boolean)
+    if (teile.length > 0) fehlt.push({ was: `${liste(teile)} des Datenschutzbeauftragten`, ziel: 'datenschutzbeauftragter' })
+  }
   if (fehlt.length > 0) {
     add({
       regel: 'U1',
       teilschritt: 'unternehmen',
       schwere: 'warnung',
       titel: 'Angaben zum Verantwortlichen fehlen',
-      text: `Für das Verzeichnis fehlen: ${fehlt.join(', ')}.`,
+      text: `Für das Verzeichnis fehlen: ${fehlt.map((f) => f.was).join(', ')}.`,
       quelle: 'Art. 30 Abs. 1 lit. a DSGVO',
-      ziel: { art: 'unternehmen', id: fehlt[0] === 'Name' ? 'name' : fehlt[0] === 'Telefon oder E-Mail' ? 'telefon' : 'anschrift' },
+      ziel: { art: 'unternehmen', id: fehlt[0].ziel },
     })
   }
   if (!u.geschaeftsleitung.trim()) {
@@ -235,20 +246,21 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
     const { medien } = ablage.get(o.id)!
     const nurPapier = medien.length > 0 && medien.every((m) => m !== undefined && !digital(m))
     if (o.d.ablageform !== 'ausdruck' && !nurPapier) continue
-    // Ausnahme (GoBD Rz. 120): elektronisch erstellt und auf Papier versandt, nicht aus einem Fakturierungssystem
+    // Ausnahme (GoBD Rz. 120): Brief elektronisch erstellt und auf Papier versandt, nicht aus einem Fakturierungssystem
     const ausFakturierung = ersteller(k, o.id).some((a) => {
       const m = a.mediumId ? k.medien.get(a.mediumId) : undefined
       return m?.art === 'erp' || m?.art === 'fachanwendung'
     })
-    const ausnahme = o.d.richtung === 'ausgang' && o.d.form !== 'strukturiert' && !ausFakturierung
+    const ausnahme = BRIEFE.has(o.d.aufbewahrungsart) && o.d.richtung === 'ausgang' && o.d.form !== 'strukturiert' && !ausFakturierung
     add({
       regel: 'B6',
       id: o.id,
       teilschritt: 'belege',
       schwere: ausnahme ? 'hinweis' : 'fehler',
-      titel: 'Elektronisch erhalten, nur auf Papier aufbewahrt',
+      titel: 'Elektronische Unterlage auf Papier aufbewahrt',
+      // Der Text nennt den Auslöser: „Als Ausdruck“ kann neben einem digitalen Ablageort stehen
       text: ausnahme
-        ? `„${o.name}“ wird nur auf Papier aufbewahrt. Nur zulässig, wenn „${o.name}“ auf Papier versandt und die Datei nicht aufbewahrt wird.`
+        ? `„${o.name}“ ${nurPapier ? 'liegt nur in Papierablagen' : 'wird als Ausdruck aufbewahrt'}. Nur zulässig, wenn „${o.name}“ auf Papier versandt und die Datei nicht aufbewahrt wird.`
         : `„${o.name}“ entsteht oder kommt elektronisch an und muss elektronisch aufbewahrt werden. Ein Ausdruck reicht nicht.`,
       quelle: 'GoBD Rz. 119, 120',
       ziel: { art: 'datenobjekt', id: o.id },
@@ -287,23 +299,27 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
       })
       continue
     }
+    // Abschlüsse und Eröffnungsbilanz dürfen nicht nur als Wiedergabe aufbewahrt werden
+    const buch = o.d.aufbewahrungsart === 'buecher'
     add({
       regel: 'B8',
       id: o.id,
       teilschritt: 'belege',
       schwere: scanDoku === true ? 'hinweis' : 'warnung',
       titel: scanDoku === true ? 'Ersetzendes Scannen dokumentieren' : scanDoku === false ? 'Verfahrensdokumentation zum Scannen fehlt' : 'Verfahrensdokumentation zum Scannen ungeklärt',
-      text: `„${o.name}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensdokumentation, z. B. nach dem Muster von BStBK und DStV.${scanDoku === true ? '' : ' Liegt sie vor, wähle bei der Frage danach „Ja“.'}`,
-      quelle: 'GoBD Rz. 136',
+      text: `„${o.name}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensdokumentation, z. B. nach dem Muster von BStBK und DStV.${buch ? ' Jahresabschlüsse und Eröffnungsbilanz sind im Original aufzubewahren.' : ''}${scanDoku === true ? '' : ' Liegt sie vor, wähle bei der Frage danach „Ja“.'}`,
+      quelle: buch ? 'GoBD Rz. 136, 140; § 147 Abs. 2 AO; § 257 Abs. 3 HGB' : 'GoBD Rz. 136',
       ziel: { art: 'datenobjekt', id: o.id },
     })
   }
   for (const a of k.aufgaben) {
     if (!a.uebertragung) continue
+    // Nur eine Kontrolle nach dem Abtippen prüft dessen Ergebnis (Ablaufreihenfolge wie bei den Kapitelnummern)
+    const nachA = (x: Aufgabe) => k.position.get(x.id)! > k.position.get(a.id)!
     const ungeprueft = objekteVon(k, a.id, 'schreibt').filter((id) => {
       const art = angaben(c, id).aufbewahrungsart
       if (art !== 'buchungsbeleg' && art !== 'buecher') return false
-      const gelesenVonKontrolle = k.aufgaben.some((x) => istKontrolle(x) && objekteVon(k, x.id, 'liest').includes(id))
+      const gelesenVonKontrolle = k.aufgaben.some((x) => istKontrolle(x) && nachA(x) && objekteVon(k, x.id, 'liest').includes(id))
       return !gelesenVonKontrolle && !c.weitereKontrollen.some((w) => w.bezugAufgabeId === a.id)
     })
     if (ungeprueft.length > 0) {
@@ -319,6 +335,18 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
         ziel: { art: 'kontrolle', id: 'weitere' },
       })
     }
+  }
+  // Ohne Unterlagen bleiben Kapitel 2.4 und das Verzeichnis leer; „Beheben“ springt zum Formular für eine neue Unterlage
+  if (k.aufgaben.length > 0 && objekte.length === 0) {
+    add({
+      regel: 'B10',
+      teilschritt: 'belege',
+      schwere: 'warnung',
+      titel: 'Keine Unterlagen angelegt',
+      text: 'Für den Ablauf ist noch keine Unterlage angelegt. Lege an, welche Belege und Daten in den Schritten entstehen oder genutzt werden.',
+      quelle: 'GoBD Rz. 151, 152; Art. 30 Abs. 1 lit. c DSGVO',
+      ziel: { art: 'datenobjekt' },
+    })
   }
   const kaufmann = istKaufmann(c.unternehmen)
   for (const o of objekte) {
@@ -355,7 +383,7 @@ function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
   for (const o of personen) {
     const fehlt = [o.d.betroffene.length === 0 ? 'betroffene Personen' : '', o.d.datenkategorien.length === 0 ? 'Datenkategorien' : ''].filter(Boolean)
     if (fehlt.length > 0) {
-      add({ regel: 'D2', id: o.id, teilschritt: 'belege', schwere: 'warnung', titel: 'Betroffene oder Datenarten fehlen', text: `Für „${o.name}“ fehlen ${liste(fehlt)}.`, quelle: 'Art. 30 Abs. 1 lit. c DSGVO', ziel: { art: 'datenobjekt', id: o.id } })
+      add({ regel: 'D2', id: o.id, teilschritt: 'belege', schwere: 'warnung', titel: 'Betroffene oder Datenkategorien fehlen', text: `Für „${o.name}“ fehlen ${liste(fehlt)}.`, quelle: 'Art. 30 Abs. 1 lit. c DSGVO', ziel: { art: 'datenobjekt', id: o.id } })
     }
   }
   for (const o of personen) {
@@ -398,18 +426,23 @@ function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
     }
   }
   for (const o of personen) {
-    if (o.d.aufbewahrungsart === 'keine' && o.d.loeschfrist === null) {
-      add({
-        regel: 'D6',
-        id: o.id,
-        teilschritt: 'fristen',
-        schwere: 'warnung',
-        titel: 'Löschfrist fehlt',
-        text: `„${o.name}“ enthält personenbezogene Daten ohne Aufbewahrungspflicht und ohne Löschfrist. Lege fest, wann gelöscht wird, z. B. 30 Tage nach Erledigung.`,
-        quelle: 'Art. 5 Abs. 1 lit. e, Art. 30 Abs. 1 lit. f DSGVO; DSK-Hinweise',
-        ziel: { art: 'frist', id: o.id },
-      })
-    }
+    if (o.d.aufbewahrungsart !== 'keine') continue
+    const f = o.d.loeschfrist
+    // „Nach einem Ereignis“ ohne Ereignis ist keine bestimmbare Frist
+    const ohneEreignis = f !== null && f.beginn === 'ereignis' && !f.ereignis.trim()
+    if (f !== null && !ohneEreignis) continue
+    add({
+      regel: 'D6',
+      id: o.id,
+      teilschritt: 'fristen',
+      schwere: 'warnung',
+      titel: ohneEreignis ? 'Ereignis der Löschfrist fehlt' : 'Löschfrist fehlt',
+      text: ohneEreignis
+        ? `Die Löschfrist für „${o.name}“ hängt an einem Ereignis, das nicht benannt ist. Nenne das Ereignis, z. B. „Ende der Kundenbeziehung“.`
+        : `„${o.name}“ enthält personenbezogene Daten ohne Aufbewahrungspflicht und ohne Löschfrist. Lege fest, wann gelöscht wird, z. B. 30 Tage nach Erledigung.`,
+      quelle: 'Art. 5 Abs. 1 lit. e, Art. 30 Abs. 1 lit. f DSGVO; DSK-Hinweise',
+      ziel: { art: 'frist', id: o.id },
+    })
   }
   if (!c.begruendungLaengereAufbewahrung.trim()) {
     // Lieferscheine von Kaufleuten können als Handelsbrief 6 Jahre aufzubewahren sein (§ 257 HGB)
@@ -432,11 +465,16 @@ function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
   }
   for (const o of personen) {
     for (const e of o.d.externeEmpfaenger) {
-      const land = e.drittland.trim() || 'einem Drittland'
       const maengel: string[] = []
       if (e.standort === 'unbekannt') maengel.push('nicht bekannt, wo die Daten verarbeitet werden')
-      if (e.standort === 'drittland' && (e.garantie === null || e.garantie === 'keine')) maengel.push(`keine Garantie für die Übermittlung nach ${land} eingetragen`)
-      if (e.standort === 'drittland' && !e.name.trim()) maengel.push(`der Empfänger in ${land} nicht benannt`)
+      if (e.standort === 'drittland') {
+        // Das Land steht in Klammern, weil es frei eingegeben wird und einen Artikel brauchen kann („die Schweiz“)
+        const land = e.drittland.trim()
+        const ohneGarantie = e.garantie === null || e.garantie === 'keine'
+        if (!land) maengel.push('das Drittland nicht angegeben')
+        if (ohneGarantie) maengel.push(land ? `keine Garantie für die Übermittlung in das Drittland (${land}) eingetragen` : 'keine Garantie für die Übermittlung eingetragen')
+        if (!e.name.trim()) maengel.push(!land ? 'der Empfänger nicht benannt' : ohneGarantie ? 'der Empfänger dort nicht benannt' : `der Empfänger im Drittland (${land}) nicht benannt`)
+      }
       if (maengel.length === 0) continue
       const wer = e.kategorie.trim() ? `„${e.kategorie.trim()}“` : e.name.trim() ? `„${e.name.trim()}“` : `einen Empfänger von „${o.name}“`
       add({
@@ -445,7 +483,7 @@ function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
         teilschritt: 'belege',
         schwere: 'warnung',
         titel: 'Empfänger ohne gesicherten Standort',
-        text: `Für ${wer} ist ${maengel.join(' und ')}.`,
+        text: `Für ${wer} ist ${liste(maengel)}.`,
         quelle: 'Art. 30 Abs. 1 lit. e, Art. 44–46 DSGVO; DSK-Hinweise Ziff. 6.5',
         ziel: { art: 'datenobjekt', id: o.id },
       })
@@ -475,7 +513,8 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
     }
   }
   for (const { m, s, name } of systeme) {
-    if (mitDienstleister(s) && hatPersonenbezug(k, m.id) && s.auftragsverarbeitung !== false && s.avVertrag !== 'ja') {
+    if (!mitDienstleister(s) || !hatPersonenbezug(k, m.id) || s.auftragsverarbeitung === false) continue
+    if (s.avVertrag !== 'ja') {
       add({
         regel: 'S2',
         id: m.id,
@@ -486,12 +525,27 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
         quelle: 'Art. 28 Abs. 3 DSGVO',
         ziel: { art: 'system', id: m.id },
       })
+    } else if (s.avVertragVom === null) {
+      // Kein Gesetz verlangt das Datum; ohne es steht in Kapitel 6 aber „vom offen“
+      add({
+        regel: 'S2',
+        id: m.id,
+        teilschritt: 'systeme',
+        schwere: 'hinweis',
+        titel: 'Datum des AV-Vertrags fehlt',
+        text: `Für „${name}“ ist ein Vertrag zur Auftragsverarbeitung ohne Datum eingetragen. Datum ergänzen; Kapitel 6 der Verfahrensdokumentation nennt den Vertrag mit Datum.`,
+        quelle: 'Art. 28 Abs. 3, 9 DSGVO',
+        ziel: { art: 'system', id: m.id },
+      })
     }
   }
   for (const { m, s, name } of systeme) {
     if (!mitDienstleister(s) || !hatPersonenbezug(k, m.id)) continue
+    // Art. 30 Abs. 1 lit. e verlangt die Angabe des Drittlands; es steht in Klammern, weil es einen Artikel brauchen kann
+    const land = s.drittland.trim()
     const ohneGarantie = s.standort === 'drittland' && (s.garantie === null || s.garantie === 'keine')
-    if (s.standort !== 'unbekannt' && !ohneGarantie) continue
+    const ohneLand = s.standort === 'drittland' && !land
+    if (s.standort !== 'unbekannt' && !ohneGarantie && !ohneLand) continue
     add({
       regel: 'S3',
       id: m.id,
@@ -501,7 +555,11 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
       text:
         s.standort === 'unbekannt'
           ? `Wo verarbeitet „${name}“ die Daten? Liegt der Server im Drittland oder läuft der Mailversand darüber, ist das eine Übermittlung; Support von dort kann eine sein.`
-          : `„${name}“ verarbeitet die Daten in ${s.drittland.trim() || 'einem Drittland'}, ohne dass eine Garantie für die Übermittlung eingetragen ist, z. B. Standardvertragsklauseln.`,
+          : ohneLand
+            ? ohneGarantie
+              ? `„${name}“ verarbeitet die Daten in einem Drittland, ohne dass das Land und eine Garantie für die Übermittlung eingetragen sind, z. B. Standardvertragsklauseln.`
+              : `„${name}“ verarbeitet die Daten in einem Drittland, ohne dass das Land eingetragen ist.`
+            : `„${name}“ verarbeitet die Daten im Drittland (${land}), ohne dass eine Garantie für die Übermittlung eingetragen ist, z. B. Standardvertragsklauseln.`,
       quelle: 'Art. 44–46 DSGVO; DSK-Hinweise Ziff. 6.4',
       ziel: { art: 'system', id: m.id },
     })
@@ -538,17 +596,55 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
   for (const { m, s, name } of systeme) {
     if (s.sicherung !== 'manuell' && s.sicherung !== 'automatisch') continue
     const getestet = s.wiederherstellungGetestet
-    if (getestet !== null && tageZwischen(getestet, heute) <= 365) continue
+    // Ein Testdatum nach heute ist ein Tippfehler oder ein geplanter Test, kein erledigter
+    const zukunft = getestet !== null && getestet > heute
+    if (getestet !== null && !zukunft && tageZwischen(getestet, heute) <= 365) continue
     add({
       regel: 'S6',
       id: m.id,
       teilschritt: 'systeme',
       schwere: 'hinweis',
       titel: 'Rücksicherung nicht getestet',
-      text: `Für „${name}“ wurde ${getestet === null ? 'noch nie' : `seit dem ${formatiereDatum(getestet)} nicht`} geprüft, ob sich die Sicherung zurückspielen lässt.`,
+      text:
+        getestet !== null && zukunft
+          ? `Für „${name}“ liegt der letzte Test der Rücksicherung in der Zukunft (${formatiereDatum(getestet)}). Datum prüfen.`
+          : `Für „${name}“ wurde ${getestet === null ? 'noch nie' : `seit dem ${formatiereDatum(getestet)} nicht`} geprüft, ob sich die Sicherung zurückspielen lässt.`,
       quelle: 'Art. 32 Abs. 1 lit. c, d DSGVO',
       ziel: { art: 'system', id: m.id },
     })
+  }
+  // Steuerlich: Bücher, Aufzeichnungen und Rechnungen elektronisch außerhalb der EU nur mit Bewilligung des Finanzamts,
+  // unabhängig vom Personenbezug. Die Kataloge kennen nur „EU oder EWR“; EWR-Staaten außerhalb der EU fängt S7 nicht ab.
+  for (const { m, s, name } of systeme) {
+    if (!mitDienstleister(s) || (s.standort !== 'drittland' && s.standort !== 'unbekannt')) continue
+    const ablage = ablageVon(k, m.id)
+    if (ablage.length === 0 || (s.standort === 'drittland' && s.bewilligungVom)) continue
+    const was = aufzaehlung(ablage.map((id) => objektName(k, id)))
+    const land = s.drittland.trim()
+    const quelle = '§ 146 Abs. 2, 2b AO; § 14b Abs. 5 UStG'
+    add(
+      s.standort === 'drittland'
+        ? {
+            regel: 'S7',
+            id: m.id,
+            teilschritt: 'systeme',
+            schwere: 'warnung',
+            titel: 'Aufbewahrung im Drittland ohne Bewilligung',
+            text: `„${name}“ bewahrt ${was} ${land ? `im Drittland (${land})` : 'in einem Drittland'} auf. Elektronische Bücher, Aufzeichnungen und Rechnungen dürfen außerhalb der EU nur mit Bewilligung des Finanzamts aufbewahrt werden. Mit der Steuerberatung klären und das Datum der Bewilligung eintragen.`,
+            quelle,
+            ziel: { art: 'system', id: m.id },
+          }
+        : {
+            regel: 'S7',
+            id: m.id,
+            teilschritt: 'systeme',
+            schwere: 'hinweis',
+            titel: 'Ort der Aufbewahrung unklar',
+            text: `„${name}“ bewahrt ${was} auf, aber der Ort der Verarbeitung ist nicht bekannt. Liegen die Daten außerhalb der EU, braucht es eine Bewilligung des Finanzamts.`,
+            quelle,
+            ziel: { art: 'system', id: m.id },
+          },
+    )
   }
   for (const { m, s, name } of systeme) {
     if (ablageVon(k, m.id).length === 0) continue
