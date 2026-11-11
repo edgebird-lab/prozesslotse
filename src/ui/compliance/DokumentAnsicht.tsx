@@ -1,13 +1,16 @@
 import { useId, type ReactNode } from 'react'
 import { gliederung } from '../../compliance/dokument'
+import { festeLeerzeichen as fest } from '../../compliance/typografie'
 import type { Abschnitt, Dokument } from '../../compliance/typen'
 import type { Prozess } from '../../modell/typen'
 import { useBpmn } from '../analyse'
+import { DiagrammDruck } from '../DiagrammDruck'
 import { DiagrammLazy as Diagramm } from '../DiagrammLazy'
 
 /**
  * Dokument → HTML für Vorschau und Druck. React maskiert alle Texte;
- * Kapitel der Ebene 1 beginnen im Druck auf einer neuen Seite.
+ * Kapitel der Ebene 1 beginnen im Druck auf einer neuen Seite. Nach §, Abs.,
+ * Nr. usw. steht wie in der Word-Datei ein geschütztes Leerzeichen.
  */
 export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; prozess: Prozess }) {
   const titelId = useId()
@@ -19,24 +22,24 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
   const abschnitt = (a: Abschnitt, i: number): ReactNode => {
     switch (a.art) {
       case 'ueberschrift': {
-        const text = `${a.nummer} ${a.text}`
+        const text = fest(`${a.nummer} ${a.text}`)
         if (a.ebene === 1) return <h4 key={i} className="dokument-h1">{text}</h4>
         if (a.ebene === 2) return <h5 key={i} className="dokument-h2">{text}</h5>
         return <h6 key={i} className="dokument-h3">{text}</h6>
       }
       case 'absatz':
-        return <p key={i}>{a.text}</p>
+        return <p key={i}>{fest(a.text)}</p>
       case 'hinweis':
         return (
           <p key={i} className="dokument-hinweis">
-            {a.text}
+            {fest(a.text)}
           </p>
         )
       case 'liste':
         return (
           <ul key={i}>
             {a.punkte.map((p, j) => (
-              <li key={j}>{p}</li>
+              <li key={j}>{fest(p)}</li>
             ))}
           </ul>
         )
@@ -48,7 +51,7 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
                 <tr>
                   {a.kopf.map((k, j) => (
                     <th key={j} scope="col">
-                      {k}
+                      {fest(k)}
                     </th>
                   ))}
                 </tr>
@@ -57,7 +60,7 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
                 {a.zeilen.map((z, j) => (
                   <tr key={j} className={z.every((t) => !t) ? 'leerzeile' : undefined}>
                     {z.map((t, l) => (
-                      <td key={l}>{t}</td>
+                      <td key={l}>{fest(t)}</td>
                     ))}
                   </tr>
                 ))}
@@ -66,9 +69,11 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
           </div>
         )
       case 'diagramm':
+        // Im Druck folgen auf die Übersicht Ausschnitte in lesbarer Größe
         return (
           <div key={i} className="dokument-diagramm">
-            <Diagramm xml={bpmn.xml} klein uebersicht druckbild beschriftung={`Ablaufdiagramm: ${prozess.name || 'Unbenannter Prozess'}`} />
+            <p>Das Diagramm in Originalgröße enthält die BPMN-Datei des Ist-Prozesses (Kapitel 6).</p>
+            <Diagramm xml={bpmn.xml} klein uebersicht druckbild druckInhalt={(svg) => <DiagrammDruck svg={svg} />} beschriftung={`Ablaufdiagramm: ${prozess.name || 'Unbenannter Prozess'}`} />
           </div>
         )
     }
@@ -80,7 +85,7 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
         <h3 id={titelId} className="dokument-titel">
           {dokument.titel}
         </h3>
-        <p className="dokument-untertitel">{dokument.untertitel}</p>
+        <p className="dokument-untertitel">{fest(dokument.untertitel)}</p>
         {deckblatt.map(abschnitt)}
       </header>
       <nav className="dokument-gliederung" aria-label={`Gliederung: ${dokument.titel}`}>
@@ -88,7 +93,7 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
         <ol>
           {gliederung(dokument).map((g) => (
             <li key={g.nummer} className={g.ebene === 2 ? 'gliederung-2' : undefined}>
-              {g.nummer} {g.text}
+              {g.nummer} {fest(g.text)}
             </li>
           ))}
         </ol>

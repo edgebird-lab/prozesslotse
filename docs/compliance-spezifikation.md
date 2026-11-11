@@ -1041,7 +1041,8 @@ Dateinamen über `dateiname(ist.name, …)`: `-verfahrensdokumentation-entwurf.d
 - „Drucken oder als PDF speichern“ druckt das gewählte Dokument mit `window.print()`.
 - Druckregeln: Kapitel der Ebene 1 beginnen auf neuer Seite; Tabellenzeilen werden nicht geteilt; Tabellenköpfe wiederholen sich; Teilschritt-Leiste, Knöpfe und Bühne sind ausgeblendet.
 - Eine Fußzeile mit `position: fixed` trägt den Hinweis auf jeder Seite. Ein unterer Seitenrand in `@page` hält Platz frei, damit sie keinen Text verdeckt. Edge prüft das in Phase 6.
-- Kapitel 9.1 zeigt das Diagramm über `DiagrammLazy` (`klein`, `uebersicht`), bei alten Versionen aus `version.prozess`.
+- Kapitel 9.1 zeigt das Diagramm über `DiagrammLazy` (`klein`, `uebersicht`), bei alten Versionen aus `version.prozess`. Davor steht „Das Diagramm in Originalgröße enthält die BPMN-Datei des Ist-Prozesses (Kapitel 6).“
+- Im Druck zeigt 9.1 zuerst eine Übersicht des ganzen Diagramms auf Satzbreite. Wäre sie unlesbar klein (Maßstab unter 0,6), zeichnet sie nummerierte Rahmen ein, und es folgen Ausschnitte in lesbarem Maßstab (0,6 bis 0,8: Beschriftungen von 11 px werden etwa 5 bis 6,6 pt groß), die sich um 40 px überlappen, je mit „Ausschnitt n von m“ (`druckausschnitte.ts`, `DiagrammDruck.tsx`). Flache, breite Diagramme stehen quer, wenn das Seiten spart: Das Bild selbst ist um 90° gedreht („(quer)“), weil WebView2 immer A4 hoch druckt und `@page`-Ausrichtungen dort nicht sicher wirken.
 - Während des Drucks setzt die App `document.title` auf den Dateinamen ohne Endung, damit „Als PDF speichern“ ihn vorschlägt.
 
 ### 7.5 Windows-Programm (Tauri 2)
