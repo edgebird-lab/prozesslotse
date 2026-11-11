@@ -6,7 +6,7 @@ import { MEDIUM_ARTEN, type Medium } from '../../modell/typen'
 import { useBestaetigen } from '../frage'
 import { Kreuz } from '../Symbol'
 import { useCompliance } from './analyse'
-import { CFeld, DatumEingabe, DatumFeld, JaNeinOffen, KatalogAuswahl, KatalogListe, TextFeld } from './Eingaben'
+import { DatumFeld, JaNeinOffen, KatalogAuswahl, KatalogListe, TextFeld } from './Eingaben'
 
 export function SystemeTeil() {
   const { c, k, ist, aendere } = useCompliance()
@@ -140,11 +140,6 @@ function SystemKarte({ m }: { m: Medium }) {
               <TextFeld label="Land" wert={s.drittland} onAendern={(drittland) => setze({ drittland }, 'drittland')} />
               <KatalogListe label="Garantie" katalog={GARANTIEN} wert={s.garantie} onAendern={(garantie) => setze({ garantie }, 'garantie')} />
             </div>
-          )}
-          {s.standort === 'drittland' && ablage.length > 0 && (
-            <CFeld label="Bewilligung des Finanzamts vom" hilfe="Nötig, weil hier aufbewahrungspflichtige Unterlagen außerhalb der EU liegen (§ 146 Abs. 2b AO, § 14b Abs. 5 UStG).">
-              {(fid) => <DatumEingabe id={fid} wert={s.bewilligungVom ?? null} onAendern={(bewilligungVom) => setze({ bewilligungVom }, 'bewilligung')} />}
-            </CFeld>
           )}
           {personen && (
             <>

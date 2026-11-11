@@ -194,8 +194,6 @@ function pruefeSystem(x: unknown, pfad: string): void {
   wahrheit(s, 'auftragsverarbeitung', pfad, true)
   wert(s, 'avVertrag', AV_VERTRAEGE, pfad)
   datum(s, 'avVertragVom', pfad)
-  // seit der Regel S7; ältere Dateien haben das Feld nicht
-  if (s.bewilligungVom !== undefined) datum(s, 'bewilligungVom', pfad)
   wert(s, 'unveraenderbarkeit', UNVERAENDERBARKEIT, pfad)
   wert(s, 'sicherung', SICHERUNGEN, pfad)
   datum(s, 'wiederherstellungGetestet', pfad)
