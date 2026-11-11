@@ -115,7 +115,7 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build
 - Bei „Gleichzeitig“ gelten die Zweige als unabhängig. Arbeitet dieselbe Person in mehreren Zweigen, ist die berechnete Dauer zu niedrig; ein Hinweis meldet das.
 - Rücksprünge führen nur zu früheren Schritten derselben oder einer umgebenden Ebene, nie aus „Gleichzeitig“ heraus.
 - Abschnitte (aufgeklappte Teilprozesse) liegen mit allen Schritten in einer Bahn; Schritte anderer Rollen tragen im Diagramm die Rolle in Klammern. Teilprozesse sind immer aufgeklappt; zugeklappte mit eigener Ansicht gibt es nicht.
-- „Für jedes Stück einer Liste“: Die Zahl der Stücke ist entweder fest (immer etwa gleich viele, die kleinste Streuung um den Schnitt) oder schwankt geometrisch wie die Durchläufe einer Wiederholung. Zur selben Zeit heißt: so viele Leute wie Stücke; hat eine Rolle weniger, meldet ein Hinweis, dass die Dauer zu niedrig ist.
+- „Für jedes Stück einer Liste“: Die Zahl der Stücke ist entweder fest (immer etwa gleich viele, die kleinste Streuung um den Schnitt) oder schwankt geometrisch wie die Durchläufe einer Wiederholung. Zur selben Zeit heißt: so viele Leute wie Stücke; hat eine Rolle weniger, meldet ein Hinweis, dass die Dauer zu niedrig ist. Gerechnet wird mit höchstens 10.000 Stücken je Vorgang.
 - Noch nicht abbildbar (in Arbeit, Design in [Modellierung, Format 4](docs/modellierung-v4.md)): Abbruch und Eskalation über Randereignisse, „weiter beim ersten“ und „in beliebiger Reihenfolge“. Ein Prozessende in „Gleichzeitig“, in ODER-Wegen und in Stücken, die zur selben Zeit laufen, meldet die Prüfung bis dahin als Fehler. Externe Beteiligte sind leere Pools (Black Box); ihr innerer Ablauf wird nicht modelliert.
 
 ## Lizenz

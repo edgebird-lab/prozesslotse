@@ -488,6 +488,11 @@ describe('Für jedes Stück: Prüfregeln und Schwachstellen', () => {
     expect(schluessel(prozess([neuerMehrfach({ name: 'X', anzahl: 0.5, streuung: 'schwankt', koerper: a() })]))).toContain('fehler:anzahl')
     expect(schluessel(prozess([neuerMehrfach({ name: 'X', liegezeitMin: -5, koerper: a() })]))).toContain('fehler:liegezeit')
     expect(schluessel(prozess([neuerMehrfach({ koerper: a() })]))).toContain('warnung:name')
+    // sehr viele Stücke: gerechnet wird mit höchstens 10.000, Rechnung und Simulation bleiben schnell
+    const viele = prozess([neuerMehrfach({ name: 'Für jeden Beleg', anzahl: 1e9, koerper: a() })])
+    expect(schluessel(viele)).toContain('warnung:viele')
+    expect(berechneKennzahlen(viele).durchlaufzeitMin).toBeCloseTo(10_000 * 5, 6)
+    expect(simuliere(viele, 20, 1).mittelMin).toBeCloseTo(10_000 * 5, 6)
     expect(pruefeProzess(positionen().p).filter((b) => b.schwere !== 'hinweis')).toEqual([])
   })
 

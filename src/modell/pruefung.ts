@@ -24,6 +24,7 @@ import {
   wirktExtern,
   type Glied,
 } from './operationen'
+import { MAX_ANZAHL } from './anzahl'
 import { unerwartet, type Block, type Id, type Mehrfach, type Prozess, type Teilprozess } from './typen'
 import { formatiereProzent, formatiereZahl } from './zeit'
 
@@ -421,6 +422,15 @@ export function pruefeProzess(p: Prozess): Befund[] {
             schwere: 'hinweis',
             titel: 'Läuft nicht in jedem Vorgang',
             text: `Mit im Schnitt ${formatiereZahl(b.anzahl, 2)} Stücken läuft „${titel}“ in ${formatiereProzent(1 - b.anzahl)} der Vorgänge gar nicht.`,
+            blockId: b.id,
+          })
+        }
+        if (b.anzahl > MAX_ANZAHL) {
+          add({
+            schluessel: `viele:${b.id}`,
+            schwere: 'warnung',
+            titel: 'Sehr viele Stücke',
+            text: `„${titel}“ hat im Schnitt ${formatiereZahl(b.anzahl, 0)} Stücke je Vorgang. Gerechnet wird mit höchstens ${formatiereZahl(MAX_ANZAHL, 0)}; so viele Stücke lohnt es sich meist, als eigenen Prozess oder als Stapel zu beschreiben.`,
             blockId: b.id,
           })
         }

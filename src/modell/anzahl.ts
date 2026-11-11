@@ -11,6 +11,9 @@
  */
 import type { MehrfachStreuung } from './typen'
 
+/** Mehr Stücke je Vorgang rechnet der Prozesslotse nicht; sonst liefen Rechnung und Simulation ohne Ende. */
+export const MAX_ANZAHL = 10_000
+
 export interface AnzahlVerteilung {
   streuung: MehrfachStreuung
   /** Mittel n (fest ≥ 0, schwankt ≥ 1) */
@@ -23,12 +26,14 @@ export interface AnzahlVerteilung {
   p: number
 }
 
-/** Die Verteilung zu Mittel und Streuung; ungültige Werte (die Prüfung meldet sie) werden in den gültigen Bereich gezogen. */
+/**
+ * Die Verteilung zu Mittel und Streuung; ungültige Werte (die Prüfung meldet
+ * sie) werden in den gültigen Bereich gezogen, sehr große auf MAX_ANZAHL.
+ */
 export function anzahlVerteilung(anzahl: number, streuung: MehrfachStreuung): AnzahlVerteilung {
-  const roh = Number.isFinite(anzahl) ? anzahl : 0
+  const roh = Math.min(Number.isFinite(anzahl) ? anzahl : 0, MAX_ANZAHL)
   if (streuung === 'schwankt') {
-    // sehr große Mittel begrenzen, damit Reihen und Simulation endlich bleiben
-    const n = Math.min(Math.max(1, roh), 10_000)
+    const n = Math.max(1, roh)
     return { streuung, n, k0: 0, rest: 0, p: 1 - 1 / n }
   }
   const n = Math.max(0, roh)

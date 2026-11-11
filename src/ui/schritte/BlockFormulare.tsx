@@ -684,7 +684,7 @@ function MehrfachFormular({ block: m, onAendern, kontext }: Props<Mehrfach>) {
         label="Wie viele hat ein einzelner Vorgang im Schnitt?"
         hilfe={p.vorgaengeProTag > 0 ? `Bei ${formatiereZahl(p.vorgaengeProTag, 1)} Vorgängen am Tag sind das ${formatiereZahl(p.vorgaengeProTag * m.anzahl, 1)} am Tag.` : undefined}
       >
-        {(id) => <ZahlEingabe id={id} wert={m.anzahl} min={0} onAendern={(anzahl) => setze({ anzahl })} />}
+        {(id) => <ZahlEingabe id={id} wert={m.anzahl} min={0} max={1000} onAendern={(anzahl) => setze({ anzahl })} />}
       </Feld>
       <Auswahl
         label="Sind es immer etwa gleich viele?"

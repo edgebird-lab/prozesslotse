@@ -71,6 +71,7 @@ const KURZ: Record<string, string> = {
   abbruch: 'Ende neben Gleichzeitigem',
   anzahl: 'Anzahl ungültig',
   nie: 'Läuft nie',
+  viele: 'Sehr viele Stücke',
   doppelt: 'Endet und springt',
   ereignis: 'Ereignis fehlt',
 }
