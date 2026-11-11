@@ -1,8 +1,9 @@
 import { useRef, type ChangeEvent } from 'react'
 import { leseDatei } from '../../bpmn/einbettung'
+import { rollenAngaben } from '../../compliance/ableitung'
 import { uebernimmFirmenangaben } from '../../compliance/speicher'
 import { GEWINNERMITTLUNGEN, leererKontakt, RECHTSFORMEN } from '../../compliance/standard'
-import type { Anschrift, Kontakt, Unternehmen, Verarbeitungstaetigkeit } from '../../compliance/typen'
+import type { Anschrift, Kontakt, RollenAngaben, Unternehmen, Verarbeitungstaetigkeit } from '../../compliance/typen'
 import { Auswahl, Schalter } from '../Eingaben'
 import { useBestaetigen } from '../frage'
 import { useApp } from '../kontext'
@@ -37,6 +38,7 @@ export function UnternehmenTeil() {
   const setze = (werte: Partial<Unternehmen>, feld: string) => aendere((x) => ({ ...x, unternehmen: { ...x.unternehmen, ...werte } }), `unternehmen.${feld}`)
   const setzeAnschrift = (werte: Partial<Anschrift>, feld: string) => aendere((x) => ({ ...x, unternehmen: { ...x.unternehmen, anschrift: { ...x.unternehmen.anschrift, ...werte } } }), `unternehmen.anschrift.${feld}`)
   const setzeV = (werte: Partial<Verarbeitungstaetigkeit>, feld: string) => aendere((x) => ({ ...x, verarbeitung: { ...x.verarbeitung, ...werte } }), `verarbeitung.${feld}`)
+  const setzeRolle = (id: string, werte: Partial<RollenAngaben>, feld: string) => aendere((x) => ({ ...x, rollen: { ...x.rollen, [id]: { ...rollenAngaben(x, id), ...werte } } }), `rolle.${id}.${feld}`)
 
   const uebernehmen = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -95,6 +97,56 @@ export function UnternehmenTeil() {
           onAendern={(geschaeftsleitung) => setze({ geschaeftsleitung }, 'leitung')}
         />
         <ZeilenFeld label="An welchen Standorten wird gearbeitet?" werte={u.standorte} onAendern={(standorte) => setze({ standorte }, 'standorte')} />
+      </section>
+
+      <section aria-labelledby="rollen-titel" className="felder">
+        <h3 id="rollen-titel">Rollen im Ablauf</h3>
+        <p className="leise">Gehört eine Rolle zu einer anderen Organisation, etwa eine Kanzlei, die die Buchhaltung erledigt, ist sie extern. Externe Rollen stehen im Verzeichnis bei den externen Empfängern.</p>
+        {ist.rollen.length === 0 ? (
+          <p className="leer-hinweis">Noch keine Rollen. Rollen legst du im Schritt „Beteiligte“ an.</p>
+        ) : (
+          <div className="tabelle-wrap">
+            <table className="eingabe-tabelle">
+              <thead>
+                <tr>
+                  <th scope="col">Rolle</th>
+                  <th scope="col">Extern</th>
+                  <th scope="col">Organisation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ist.rollen.map((r) => {
+                  const ra = rollenAngaben(c, r.id)
+                  const name = r.name.trim() || 'Unbenannte Rolle'
+                  return (
+                    <tr key={r.id}>
+                      <th scope="row">{name}</th>
+                      <td>
+                        <Schalter an={ra.extern} onAendern={(extern) => setzeRolle(r.id, { extern }, 'extern')}>
+                          <span className="sr">{name}: </span>extern
+                        </Schalter>
+                      </td>
+                      <td>
+                        {ra.extern ? (
+                          <input
+                            type="text"
+                            autoComplete="off"
+                            aria-label={`Organisation von ${name}`}
+                            placeholder="z. B. Kanzlei Beispiel"
+                            value={ra.organisation}
+                            onChange={(e) => setzeRolle(r.id, { organisation: e.target.value }, 'organisation')}
+                          />
+                        ) : (
+                          '–'
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="datenschutz-titel" className="felder">

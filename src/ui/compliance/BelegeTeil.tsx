@@ -5,6 +5,7 @@ import { aufbewahrungText, beispielBis, wirksameJahre } from '../../compliance/f
 import {
   ABLAGEFORMEN,
   AUFBEWAHRUNGSARTEN,
+  AUSNAHMEN_ART9,
   BELEGFORMEN,
   BESONDERE_KATEGORIEN,
   BETROFFENE,
@@ -248,6 +249,15 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
               <Chips legende="Warum dürfen die Daten verarbeitet werden?" optionen={RECHTSGRUNDLAGEN} werte={d.rechtsgrundlagen} onAendern={(rechtsgrundlagen) => setze({ rechtsgrundlagen }, 'grundlagen')} />
               {d.rechtsgrundlagen.includes('interesse') && (
                 <TextFeld label="Welches Interesse?" mehrzeilig wert={d.berechtigtesInteresse} onAendern={(berechtigtesInteresse) => setze({ berechtigtesInteresse }, 'interesse')} />
+              )}
+              {d.besondereKategorien.length > 0 && (
+                <>
+                  <KatalogListe label="Welche Ausnahme nach Art. 9 Abs. 2 DSGVO gilt?" katalog={AUSNAHMEN_ART9} wert={d.ausnahmeArt9 ?? null} leer="offen" onAendern={(ausnahmeArt9) => setze({ ausnahmeArt9 }, 'art9')} />
+                  <p className="feld-hilfe">
+                    Besonders geschützte Daten sind nur mit einer dieser Ausnahmen erlaubt, zusätzlich zur Rechtsgrundlage oben. Ob daneben eine Vorschrift des BDSG gilt, etwa für Daten von Beschäftigten, klärst du mit
+                    dem Datenschutzbeauftragten oder einer fachkundigen Person.
+                  </p>
+                </>
               )}
               <EmpfaengerListe d={d} setze={setze} teilnehmer={ist.teilnehmer.map((t) => t.name.trim()).filter(Boolean)} />
             </div>

@@ -12,6 +12,7 @@ import { useApp } from '../kontext'
 import { useCompliance } from './analyse'
 import { DokumentAnsicht } from './DokumentAnsicht'
 import { FreigabeDialog } from './FreigabeDialog'
+import { MitgeltendeListe } from './MitgeltendeListe'
 
 const REITER: { art: DokumentArt; name: string }[] = [
   { art: 'verfahrensdokumentation', name: 'Verfahrensdokumentation' },
@@ -148,6 +149,8 @@ export function DokumenteTeil() {
       </div>
 
       <Versionsliste versionen={c.versionen} ansicht={ansicht} onAnsehen={setAnsicht} onDocx={(v) => void docx(art === 'verfahrensdokumentation' ? v.verfahrensdoku : v.verzeichnis)} art={art} />
+
+      <MitgeltendeListe />
 
       <div className="reiter" role="tablist" aria-label="Dokument">
         {REITER.map((r, i) => (
