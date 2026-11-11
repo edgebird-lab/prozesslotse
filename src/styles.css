@@ -151,6 +151,11 @@ textarea {
   outline: 2px solid var(--fokus);
   outline-offset: 2px;
 }
+/* „Beheben“: die angesteuerte Frage kurz umranden, auch nach einem Mausklick (ohne :focus-visible) */
+[data-sprungziel] {
+  outline: 3px solid var(--fokus);
+  outline-offset: 4px;
+}
 
 .sr {
   position: absolute;

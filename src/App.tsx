@@ -8,6 +8,7 @@ import { plattform, type MenueBefehl, type Zuletzt } from './plattform'
 import { aktiverProzess, istGeaendert, reduziere, SCHRITTE, startZustand } from './zustand'
 import { hauptElement, markierungen, useAnalyse, useBpmn } from './ui/analyse'
 import { useDateiBefehle, type FremdesBpmn } from './ui/datei'
+import type { DiagrammApi } from './ui/Diagramm'
 import { DiagrammLazy as Diagramm } from './ui/DiagrammLazy'
 import { Schalter } from './ui/Eingaben'
 import { useFrage } from './ui/frage'
@@ -417,6 +418,7 @@ function FremdeAnsicht({ fremd, onSchliessen }: { fremd: FremdesBpmn; onSchliess
 
 function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
   const { z, dispatch } = useApp()
+  const diagramm = useRef<DiagrammApi>(null)
   const pDiagramm = useVerzoegert(p, 200)
   const bpmn = useBpmn(pDiagramm)
   const analyse = useAnalyse(pDiagramm)
@@ -457,9 +459,14 @@ function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
         )}
         <span className="buehne-name">{p.name || 'Unbenannter Prozess'}</span>
         {zeigeBefunde && marken && marken.size > 0 && <span className="leise klein">Markiert: Schwachstellen und Fehler</span>}
-        {dokumentieren && marken && marken.size > 0 && <span className="leise klein">Markiert: Lücken an Schritten</span>}
+        {/* Markierte Schritte liegen oft außerhalb des Anfangsausschnitts: der Knopf holt den ersten ins Bild */}
+        {dokumentieren && marken && marken.size > 0 && (
+          <button type="button" className="knopf knopf-klein" title="Lücken an Schritten im Diagramm zeigen" onClick={() => diagramm.current?.zeige([...marken.keys()])}>
+            {marken.size} markiert – zeigen
+          </button>
+        )}
       </div>
-      <Diagramm xml={bpmn.xml} markierungen={marken} ausgewaehlt={ausgewaehlt} onKlick={klick} beschriftung={`BPMN-Diagramm: ${p.name || 'Unbenannter Prozess'}`} />
+      <Diagramm ref={diagramm} xml={bpmn.xml} markierungen={marken} ausgewaehlt={ausgewaehlt} onKlick={klick} beschriftung={`BPMN-Diagramm: ${p.name || 'Unbenannter Prozess'}`} />
       <p className="buehne-fuss leise klein">
         Ziehen zum Verschieben, Strg + Mausrad zum Zoomen. {dokumentieren ? 'Ein Klick auf einen Schritt zeigt nur seine Angaben.' : 'Ein Klick auf einen Schritt öffnet ihn zum Bearbeiten.'}
       </p>

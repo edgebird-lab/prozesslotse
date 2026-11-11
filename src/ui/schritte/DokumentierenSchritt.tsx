@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { TEILSCHRITTE } from '../../compliance/standard'
-import type { ComplianceBefund } from '../../compliance/typen'
+import type { ComplianceBefund, Teilschritt } from '../../compliance/typen'
+import type { Id } from '../../modell/typen'
 import { useApp } from '../kontext'
 import { useCompliance, zielElement } from '../compliance/analyse'
+import { feldZiel, zeigeAnfang, zeigeFrage } from '../compliance/beheben'
 import { BelegeTeil } from '../compliance/BelegeTeil'
 import { DokumenteTeil } from '../compliance/DokumenteTeil'
 import { ComplianceLernhinweis } from '../compliance/Eingaben'
@@ -20,33 +23,36 @@ import { UnternehmenTeil } from '../compliance/UnternehmenTeil'
  */
 export function DokumentierenSchritt() {
   const { z, dispatch } = useApp()
-  const { befunde } = useCompliance()
-  const fokus = useRef<string | null>(null)
+  const { c, befunde } = useCompliance()
+  const wurzel = useRef<HTMLDivElement>(null)
+  // Karte, die „Beheben“ beim Wechsel zu „Belege und Daten“ geöffnet zeigt
+  const [oeffnen, setOeffnen] = useState<Id | null>(null)
   const index = TEILSCHRITTE.findIndex((t) => t.id === z.teilschritt)
   const naechster = TEILSCHRITTE[index + 1]
 
-  // „Beheben“: nach dem Wechsel des Teilschritts das Ziel ansteuern
-  useEffect(() => {
-    const id = fokus.current
-    if (!id) return
-    fokus.current = null
-    const el = document.getElementById(id)
-    if (!el) return
-    el.scrollIntoView({ block: 'center' })
-    el.focus({ preventScroll: true })
-  }, [z.teilschritt])
-
+  // Beide Sprünge zeichnen den neuen Teilschritt sofort (flushSync) und steuern dann an:
+  // „Beheben“ die Frage zum Befund, „Weiter“ den Anfang des Teilschritts.
   const beheben = useCallback(
     (b: ComplianceBefund) => {
-      fokus.current = zielElement(b)
-      dispatch({ typ: 'auswahl', auswahl: null })
-      dispatch({ typ: 'teilschritt', teilschritt: b.teilschritt })
+      const ziele = [feldZiel(b, c), zielElement(b)].filter((id): id is string => !!id)
+      flushSync(() => {
+        setOeffnen(b.ziel?.art === 'datenobjekt' ? (b.ziel.id ?? null) : null)
+        dispatch({ typ: 'auswahl', auswahl: null })
+        dispatch({ typ: 'teilschritt', teilschritt: b.teilschritt })
+      })
+      zeigeFrage(ziele)
+      setOeffnen(null)
     },
-    [dispatch],
+    [c, dispatch],
   )
 
+  const weiter = (id: Teilschritt) => {
+    flushSync(() => dispatch({ typ: 'teilschritt', teilschritt: id }))
+    zeigeAnfang(wurzel.current)
+  }
+
   return (
-    <div className="schritt dokumentieren">
+    <div className="schritt dokumentieren" ref={wurzel}>
       <h2>6 · Dokumentieren</h2>
       <p className="leise">
         Aus dem Ablauf entstehen zwei Dokumente: die Verfahrensdokumentation, die das Finanzamt nach den GoBD (Regeln für die elektronische Buchführung) erwartet, und das Verzeichnis
@@ -55,7 +61,7 @@ export function DokumentierenSchritt() {
       <Teilschritte befunde={befunde} />
       <ComplianceLernhinweis thema={z.teilschritt} />
       {z.teilschritt === 'unternehmen' && <UnternehmenTeil />}
-      {z.teilschritt === 'belege' && <BelegeTeil />}
+      {z.teilschritt === 'belege' && <BelegeTeil oeffnen={oeffnen} />}
       {z.teilschritt === 'systeme' && <SystemeTeil />}
       {z.teilschritt === 'fristen' && <FristenTeil />}
       {z.teilschritt === 'kontrollen' && <KontrollenTeil />}
@@ -64,7 +70,7 @@ export function DokumentierenSchritt() {
       {z.teilschritt === 'dokumente' && <DokumenteTeil />}
       <div className="schritt-fuss">
         {naechster ? (
-          <button type="button" className="knopf knopf-haupt" onClick={() => dispatch({ typ: 'teilschritt', teilschritt: naechster.id })}>
+          <button type="button" className="knopf knopf-haupt" onClick={() => weiter(naechster.id)}>
             Weiter: {naechster.name}
           </button>
         ) : (

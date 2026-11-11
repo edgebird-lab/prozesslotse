@@ -10,15 +10,29 @@ import { Auswahl } from '../Eingaben'
 import { useApp } from '../kontext'
 import { COMPLIANCE_LERNINHALTE, type ComplianceThema } from './lerninhalte'
 
-/** Beschriftetes Feld; `id` ist fest, wenn „Beheben“ das Feld ansteuern soll. */
-export function CFeld({ label, id, hilfe, children }: { label: ReactNode; id?: string; hilfe?: ReactNode; children: (id: string) => ReactNode }) {
+/** Id der Meldung unter einem Feld (für aria-describedby). */
+const meldungId = (feldId: string) => `${feldId}-meldung`
+
+/** Meldung direkt am Feld; Screenreader lesen sie sofort vor. */
+export function FeldMeldung({ feldId, text }: { feldId: string; text: string | null | undefined }) {
+  if (!text) return null
+  return (
+    <p className="feld-meldung" role="alert" id={meldungId(feldId)}>
+      {text}
+    </p>
+  )
+}
+
+/** Beschriftetes Feld; `id` ist fest, wenn „Beheben“ das Feld ansteuern soll. `fehler` steht als Meldung unter dem Feld. */
+export function CFeld({ label, id, hilfe, fehler, children }: { label: ReactNode; id?: string; hilfe?: ReactNode; fehler?: string | null; children: (id: string) => ReactNode }) {
   const eigene = useId()
   const feldId = id ?? eigene
   return (
-    <div className="feld">
+    <div className={`feld${fehler ? ' feld-fehler' : ''}`}>
       <label htmlFor={feldId}>{label}</label>
       {children(feldId)}
       {hilfe && <p className="feld-hilfe">{hilfe}</p>}
+      <FeldMeldung feldId={feldId} text={fehler} />
     </div>
   )
 }
@@ -29,6 +43,7 @@ export function TextFeld({
   onAendern,
   id,
   hilfe,
+  fehler,
   platzhalter,
   mehrzeilig,
   typ = 'text',
@@ -38,19 +53,22 @@ export function TextFeld({
   onAendern: (s: string) => void
   id?: string
   hilfe?: ReactNode
+  /** Meldung am Feld; das Feld gilt dann als ungültig (aria-invalid). */
+  fehler?: string | null
   platzhalter?: string
   mehrzeilig?: boolean
   typ?: 'text' | 'email' | 'tel' | 'url'
 }) {
   return (
-    <CFeld label={label} id={id} hilfe={hilfe}>
-      {(fid) =>
-        mehrzeilig ? (
-          <textarea id={fid} rows={2} value={wert} placeholder={platzhalter} onChange={(e) => onAendern(e.target.value)} />
+    <CFeld label={label} id={id} hilfe={hilfe} fehler={fehler}>
+      {(fid) => {
+        const pruefung = fehler ? { 'aria-invalid': true, 'aria-describedby': meldungId(fid) } : {}
+        return mehrzeilig ? (
+          <textarea id={fid} rows={2} value={wert} placeholder={platzhalter} onChange={(e) => onAendern(e.target.value)} {...pruefung} />
         ) : (
-          <input id={fid} type="text" inputMode={typ} autoComplete="off" value={wert} placeholder={platzhalter} onChange={(e) => onAendern(e.target.value)} />
+          <input id={fid} type="text" inputMode={typ} autoComplete="off" value={wert} placeholder={platzhalter} onChange={(e) => onAendern(e.target.value)} {...pruefung} />
         )
-      }
+      }}
     </CFeld>
   )
 }
@@ -64,29 +82,72 @@ export function ZeilenFeld({ label, werte, onAendern, id, hilfe, platzhalter }: 
   )
 }
 
-/** Ganze Zahl oder leer (null). */
-export function OptionaleZahl({ wert, onAendern, id, ariaLabel, min = 0, max = 1_000_000, suffix }: { wert: number | null; onAendern: (n: number | null) => void; id?: string; ariaLabel?: string; min?: number; max?: number; suffix?: string }) {
+/** Was an einer Eingabe für `OptionaleZahl` nicht stimmt; null, wenn sie gilt. */
+function zahlFehler(text: string, min: number, max: number, einheit?: string): string | null {
+  const t = text.trim()
+  if (t === '') return null
+  if (!/^\d+$/.test(t)) return 'Bitte eine ganze Zahl eingeben, z. B. 12.'
+  const n = Number(t)
+  const mit = (z: number) => (einheit ? `${z} ${einheit}` : String(z))
+  if (n > max) return `Höchstens ${mit(max)}.`
+  if (n < min) return `Mindestens ${mit(min)}.`
+  return null
+}
+
+/**
+ * Ganze Zahl oder leer (null). Ungültiges (Text, zu groß, zu klein) wird nicht übernommen,
+ * sondern bleibt mit einer Meldung am Feld stehen, bis es korrigiert ist.
+ */
+export function OptionaleZahl({
+  wert,
+  onAendern,
+  id,
+  ariaLabel,
+  min = 0,
+  max = 1_000_000,
+  suffix,
+  einheit,
+}: {
+  wert: number | null
+  onAendern: (n: number | null) => void
+  id?: string
+  ariaLabel?: string
+  min?: number
+  max?: number
+  suffix?: string
+  /** Einheit für die Meldung, z. B. „Jahre“ in „Höchstens 30 Jahre.“ */
+  einheit?: string
+}) {
   const [text, setText] = useState<string | null>(null)
+  const eigene = useId()
+  const feldId = id ?? eigene
+  const fehler = text === null ? null : zahlFehler(text, min, max, einheit)
   return (
-    <span className="zahl">
-      <input
-        id={id}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        aria-label={ariaLabel}
-        value={text ?? (wert === null ? '' : String(wert))}
-        onFocus={() => setText(wert === null ? '' : String(wert))}
-        onBlur={() => setText(null)}
-        onChange={(e) => {
-          setText(e.target.value)
-          const t = e.target.value.trim()
-          if (t === '') return onAendern(null)
-          if (/^\d+$/.test(t)) onAendern(Math.min(max, Math.max(min, Number(t))))
-        }}
-      />
-      {suffix && <span className="zahl-suffix">{suffix}</span>}
-    </span>
+    <>
+      <span className="zahl">
+        <input
+          id={feldId}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          aria-label={ariaLabel}
+          aria-invalid={fehler ? true : undefined}
+          aria-describedby={fehler ? meldungId(feldId) : undefined}
+          value={text ?? (wert === null ? '' : String(wert))}
+          onFocus={() => setText((t) => t ?? (wert === null ? '' : String(wert)))}
+          // Gültiges zeigt danach den gespeicherten Wert; Ungültiges bleibt mit der Meldung stehen
+          onBlur={() => setText((t) => (t !== null && zahlFehler(t, min, max, einheit) ? t : null))}
+          onChange={(e) => {
+            setText(e.target.value)
+            const t = e.target.value.trim()
+            if (t === '') return onAendern(null)
+            if (!zahlFehler(t, min, max, einheit)) onAendern(Number(t))
+          }}
+        />
+        {suffix && <span className="zahl-suffix">{suffix}</span>}
+      </span>
+      <FeldMeldung feldId={feldId} text={fehler} />
+    </>
   )
 }
 
@@ -133,6 +194,7 @@ export function Chips<T extends string>({ legende, optionen, werte, onAendern, i
             <label key={o.wert} className={`chip-option${an ? ' an' : ''}`}>
               <input
                 type="checkbox"
+                value={o.wert}
                 checked={an}
                 onChange={(e) => {
                   const neu = new Set(werte)
@@ -151,10 +213,11 @@ export function Chips<T extends string>({ legende, optionen, werte, onAendern, i
 }
 
 /** Einfachauswahl aus einem Katalog als Knopfgruppe; `null` = noch nichts gewählt. */
-export function KatalogAuswahl<T extends string>({ label, katalog, wert, onAendern, spalten }: { label: string; katalog: readonly Eintrag<T>[]; wert: T | null; onAendern: (w: T) => void; spalten?: number }) {
+export function KatalogAuswahl<T extends string>({ label, katalog, wert, onAendern, spalten, id }: { label: string; katalog: readonly Eintrag<T>[]; wert: T | null; onAendern: (w: T) => void; spalten?: number; id?: string }) {
   return (
     <Auswahl<T | ''>
       label={label}
+      id={id}
       wert={wert ?? ''}
       spalten={spalten}
       optionen={katalog.map((e) => ({ wert: e.wert, text: e.text, beschreibung: e.beschreibung }))}
@@ -200,7 +263,7 @@ export function KatalogListe<T extends string>({
 type JaNein = 'ja' | 'nein' | 'offen'
 
 /** Ja · Nein · Weiß nicht für Angaben, die auch offen sein dürfen. */
-export function JaNeinOffen({ label, wert, onAendern, ohneOffen }: { label: string; wert: boolean | null; onAendern: (w: boolean | null) => void; ohneOffen?: boolean }) {
+export function JaNeinOffen({ label, wert, onAendern, ohneOffen, id }: { label: string; wert: boolean | null; onAendern: (w: boolean | null) => void; ohneOffen?: boolean; id?: string }) {
   const optionen: { wert: JaNein; text: string }[] = [
     { wert: 'ja', text: 'Ja' },
     { wert: 'nein', text: 'Nein' },
@@ -209,6 +272,7 @@ export function JaNeinOffen({ label, wert, onAendern, ohneOffen }: { label: stri
   return (
     <Auswahl<JaNein | ''>
       label={label}
+      id={id}
       spalten={optionen.length}
       wert={wert === true ? 'ja' : wert === false ? 'nein' : ohneOffen ? '' : 'offen'}
       optionen={optionen}

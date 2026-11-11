@@ -1,4 +1,5 @@
-import { useId, useState, type FocusEvent } from 'react'
+import { useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { angaben, ersteller, nutzer, schrittText, type Kontext } from '../../compliance/ableitung'
 import { jahrVon } from '../../compliance/datum'
 import { empfaengerVorschlaege } from '../../compliance/empfaenger'
@@ -30,6 +31,7 @@ import { useApp } from '../kontext'
 import { Kreuz } from '../Symbol'
 import { useAufgabenFilter, useCompliance } from './analyse'
 import { CFeld, Chips, JaNeinOffen, KatalogAuswahl, KatalogListe, TextFeld, ZeilenFeld } from './Eingaben'
+import { erstesFeld, fokussiere, nachbar } from './fokus'
 
 function rolleVon(k: Kontext, a: Aufgabe): string {
   return k.p.rollen.find((r) => r.id === a.rolleId)?.name.trim() || 'ohne Rolle'
@@ -57,11 +59,14 @@ export function FilterHinweis({ k, aufgabe, aufheben, was }: { k: Kontext; aufga
   )
 }
 
-export function BelegeTeil() {
+/** `oeffnen`: Karte, die „Beheben“ ansteuert; sie ist von Anfang an offen. */
+export function BelegeTeil({ oeffnen = null }: { oeffnen?: Id | null }) {
   const { c, k, befunde, aendere } = useCompliance()
   const filter = useAufgabenFilter(k)
   // Offen sind anfangs die Karten mit Fehlern oder Warnungen; die übrigen zeigen nur eine Zusammenfassung
-  const [offen, setOffen] = useState<ReadonlySet<Id>>(() => new Set(befunde.flatMap((b) => (b.ziel?.art === 'datenobjekt' && b.ziel.id && b.schwere !== 'hinweis' ? [b.ziel.id] : []))))
+  const [offen, setOffen] = useState<ReadonlySet<Id>>(
+    () => new Set([...befunde.flatMap((b) => (b.ziel?.art === 'datenobjekt' && b.ziel.id && b.schwere !== 'hinweis' ? [b.ziel.id] : [])), ...(oeffnen ? [oeffnen] : [])]),
+  )
   const oeffne = (id: Id, an = true) =>
     setOffen((alt) => {
       const neu = new Set(alt)
@@ -105,18 +110,28 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
   const { k, aendere } = useCompliance()
   const { melde } = useApp()
   const [name, setName] = useState('')
+  const [fehler, setFehler] = useState<string | null>(null)
   const [entstehtIn, setEntstehtIn] = useState<Id>('')
   const [genutztIn, setGenutztIn] = useState<Id[]>([])
   const nameId = useId()
   const anlegen = () => {
     const n = name.trim()
-    if (!n) return melde('Bitte einen Namen für die Unterlage eingeben.')
+    // Meldung am Feld statt in der Kopfzeile, die bei langen Seiten außerhalb des Bilds liegt
+    if (!n) {
+      setFehler('Gib der Unterlage einen Namen, z. B. „Ausgangsrechnung“.')
+      document.getElementById(`${nameId}-name`)?.focus()
+      return
+    }
     const id = neueId('unt')
-    aendere((x) => legeUnterlageAn(x, n, { id, entstehtIn: entstehtIn || null, genutztIn }).compliance)
-    onAngelegt(id)
-    setName('')
-    setEntstehtIn('')
-    setGenutztIn([])
+    flushSync(() => {
+      aendere((x) => legeUnterlageAn(x, n, { id, entstehtIn: entstehtIn || null, genutztIn }).compliance)
+      onAngelegt(id)
+      setName('')
+      setEntstehtIn('')
+      setGenutztIn([])
+    })
+    // Fokus auf die neue Karte; ist sie gerade ausgefiltert, bleibt er im Formular
+    fokussiere(document.getElementById(`ziel-datenobjekt-${id}`))
     melde(`„${n}“ angelegt.`)
   }
   return (
@@ -129,7 +144,16 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
       }}
     >
       <h4 id={`${nameId}-titel`}>Neue Unterlage</h4>
-      <TextFeld label="Name, z. B. „Ausgangsrechnung“" wert={name} onAendern={setName} />
+      <TextFeld
+        id={`${nameId}-name`}
+        label="Name, z. B. „Ausgangsrechnung“"
+        wert={name}
+        fehler={fehler}
+        onAendern={(n) => {
+          setName(n)
+          if (n.trim()) setFehler(null)
+        }}
+      />
       <CFeld label="In welchem Schritt entsteht es?" hilfe="Die Nummer ist das Kapitel in der Verfahrensdokumentation.">
         {(id) => (
           <select id={id} value={entstehtIn} onChange={(e) => setEntstehtIn(e.target.value)}>
@@ -178,13 +202,11 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
   const nutz = nutzer(k, id)
   const jahre = wirksameJahre(d)
   const koerperId = `unterlage-${id}-angaben`
-  // „Beheben“ setzt den Fokus auf die Karte: dann aufklappen
-  const fokus = (e: FocusEvent) => {
-    if (e.target === e.currentTarget && !offen) onOffen(true)
-  }
+  // Sprungziele für „Beheben“: die Karte und je Frage ein Feld
+  const ziel = `ziel-datenobjekt-${id}`
 
   return (
-    <section className="karte unterlage felder" id={`ziel-datenobjekt-${id}`} tabIndex={-1} aria-labelledby={titelId} onFocus={fokus}>
+    <section className="karte unterlage felder" id={ziel} tabIndex={-1} aria-labelledby={titelId}>
       <div className="teil-kopf">
         <h4 id={titelId}>{name}</h4>
         <button
@@ -193,7 +215,11 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
           aria-label={`Unterlage ${name} entfernen`}
           title="Entfernen"
           onClick={async () => {
-            if (await bestaetige('Unterlage entfernen?', `„${name}“ und alle Angaben dazu werden entfernt. Rückgängig ist möglich.`, 'Entfernen')) aendere((x) => loescheUnterlage(x, id))
+            if (!(await bestaetige('Unterlage entfernen?', `„${name}“ und alle Angaben dazu werden entfernt. Rückgängig ist möglich.`, 'Entfernen'))) return
+            // Danach auf die nächste Karte, sonst die Überschrift des Abschnitts
+            const ersatz = nachbar(document.getElementById(ziel), 'section.unterlage') ?? document.getElementById('belege-titel')
+            flushSync(() => aendere((x) => loescheUnterlage(x, id)))
+            fokussiere(ersatz)
           }}
         >
           <Kreuz />
@@ -223,7 +249,7 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
             </details>
           )}
 
-          <KatalogAuswahl label={`Was ist „${name}“?`} katalog={AUFBEWAHRUNGSARTEN} wert={d.aufbewahrungsart} spalten={2} onAendern={(aufbewahrungsart) => setze({ aufbewahrungsart }, 'art')} />
+          <KatalogAuswahl id={`${ziel}-art`} label={`Was ist „${name}“?`} katalog={AUFBEWAHRUNGSARTEN} wert={d.aufbewahrungsart} spalten={2} onAendern={(aufbewahrungsart) => setze({ aufbewahrungsart }, 'art')} />
           <p className="feld-hilfe">
             {istPflichtig(d.aufbewahrungsart)
               ? `Aufbewahrung: ${aufbewahrungText(d)}${jahre !== null ? `; aus ${jahrVon(heute)} also ${beispielBis(d, jahrVon(heute))}` : ''}.`
@@ -234,28 +260,28 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
           <KatalogAuswahl label="Wie kommt es an oder entsteht es?" katalog={BELEGFORMEN} wert={d.form} spalten={2} onAendern={(form) => setze({ form }, 'form')} />
           <KatalogAuswahl label="Woher kommt es, wohin geht es?" katalog={RICHTUNGEN} wert={d.richtung} spalten={3} onAendern={(richtung) => setze({ richtung }, 'richtung')} />
           <Ablage id={id} d={d} setze={setze} />
-          <KatalogAuswahl label="In welcher Form wird es aufbewahrt?" katalog={ABLAGEFORMEN} wert={d.ablageform} spalten={2} onAendern={(ablageform) => setze({ ablageform }, 'ablageform')} />
+          <KatalogAuswahl id={`${ziel}-ablageform`} label="In welcher Form wird es aufbewahrt?" katalog={ABLAGEFORMEN} wert={d.ablageform} spalten={2} onAendern={(ablageform) => setze({ ablageform }, 'ablageform')} />
           {d.form === 'papier' && d.ablageform === 'scan' && (
-            <JaNeinOffen label="Wird das Papier nach dem Scannen vernichtet?" wert={d.originalVernichtet} onAendern={(originalVernichtet) => setze({ originalVernichtet }, 'vernichtet')} />
+            <JaNeinOffen id={`${ziel}-vernichtet`} label="Wird das Papier nach dem Scannen vernichtet?" wert={d.originalVernichtet} onAendern={(originalVernichtet) => setze({ originalVernichtet }, 'vernichtet')} />
           )}
 
-          <JaNeinOffen label="Enthält es Angaben zu Personen?" wert={d.personenbezogen} onAendern={(personenbezogen) => setze({ personenbezogen }, 'personen')} />
+          <JaNeinOffen id={`${ziel}-personen`} label="Enthält es Angaben zu Personen?" wert={d.personenbezogen} onAendern={(personenbezogen) => setze({ personenbezogen }, 'personen')} />
           {d.personenbezogen === true && (
             <div className="eingerueckt felder">
-              <Chips legende="Wer ist betroffen?" optionen={BETROFFENE} werte={d.betroffene} onAendern={(betroffene) => setze({ betroffene }, 'betroffene')} />
-              <Chips legende="Welche Daten?" optionen={DATENKATEGORIEN} werte={d.datenkategorien} onAendern={(datenkategorien) => setze({ datenkategorien }, 'kategorien')} />
+              <Chips id={`${ziel}-betroffene`} legende="Wer ist betroffen?" optionen={BETROFFENE} werte={d.betroffene} onAendern={(betroffene) => setze({ betroffene }, 'betroffene')} />
+              <Chips id={`${ziel}-kategorien`} legende="Welche Daten?" optionen={DATENKATEGORIEN} werte={d.datenkategorien} onAendern={(datenkategorien) => setze({ datenkategorien }, 'kategorien')} />
               <details className="aufklapp">
                 <summary>
                   Besonders geschützte Daten (Art. 9 und 10 DSGVO){d.besondereKategorien.length > 0 || d.strafrechtlich ? ': angegeben' : ''}
                 </summary>
-                <Chips legende="Besondere Kategorien" optionen={BESONDERE_KATEGORIEN} werte={d.besondereKategorien} onAendern={(besondereKategorien) => setze({ besondereKategorien }, 'besondere')} />
+                <Chips id={`${ziel}-besondere`} legende="Besondere Kategorien" optionen={BESONDERE_KATEGORIEN} werte={d.besondereKategorien} onAendern={(besondereKategorien) => setze({ besondereKategorien }, 'besondere')} />
                 <Schalter an={d.strafrechtlich} onAendern={(strafrechtlich) => setze({ strafrechtlich }, 'straf')}>
                   Daten über strafrechtliche Verurteilungen und Straftaten
                 </Schalter>
               </details>
-              <Chips legende="Warum dürfen die Daten verarbeitet werden?" optionen={RECHTSGRUNDLAGEN} werte={d.rechtsgrundlagen} onAendern={(rechtsgrundlagen) => setze({ rechtsgrundlagen }, 'grundlagen')} />
+              <Chips id={`${ziel}-grundlagen`} legende="Warum dürfen die Daten verarbeitet werden?" optionen={RECHTSGRUNDLAGEN} werte={d.rechtsgrundlagen} onAendern={(rechtsgrundlagen) => setze({ rechtsgrundlagen }, 'grundlagen')} />
               {d.rechtsgrundlagen.includes('interesse') && (
-                <TextFeld label="Welches Interesse?" mehrzeilig wert={d.berechtigtesInteresse} onAendern={(berechtigtesInteresse) => setze({ berechtigtesInteresse }, 'interesse')} />
+                <TextFeld id={`${ziel}-interesse`} label="Welches Interesse?" mehrzeilig wert={d.berechtigtesInteresse} onAendern={(berechtigtesInteresse) => setze({ berechtigtesInteresse }, 'interesse')} />
               )}
               <EmpfaengerListe d={d} setze={setze} teilnehmer={ist.teilnehmer.map((t) => t.name.trim()).filter(Boolean)} />
             </div>
@@ -269,26 +295,38 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
 function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Partial<DatenobjektAngaben>, feld: string) => void }) {
   const { c, ist, aendere } = useCompliance()
   const [name, setName] = useState('')
+  const [fehler, setFehler] = useState<string | null>(null)
   const [medium, setMedium] = useState<Id>('')
+  const bereich = `ziel-datenobjekt-${id}-ablage`
   const optionen: Eintrag<Id>[] = c.ablageorte.map((a) => {
     const name = a.name.trim() || 'Unbenannter Ablageort'
     const system = ist.medien.find((m) => m.id === a.mediumId)?.name.trim() || 'ohne System'
     // „Warenwirtschaft (Warenwirtschaft)“ sagt nichts Neues
     return { wert: a.id, text: name.toLocaleLowerCase('de') === system.toLocaleLowerCase('de') ? name : `${name} (${system})` }
   })
+  // Der Knopf bleibt bedienbar (ein gesperrter Knopf verliert den Fokus); ohne Namen meldet das Feld es
   const anlegen = () => {
     const n = name.trim()
-    if (!n) return
-    aendere((x) => {
-      const { compliance, id: neu } = legeAblageortAn(x, n, medium || null)
-      const alt = angaben(compliance, id)
-      return { ...compliance, datenobjekte: { ...compliance.datenobjekte, [id]: { ...alt, ablageSpeicherIds: [...alt.ablageSpeicherIds, neu] } } }
+    if (!n) {
+      setFehler('Gib dem Ablageort einen Namen, z. B. „Belegarchiv“.')
+      document.getElementById(`${bereich}-name`)?.focus()
+      return
+    }
+    const neu = neueId('abl')
+    flushSync(() => {
+      aendere((x) => {
+        const { compliance } = legeAblageortAn(x, n, medium || null, neu)
+        const alt = angaben(compliance, id)
+        return { ...compliance, datenobjekte: { ...compliance.datenobjekte, [id]: { ...alt, ablageSpeicherIds: [...alt.ablageSpeicherIds, neu] } } }
+      })
+      setName('')
+      setMedium('')
     })
-    setName('')
-    setMedium('')
+    // Fokus auf das neue, schon ausgewählte Kästchen
+    fokussiere(document.getElementById(bereich)?.querySelector<HTMLElement>(`input[type="checkbox"][value="${CSS.escape(neu)}"]`))
   }
   return (
-    <div className="felder">
+    <div className="felder" id={bereich}>
       {optionen.length > 0 ? (
         <Chips legende="Wo wird es aufbewahrt?" optionen={optionen} werte={d.ablageSpeicherIds} onAendern={(ablageSpeicherIds) => setze({ ablageSpeicherIds }, 'ablage')} />
       ) : (
@@ -297,7 +335,17 @@ function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Pa
       <details className="aufklapp">
         <summary>+ Ablageort</summary>
         <div className="feldreihe">
-          <TextFeld label="Name des Ablageorts" platzhalter="z. B. Belegarchiv" wert={name} onAendern={setName} />
+          <TextFeld
+            id={`${bereich}-name`}
+            label="Name des Ablageorts"
+            platzhalter="z. B. Belegarchiv"
+            wert={name}
+            fehler={fehler}
+            onAendern={(n) => {
+              setName(n)
+              if (n.trim()) setFehler(null)
+            }}
+          />
           <CFeld label="System">
             {(fid) => (
               <select id={fid} value={medium} onChange={(e) => setMedium(e.target.value)}>
@@ -311,7 +359,7 @@ function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Pa
             )}
           </CFeld>
         </div>
-        <button type="button" className="knopf knopf-klein" onClick={anlegen} disabled={!name.trim()}>
+        <button type="button" className="knopf knopf-klein" onClick={anlegen}>
           Ablageort anlegen und auswählen
         </button>
       </details>
@@ -324,6 +372,18 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
     setze({ externeEmpfaenger: d.externeEmpfaenger.map((x) => (x.id === e.id ? { ...x, ...werte } : x)) }, `empfaenger.${e.id}.${feld}`)
   const vorschlaege = empfaengerVorschlaege(teilnehmer, d)
   const vorschlagId = useId()
+  const plus = useRef<HTMLButtonElement>(null)
+  // Neuer Empfänger: Fokus in sein erstes offenes Feld (Kategorie, beim Vorschlag der Name)
+  const neu = (e: Empfaenger, feld: 'kategorie' | 'name') => {
+    flushSync(() => setze({ externeEmpfaenger: [...d.externeEmpfaenger, e] }, 'empfaenger'))
+    fokussiere(document.getElementById(`ziel-empfaenger-${e.id}-${feld}`))
+  }
+  // Entfernt: Fokus in den nächsten Empfänger, sonst auf „+ Empfänger“
+  const entferne = (e: Empfaenger, knopf: HTMLElement) => {
+    const ersatz = erstesFeld(nachbar(knopf.closest('fieldset'), 'fieldset.empfaenger')) ?? plus.current
+    flushSync(() => setze({ externeEmpfaenger: d.externeEmpfaenger.filter((x) => x.id !== e.id) }, 'empfaenger'))
+    fokussiere(ersatz)
+  }
   return (
     <div className="felder">
       <p className="feld-titel">Wer bekommt die Daten außerhalb des Unternehmens?</p>
@@ -332,14 +392,15 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
         <fieldset key={e.id} className="empfaenger eingerueckt">
           <legend>Empfänger {i + 1}</legend>
           <div className="feldreihe">
-            <TextFeld label="Kategorie" platzhalter="z. B. Steuerberatung" wert={e.kategorie} onAendern={(kategorie) => aendereEmpfaenger(e, { kategorie }, 'kategorie')} />
-            <TextFeld label="Name" platzhalter="z. B. Kanzlei Beispiel" wert={e.name} onAendern={(name) => aendereEmpfaenger(e, { name }, 'name')} />
+            <TextFeld id={`ziel-empfaenger-${e.id}-kategorie`} label="Kategorie" platzhalter="z. B. Steuerberatung" wert={e.kategorie} onAendern={(kategorie) => aendereEmpfaenger(e, { kategorie }, 'kategorie')} />
+            <TextFeld id={`ziel-empfaenger-${e.id}-name`} label="Name" platzhalter="z. B. Kanzlei Beispiel" wert={e.name} onAendern={(name) => aendereEmpfaenger(e, { name }, 'name')} />
           </div>
-          <KatalogListe label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={e.standort} onAendern={(standort) => standort && aendereEmpfaenger(e, { standort }, 'standort')} />
+          <KatalogListe id={`ziel-empfaenger-${e.id}-standort`} label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={e.standort} onAendern={(standort) => standort && aendereEmpfaenger(e, { standort }, 'standort')} />
           {e.standort === 'drittland' && (
             <div className="feldreihe">
               <TextFeld label="Land" wert={e.drittland} onAendern={(drittland) => aendereEmpfaenger(e, { drittland }, 'land')} />
               <KatalogListe
+                id={`ziel-empfaenger-${e.id}-garantie`}
                 label="Absicherung der Übermittlung"
                 hilfe="Steht im Vertrag oder in den Datenschutzhinweisen des Empfängers; frag im Zweifel nach."
                 katalog={GARANTIEN}
@@ -348,13 +409,13 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
               />
             </div>
           )}
-          <button type="button" className="knopf knopf-klein knopf-leise" onClick={() => setze({ externeEmpfaenger: d.externeEmpfaenger.filter((x) => x.id !== e.id) }, 'empfaenger')}>
+          <button type="button" className="knopf knopf-klein knopf-leise" onClick={(ev) => entferne(e, ev.currentTarget)}>
             Empfänger entfernen
           </button>
         </fieldset>
       ))}
       <div className="knopfreihe">
-        <button type="button" className="knopf knopf-klein" onClick={() => setze({ externeEmpfaenger: [...d.externeEmpfaenger, neuerEmpfaenger()] }, 'empfaenger')}>
+        <button type="button" className="knopf knopf-klein" ref={plus} onClick={() => neu(neuerEmpfaenger(), 'kategorie')}>
           + Empfänger
         </button>
       </div>
@@ -364,7 +425,7 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
             Externe aus dem Ablauf – nur, wenn sie Daten anderer Personen bekommen:
           </span>
           {vorschlaege.map((t) => (
-            <button key={t} type="button" className="knopf knopf-klein knopf-leise" onClick={() => setze({ externeEmpfaenger: [...d.externeEmpfaenger, neuerEmpfaenger({ kategorie: t })] }, 'empfaenger')}>
+            <button key={t} type="button" className="knopf knopf-klein knopf-leise" onClick={() => neu(neuerEmpfaenger({ kategorie: t }), 'name')}>
               + {t}
             </button>
           ))}

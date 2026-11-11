@@ -571,6 +571,7 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 - Beim Wechsel in „Dokumentieren“ schaltet die Ansicht auf Ist; der Ist-Soll-Umschalter ist dort ausgeblendet. Ein Satz erklärt: „Aus dem Ablauf entstehen zwei Dokumente: die Verfahrensdokumentation, die das Finanzamt nach den GoBD (Regeln für die elektronische Buchführung) erwartet, und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO. Beide beschreiben den Ist-Prozess.“
 - Jeder Teilschritt zeigt in der Leiste ein Häkchen, wenn es dort keinen Fehler und keine Warnung gibt, sonst die Zahl offener Punkte. Beispiel für Screenreader: „Belege und Daten, 2 offene Punkte“.
 - Ein Klick auf eine Aufgabe im Diagramm filtert im aktiven Teilschritt auf diese Aufgabe (Belege, Kontrollen).
+- Sind Schritte markiert, steht im Bühnenkopf der Knopf „{n} markiert – zeigen“. Er holt den ersten markierten Schritt (links, dann oben) mindestens in Originalgröße in die Mitte; markierte Schritte liegen oft außerhalb des Anfangsausschnitts.
 - Jeder Teilschritt hat einen Lernhinweis mit Quelle (eigene Liste `COMPLIANCE_LERNINHALTE`, Darstellung wie `Lernhinweis`, ohne BPMN-Symbol).
 - Alle Änderungen laufen über die Aktion `compliance` mit `gruppe` je Feld, damit Tippen ein Rückgängig-Schritt bleibt.
 - Für Eingaben werden `Feld`, `Auswahl`, `ZahlEingabe` und `Schalter` wiederverwendet. Neu sind `Chips` (Mehrfachauswahl als Gruppe von Kontrollkästchen) und `DatumEingabe` (`<input type="date">`).
@@ -670,7 +671,8 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 **7 Lücken**
 
 - Zählerzeile wie im Schritt „Prüfen“ (`zaehle`), dann Befunde nach Teilschritt gruppiert und nach Schwere sortiert.
-- Je Befund: Symbol, Titel, Text, Quelle in kleiner Schrift, Knopf „Beheben“. Er wechselt in den Teilschritt und setzt den Fokus auf das Ziel (Element-Id `ziel-{art}-{id}`).
+- Je Befund: Symbol, Titel, Text, Quelle in kleiner Schrift, Knopf „Beheben“. Er wechselt in den Teilschritt, bringt die Frage ins Bild, die den Befund behebt, und setzt den Fokus auf ihr Feld (`feldZiel`, Element-Id `ziel-{art}-{id}-{frage}`, z. B. `ziel-datenobjekt-{id}-art` bei B1; bei einer Auswahl auf die gewählte Option). Gibt es keine einzelne Frage (K1), gilt das Ziel selbst (`ziel-{art}-{id}`). Die Karte einer Unterlage ist dann offen, zugeklappte Bereiche um das Feld klappen auf. Fragen, die höher als das Fenster sind, beginnen oben, sonst stehen sie in der Mitte. Die Frage ist danach kurz umrandet (`data-sprungziel`), weil der Browser nach einem Mausklick keinen Fokusring zeigt.
+- „Weiter: …“ führt an den Anfang des nächsten Teilschritts: Die Teilschritt-Leiste steht oben im Bild, der Fokus auf der ersten Überschrift des Teilschritts. Jeder Teilschritt beginnt mit einer Überschrift der Ebene 3 („Lücken“ und „Dokumente“ eigens dafür). Ein Klick in der Leiste lässt den Fokus dort.
 - Befunde mit `blockId` werden im Diagramm markiert (`markierungen`).
 
 ### 5.4 Teilschritt „Dokumente“
@@ -703,6 +705,9 @@ Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem 
 - axe meldet in keinem Teilschritt schwere oder kritische Befunde, hell wie dunkel.
 - Wiederholte Knöpfe nennen ihr Objekt im zugänglichen Namen; er beginnt mit dem sichtbaren Text (WCAG 2.5.3), z. B. „Beheben: Schutzmaßnahmen fehlen – Verschlüsselung“, „Angaben bearbeiten: Tourenliste“, „DOCX: Version 1.0, Verfahrensdokumentation als Word-Datei“.
 - Wiederholte Kontaktfelder (Datenschutzbeauftragter, gemeinsam Verantwortlicher, Vertreter) stehen in einem `fieldset` mit Legende „Kontakt: {wer}“ (für Screenreader).
+- Der Fokus fällt nie auf die Seite zurück: Nach dem Anlegen steht er im ersten Feld des neuen Eintrags (Empfänger, weitere Kontrolle, Löschfrist: „Anzahl“), bei einer neuen Unterlage auf ihrer Karte, bei einem neuen Ablageort auf seinem Kästchen. Nach dem Entfernen steht er auf dem nächsten Eintrag, sonst auf der Überschrift des Abschnitts; nach „Löschfrist entfernen“ auf „Löschfrist festlegen“, nach „Zurück zum aktuellen Entwurf“ auf dem gewählten Reiter.
+- Knöpfe zum Anlegen werden nicht gesperrt. Fehlt eine Angabe, steht die Meldung am Feld (`role="alert"`, `aria-invalid`, `aria-describedby`), und der Fokus geht ins Feld, z. B. „Gib der Unterlage einen Namen, z. B. „Ausgangsrechnung“.“
+- Zahlenfelder (`OptionaleZahl`) übernehmen nur ganze Zahlen im erlaubten Bereich. Alles andere bleibt sichtbar im Feld stehen, mit „Bitte eine ganze Zahl eingeben, z. B. 12.“ oder „Höchstens 30 Jahre.“, bis es korrigiert ist; gespeichert bleibt der letzte gültige Wert.
 
 ## 6. Regeln, Berechnungen und Prüfungen
 
@@ -1252,13 +1257,14 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 ### 9.10 Browsertests (Playwright, Uhr fest auf 11.11.2026)
 
 1. Beispiel „Lieferdienst“ laden, „Dokumentieren“ → „Lücken“: Zählerzeile „keine Fehler · 4 Warnungen · 3 Hinweise“ (Format von `zaehle`).
-2. „Beheben“ bei B1 öffnet „Belege und Daten“ mit Fokus auf „Bestellnotiz“. „Nicht aufbewahrungspflichtig“ und eine Löschfrist von 30 Tagen ab Entstehung wählen: „keine Fehler · 3 Warnungen · 3 Hinweise“.
+2. „Beheben“ bei B1 öffnet „Belege und Daten“ mit Fokus auf der Frage „Was ist „Bestellnotiz“?“ (Option „Weiß nicht“). „Nicht aufbewahrungspflichtig“ und eine Löschfrist von 30 Tagen ab Entstehung wählen: „keine Fehler · 3 Warnungen · 3 Hinweise“.
 3. Version freigeben: Liste zeigt „1.0 · gültig ab 11.11.2026“. Im Schritt „Ablauf“ eine Aufgabe umbenennen: „Lücken“ zeigt V2 mit „Seit Version 1.0 geändert“.
 4. „Als Word-Datei“: Download mit Namen `…-verfahrensdokumentation-v1-0.docx`, größer als 5 KB.
 5. Druckansicht (`emulateMedia print`): Hinweis sichtbar, Teilschritt-Leiste unsichtbar.
 6. axe in allen acht Teilschritten und im Freigabe-Dialog, hell und dunkel, sowie nach einer Freigabe (Versionsliste): keine schweren oder kritischen Befunde.
 7. Tastatur: Teilschritte, Chips und Dialog vollständig ohne Maus bedienbar.
 8. „Verbessern“: Vorschlag „Freigabe „Rechnung freigeben“ streichen“ zeigt den Hinweis auf die dokumentierte Kontrolle.
+9. Bedienung (`e2e/dokumentieren-bedienung.spec.ts`): „Weiter“ zeigt den Anfang des nächsten Teilschritts, „Beheben“ die Frage zum Befund; der Fokus bleibt nach Anlegen und Entfernen bei einem sinnvollen Element; fehlende Namen und ungültige Zahlen werden am Feld gemeldet; „1 markiert – zeigen“ holt den markierten Schritt ins Bild.
 
 ### 9.11 Fachliche Abnahme
 

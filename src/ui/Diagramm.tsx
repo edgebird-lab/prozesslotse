@@ -32,6 +32,8 @@ interface ElementRegistry {
 export interface DiagrammApi {
   svg(): Promise<string>
   einpassen(): void
+  /** Holt das erste der Elemente (in Leserichtung) lesbar groß in die Mitte, z. B. den ersten markierten Schritt. */
+  zeige(ids: string[]): void
 }
 
 export interface DiagrammProps {
@@ -81,6 +83,16 @@ function zeigeElemente(canvas: Canvas, registry: ElementRegistry, ids: string[])
   } else {
     canvas.viewbox({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 })
   }
+}
+
+/** Das erste Element in Leserichtung (links, dann oben) mindestens in Originalgröße mittig zeigen. */
+function zeigeErstes(canvas: Canvas, registry: ElementRegistry, ids: string[]): void {
+  const formen = ids.map((id) => registry.get(id) as Partial<Form> | undefined).filter((f): f is Form => typeof f?.x === 'number' && typeof f.width === 'number')
+  if (formen.length === 0) return
+  const f = formen.reduce((a, b) => (b.x < a.x || (b.x === a.x && b.y < a.y) ? b : a))
+  if (canvas.zoom() < 1) canvas.zoom(1)
+  const box = canvas.viewbox()
+  canvas.viewbox({ x: f.x + f.width / 2 - box.width / 2, y: f.y + f.height / 2 - box.height / 2, width: box.width, height: box.height })
 }
 
 /** Ganzes Diagramm zeigen; ist es dafür zu klein, lesbar vergrößert am Anfang beginnen. */
@@ -201,6 +213,13 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
       return svg
     },
     einpassen,
+    zeige: (ids) => {
+      const v = viewer.current
+      if (!v) return
+      // Wie ein Zoom von Hand: Ein neues Zeichnen behält diesen Ausschnitt
+      benutzerZoom.current = true
+      zeigeErstes(v.get<Canvas>('canvas'), v.get<ElementRegistry>('elementRegistry'), ids)
+    },
   }))
 
   return (

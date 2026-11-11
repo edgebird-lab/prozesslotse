@@ -115,7 +115,7 @@ export function UnternehmenTeil() {
           Unabhängig von der Zahl kann ein Datenschutzbeauftragter nötig sein, etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören (Art. 37 Abs. 1 lit. b, c DSGVO) oder eine
           Datenschutz-Folgenabschätzung nötig ist (§ 38 Abs. 1 Satz 2 BDSG). Das prüft die App nicht.
         </p>
-        <div id="ziel-unternehmen-datenschutzbeauftragter" tabIndex={-1}>
+        <div id="ziel-unternehmen-datenschutzbeauftragter">
           <JaNeinOffen
             label="Ist ein Datenschutzbeauftragter benannt?"
             ohneOffen

@@ -39,7 +39,8 @@ test('zeigt die Lücken des Beispiels, „Beheben“ führt zur Unterlage (9.10,
   await page.getByRole('button', { name: 'Beheben: Aufbewahrungsfrist fehlt' }).click()
   await expect(teil(page, 'Belege und Daten')).toHaveAttribute('aria-current', 'step')
   const karte = page.locator('#ziel-datenobjekt-dob_bestellnotiz')
-  await expect(karte).toBeFocused()
+  // Fokus auf der Frage, die den Befund behebt
+  await expect(karte.getByRole('group', { name: 'Was ist „Bestellnotiz“?' }).getByRole('radio', { name: /^Weiß nicht/ })).toBeFocused()
   await karte.getByText('Nicht aufbewahrungspflichtig').click()
 
   await teil(page, 'Aufbewahrung und Löschung').click()
@@ -139,6 +140,8 @@ test('im Druck passen alle Tabellen auf A4 mit 15 mm Rand, wie beim PDF aus dem 
 
 for (const schema of ['light', 'dark'] as const) {
   test(`alle Teilschritte und der Freigabe-Dialog ohne schwere Barrieren (${schema === 'light' ? 'hell' : 'dunkel'}, 9.10, 6)`, async ({ page }) => {
+    // Neun axe-Läufe: Auf einem ausgelasteten Rechner reichen 30 s nicht
+    test.slow()
     await page.emulateMedia({ colorScheme: schema })
     await start(page)
     for (const name of TEILSCHRITTE) {

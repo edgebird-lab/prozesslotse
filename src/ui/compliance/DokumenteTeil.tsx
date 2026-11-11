@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { formatiereDatum } from '../../compliance/datum'
 import { docxEndung, erzeugeDocx } from '../../compliance/docx'
 import { kapitelText } from '../../compliance/dokument'
@@ -103,6 +104,7 @@ export function DokumenteTeil() {
   return (
     <div className="teil dokumente">
       <style>{druckFuss(dokument)}</style>
+      <h3>Dokumente</h3>
       <p className="status-zeile">
         {letzte === null
           ? 'Entwurf, nicht freigegeben'
@@ -177,7 +179,15 @@ export function DokumenteTeil() {
             Version {version.bezeichnung}, gültig ab {formatiereDatum(version.gueltigAb)}, freigegeben am {formatiereDatum(version.freigegebenAm)} von {version.freigegebenVon} · Prüfsumme{' '}
             <code>{version.pruefsumme.slice(0, 12)}</code>
           </p>
-          <button type="button" className="knopf knopf-klein" onClick={() => setAnsicht(null)}>
+          <button
+            type="button"
+            className="knopf knopf-klein"
+            onClick={() => {
+              // Das Band verschwindet mit dem Knopf: Fokus auf den gewählten Reiter
+              flushSync(() => setAnsicht(null))
+              reiter.current[REITER.findIndex((r) => r.art === art)]?.focus()
+            }}
+          >
             Zurück zum aktuellen Entwurf
           </button>
         </div>

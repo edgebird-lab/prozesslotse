@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom'
 import { angaben } from '../../compliance/ableitung'
 import { formatiereDatum, jahrVon } from '../../compliance/datum'
 import { fristEnde, laengerAlsVorgeschrieben, mindestJahre, vernichtungAb, wirksameJahre } from '../../compliance/fristen'
@@ -8,6 +9,7 @@ import type { Id } from '../../modell/typen'
 import { ZahlEingabe } from '../Eingaben'
 import { useCompliance } from './analyse'
 import { CFeld, KatalogAuswahl, KatalogListe, OptionaleZahl, TextFeld } from './Eingaben'
+import { erstesFeld, fokussiere } from './fokus'
 
 function gesetzlich(d: DatenobjektAngaben): string {
   const n = mindestJahre(d.aufbewahrungsart)
@@ -64,7 +66,7 @@ export function FristenTeil() {
                     <td>{gesetzlich(o.d)}</td>
                     <td>
                       {istPflichtig(o.d.aufbewahrungsart) ? (
-                        <OptionaleZahl id={`ziel-frist-${o.id}`} ariaLabel={`Gewählte Frist für ${o.name} in Jahren, leer heißt gesetzlich`} wert={o.d.aufbewahrungJahre} max={30} onAendern={(aufbewahrungJahre) => setze(o.id, { aufbewahrungJahre }, 'jahre')} />
+                        <OptionaleZahl id={`ziel-frist-${o.id}`} ariaLabel={`Gewählte Frist für ${o.name} in Jahren, leer heißt gesetzlich`} wert={o.d.aufbewahrungJahre} max={30} einheit="Jahre" onAendern={(aufbewahrungJahre) => setze(o.id, { aufbewahrungJahre }, 'jahre')} />
                       ) : (
                         '–'
                       )}
@@ -120,7 +122,16 @@ export function FristenTeil() {
             <fieldset key={o.id} className="karte felder" id={`ziel-frist-${o.id}`} tabIndex={-1}>
               <legend>{o.name}</legend>
               {f === null ? (
-                <button type="button" className="knopf knopf-klein" onClick={() => setzeFrist(o.id, neueFrist(), 'neu')}>
+                <button
+                  type="button"
+                  className="knopf knopf-klein"
+                  onClick={(e) => {
+                    // Der Knopf weicht den Feldern: Fokus auf „Anzahl“
+                    const karte = e.currentTarget.closest('fieldset')
+                    flushSync(() => setzeFrist(o.id, neueFrist(), 'neu'))
+                    fokussiere(erstesFeld(karte))
+                  }}
+                >
                   Löschfrist festlegen
                 </button>
               ) : (
@@ -131,7 +142,16 @@ export function FristenTeil() {
                   </div>
                   <KatalogAuswahl label="Ab wann?" katalog={FRIST_BEGINNE} wert={f.beginn} spalten={3} onAendern={(beginn) => setzeFrist(o.id, { ...f, beginn }, 'beginn')} />
                   {f.beginn === 'ereignis' && <TextFeld label="Nach welchem Ereignis?" platzhalter="z. B. Ende der Kundenbeziehung" wert={f.ereignis} onAendern={(ereignis) => setzeFrist(o.id, { ...f, ereignis }, 'ereignis')} />}
-                  <button type="button" className="knopf knopf-klein knopf-leise" onClick={() => setzeFrist(o.id, null, 'weg')}>
+                  <button
+                    type="button"
+                    className="knopf knopf-klein knopf-leise"
+                    onClick={(e) => {
+                      // Zurück auf „Löschfrist festlegen“
+                      const karte = e.currentTarget.closest('fieldset')
+                      flushSync(() => setzeFrist(o.id, null, 'weg'))
+                      fokussiere(karte?.querySelector('button'))
+                    }}
+                  >
                     Löschfrist entfernen
                   </button>
                 </>
