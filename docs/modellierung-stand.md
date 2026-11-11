@@ -116,7 +116,7 @@ Hinweise für Schritt 5:
 
 ## Schritt 5 – Abbruch in nebenläufiger Umgebung
 
-Fertig am 2026-11-11, Commit „Abbruch neben gleichzeitig laufenden Schritten“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 5)“.
+Fertig am 2026-11-11, Commit 8b2b56c „Abbruch neben gleichzeitig laufenden Schritten“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 5)“.
 
 - [x] „Prozess endet“ an nebenläufigen Stellen erlauben (außer Nebenweg), Formulartext „Prozess endet sofort; was gleichzeitig läuft, wird abgebrochen“, Prüfregel „Verklemmung“ nur noch für Rücksprünge; `ausgaengeBlock` für ODER (weiter, wenn eine mögliche Auswahl weiterkommt)
 - [x] Export: Terminierung mit Ergebnis auf Prozessebene, Fehler-Ende im Rahmen mit Terminierung hinter dem Randereignis, wenn der äußerste Rahmen nebenläufig liegt; Gleichzeitig ohne Zusammenführung, wenn ein Zweig immer endet
@@ -154,4 +154,4 @@ Hinweise für die abschließende Prüfung:
 | Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
 | Schritt 3, Unterbrechung (Commits 5d73e28 und addb89b) | 210 in 20 Dateien | 23 |
 | Schritt 4, Gleichzeitig-Arten (Commit 3c1d07f) | 231 in 21 Dateien | 25 |
-| Schritt 5, Abbruch | 253 in 22 Dateien | 26 |
+| Schritt 5, Abbruch (Commit 8b2b56c) | 253 in 22 Dateien | 26 |
