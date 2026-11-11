@@ -367,3 +367,26 @@ test('Ablageorte: keine Klammer, wenn System und Name gleich sind', async ({ pag
   await expect(karte.getByRole('checkbox', { name: 'Ordner Lieferscheine (Papier)' })).toBeVisible()
   await expect(karte.getByText('Warenwirtschaft (Warenwirtschaft)')).toHaveCount(0)
 })
+
+test('„Dokumentieren“ lädt erst im Schritt; der Hauptteil bleibt unter 500 kB', async ({ page, request }) => {
+  const skripte: string[] = []
+  page.on('request', (r) => {
+    if (r.resourceType() === 'script') skripte.push(new URL(r.url()).pathname)
+  })
+  await page.clock.setFixedTime(new Date('2026-11-11T10:00:00'))
+  await page.goto('/')
+  await page.getByRole('button', { name: /Mit dem Beispiel/ }).click()
+  await expect(page.getByRole('region', { name: 'Diagramm' }).locator('.djs-container')).toBeAttached()
+  const lueckenpruefung = (u: string) => /\/(DokumentierenSchritt|analyse)-[\w-]+\.js$/.test(u)
+  expect(skripte.filter(lueckenpruefung)).toEqual([])
+
+  const haupt = await page.locator('script[type="module"]').getAttribute('src')
+  const groesse = (await (await request.get(haupt!)).body()).length
+  expect(groesse).toBeLessThan(500_000)
+
+  // Im Schritt „Dokumentieren“ laden Schritt und Lückenprüfung nach; die Bühne zeigt dann die Markierung
+  await schritt(page, 'Dokumentieren').click()
+  await expect(leiste(page)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Diagramm' }).locator('.pl-abzeichen')).toHaveCount(1)
+  expect(skripte.filter(lueckenpruefung).length).toBeGreaterThan(0)
+})

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { beispielMitCompliance } from './compliance/beispiel'
 import { neuesProjekt } from './modell/bausteine'
 import { beispielOnlineProjekt } from './modell/beispiel'
@@ -18,14 +18,16 @@ import { AppKontext, useApp, type AppApi } from './ui/kontext'
 import { AblaufSchritt } from './ui/schritte/AblaufSchritt'
 import { BerichtSchritt } from './ui/schritte/BerichtSchritt'
 import { BeteiligteSchritt } from './ui/schritte/BeteiligteSchritt'
-import { DokumentierenSchritt } from './ui/schritte/DokumentierenSchritt'
-import { useComplianceMarkierungen } from './ui/compliance/analyse'
+import { useComplianceMarkierungen } from './ui/compliance/nachladen'
 import { PruefenSchritt } from './ui/schritte/PruefenSchritt'
 import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
 import { VerbessernSchritt } from './ui/schritte/VerbessernSchritt'
 import './styles.css'
 
 const VERSION = '0.2.0'
+
+// „Dokumentieren“ mit Lückenprüfung und Generatoren ist groß; der Schritt lädt erst, wenn er gebraucht wird
+const DokumentierenSchritt = lazy(() => import('./ui/schritte/DokumentierenSchritt').then((m) => ({ default: m.DokumentierenSchritt })))
 
 function erstZustand() {
   const gespeichert = ladeAusBrowser()
@@ -253,7 +255,11 @@ function Hauptfenster() {
                   {z.schritt === 'ablauf' && <AblaufSchritt />}
                   {z.schritt === 'pruefen' && <PruefenSchritt />}
                   {z.schritt === 'verbessern' && <VerbessernSchritt />}
-                  {z.schritt === 'dokumentieren' && <DokumentierenSchritt />}
+                  {z.schritt === 'dokumentieren' && (
+                    <Suspense fallback={<p className="leise">Dokumentieren wird geladen …</p>}>
+                      <DokumentierenSchritt />
+                    </Suspense>
+                  )}
                 </section>
                 {!(z.schritt === 'dokumentieren' && z.teilschritt === 'dokumente') && <Buehne p={p} hervorhebung={hervorhebung} />}
               </main>

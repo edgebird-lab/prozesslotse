@@ -69,11 +69,9 @@ export function complianceMarkierungen(befunde: ComplianceBefund[], bpmn: BpmnEr
   return ergebnis
 }
 
-/** Markierungen für die Bühne im Schritt „Dokumentieren“; sonst undefined. */
-export function useComplianceMarkierungen(aktiv: boolean, projekt: Projekt, bpmn: BpmnErgebnis): Map<string, Markierung> | undefined {
-  const c = angabenVon(projekt)
-  const heute = heuteIso()
-  return useMemo(() => (aktiv ? complianceMarkierungen(complianceBefunde(projekt.ist, c, heute), bpmn) : undefined), [aktiv, projekt.ist, c, heute, bpmn])
+/** Markierungen für die Bühne im Schritt „Dokumentieren“ (lädt nach, siehe `nachladen.ts`). */
+export function markierungenFuer(ist: Prozess, compliance: ComplianceProjekt | undefined, heute: IsoDatum, bpmn: BpmnErgebnis): Map<string, Markierung> {
+  return complianceMarkierungen(complianceBefunde(ist, compliance ?? LEER, heute), bpmn)
 }
 
 /** Gefiltert nach einer Aufgabe, die im Diagramm angeklickt wurde */
