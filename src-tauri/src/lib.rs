@@ -13,6 +13,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use tauri::{
+    http::HeaderMap,
+    ipc::{InvokeBody, Request},
     menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     AppHandle, DragDropEvent, Emitter, Manager, State, WindowEvent, Wry,
 };
@@ -60,7 +62,7 @@ fn lies(pfad: &Path) -> Result<Datei, String> {
 }
 
 /// Speichert über eine Hilfsdatei und Umbenennen, damit ein Absturz keine halbe Datei hinterlässt.
-fn schreibe(p: &Path, inhalt: &str) -> Result<(), String> {
+fn schreibe(p: &Path, inhalt: &[u8]) -> Result<(), String> {
     let mut tmp = p.as_os_str().to_owned();
     tmp.push(".speichern.tmp");
     let tmp = PathBuf::from(tmp);
@@ -92,7 +94,7 @@ fn speichere_zuletzt(app: &AppHandle, liste: &[Zuletzt]) {
             let _ = std::fs::create_dir_all(ordner);
         }
         if let Ok(t) = serde_json::to_string_pretty(liste) {
-            let _ = schreibe(&d, &t);
+            let _ = schreibe(&d, t.as_bytes());
         }
     }
 }
@@ -123,6 +125,73 @@ fn testantwort(variable: &str) -> Option<Option<PathBuf>> {
 #[cfg(not(debug_assertions))]
 fn testantwort(_variable: &str) -> Option<Option<PathBuf>> {
     None
+}
+
+/// Wie eine Dateiart gespeichert wird: Filter im Dialog, Endung, Titel des Dialogs.
+type Ziel = (&'static str, &'static str, &'static str);
+
+/// Speichern-Dialog für eine Dateiart; im Debug-Build beantwortet ihn ggf.
+/// `PROZESSLOTSE_TEST_SPEICHERN_{ART}`. None bei Abbruch.
+fn waehle_ziel(app: &AppHandle, art: &str, vorschlag: &str, (filter, endung, titel): Ziel) -> Option<PathBuf> {
+    let mut p = testantwort(&format!("PROZESSLOTSE_TEST_SPEICHERN_{}", art.to_uppercase()))
+        .unwrap_or_else(|| app.dialog().file().set_title(titel).set_file_name(vorschlag).add_filter(filter, &[endung]).blocking_save_file().and_then(|w| w.into_path().ok()))?;
+    // Ohne Endung getippt: passende Endung ergänzen, damit Doppelklick und Filter funktionieren
+    if p.extension().is_none() {
+        p.set_extension(endung);
+    }
+    Some(p)
+}
+
+/// Dateiarten, die als Bytes kommen (Word). Text geht über `speichern_unter`.
+fn bytes_ziel(art: &str) -> Option<Ziel> {
+    match art {
+        "docx" => Some(("Word-Dokument", "docx", "Als Word-Datei speichern")),
+        _ => None,
+    }
+}
+
+/// Macht `encodeURIComponent` rückgängig; None bei falscher Kodierung oder ungültigem UTF-8.
+fn dekodiere(text: &str) -> Option<String> {
+    let mut bytes = Vec::with_capacity(text.len());
+    let mut rest = text.bytes();
+    while let Some(b) = rest.next() {
+        if b == b'%' {
+            // to_digit nimmt nur 0–9, a–f, A–F (kein Vorzeichen wie from_str_radix)
+            let ziffer = |c: Option<u8>| char::from(c?).to_digit(16);
+            bytes.push((ziffer(rest.next())? * 16 + ziffer(rest.next())?) as u8);
+        } else {
+            bytes.push(b);
+        }
+    }
+    String::from_utf8(bytes).ok()
+}
+
+/// Kopfwerte sind nur ASCII; die Oberfläche kodiert sie deshalb mit `encodeURIComponent`.
+fn kopfwert(kopf: &HeaderMap, name: &str) -> Result<String, String> {
+    let wert = kopf.get(name).ok_or_else(|| format!("Kopfwert „{name}“ fehlt."))?;
+    wert.to_str().ok().and_then(dekodiere).ok_or_else(|| format!("Kopfwert „{name}“ ist falsch kodiert."))
+}
+
+/// Eine geprüfte Anfrage an `speichern_unter_bytes`.
+struct BytesAnfrage<'a> {
+    bytes: &'a [u8],
+    vorschlag: String,
+    art: String,
+    ziel: Ziel,
+}
+
+/// Prüft die Anfrage, bevor ein Dialog aufgeht: Rohdaten (kein JSON), bekannte Dateiart, lesbarer Vorschlag.
+fn pruefe_bytes_anfrage<'a>(koerper: &'a InvokeBody, kopf: &HeaderMap) -> Result<BytesAnfrage<'a>, String> {
+    let InvokeBody::Raw(bytes) = koerper else {
+        return Err("Die Datei muss als Rohdaten kommen, nicht als JSON.".into());
+    };
+    if bytes.is_empty() {
+        return Err("Die Datei ist leer.".into());
+    }
+    let art = kopfwert(kopf, "art")?;
+    let ziel = bytes_ziel(&art).ok_or_else(|| format!("Unbekannte Dateiart: {art}"))?;
+    let vorschlag = kopfwert(kopf, "vorschlag")?;
+    Ok(BytesAnfrage { bytes, vorschlag, art, ziel })
 }
 
 /// Erste Datei aus der Befehlszeile (Doppelklick im Explorer, „Öffnen mit“).
@@ -164,29 +233,35 @@ fn speichern(pfad: String, inhalt: String, freigaben: State<Freigaben>) -> Resul
     if !freigaben.0.lock().unwrap().contains(&p) {
         return Err("Dieser Pfad wurde nicht vom Benutzer gewählt.".into());
     }
-    schreibe(&p, &inhalt)
+    schreibe(&p, inhalt.as_bytes())
 }
 
 #[tauri::command]
 async fn speichern_unter(app: AppHandle, vorschlag: String, inhalt: String, art: String) -> Result<Option<Gespeichert>, String> {
-    let (filter, endung, titel) = match art.as_str() {
+    let ziel = match art.as_str() {
         "projekt" => ("Prozesslotse-Projekt", "prozesslotse", "Speichern unter"),
         "bpmn" => ("BPMN-Diagramm", "bpmn", "Als BPMN exportieren"),
         "svg" => ("SVG-Bild", "svg", "Als Bild exportieren"),
         _ => return Err(format!("Unbekannte Dateiart: {art}")),
     };
-    let wahl = testantwort(&format!("PROZESSLOTSE_TEST_SPEICHERN_{}", art.to_uppercase()))
-        .unwrap_or_else(|| app.dialog().file().set_title(titel).set_file_name(&vorschlag).add_filter(filter, &[endung]).blocking_save_file().and_then(|w| w.into_path().ok()));
-    let Some(mut p) = wahl else { return Ok(None) };
-    // Ohne Endung getippt: passende Endung ergänzen, damit Doppelklick und Filter funktionieren
-    if p.extension().is_none() {
-        p.set_extension(endung);
-    }
-    schreibe(&p, &inhalt)?;
+    let Some(p) = waehle_ziel(&app, &art, &vorschlag, ziel) else { return Ok(None) };
+    schreibe(&p, inhalt.as_bytes())?;
     freigeben(&app, &p);
     if art == "projekt" {
         merke_zuletzt(&app, &p);
     }
+    Ok(Some(Gespeichert { pfad: p.to_string_lossy().into_owned(), name: dateiname(&p) }))
+}
+
+/// Speichert eine Word-Datei nach Rückfrage. Die Oberfläche schickt die Bytes als Rohdaten
+/// (`invoke('speichern_unter_bytes', bytes, { headers })`), ohne JSON und ohne Base64;
+/// Dateiart und Namensvorschlag stehen in den Kopfwerten `art` und `vorschlag`.
+#[tauri::command]
+async fn speichern_unter_bytes(app: AppHandle, request: Request<'_>) -> Result<Option<Gespeichert>, String> {
+    let a = pruefe_bytes_anfrage(request.body(), request.headers())?;
+    let Some(p) = waehle_ziel(&app, &a.art, &a.vorschlag, a.ziel) else { return Ok(None) };
+    schreibe(&p, a.bytes)?;
+    freigeben(&app, &p);
     Ok(Some(Gespeichert { pfad: p.to_string_lossy().into_owned(), name: dateiname(&p) }))
 }
 
@@ -353,7 +428,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![start_datei, oeffnen, speichern, speichern_unter, zuletzt, oeffne_zuletzt, als_pdf])
+        .invoke_handler(tauri::generate_handler![start_datei, oeffnen, speichern, speichern_unter, speichern_unter_bytes, zuletzt, oeffne_zuletzt, als_pdf])
         .run(tauri::generate_context!())
         .expect("Prozesslotse konnte nicht starten");
 }
@@ -381,8 +456,8 @@ mod tests {
         let ordner = std::env::temp_dir().join("prozesslotse-test-schreiben");
         std::fs::create_dir_all(&ordner).unwrap();
         let datei = ordner.join("projekt.prozesslotse");
-        schreibe(&datei, "{\"a\":1}").unwrap();
-        schreibe(&datei, "{\"a\":2}").unwrap();
+        schreibe(&datei, b"{\"a\":1}").unwrap();
+        schreibe(&datei, b"{\"a\":2}").unwrap();
         let gelesen = lies(&datei).unwrap();
         assert_eq!(gelesen.inhalt, "{\"a\":2}");
         assert_eq!(gelesen.name, "projekt.prozesslotse");
@@ -396,5 +471,68 @@ mod tests {
         let datei = ordner.join("bild.bpmn");
         std::fs::write(&datei, [0xff, 0xfe, 0x00, 0xd8]).unwrap();
         assert!(lies(&datei).is_err());
+    }
+
+    #[test]
+    fn speichert_bytes_mit_nullbytes_unter_einem_namen_mit_umlauten() {
+        let ordner = std::env::temp_dir().join("prozesslotse-test-bytes");
+        std::fs::create_dir_all(&ordner).unwrap();
+        let datei = ordner.join("Verfahrensdokumentation Prüfung – Größe.docx");
+        // Nullbytes am Anfang, in der Mitte und am Ende, dazu alle Bytewerte: kein gültiges UTF-8
+        let mut bytes = vec![0u8, 0, b'P', b'K', 3, 4];
+        bytes.extend(0..=255u8);
+        bytes.extend([0xff, 0xfe, 0, 0]);
+        schreibe(&datei, &bytes).unwrap();
+        assert_eq!(std::fs::read(&datei).unwrap(), bytes);
+        // Überschreiben mit kürzerem Inhalt lässt nichts von der alten Datei stehen
+        schreibe(&datei, &[0, b'P', b'K', 0]).unwrap();
+        assert_eq!(std::fs::read(&datei).unwrap(), [0, b'P', b'K', 0]);
+        assert_eq!(dateiname(&datei), "Verfahrensdokumentation Prüfung – Größe.docx");
+        assert!(!ordner.join("Verfahrensdokumentation Prüfung – Größe.docx.speichern.tmp").exists());
+    }
+
+    #[test]
+    fn dekodiert_kopfwerte_wie_encode_uri_component() {
+        assert_eq!(dekodiere("lieferdienst-verfahrensdokumentation-v1-0.docx").as_deref(), Some("lieferdienst-verfahrensdokumentation-v1-0.docx"));
+        assert_eq!(dekodiere("M%C3%BCller%20%26%20S%C3%B6hne%20%E2%80%93%20Pr%c3%bcfung.docx").as_deref(), Some("Müller & Söhne – Prüfung.docx"));
+        assert_eq!(dekodiere("").as_deref(), Some(""));
+        // unvollständig, keine Hexziffern, Vorzeichen, abgeschnittenes oder ungültiges UTF-8 (Latin-1)
+        for falsch in ["%", "%4", "a%4", "%G0", "%+1", "%-1", "%C3", "%FF", "%E4%FC"] {
+            assert_eq!(dekodiere(falsch), None, "{falsch}");
+        }
+    }
+
+    #[test]
+    fn prueft_bytes_anfragen_vor_dem_dialog() {
+        use tauri::http::HeaderValue;
+        let kopf = |art: Option<&[u8]>, vorschlag: Option<&[u8]>| {
+            let mut k = HeaderMap::new();
+            if let Some(a) = art {
+                k.insert("art", HeaderValue::from_bytes(a).unwrap());
+            }
+            if let Some(v) = vorschlag {
+                k.insert("vorschlag", HeaderValue::from_bytes(v).unwrap());
+            }
+            k
+        };
+        let roh = InvokeBody::Raw(vec![b'P', b'K', 3, 4, 0]);
+        let a = pruefe_bytes_anfrage(&roh, &kopf(Some(b"docx"), Some(b"Pr%C3%BCfung%20v1.docx"))).unwrap();
+        assert_eq!(a.bytes, [b'P', b'K', 3, 4, 0]);
+        assert_eq!(a.vorschlag, "Prüfung v1.docx");
+        assert_eq!(a.art, "docx");
+        assert_eq!(a.ziel, ("Word-Dokument", "docx", "Als Word-Datei speichern"));
+
+        let fehler = |koerper: &InvokeBody, k: HeaderMap| pruefe_bytes_anfrage(koerper, &k).err().unwrap_or_default();
+        let gut = || kopf(Some(b"docx"), Some(b"a.docx"));
+        assert!(fehler(&InvokeBody::Json(serde_json::json!({ "inhalt": [80, 75] })), gut()).contains("Rohdaten"));
+        assert!(fehler(&InvokeBody::Raw(Vec::new()), gut()).contains("leer"));
+        assert!(fehler(&roh, kopf(Some(b"exe"), Some(b"a.exe"))).contains("Unbekannte Dateiart: exe"));
+        // Text-Arten gehen nicht als Bytes
+        assert!(fehler(&roh, kopf(Some(b"projekt"), Some(b"a.prozesslotse"))).contains("Unbekannte Dateiart"));
+        assert!(fehler(&roh, kopf(None, Some(b"a.docx"))).contains("„art“ fehlt"));
+        assert!(fehler(&roh, kopf(Some(b"docx"), None)).contains("„vorschlag“ fehlt"));
+        assert!(fehler(&roh, kopf(Some(b"docx"), Some(b"%E4%FC.docx"))).contains("falsch kodiert"));
+        // unkodiert mit Umlaut: Kopfwert ist kein ASCII
+        assert!(fehler(&roh, kopf(Some(b"docx"), Some("Prüfung.docx".as_bytes()))).contains("falsch kodiert"));
     }
 }

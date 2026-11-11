@@ -15,7 +15,7 @@ Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zei
 - **Vorschläge mit berechneter Wirkung.** Sechs Regeln formen eine Kopie des Prozesses um, die Wirkung kommt aus denselben Formeln wie die Kennzahlen. Übernommene Vorschläge ergeben den Soll-Prozess.
 - **Bericht** mit Ist-Soll-Vergleich, Maßnahmen, Befunden und beiden Diagrammen. Export als BPMN, SVG und Projektdatei, Druck als PDF.
 - **Compliance-Doku:** Aus dem Ist-Prozess entstehen die Verfahrensdokumentation nach GoBD und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO, mit Lückenprüfung, freigegebenen Versionen und Export als Word-Datei und PDF ([Abschnitt unten](#compliance-doku)).
-- **Windows-Programm (Tauri 2):** Installer mit 1,3 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
+- **Windows-Programm (Tauri 2):** Installer mit 1,3 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog, auch für Verfahrensdokumentation und Verzeichnis; deren Word-Dateien gehen über den Speichern-Dialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
 - **Lernmodus:** Zu jeder Auswahl erklärt ein Hinweis das passende BPMN-Element.
 
 | Ablauf beschreiben | Verbessern |
@@ -80,7 +80,7 @@ Der Schritt „Dokumentieren“ erzeugt aus dem Ist-Prozess zwei Dokumente, die 
 | Kontrollen | Prüfungen und Freigaben mit Vier-Augen-Status, weitere Kontrollen, Einweisung |
 | Schutzmaßnahmen | sechs Bereiche nach Art. 32 Abs. 1 DSGVO mit Vorschlägen |
 | Lücken | 38 Regeln mit Quelle und „Beheben“, z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Dienstleister ohne AV-Vertrag |
-| Dokumente | Vorschau, Druck als PDF, Word-Datei, Freigabe und Versionsliste |
+| Dokumente | Vorschau, Druck als PDF (im Programm auch ohne Druckdialog), Word-Datei, Freigabe und Versionsliste |
 
 - **Fristen** nach § 147 AO: Bücher und Organisationsunterlagen 10 Jahre, Buchungsbelege 8, Geschäftsbriefe und sonstige Unterlagen 6, jeweils ab Ende des Kalenderjahres; Lieferscheine ohne Buchungsfunktion bis zur Rechnung.
 - **Versionen:** Eine Freigabe friert Ist-Prozess und beide Dokumente ein, mit Gültig-ab-Datum, Freigabe, geänderten Kapiteln und SHA-256-Prüfsumme über kanonisches JSON. Ändert sich danach etwas Fachliches, nennt die Lückenprüfung die betroffenen Kapitel; nach 365 Tagen erinnert sie an die Überprüfung.
@@ -99,7 +99,7 @@ Spezifikation, Annahmen und Stand: [compliance-spezifikation.md](docs/compliance
 | `src/bpmn` | eigenes Layout mit Bahnen und Spuren, BPMN-XML mit DI |
 | `src/ui` | React-Oberfläche: Assistent, Diagramm (bpmn-js), Prüfen, Verbessern, Bericht |
 | `src/plattform` | Öffnen, Speichern und Fenster: im Browser per Download, im Programm über den Rust-Teil |
-| `src-tauri` | Windows-Programm: Dateibefehle nur für vom Benutzer gewählte Pfade, Menü, PDF über WebView2, Installer |
+| `src-tauri` | Windows-Programm: Dateibefehle nur für vom Benutzer gewählte Pfade (Word-Dateien als Rohdaten, ohne Base64), Menü, PDF über WebView2, Installer |
 | `e2e` | Browsertests mit Playwright und axe |
 | `docs` | [Datenmodell](docs/datenmodell.md), [Fragenkatalog](docs/fragenkatalog.md) |
 
@@ -109,14 +109,14 @@ Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur 
 
 ## Qualität
 
-- 102 Unit-Tests und 3 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen und Ereignis-Entscheidungen): keine Überlappung, keine Kante durch fremde Elemente, Schema-Prüfung mit bpmn-moddle.
+- 102 Unit-Tests und 6 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen und Ereignis-Entscheidungen): keine Überlappung, keine Kante durch fremde Elemente, Schema-Prüfung mit bpmn-moddle.
 - Tokenspiel nach den Ausführungsregeln von BPMN 2.0: Für beide Beispiele und alle 300 Zufallsprozesse ist das exportierte Diagramm sound (keine Verklemmung, jeder Vorgang kann enden, kein toter Schritt), und die Häufigkeiten aus dem Tokenspiel stimmen mit den Formeln überein.
 - 15 Browsertests: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen, BPMN wieder öffnen, Rückfrage bei ungespeicherten Änderungen.
-- Desktop-Test am echten Programm (`npm run desktop:test`): 16 Prüfungen von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4.
+- Desktop-Test am echten Programm (`npm run desktop:test`): 46 Prüfungen in drei Programmstarts, von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4; dazu die Compliance-Doku mit Freigabe, Word-Datei als Rohdaten (falsche Aufrufe werden abgelehnt), PDF der Verfahrensdokumentation und Wiederöffnen nach Neustart; sicherer Kontext, Web Crypto und keine Meldung der Content Security Policy.
 - Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
-- Compliance-Doku: 38 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft. 14 Browsertests decken Lücken und „Beheben“, Freigabe, Word-Datei, Druck, Tastatur und axe hell und dunkel ab.
+- Compliance-Doku: 38 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft. 15 Browsertests decken Lücken und „Beheben“, Freigabe, Word-Datei, Druck (alle Tabellen passen auf A4), Tastatur und axe hell und dunkel ab.
 
 ## Entwickeln
 
@@ -131,7 +131,7 @@ npm run build     # Typprüfung und Produktions-Build
 npm run desktop                        # Programm mit Entwicklungsserver
 npm run desktop:build                  # Programm und Installer (src-tauri/target/release/bundle/nsis)
 npx tauri build --debug --no-bundle    # Debug-Build für den Desktop-Test
-npm run desktop:test                   # Desktop-Test gegen den Debug-Build
+npm run desktop:test                   # Desktop-Test gegen den Debug-Build (andere exe: PROZESSLOTSE_EXE)
 ```
 
 `node scripts/readme-bilder.mjs` erzeugt die Bilder dieser README neu (bei laufendem `npx vite preview --port 4173`).

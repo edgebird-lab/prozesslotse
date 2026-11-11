@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { formatiereDatum } from '../../compliance/datum'
-import { docxEndung, DOCX_MIME, erzeugeDocx } from '../../compliance/docx'
+import { docxEndung, erzeugeDocx } from '../../compliance/docx'
 import { aufbewahrenBisText, gueltigBisIn } from '../../compliance/fristen'
 import { RECHTSSTAND } from '../../compliance/standard'
 import { FUSSZEILE_VORLAGE, hinweisband } from '../../compliance/textbausteine'
 import type { Dokument, DokumentArt, DokuVersion } from '../../compliance/typen'
 import { entwurfsKontext, erzeugeDokumente, geaenderteKapitel } from '../../compliance/versionen'
-import { dateiname, ladeHerunter } from '../hilfen'
+import { plattform } from '../../plattform'
+import { dateiname } from '../hilfen'
 import { useApp } from '../kontext'
 import { useCompliance } from './analyse'
 import { DokumentAnsicht } from './DokumentAnsicht'
@@ -57,19 +58,36 @@ export function DokumenteTeil() {
     return () => window.removeEventListener('afterprint', zurueck)
   }, [])
 
+  /** Dateiname des Dokuments ohne Endung, z. B. „…-verfahrensdokumentation-v1-0“ */
+  const basis = (d: Dokument) => dateiname(ist.name, docxEndung(d).replace(/\.docx$/, ''))
+
   const drucken = () => {
     alterTitel.current = document.title
     // „Als PDF speichern“ schlägt den Fenstertitel als Dateinamen vor
-    document.title = dateiname(ist.name, docxEndung(dokument).replace(/\.docx$/, ''))
+    document.title = basis(dokument)
     window.print()
   }
 
+  // Nur im Programm: PDF ohne Druckdialog (WebView2, A4); es gilt dieselbe Druck-CSS wie beim Drucken
+  const pdf = () =>
+    void plattform
+      .alsPdf(`${basis(dokument)}.pdf`)
+      .then((ok) => ok && melde('PDF gespeichert.'))
+      .catch((err: unknown) => melde(`PDF nicht gespeichert: ${err instanceof Error ? err.message : String(err)}`))
+
   const docx = async (d: Dokument) => {
+    let bytes: Uint8Array
     try {
-      const bytes = await erzeugeDocx(d)
-      ladeHerunter(dateiname(ist.name, docxEndung(d)), new Blob([bytes as Uint8Array<ArrayBuffer>], { type: DOCX_MIME }))
+      bytes = await erzeugeDocx(d)
     } catch (err) {
-      melde(`Word-Datei nicht erstellt: ${err instanceof Error ? err.message : String(err)}`)
+      return melde(`Word-Datei nicht erstellt: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    try {
+      // Browser: Download; Programm: Speichern-Dialog, die Bytes gehen als Rohdaten an den Rust-Teil
+      const r = await plattform.speichereBytes(`${basis(d)}.docx`, bytes, 'docx')
+      if (r && plattform.desktop) melde(`„${r.name}“ gespeichert.`)
+    } catch (err) {
+      melde(`Word-Datei nicht gespeichert: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -99,8 +117,13 @@ export function DokumenteTeil() {
 
       <div className="knopfreihe dokumente-aktionen">
         <button type="button" className="knopf knopf-haupt" onClick={drucken}>
-          Drucken oder als PDF speichern
+          {plattform.desktop ? 'Drucken' : 'Drucken oder als PDF speichern'}
         </button>
+        {plattform.desktop && (
+          <button type="button" className="knopf" onClick={pdf}>
+            Als PDF speichern
+          </button>
+        )}
         <button type="button" className="knopf" onClick={() => void docx(dokument)}>
           Als Word-Datei (DOCX)
         </button>

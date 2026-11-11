@@ -8,8 +8,6 @@ import { gliederung } from './dokument'
 import { FUSSZEILE_VORLAGE } from './textbausteine'
 import type { Dokument } from './typen'
 
-export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-
 /** A4 hoch in Twips, Ränder 2 cm */
 const SEITE = { breite: 11906, hoehe: 16838, rand: 1134 }
 
