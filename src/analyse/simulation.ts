@@ -8,8 +8,8 @@
  * festem Startwert ist das Ergebnis reproduzierbar.
  */
 import { anzahlVerteilung, zieheAnzahl } from '../modell/anzahl'
-import { oderZiehung } from '../modell/operationen'
-import { unerwartet, type Block, type Id, type Prozess } from '../modell/typen'
+import { oderZiehung, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
+import { unerwartet, unterbrechungenVon, type Block, type Id, type Prozess, type Unterbrechbar, type Unterbrechung } from '../modell/typen'
 
 export interface ErgebnisDauer {
   ergebnis: string
@@ -65,6 +65,37 @@ function laufeSequenz(schritte: Block[], zufall: () => number): Lauf {
 }
 
 function laufeBlock(b: Block, zufall: () => number): Lauf {
+  return unterbrechungenVon(b).length > 0 ? laufeMitUnterbrechungen(b as Unterbrechbar, zufall) : laufeOhneUnterbrechung(b, zufall)
+}
+
+/**
+ * Schritt mit Unterbrechungen: Ausgang würfeln (normal oder Unterbrechung j mit
+ * ihrem Anteil). Unterbrochen dauert er bis zur Frist bzw. zum Zeitpunkt der
+ * Nachricht, an einem Rahmen bis zur Hälfte seines Durchlaufs; danach läuft der
+ * Ausnahmeweg. Nebenwege verlängern nichts und laufen deshalb nicht mit.
+ */
+function laufeMitUnterbrechungen(b: Unterbrechbar, zufall: () => number): Lauf {
+  const { je } = unterbrechungsAnteile(b)
+  let wurf = zufall()
+  let gewaehlt: Unterbrechung | null = null
+  for (const u of b.unterbrechungen ?? []) {
+    const q = je.get(u.id) ?? 0
+    if (!u.unterbrechend || q <= 0) continue
+    if (wurf < q) {
+      gewaehlt = u
+      break
+    }
+    wurf -= q
+  }
+  if (!gewaehlt) return laufeOhneUnterbrechung(b, zufall)
+  const t = unterbrechungsZeit(b, gewaehlt)
+  const bis = t !== null ? t : laufeOhneUnterbrechung(b, zufall).zeit / 2
+  const r = laufeSequenz(gewaehlt.schritte, zufall)
+  if (r.ende !== null || r.rueck) return { zeit: bis + r.zeit, ende: r.ende, rueck: r.rueck }
+  return { zeit: bis + r.zeit, ende: gewaehlt.ende, rueck: gewaehlt.ende === null ? gewaehlt.zurueckZu : null }
+}
+
+function laufeOhneUnterbrechung(b: Block, zufall: () => number): Lauf {
   switch (b.typ) {
     case 'aufgabe':
       return { zeit: b.liegezeitMin + b.bearbeitungMin, ende: null, rueck: null }

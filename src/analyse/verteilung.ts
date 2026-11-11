@@ -11,8 +11,8 @@
  * mittelwerttreu, so dass Erwartungswerte von Summen exakt bleiben.
  */
 import { anzahlVerteilung, erwartungMaximumOhneNull, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
-import { oderZiehung } from '../modell/operationen'
-import { unerwartet, type Block, type Id, type Mehrfach, type Oder } from '../modell/typen'
+import { oderZiehung, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
+import { unerwartet, unterbrechungenVon, type Block, type Id, type Mehrfach, type Oder, type Unterbrechbar } from '../modell/typen'
 
 export interface Verteilung {
   wert: number[]
@@ -161,6 +161,69 @@ export function verteilungSequenz(schritte: Block[], art: Zeitart): Teilverteilu
 }
 
 export function verteilungBlock(b: Block, art: Zeitart): Teilverteilungen {
+  const basis = verteilungOhneUnterbrechung(b, art)
+  return unterbrechungenVon(b).length > 0 ? verteilungMitUnterbrechungen(b as Unterbrechbar, basis, art) : basis
+}
+
+/** Alle Teile (weiter, Rücksprünge, Enden) zu einer Verteilung mit Masse 1 vereint: die Dauer eines Durchlaufs, wie auch immer er endet. */
+function alleTeile(t: Teilverteilungen): Verteilung {
+  return [t.weiter, ...t.rueck.values(), ...t.ende.values()].reduce((s, v) => addiere(s, v), leer())
+}
+
+/** Jeden Wert auf höchstens t kürzen (Arbeit bis zu einer Frist). */
+function hoechstens(v: Verteilung, t: number): Verteilung {
+  return addiere(leer(), { wert: v.wert.map((w) => Math.min(t, w)), masse: [...v.masse] })
+}
+
+/**
+ * Erwartete Bearbeitungszeit eines Rahmens bis zur Frist t: E[min(t, TCT)],
+ * aus der Verteilung der Bearbeitungszeit eines Durchlaufs ohne die
+ * Unterbrechungen des Rahmens selbst.
+ */
+export function erwartungMinimum(b: Unterbrechbar, t: number): number {
+  const v = alleTeile(verteilungOhneUnterbrechung(b, 'arbeit'))
+  return v.wert.reduce((s, w, i) => s + Math.min(t, w) * v.masse[i], 0)
+}
+
+/**
+ * Teilverteilungen eines Schritts mit Unterbrechungen. Normal (Anteil
+ * 1 − Σq) die des Schritts; unterbrochen von j die Zeit bis zur Unterbrechung
+ * gefaltet mit dem Ausnahmeweg, mit dessen „Danach“. Zeit bis zur
+ * Unterbrechung: die Frist bzw. der Zeitpunkt der Nachricht (an einem Rahmen
+ * jeder Wert des Durchlaufs halbiert); nur Bearbeitung: an einer Aufgabe
+ * min(B, max(0, t − L)), an einem Rahmen min(t, TCT) bzw. die halbe TCT.
+ */
+function verteilungMitUnterbrechungen(b: Unterbrechbar, basis: Teilverteilungen, art: Zeitart): Teilverteilungen {
+  const { normal, je } = unterbrechungsAnteile(b)
+  let weiter = skaliere(basis.weiter, normal)
+  const rueck = new Map<Id, Verteilung>()
+  const ende = new Map<string, Verteilung>()
+  for (const [id, r] of basis.rueck) rueck.set(id, skaliere(r, normal))
+  for (const [e, v] of basis.ende) ende.set(e, skaliere(v, normal))
+  let durchlauf: Verteilung | null = null
+  const ganz = () => (durchlauf ??= alleTeile(basis))
+  for (const u of b.unterbrechungen ?? []) {
+    const q = je.get(u.id) ?? 0
+    if (!u.unterbrechend || q <= 0) continue
+    const t = unterbrechungsZeit(b, u)
+    let bis: Verteilung
+    if (t === null) bis = { wert: ganz().wert.map((w) => w / 2), masse: [...ganz().masse] }
+    else if (art === 'gesamt') bis = punkt(t)
+    else if (b.typ === 'aufgabe') bis = punkt(Math.min(Math.max(0, b.bearbeitungMin), Math.max(0, t - Math.max(0, b.liegezeitMin))))
+    else bis = hoechstens(ganz(), t)
+    const x = verteilungSequenz(u.schritte, art)
+    const nach = (v: Verteilung) => skaliere(falte(bis, v), q)
+    for (const [id, r] of x.rueck) plus(rueck, id, nach(r))
+    for (const [e, v] of x.ende) plus(ende, e, nach(v))
+    const aus = nach(x.weiter)
+    if (u.ende !== null) plus(ende, u.ende, aus)
+    else if (u.zurueckZu !== null) plus(rueck, u.zurueckZu, aus)
+    else weiter = addiere(weiter, aus)
+  }
+  return { weiter, rueck, ende }
+}
+
+function verteilungOhneUnterbrechung(b: Block, art: Zeitart): Teilverteilungen {
   switch (b.typ) {
     case 'aufgabe':
       return { weiter: punkt(art === 'gesamt' ? b.liegezeitMin + b.bearbeitungMin : b.bearbeitungMin), rueck: new Map(), ende: new Map() }

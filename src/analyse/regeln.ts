@@ -9,7 +9,7 @@
  * Medienbruch).
  */
 import { bereichTitel, blockTitel, durchlaufe, ersetzeBereich, aendereBlock, entferneBlock, freigabeQuote, kinderSequenzen, mediumName, rolleName, verlaesstBlock } from '../modell/operationen'
-import { istDigital, type Aufgabe, type Block, type Entscheidung, type Id, type Prozess, type Sequenz } from '../modell/typen'
+import { istDigital, unterbrechungenVon, type Aufgabe, type Block, type Entscheidung, type Id, type Prozess, type Sequenz } from '../modell/typen'
 import { formatiereDauer, formatiereProzent } from '../modell/zeit'
 import { berechneKennzahlen, type Kennzahlen } from './kennzahlen'
 
@@ -80,7 +80,8 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
       const a = i > 0 ? seq.schritte[i - 1] : null
 
       // 1. Gleichzeitig ausführen
-      if (a && b.typ === 'aufgabe' && b.brauchtVorgaenger === false && b.rolleId !== null && !rollenIn(a).has(b.rolleId) && !verlaesstBlock(a)) {
+      // Weder a noch b darf den Prozess beenden oder zurückspringen (auch nicht über eine Unterbrechung), sonst stünde das in einem Zweig von „Gleichzeitig“.
+      if (a && b.typ === 'aufgabe' && b.brauchtVorgaenger === false && b.rolleId !== null && !rollenIn(a).has(b.rolleId) && !verlaesstBlock(a) && !verlaesstBlock(b)) {
         const parId = `par_${b.id}`
         vorschlaege.push({
           schluessel: `parallelisieren:${a.id}:${b.id}`,
@@ -112,7 +113,10 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
         a.rolleId === b.rolleId &&
         b.liegezeitMin > 0 &&
         a.art === 'normal' &&
-        b.art === 'normal'
+        b.art === 'normal' &&
+        // Unterbrechungen gehören zu genau einem Schritt; zusammengelegt wäre unklar, wofür sie gelten.
+        unterbrechungenVon(a).length === 0 &&
+        unterbrechungenVon(b).length === 0
       ) {
         const abtippenEntfaellt = b.uebertragung !== null && b.uebertragung.quelleMediumId === a.mediumId
         const mb = medium(b.mediumId)
@@ -211,7 +215,7 @@ interface Pruefstufe {
 }
 
 function pruefstufe(a: Block | undefined, e: Block | undefined): Pruefstufe | null {
-  if (a?.typ !== 'aufgabe' || a.art === 'normal' || e?.typ !== 'entscheidung' || e.art !== 'daten') return null
+  if (a?.typ !== 'aufgabe' || a.art === 'normal' || unterbrechungenVon(a).length > 0 || e?.typ !== 'entscheidung' || e.art !== 'daten') return null
   const enden = e.zweige.filter((z) => z.ende !== null)
   const durch = e.zweige.filter((z) => z.ende === null)
   if (enden.length === 0 || durch.length === 0 || durch.some((z) => z.zurueckZu !== null || z.schritte.length > 0)) return null

@@ -23,12 +23,19 @@
  * Durchlauf endet normal): nacheinander laufen im Schnitt
  * K = E[(1 − c^N)/(1 − c)] Durchläufe, gleichzeitig K = E[N]; weiter geht es
  * mit E[c^N]. Die Liegezeit des Bausteins zählt einmal, wenn N ≥ 1.
+ *
+ * Unterbrechungen eines Schritts mit festen Anteilen q_j je Ausführung: Der
+ * Schritt zählt voll (abgebrochene Arbeit zählt voll), Ausnahmeweg j läuft mit
+ * q_j, ein Nebenweg mit seiner Anzahl c_k je Ausführung. Weiter, Enden und
+ * Rücksprünge des Schritts zählen nur im normalen Anteil 1 − Σq_j. Zeit bis zur
+ * Unterbrechung: die Frist bzw. bei einer Nachricht der angegebene Zeitpunkt,
+ * an einem Rahmen die halbe Dauer des Durchlaufs; Nebenwege verlängern nichts.
  */
 import { anzahlVerteilung, erwartungLaeufe, erwartungPotenz, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
-import { durchlaufe, nachrichtenVerweise, oderWahrscheinlichkeiten } from '../modell/operationen'
-import { erwartungGesamt, erwartungMaximum, erwartungOder, verteilungBlock } from './verteilung'
+import { durchlaufe, nachrichtenVerweise, nebenwegAnzahl, oderWahrscheinlichkeiten, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
+import { erwartungGesamt, erwartungMaximum, erwartungMinimum, erwartungOder, verteilungMehrfach } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
-import { unerwartet, type Aufgabe, type Block, type Id, type Mehrfach, type Prozess, type Rolle, type Teilnehmer } from '../modell/typen'
+import { unerwartet, unterbrechungenVon, type Aufgabe, type Block, type Id, type Mehrfach, type Prozess, type Rolle, type Teilnehmer, type Unterbrechbar } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
 // Ergebnis
@@ -109,6 +116,8 @@ export interface Kennzahlen {
   wiederholAnteil: Map<Id, number>
   /** Nachrichten mit externen Teilnehmern (Kunde, Lieferant) je Vorgang */
   kontakte: KontaktKennzahl[]
+  /** Wie oft jede Stelle je Vorgang erreicht wird: Aufgaben, Warten, Abschnitte, „für jedes Stück“, Unterbrechungen (wie oft sie eintreten) */
+  haeufigkeiten: Map<Id, number>
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +205,68 @@ function flussSequenz(schritte: Block[], f: Fluss, z: Zaehler, ctx: Kontext): Er
 }
 
 function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
+  return unterbrechungenVon(b).length > 0 ? flussMitUnterbrechungen(b as Unterbrechbar, f, z, ctx) : flussOhneUnterbrechung(b, f, z, ctx)
+}
+
+/** Zählt mit einem eigenen Ende-Zähler; die übrigen Zähler laufen weiter. Danach `zurueck` aufrufen. */
+function mitEigenenEnden(z: Zaehler): { zz: Zaehler; zurueck: () => void } {
+  const zz: Zaehler = { ...z, enden: new Map() }
+  return {
+    zz,
+    zurueck: () => {
+      z.uebergaben = zz.uebergaben
+      z.systemwechsel = zz.systemwechsel
+      z.medienbrueche = zz.medienbrueche
+      z.uebertragungMin = zz.uebertragungMin
+    },
+  }
+}
+
+/**
+ * Schritt mit Unterbrechungen. Er läuft ganz (seine Häufigkeiten zählen voll);
+ * normal endet er mit 1 − Σq, und nur dann zählen sein Weiter, seine Enden und
+ * seine Rücksprünge. Ausnahmeweg j beginnt mit f · q_j, ein Nebenweg mit
+ * f · c_k; vorher arbeitet die Aufgabe selbst bzw. die letzten Aufgaben des
+ * Rahmens. Ein Nebenweg endet für sich und ändert den Ablauf nicht.
+ */
+function flussMitUnterbrechungen(b: Unterbrechbar, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
+  const { normal, je } = unterbrechungsAnteile(b)
+  const { zz, zurueck } = mitEigenenEnden(z)
+  const basis = flussOhneUnterbrechung(b, f, zz, ctx)
+  zurueck()
+  for (const [e, x] of zz.enden) plus(z.enden, e, x * normal)
+  const aus = skaliere(basis.aus, normal)
+  const rueck = new Map<Id, Fluss>()
+  for (const [id, r] of basis.rueck) rueck.set(id, skaliere(r, normal))
+  const c = f.anteil > 0 ? basis.aus.anteil / f.anteil : 0
+  const letzteBei = (anteil: number): Map<string, number> => {
+    if (b.typ === 'aufgabe') return new Map([[b.id, f.anteil * anteil]])
+    const m = new Map<string, number>()
+    if (c > 1e-12) addiereLetzte(m, basis.aus.letzte, anteil / c)
+    return m
+  }
+  for (const u of b.unterbrechungen ?? []) {
+    if (u.unterbrechend) {
+      const q = je.get(u.id) ?? 0
+      plus(z.haeufigkeit, u.id, f.anteil * q)
+      const o = flussSequenz(u.schritte, { anteil: f.anteil * q, letzte: letzteBei(q) }, z, ctx)
+      addiereRueck(rueck, o.rueck)
+      if (u.ende !== null) plus(z.enden, u.ende, o.aus.anteil)
+      else if (u.zurueckZu !== null) addiereRueck(rueck, new Map([[u.zurueckZu, o.aus]]))
+      else addiere(aus, o.aus)
+    } else {
+      const anzahl = nebenwegAnzahl(u)
+      plus(z.haeufigkeit, u.id, f.anteil * anzahl)
+      // Enden und Rücksprünge im Nebenweg meldet die Prüfung als Fehler; sie zählen hier nicht.
+      const neben = mitEigenenEnden(z)
+      flussSequenz(u.schritte, { anteil: f.anteil * anzahl, letzte: letzteBei(anzahl) }, neben.zz, ctx)
+      neben.zurueck()
+    }
+  }
+  return { aus, rueck }
+}
+
+function flussOhneUnterbrechung(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
   switch (b.typ) {
     case 'aufgabe': {
       plus(z.haeufigkeit, b.id, f.anteil)
@@ -290,6 +361,7 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
     }
     case 'teilprozess':
       // Ein Abschnitt rechnet wie die Folge seiner Schritte; Enden darin beenden den Vorgang.
+      plus(z.haeufigkeit, b.id, f.anteil)
       return flussSequenz(b.koerper.schritte, f, z, ctx)
     case 'mehrfach':
       return flussMehrfach(b, f, z, ctx)
@@ -438,6 +510,55 @@ function dauerSequenz(schritte: Block[]): Dauer {
 }
 
 function dauerBlock(b: Block): Dauer {
+  const basis = dauerOhneUnterbrechung(b)
+  return unterbrechungenVon(b).length > 0 ? dauerMitUnterbrechungen(b as Unterbrechbar, basis) : basis
+}
+
+/**
+ * Dauer eines Schritts mit Unterbrechungen: normal (1 − Σq) die Dauer des
+ * Schritts; unterbrochen von j die Zeit bis zur Unterbrechung t_j (Frist bzw.
+ * Zeitpunkt der Nachricht; am Rahmen bei einer Nachricht die halbe Dauer des
+ * Durchlaufs) und danach der Ausnahmeweg. TCT: Bearbeitung bis zur
+ * Unterbrechung, an einer Aufgabe min(B, max(0, t − L)), an einem Rahmen
+ * E[min(t, TCT)] bzw. die halbe TCT. Die Zeit bis zur Unterbrechung verteilt
+ * sich auf die Beiträge des Schritts (an einer Aufgabe Liegezeit und
+ * Bearbeitung, an einem Rahmen anteilig auf seine Schritte).
+ */
+function dauerMitUnterbrechungen(b: Unterbrechbar, basis: Dauer): Dauer {
+  const { normal, je } = unterbrechungsAnteile(b)
+  const d: Dauer = { gesamt: normal * basis.gesamt, arbeit: normal * basis.arbeit, weiter: normal * basis.weiter, rueck: new Map(), beitraege: new Map() }
+  for (const [id, r] of basis.rueck) plus(d.rueck, id, normal * r)
+  addiereBeitraege(d.beitraege, basis.beitraege, normal)
+  for (const u of b.unterbrechungen ?? []) {
+    const q = je.get(u.id) ?? 0
+    if (!u.unterbrechend || q <= 0) continue
+    const x = dauerSequenz(u.schritte)
+    const t = unterbrechungsZeit(b, u)
+    if (t === null) {
+      // Nachricht an einem Rahmen: nach der Hälfte der Dauer des Durchlaufs
+      d.gesamt += q * (basis.gesamt / 2 + x.gesamt)
+      d.arbeit += q * (basis.arbeit / 2 + x.arbeit)
+      addiereBeitraege(d.beitraege, basis.beitraege, q / 2)
+    } else if (b.typ === 'aufgabe') {
+      const arbeitBis = Math.min(Math.max(0, b.bearbeitungMin), Math.max(0, t - Math.max(0, b.liegezeitMin)))
+      d.gesamt += q * (t + x.gesamt)
+      d.arbeit += q * (arbeitBis + x.arbeit)
+      addiereBeitraege(d.beitraege, new Map([[b.id, { warten: t - arbeitBis, arbeit: arbeitBis }]]), q)
+    } else {
+      d.gesamt += q * (t + x.gesamt)
+      d.arbeit += q * (erwartungMinimum(b, t) + x.arbeit)
+      if (basis.gesamt > 0) addiereBeitraege(d.beitraege, basis.beitraege, (q * t) / basis.gesamt)
+    }
+    addiereBeitraege(d.beitraege, x.beitraege, q)
+    for (const [id, r] of x.rueck) plus(d.rueck, id, q * r)
+    if (u.ende !== null) continue
+    if (u.zurueckZu !== null) plus(d.rueck, u.zurueckZu, q * x.weiter)
+    else d.weiter += q * x.weiter
+  }
+  return d
+}
+
+function dauerOhneUnterbrechung(b: Block): Dauer {
   switch (b.typ) {
     case 'aufgabe':
       return {
@@ -533,9 +654,9 @@ function dauerBlock(b: Block): Dauer {
           return { gesamt: liegen + k * x.gesamt, arbeit: k * x.arbeit, weiter: erwartungPotenz(v, x.weiter), rueck, beitraege }
         }
         case 'gleichzeitig': {
-          // spätestes von N Stücken, aus der Verteilung eines Stücks (wie bei „Gleichzeitig“)
-          const gesamt = erwartungGesamt(verteilungBlock(b, 'gesamt'))
-          const arbeit = erwartungGesamt(verteilungBlock(b, 'arbeit'))
+          // spätestes von N Stücken, aus der Verteilung eines Stücks (wie bei „Gleichzeitig“); Unterbrechungen des Bausteins kommen danach
+          const gesamt = erwartungGesamt(verteilungMehrfach(b, 'gesamt'))
+          const arbeit = erwartungGesamt(verteilungMehrfach(b, 'arbeit'))
           // Beiträge: ein Stück, auf den exakten Erwartungswert hochgerechnet
           addiereBeitraege(beitraege, x.beitraege, x.gesamt > 0 ? (gesamt - liegen) / x.gesamt : 0)
           return { gesamt, arbeit, weiter: erwartungPotenz(v, x.weiter), rueck: new Map(), beitraege }
@@ -640,6 +761,7 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   const minutenProTag = p.arbeitsstundenProTag * 60
   return {
     kontakte,
+    haeufigkeiten: z.haeufigkeit,
     durchlaufzeitMin: dauer.gesamt,
     kritischeArbeitMin: dauer.arbeit,
     flusseffizienz: dauer.gesamt > 0 ? dauer.arbeit / dauer.gesamt : 0,

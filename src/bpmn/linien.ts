@@ -79,6 +79,27 @@ export interface NachrichtAuftrag {
   richtung: 'an' | 'von'
   /** Versatz vom Mittelpunkt, wenn der Knoten Nachrichten in beide Richtungen hat */
   dx: number
+  /** Über die Oberkante, auch zu einem Pool unten (Aufgaben mit Randereignissen auf der Unterkante) */
+  ueberOben?: boolean
+  /**
+   * Nachricht zu einem Randereignis: Anschluss am Kreis (Spalte, Abstand von der
+   * Spaltenmitte, Höhe), senkrecht hinunter bis `ebene`, waagerecht in die Lücke
+   * `luecke` vor dem Schritt und dort zum Pool.
+   */
+  rand?: { spalte: number; dx: number; y: number; ebene: number; luecke: number }
+}
+
+/**
+ * Fluss, der an einem Randereignis beginnt: Er läuft vom unteren Rand des Kreises
+ * senkrecht bis zur Höhe des Ersatzknotens und von dort weiter wie aus einer
+ * rechten Ecke. Der Ersatzknoten steht in der letzten Spalte des Schritts.
+ */
+export interface RandAbgang {
+  knoten: LayoutKnoten
+  /** waagerechter Abstand des Kreismittelpunkts von der Spaltenmitte */
+  dx: number
+  /** Unterkante des Kreises: Hier beginnt der Fluss */
+  vonY: number
 }
 
 export interface LinienAuftrag {
@@ -102,6 +123,8 @@ export interface LinienAuftrag {
   rahmenEin?: Map<string, LayoutKnoten>
   /** Rahmen als Quelle eines Flusses: Ersatzknoten in der letzten inneren Spalte, Breite bis zur rechten Kante */
   rahmenAus?: Map<string, LayoutKnoten>
+  /** Randereignisse als Quelle eines Flusses (Abgang) */
+  randAus?: Map<string, RandAbgang>
 }
 
 export interface Linien {
@@ -393,7 +416,8 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
   const nach = new Map(auftrag.knoten.map((k) => [k.id, k]))
   const rahmenEin = auftrag.rahmenEin ?? new Map<string, LayoutKnoten>()
   const rahmenAus = auftrag.rahmenAus ?? new Map<string, LayoutKnoten>()
-  const quelle = (id: string) => rahmenAus.get(id) ?? nach.get(id)!
+  const randAus = auftrag.randAus ?? new Map<string, RandAbgang>()
+  const quelle = (id: string) => rahmenAus.get(id) ?? randAus.get(id)?.knoten ?? nach.get(id)!
   const ziel = (id: string) => rahmenEin.get(id) ?? nach.get(id)!
   const { aus, ein } = bestimmeAnschluesse(kanten, quelle, ziel, spurMitte, auftrag.spalteFrei)
   // Neben Rahmenkanten bleibt in der Lücke Platz: Kanalspuren liegen außerhalb des Rahmens.
@@ -418,6 +442,10 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
     const z = ziel(e.nach)
     const sa = aus.get(e.id)!
     const sz = ein.get(e.id)!
+    // Abgang von einem Randereignis: vom Kreis senkrecht hinunter (in der Spalte des Schritts, die in seinen Bändern frei ist), dann wie aus einer rechten Ecke
+    const rand = randAus.get(e.von)
+    const vorweg: Wegpunkt[] = rand ? [P(a, rand.dx, rand.vonY)] : []
+    const eckeDx = rand ? rand.dx : a.breite / 2
     if (e.rueck) {
       // aus der unteren Kante der Frage hinunter zur Extraspur, zurück und von unten in den Eingang
       const y = spurMitte(e.rueck)
@@ -429,20 +457,20 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
     if (e.sprung) {
       // nach rechts in die Lücke hinter der Quelle, hinunter zur eigenen Extraspur, zurück und von unten in den Anfang
       const y = spurMitte(e.sprung)
-      const start = sa.art === 'ecke' ? { dx: a.breite / 2, y: mitteY(a) } : randpunkt(sa)
+      const start = sa.art === 'ecke' ? { dx: eckeDx, y: mitteY(a) } : randpunkt(sa)
       const s = kanal(a.spalte, start.y, y, [
         { y: start.y, richtung: -1 },
         { y, richtung: -1 },
       ])
       const rz = randpunkt(sz)
-      wege.set(e.id, [P(a, start.dx, start.y), K(s, start.y), K(s, y), P(z, rz.dx, y), P(z, rz.dx, rz.y)])
+      wege.set(e.id, [...vorweg, P(a, start.dx, start.y), K(s, start.y), K(s, y), P(z, rz.dx, y), P(z, rz.dx, rz.y)])
       continue
     }
-    const weg: Wegpunkt[] = []
+    const weg: Wegpunkt[] = [...vorweg]
     let y: number
     if (sa.art === 'ecke') {
       y = mitteY(a)
-      weg.push(P(a, a.breite / 2, y))
+      weg.push(P(a, eckeDx, y))
     } else {
       const r = randpunkt(sa)
       weg.push(P(a, r.dx, r.y))
@@ -453,8 +481,8 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
       }
     }
     // Leerer Zweig auf eigener Spur: Höhenwechsel in der Lücke hinter der Quelle. Ebenso, wenn der erste
-    // Baustein eines Zweigs hinter einen Rahmen gerückt ist: Die Linie läuft dann im eigenen Band zu ihm.
-    const weiterRechts = istSplit(a) && sa.art !== 'senkrecht' && sz.art !== 'senkrecht' && z.spalte > a.spalte + 1
+    // Baustein eines Zweigs (auch eines Ausnahmewegs) hinter einen Rahmen gerückt ist: Die Linie läuft dann im eigenen Band zu ihm.
+    const weiterRechts = (istSplit(a) || !!rand) && sa.art !== 'senkrecht' && sz.art !== 'senkrecht' && z.spalte > a.spalte + 1
     const ebene = e.ueber ? spurMitte(e.ueber) : weiterRechts ? (sz.art === 'ecke' ? mitteY(z) : randpunkt(sz).y) : y
     if (!gleich(ebene, y)) {
       const s = kanal(a.spalte, y, ebene, [
@@ -486,8 +514,18 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
   const nachrichtWege = new Map<string, Wegpunkt[]>()
   for (const n of auftrag.nachrichten) {
     const k = n.knoten
-    const rand = n.oben ? k.y : k.y + k.hoehe
-    const stummelY = n.oben ? rand - LINIE.stummel : rand + LINIE.stummel
+    if (n.rand) {
+      // zu einem Randereignis: vom Kreis hinunter zur eigenen Stufe, waagerecht in die Lücke vor dem Schritt, dort zum Pool
+      const r = n.rand
+      const s = kanal(r.luecke, r.ebene, n.poolRand, [{ y: r.ebene, richtung: 1 }])
+      const am = (y: number): Wegpunkt => ({ x: { spalte: r.spalte, dx: r.dx }, y })
+      const weg = [am(r.y), am(r.ebene), K(s, r.ebene), K(s, n.poolRand)]
+      nachrichtWege.set(n.id, n.richtung === 'an' ? weg : weg.reverse())
+      continue
+    }
+    const oben = n.oben || !!n.ueberOben
+    const rand = oben ? k.y : k.y + k.hoehe
+    const stummelY = oben ? rand - LINIE.stummel : rand + LINIE.stummel
     const luecke = n.richtung === 'an' ? k.spalte : k.spalte - 1
     const s = kanal(luecke, stummelY, n.poolRand, [{ y: stummelY, richtung: n.richtung === 'an' ? -1 : 1 }])
     const weg = [P(k, n.dx, rand), P(k, n.dx, stummelY), K(s, stummelY), K(s, n.poolRand)]

@@ -77,7 +77,11 @@ export function geometrieFehler(l: Layout): string[] {
 
   for (let i = 0; i < l.knoten.length; i++) {
     for (let j = i + 1; j < l.knoten.length; j++) {
-      if (ueberlappen(l.knoten[i], l.knoten[j])) fehler.push(`Überlappung ${l.knoten[i].id} / ${l.knoten[j].id}`)
+      const a = l.knoten[i]
+      const b = l.knoten[j]
+      // Ein Randereignis sitzt auf dem Rand seiner Aufgabe (geprüft unten)
+      if ((a.art === 'rand' && a.wirt === b.id) || (b.art === 'rand' && b.wirt === a.id)) continue
+      if (ueberlappen(a, b)) fehler.push(`Überlappung ${a.id} / ${b.id}`)
     }
   }
   for (const k of [...l.knoten, ...l.rahmen]) {
@@ -106,15 +110,26 @@ export function geometrieFehler(l: Layout): string[] {
       if (ueberlappen(k, r)) fehler.push(`${k.id} berührt den fremden Rahmen ${r.id}`)
     }
   }
-  // Ein Randereignis sitzt auf der Unterkante seines Wirts, ganz innerhalb von dessen Breite
+  // Ein Randereignis sitzt auf der Unterkante seines Wirts (Rahmen oder Aufgabe), ganz innerhalb von dessen Breite;
+  // sein Fluss beginnt unten am Kreis, führt senkrecht hinunter und läuft nicht durch den Wirt.
   for (const k of l.knoten) {
     if (k.art !== 'rand') continue
-    const w = k.wirt ? rahmenNach.get(k.wirt) : undefined
+    const aufgabe = k.wirt ? nachId.get(k.wirt) : undefined
+    const w = (k.wirt ? rahmenNach.get(k.wirt) : undefined) ?? (aufgabe?.art === 'aufgabe' ? aufgabe : undefined)
     const cy = k.y + k.hoehe / 2
-    if (!w) fehler.push(`Randereignis ${k.id} ohne Wirt`)
-    else if (Math.abs(cy - (w.y + w.hoehe)) > 0.5 || k.x < w.x - 0.5 || k.x + k.breite > w.x + w.breite + 0.5) fehler.push(`Randereignis ${k.id} sitzt nicht auf der Unterkante von ${w.id}`)
+    if (!w) {
+      fehler.push(`Randereignis ${k.id} ohne Wirt`)
+      continue
+    }
+    if (Math.abs(cy - (w.y + w.hoehe)) > 0.5 || k.x < w.x - 0.5 || k.x + k.breite > w.x + w.breite + 0.5) fehler.push(`Randereignis ${k.id} sitzt nicht auf der Unterkante von ${w.id}`)
     // Die Mitte der Unterkante eines Mehrfach-Rahmens gehört der Markierung
     else if (w.mehrfach && k.x < w.x + w.breite / 2 + RAHMEN.markeHalb - 0.5 && k.x + k.breite > w.x + w.breite / 2 - RAHMEN.markeHalb + 0.5) fehler.push(`Randereignis ${k.id} verdeckt die Mehrfach-Markierung von ${w.id}`)
+    for (const e of l.kanten) {
+      if (e.von !== k.id || e.punkte.length < 2) continue
+      const [p0, p1] = e.punkte
+      if (Math.abs(p0.x - (k.x + k.breite / 2)) > 0.5 || Math.abs(p0.y - (k.y + k.hoehe)) > 0.5 || Math.abs(p1.x - p0.x) > 0.01 || p1.y <= p0.y) fehler.push(`${e.id} verlässt das Randereignis ${k.id} nicht senkrecht nach unten`)
+      if (e.punkte.some((p, i) => i > 0 && segmentSchneidet(e.punkte[i - 1], p, w))) fehler.push(`${e.id} läuft durch ${w.id}, an dem sein Randereignis sitzt`)
+    }
   }
 
   for (const e of l.kanten) {

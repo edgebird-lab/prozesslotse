@@ -2,11 +2,12 @@
  * Schwachstellen, die sich aus den Kennzahlen ergeben. Anders als die
  * Prüfregeln des Modells sind das keine Fehler, sondern begründete Hinweise.
  */
-import { bereichTitel, blockTitel, durchlaufe, folgtEntscheidung, freigabeQuote, mediumName, rolleName } from '../modell/operationen'
+import { bereichTitel, blockTitel, durchlaufe, folgtEntscheidung, freigabeQuote, mediumName, rolleName, unterbrechungsAnteile } from '../modell/operationen'
 import { sortiereBefunde, type Befund } from '../modell/pruefung'
-import type { Aufgabe, Id, Prozess } from '../modell/typen'
+import { istUnterbrechbar, type Aufgabe, type Id, type Prozess, type Unterbrechbar } from '../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
 import type { Kennzahlen } from './kennzahlen'
+import { erwartungGesamt, verteilungBlock, verteilungSequenz } from './verteilung'
 import { bedienende, WARTEFAKTOR_SCHWELLE } from './warteschlange'
 
 export { WARTEFAKTOR_SCHWELLE }
@@ -18,6 +19,56 @@ export const FREIGABE_SCHWELLE = 0.9
 /** Ab so vielen Nachrichten mit einem externen Teilnehmer je Vorgang lohnt der Blick auf Kontaktreduktion. */
 export const KONTAKT_SCHWELLE = 3
 const PINGPONG_SCHWELLE = 0.05
+/** Ab diesem Anteil abgebrochener Ausführungen bzw. überschrittener Fristen gilt ein Schritt als auffällig. */
+export const UNTERBRECHUNG_SCHWELLE = 0.2
+
+/**
+ * Schwachstellen an Unterbrechungen: viel abgebrochene Arbeit, oft
+ * überschrittene Fristen, Nebenwege, die länger dauern als ihr Schritt (dann
+ * ist die Annahme fraglich, dass sie den Vorgang nicht verlängern).
+ */
+function unterbrechungsHinweise(p: Prozess, b: Unterbrechbar, add: (x: Befund) => void): void {
+  const liste = b.unterbrechungen ?? []
+  if (liste.length === 0) return
+  const std = p.arbeitsstundenProTag
+  const titel = blockTitel(b)
+  const { je } = unterbrechungsAnteile(b)
+  const abgebrochen = [...je.values()].reduce((s, q) => s + q, 0)
+  if (abgebrochen >= UNTERBRECHUNG_SCHWELLE) {
+    add({
+      schluessel: `abgebrochen:${b.id}`,
+      schwere: 'hinweis',
+      titel: 'Viel abgebrochene Arbeit',
+      text: `„${titel}“ wird in ${formatiereProzent(abgebrochen)} der Ausführungen unterbrochen. Was bis dahin getan ist, ist meist verloren; die Rechnung zählt die Arbeit am Schritt voll. Lässt sich das Ereignis früher erkennen oder vermeiden, etwa durch eine Rückfrage vorab?`,
+      blockId: b.id,
+    })
+  }
+  for (const u of liste) {
+    const q = je.get(u.id) ?? 0
+    if (u.unterbrechend && u.art === 'zeit' && q >= UNTERBRECHUNG_SCHWELLE) {
+      add({
+        schluessel: `frist:${u.id}`,
+        schwere: 'hinweis',
+        titel: 'Frist wird oft überschritten',
+        text: `Die Frist von ${formatiereDauer(u.fristMin, std)} bei „${titel}“ wird in ${formatiereProzent(q)} der Ausführungen überschritten. Passt die Frist zum Ablauf, oder liegt der Vorgang zu lange, bevor jemand anfängt?`,
+        blockId: b.id,
+      })
+    }
+    if (!u.unterbrechend && u.schritte.length > 0) {
+      const nebenweg = erwartungGesamt(verteilungSequenz(u.schritte, 'gesamt'))
+      const schritt = erwartungGesamt(verteilungBlock({ ...b, unterbrechungen: undefined }, 'gesamt'))
+      if (nebenweg > schritt + 1e-9) {
+        add({
+          schluessel: `nebenweglang:${u.id}`,
+          schwere: 'hinweis',
+          titel: 'Nebenweg länger als sein Schritt',
+          text: `Der Nebenweg „${u.bezeichnung || 'ohne Bezeichnung'}“ dauert im Schnitt ${formatiereDauer(nebenweg, std)}, „${titel}“ selbst ${formatiereDauer(schritt, std)}. Gerechnet wird, als verlängere ein Nebenweg den Vorgang nicht; hier ist das fraglich. Wartet der Ablauf eigentlich auf ihn, bilde ihn als Schritt im Ablauf ab.`,
+          blockId: b.id,
+        })
+      }
+    }
+  }
+}
 
 function personenText(n: number, dativ = false): string {
   return n === 1 ? (dativ ? 'einer Person' : 'eine Person') : `${n} Personen`
@@ -58,6 +109,7 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
   for (const fund of durchlaufe(p.ablauf)) {
     const block = fund.block
     const kz = k.schritte.get(block.id)
+    if (istUnterbrechbar(block)) unterbrechungsHinweise(p, block, add)
     if (block.typ === 'aufgabe') {
       aufgaben.set(block.id, block)
       if (kz && k.durchlaufzeitMin > 0 && kz.beitragWartenMin / k.durchlaufzeitMin >= LIEGEZEIT_SCHWELLE) {

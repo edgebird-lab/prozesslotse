@@ -15,6 +15,12 @@
  * Aufgabe ist, sonst an einem aufgeklappten Teilprozess. `loopCardinality`
  * steht nur bei fester, ganzzahliger Anzahl im XML; Mittel, Streuung und
  * Liegezeit stehen in der Dokumentation.
+ *
+ * Unterbrechungen werden Randereignisse (`boundaryEvent` mit Zeit- oder
+ * Nachrichtendefinition) an der Aufgabe oder am Teilprozess; `cancelActivity`
+ * ist false für Nebenwege. Anteil, Frist und Zeitpunkt stehen in der
+ * Dokumentation, eine Nachricht von außen kommt als Nachrichtenfluss vom Pool.
+ * Ein Nebenweg endet in einem eigenen Endereignis ohne Namen.
  */
 import { anzahlVerteilung } from '../modell/anzahl'
 import { findeBlock, mediumName, rolleName } from '../modell/operationen'
@@ -119,8 +125,8 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
       // Im Abschnitt ein Fehler-Ende: Es steigt zum Randereignis des äußersten Abschnitts auf.
       return `${e}<bpmn:endEvent id="${k.id}"${attrName(k.name)}>\n${flussRefs}${fehlerDefinition}${e}</bpmn:endEvent>\n`
     case 'rand':
-      // Fehler-Randereignis: bricht den Abschnitt ab und führt zum Ende mit dem Ergebnis
-      return `${e}<bpmn:boundaryEvent id="${k.id}"${attrName(k.name)} attachedToRef="${k.wirt}" cancelActivity="true">\n${flussRefs}${fehlerDefinition}${e}</bpmn:boundaryEvent>\n`
+      // Randereignis: Fehler (Ausstieg aus dem Abschnitt), Frist oder Nachricht; unterbrechend oder nebenher (cancelActivity="false")
+      return `${e}<bpmn:boundaryEvent id="${k.id}"${attrName(k.name)} attachedToRef="${k.wirt}" cancelActivity="${k.unterbrechend !== false}">\n${doku(k.doku ?? '', `${e}  `)}${flussRefs}${k.fehler ? fehlerDefinition : definition(k.ereignis)}${e}</bpmn:boundaryEvent>\n`
     case 'warten':
       return `${e}<bpmn:intermediateCatchEvent id="${k.id}"${attrName(k.name)}>\n${doku(blockDoku.get(k.id) ?? '', `${e}  `)}${flussRefs}${definition(k.ereignis)}${e}</bpmn:intermediateCatchEvent>\n`
     case 'aufgabe': {

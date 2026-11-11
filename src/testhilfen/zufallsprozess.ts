@@ -14,17 +14,20 @@ import {
   neueWiederholung,
   neuerMehrfach,
   neuerTeilprozess,
+  neueUnterbrechung,
 } from '../modell/bausteine'
-import { durchlaufe, findeBlock, nebenlaeufig, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
-import type { Block, Prozess, Sequenz } from '../modell/typen'
+import { aendereUnterbrechungen, durchlaufe, findeBlock, nebenlaeufig, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
+import { istUnterbrechbar, type Block, type NachrichtZeitpunkt, type Prozess, type Rolle, type Sequenz, type Teilnehmer, type Unterbrechung } from '../modell/typen'
 
 /**
  * Zufällige, gültige Prozesse für Belastungstests: verschachtelte
  * Entscheidungen (auch ereignisbasiert), Gleichzeitig, ODER, Wiederholungen,
  * Warten, Abschnitte (auch verschachtelt und mit Enden darin), „für jedes
  * Stück“ (fest und schwankend, nacheinander mit Enden darin und gleichzeitig,
- * als Aufgabe mit Markierung und als Rahmen), vorzeitige Enden und
- * Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche.
+ * als Aufgabe mit Markierung und als Rahmen), Unterbrechungen an Aufgaben und
+ * Rahmen (Zeit oder Nachricht, unterbrechend mit „weiter“, Ende oder
+ * Rücksprung, oder als Nebenweg), vorzeitige Enden und Rücksprünge, die über
+ * `setzeRuecksprung` entstehen wie in der Oberfläche.
  */
 export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: boolean } = {}): Prozess {
   // auchUngueltig: jeder Ausgang darf enden oder zurückspringen, also auch alle; dann entstehen unerreichbare Schritte und Endlosschleifen
@@ -142,6 +145,65 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
         if (rest.length > 0 && ziele2.length > 0) p = setzeRuecksprung(p, id, wahl(rest).id, wahl(ziele2).id)
       }
     }
+  }
+  // Unterbrechungen aus einem eigenen Zufallsstrom: Der übrige Prozess bleibt für jeden Startwert, wie er war.
+  return mitUnterbrechungen(p, zufallMitStartwert(startwert * 7919 + 17), rollen, kunde, frei)
+}
+
+/**
+ * Hängt an einen Teil der Aufgaben, Abschnitte und „für jedes Stück“ in den
+ * oberen Ebenen Unterbrechungen: Zeit oder Nachricht (auch vom Kunden),
+ * unterbrechend mit „weiter“, Ende (nicht in nebenläufiger Umgebung) oder
+ * Rücksprung, oder als Nebenweg. Ausnahmewege haben null bis zwei Schritte.
+ * Mit `frei` entstehen auch ungültige: Anteile über 100 %, ein Ende im Nebenweg
+ * oder neben gleichzeitig laufenden Schritten, ein Nebenweg ohne Schritte.
+ */
+function mitUnterbrechungen(p: Prozess, zufall: () => number, rollen: Rolle[], kunde: Teilnehmer, frei: boolean): Prozess {
+  const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
+  let nr = 0
+  const aufgabe = () => neueAufgabe({ name: `Ausnahme ${++nr} erledigen`, rolleId: wahl(rollen).id, bearbeitungMin: wahl([5, 10, 20]), liegezeitMin: wahl([0, 15]) })
+  const zeitpunkte: NachrichtZeitpunkt[] = ['vorher', 'waehrend', 'unbekannt']
+  const rueckWunsch: [string, string][] = []
+  const kandidaten = [...durchlaufe(p.ablauf)].filter(({ block, kette }) => istUnterbrechbar(block) && kette.length <= 2 && zufall() < (block.typ === 'aufgabe' ? 0.12 : 0.35))
+  for (const { block, kette } of kandidaten) {
+    const neben = nebenlaeufig(kette)
+    const anzahl = 1 + Math.floor(zufall() * (block.typ === 'aufgabe' ? 3 : 2))
+    let summe = 0
+    const liste: Unterbrechung[] = Array.from({ length: anzahl }, (_, i) => {
+      const unterbrechend = zufall() < 0.7
+      const art = zufall() < 0.5 ? 'nachricht' : 'zeit'
+      const schritte = Array.from({ length: Math.floor(zufall() * (unterbrechend ? 3 : 2)) + (unterbrechend ? 0 : frei && zufall() < 0.2 ? 0 : 1) }, () => aufgabe() as Block)
+      if (unterbrechend && schritte.length > 0 && zufall() < 0.2) {
+        // ein Ausnahmeweg mit Entscheidung; im ungültigen Fall auch neben gleichzeitig laufenden Schritten mit Ende
+        const endet = (!neben || frei) && zufall() < 0.5
+        schritte.push(neueEntscheidung({ frage: 'Geklärt?', zweige: [neuerZweig('Ja', 0.8), neuerZweig('Nein', 0.2, endet ? { ende: `Ausnahme ${nr} offen` } : { schritte: [aufgabe()] })] }))
+      }
+      const anteil = unterbrechend ? (frei && zufall() < 0.15 ? 0.6 : wahl([0.05, 0.1, 0.2, 0.3])) : wahl([0.3, 0.5, 1, 1.5, 2.5])
+      if (unterbrechend) summe += anteil
+      const danach = zufall()
+      const ende = unterbrechend && (!neben || frei) && danach < 0.3 ? `Unterbrochen ${nr}` : !unterbrechend && frei && danach < 0.1 ? `Nebenweg ${nr} endet` : null
+      const u = neueUnterbrechung({
+        bezeichnung: `Ereignis ${nr}.${i + 1}`,
+        art,
+        von: art === 'nachricht' && zufall() < 0.4 ? kunde.id : null,
+        unterbrechend,
+        anteil: unterbrechend && !frei && summe > 0.9 ? 0.01 : anteil,
+        fristMin: wahl([30, 120, 480, 2400]),
+        zeitpunkt: wahl(zeitpunkte),
+        ende,
+        schritte,
+      })
+      if (unterbrechend && !neben && ende === null && danach > 0.75) rueckWunsch.push([block.id, u.id])
+      return u
+    })
+    p = aendereUnterbrechungen(p, block.id, () => liste)
+  }
+  // Rücksprünge wie in der Oberfläche: zum Schritt selbst („noch einmal von vorn“) oder davor
+  for (const [blockId, uId] of rueckWunsch) {
+    const ort = findeBlock(p, blockId)
+    if (!ort) continue
+    const ziele = ruecksprungZiele(p, ort.sequenz.id, ort.index, true)
+    if (ziele.length > 0) p = setzeRuecksprung(p, blockId, uId, wahl(ziele).id)
   }
   return p
 }

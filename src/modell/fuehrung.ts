@@ -2,7 +2,7 @@
  * Führung durch den Ablauf: Wo steht die Einfügeposition, wohin springt sie
  * nach dem Einfügen und was passiert bei „Abschnitt fertig“.
  */
-import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, nebenlaeufig } from './operationen'
+import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, nebenlaeufig, unterbrechungVon } from './operationen'
 import { unerwartet, type Block, type Cursor, type Prozess } from './typen'
 
 export interface Ort {
@@ -23,6 +23,8 @@ function bereichText(p: Prozess, sequenzId: string): string {
   const f = findeSequenz(p, sequenzId)
   const b = f?.besitzer
   if (!b) return 'im Hauptablauf'
+  const u = unterbrechungVon(b, sequenzId)
+  if (u) return `${u.unterbrechend ? 'im Ausnahmeweg' : 'im Nebenweg'} „${u.bezeichnung || 'ohne Bezeichnung'}“ von „${blockTitel(b)}“`
   if (b.typ === 'entscheidung') {
     const z = b.zweige.find((x) => x.id === sequenzId)
     return `im Ausgang „${z?.bezeichnung || '?'}“ von „${b.frage || 'Entscheidung'}“`
@@ -76,6 +78,11 @@ export function stelleErreichbar(p: Prozess, c: Cursor): boolean {
   return true
 }
 
+/**
+ * Einfügeposition nach dem Hinzufügen: in den ersten Zweig bzw. den Körper; bei
+ * einer Aufgabe mit Unterbrechungen in den ersten Ausnahmeweg (der Rest des
+ * Ablaufs geht danach hinter ihr weiter).
+ */
 export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {
   switch (block.typ) {
     case 'entscheidung':
@@ -86,7 +93,10 @@ export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {
     case 'teilprozess':
     case 'mehrfach':
       return { sequenzId: block.koerper.id, index: block.koerper.schritte.length }
-    case 'aufgabe':
+    case 'aufgabe': {
+      const u = block.unterbrechungen?.[0]
+      return u ? { sequenzId: u.id, index: u.schritte.length } : { sequenzId: c.sequenzId, index: c.index + 1 }
+    }
     case 'warten':
       return { sequenzId: c.sequenzId, index: c.index + 1 }
     default:
@@ -94,7 +104,7 @@ export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {
   }
 }
 
-/** Nächste Stelle nach „Abschnitt fertig“: nächster Zweig, sonst hinter den Block; im Hauptablauf „fertig“. */
+/** Nächste Stelle nach „Abschnitt fertig“: nächster Zweig, sonst hinter den Block (aus einem Ausnahmeweg hinter den Schritt); im Hauptablauf „fertig“. */
 export function abschnittFertig(p: Prozess, c: Cursor): Cursor | 'fertig' {
   const f = findeSequenz(p, c.sequenzId)
   if (!f?.besitzer) return 'fertig'

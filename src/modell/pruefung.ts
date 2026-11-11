@@ -13,20 +13,23 @@ import {
   blockTitel,
   durchlaufe,
   gliedNebenlaeufig,
+  gliedRahmen,
   heisstBeides,
   istMengenschleife,
-  istRahmen,
   kannWeiterlaufen,
   mengenschleifeAlsMehrfach,
   nachrichtenVerweise,
   oderWahrscheinlichkeiten,
   rahmenRolle,
+  rahmenUeber,
+  unterbrechungVon,
   wirktExtern,
   type Glied,
 } from './operationen'
 import { MAX_ANZAHL } from './anzahl'
-import { unerwartet, type Block, type Id, type Mehrfach, type Prozess, type Teilprozess } from './typen'
-import { formatiereProzent, formatiereZahl } from './zeit'
+import { unerwartet, type Block, type Id, type Mehrfach, type Prozess, type Teilprozess, type Unterbrechbar, type Unterbrechung } from './typen'
+import { formatiereDauer, formatiereProzent, formatiereZahl } from './zeit'
+import { verteilungBlock, type Verteilung } from '../analyse/verteilung'
 
 export type Schwere = 'fehler' | 'warnung' | 'hinweis'
 
@@ -75,20 +78,35 @@ const TOLERANZ = 1e-6
 function nebenlaeufigText(kette: Glied[]): string {
   const g = kette.filter(gliedNebenlaeufig).pop()
   if (g?.block.typ === 'oder') return 'in einem Weg einer ODER-Verzweigung'
-  if (g?.block.typ === 'mehrfach') return `in „${blockTitel(g.block)}“, wo die Stücke zur selben Zeit laufen`
+  if (g?.block.typ === 'mehrfach' && gliedRahmen(g)) return `in „${blockTitel(g.block)}“, wo die Stücke zur selben Zeit laufen`
   return 'in einem Zweig von „Gleichzeitig“'
 }
 
 /**
  * Führt ein Ende an dieser Stelle zur Verklemmung? Im BPMN wird ein Ende in
  * einem Rahmen zum Fehler-Ende, das der äußerste Rahmen fängt; dann wartet nur
- * eine nebenläufige Umgebung außerhalb dieses Rahmens ewig. Liegt keine
- * außerhalb, bricht der Rahmen alles darin ab: kein Verklemmen, aber die
- * Rechnung dafür folgt erst mit dem Abbruch in nebenläufiger Umgebung.
+ * ein „Gleichzeitig“ außerhalb dieses Rahmens ewig auf den beendeten Zweig.
+ * Eine ODER-Zusammenführung wartet nach der Regel der Norm nicht auf einen Weg,
+ * der beendet ist, und ein Nebenweg endet ohnehin für sich. In diesen Fällen
+ * müsste der Rest abgebrochen werden; die Rechnung dafür folgt erst mit dem
+ * Abbruch in nebenläufiger Umgebung.
  */
 function endeVerklemmt(kette: Glied[]): boolean {
-  const aeusserster = kette.findIndex((g) => istRahmen(g.block))
-  return kette.slice(0, aeusserster < 0 ? kette.length : aeusserster).some(gliedNebenlaeufig)
+  const aeusserster = kette.findIndex(gliedRahmen)
+  return kette.slice(0, aeusserster < 0 ? kette.length : aeusserster).some((g) => g.block.typ === 'parallel' && gliedNebenlaeufig(g))
+}
+
+/** Ist das Glied ein Nebenweg (nicht unterbrechender Ausnahmeweg)? Er endet für sich. */
+function gliedNebenweg(g: Glied): boolean {
+  const u = unterbrechungVon(g.block, g.sequenz.id)
+  return u !== null && !u.unterbrechend
+}
+
+/** Text für einen Rücksprung, der eine nebenläufige Umgebung verlässt. */
+function rueckVerklemmtText(wer: string, kette: Glied[]): string {
+  const g = kette.filter(gliedNebenlaeufig).pop()
+  if (g?.block.typ === 'mehrfach') return `${wer} springt aus „${blockTitel(g.block)}“ heraus zurück, wo die Stücke zur selben Zeit laufen. Weiter geht es erst, wenn alle Stücke fertig sind; das wäre dann nie der Fall.`
+  return `${wer} springt aus „Gleichzeitig“ oder einer ODER-Verzweigung heraus zurück. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`
 }
 
 export function pruefeProzess(p: Prozess): Befund[] {
@@ -157,6 +175,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
         if (b.art === 'freigabe' && (b.freigabeQuote < 0 || b.freigabeQuote > 1)) {
           add({ schluessel: `freigabe:${b.id}`, schwere: 'fehler', titel: 'Freigabequote ungültig', text: 'Die Freigabequote muss zwischen 0 und 100 % liegen.', blockId: b.id })
         }
+        pruefeUnterbrechungen(b, vorfahren, kette)
         break
       }
       case 'entscheidung': {
@@ -182,12 +201,14 @@ export function pruefeProzess(p: Prozess): Befund[] {
           if (!z.bezeichnung.trim()) {
             add({ schluessel: `bezeichnung:${z.id}`, schwere: 'warnung', titel: 'Ausgang ohne Bezeichnung', text: `Ausgang ${i + 1} von „${blockTitel(b)}“ braucht eine Antwort, z. B. „Ja“ oder „Nein“.`, blockId: b.id })
           }
-          if (z.ende !== null && endeVerklemmt(kette)) {
+          if (z.ende !== null && kette.some(gliedNebenweg)) {
+            add(nebenwegEnde(`Der Ausgang „${z.bezeichnung}“`, b.id, z.id))
+          } else if (z.ende !== null && endeVerklemmt(kette)) {
             add({
               schluessel: `verklemmung:${z.id}`,
               schwere: 'fehler',
               titel: 'Verklemmung',
-              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“ oder einer ODER-Verzweigung${vorfahren.some(istRahmen) ? ' (der Rahmen darum liegt selbst in einem ihrer Zweige)' : ''}. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`,
+              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“${rahmenUeber(kette).length > 0 ? ' (der Rahmen darum liegt selbst in einem seiner Zweige)' : ''}. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`,
               blockId: b.id,
             })
           } else if (z.ende !== null && kette.some(gliedNebenlaeufig)) {
@@ -213,27 +234,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
           if (z.ende !== null && z.zurueckZu !== null) {
             add({ schluessel: `doppelt:${z.id}`, schwere: 'fehler', titel: 'Ausgang endet und springt zurück', text: `Der Ausgang „${z.bezeichnung}“ kann nicht zugleich den Prozess beenden und zurückspringen.`, blockId: b.id })
           }
-          if (z.zurueckZu !== null) {
-            const t = vorfahren.findIndex((v) => v.id === z.zurueckZu && v.typ === 'wiederholung' && v.modus === 'ruecksprung')
-            if (t < 0) {
-              add({ schluessel: `rueckziel:${z.id}`, schwere: 'fehler', titel: 'Rücksprung ins Leere', text: `Der Ausgang „${z.bezeichnung}“ springt zu einem Schritt zurück, der nicht vor dieser Entscheidung liegt.`, blockId: b.id })
-            } else if (vorfahren.slice(t + 1).some(istRahmen)) {
-              // Im BPMN entfällt ein Rückfluss über die Grenze; der Rahmen endet dann an dieser Stelle.
-              const rahmen = vorfahren.slice(t + 1).find(istRahmen)!
-              add({
-                schluessel: `rahmenrueck:${z.id}`,
-                schwere: 'fehler',
-                titel: rahmen.typ === 'mehrfach' ? `Rücksprung aus „${blockTitel(rahmen)}“` : 'Rücksprung aus einem Abschnitt',
-                text:
-                  rahmen.typ === 'mehrfach'
-                    ? `Der Ausgang „${z.bezeichnung}“ springt aus „${blockTitel(rahmen)}“ hinaus zurück. Was je Stück läuft, hat einen eigenen Anfang und ein eigenes Ende; zurück geht es nur zu Schritten, die ebenfalls je Stück laufen.`
-                    : `Der Ausgang „${z.bezeichnung}“ springt aus dem Abschnitt „${blockTitel(rahmen)}“ hinaus zurück. Ein Abschnitt hat einen eigenen Start und ein eigenes Ende; zurück geht es nur zu Schritten im selben Abschnitt.`,
-                blockId: b.id,
-              })
-            } else if (kette.slice(t + 1).some(gliedNebenlaeufig)) {
-              add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ springt aus „Gleichzeitig“ oder einer ODER-Verzweigung heraus zurück. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
-            }
-          }
+          if (z.zurueckZu !== null) pruefeRuecksprung(`Der Ausgang „${z.bezeichnung}“`, 'dieser Entscheidung', z.zurueckZu, z.id, b.id, vorfahren, kette)
           if (b.art === 'ereignis') {
             if (!z.ereignis) {
               add({ schluessel: `ereignis:${z.id}`, schwere: 'fehler', titel: 'Ereignis fehlt', text: `Der Ausgang „${z.bezeichnung || i + 1}“ einer Ereignis-Entscheidung braucht ein Ereignis (Nachricht oder Zeitpunkt).`, blockId: b.id })
@@ -391,8 +392,9 @@ export function pruefeProzess(p: Prozess): Befund[] {
         if (!b.name.trim()) {
           add({ schluessel: `name:${b.id}`, schwere: 'warnung', titel: 'Abschnitt ohne Namen', text: 'Gib dem Abschnitt einen Namen, z. B. „Ware versenden“; er steht im Diagramm oben im Rahmen.', blockId: b.id })
         }
-        if (!vorfahren.some(istRahmen)) rahmenBahn(b)
+        if (rahmenUeber(kette).length === 0) rahmenBahn(b)
         pruefeSequenzen([b.koerper.schritte])
+        pruefeUnterbrechungen(b, vorfahren, kette)
         break
       }
       case 'mehrfach': {
@@ -437,8 +439,9 @@ export function pruefeProzess(p: Prozess): Befund[] {
         if (b.liegezeitMin < 0) {
           add({ schluessel: `liegezeit:${b.id}`, schwere: 'fehler', titel: 'Negative Liegezeit', text: `„${titel}“ hat eine negative Liegezeit.`, blockId: b.id })
         }
-        if (!vorfahren.some(istRahmen) && !alsMarkierteAufgabe(b)) rahmenBahn(b)
+        if (rahmenUeber(kette).length === 0 && !alsMarkierteAufgabe(b)) rahmenBahn(b)
         pruefeSequenzen([b.koerper.schritte])
+        pruefeUnterbrechungen(b, vorfahren, kette)
         break
       }
       case 'warten': {
@@ -457,6 +460,154 @@ export function pruefeProzess(p: Prozess): Befund[] {
 
   function pruefeSequenzen(listen: Block[][]) {
     for (const schritte of listen) pruefeSequenz(schritte)
+  }
+
+  /** Rücksprung eines Ausgangs oder einer Unterbrechung: ins Leere, aus einem Rahmen hinaus oder aus einer nebenläufigen Umgebung heraus. */
+  function pruefeRuecksprung(wer: string, vorWas: string, ziel: Id, ausgangId: Id, blockId: Id, vorfahren: Block[], kette: Glied[]) {
+    const t = vorfahren.findIndex((v) => v.id === ziel && v.typ === 'wiederholung' && v.modus === 'ruecksprung')
+    if (t < 0) {
+      add({ schluessel: `rueckziel:${ausgangId}`, schwere: 'fehler', titel: 'Rücksprung ins Leere', text: `${wer} springt zu einem Schritt zurück, der nicht vor ${vorWas} liegt.`, blockId })
+      return
+    }
+    // Im BPMN entfällt ein Rückfluss über die Grenze; der Rahmen endet dann an dieser Stelle.
+    const rahmen = kette.slice(t + 1).find(gliedRahmen)?.block
+    if (rahmen) {
+      add({
+        schluessel: `rahmenrueck:${ausgangId}`,
+        schwere: 'fehler',
+        titel: rahmen.typ === 'mehrfach' ? `Rücksprung aus „${blockTitel(rahmen)}“` : 'Rücksprung aus einem Abschnitt',
+        text:
+          rahmen.typ === 'mehrfach'
+            ? `${wer} springt aus „${blockTitel(rahmen)}“ hinaus zurück. Was je Stück läuft, hat einen eigenen Anfang und ein eigenes Ende; zurück geht es nur zu Schritten, die ebenfalls je Stück laufen.`
+            : `${wer} springt aus dem Abschnitt „${blockTitel(rahmen)}“ hinaus zurück. Ein Abschnitt hat einen eigenen Start und ein eigenes Ende; zurück geht es nur zu Schritten im selben Abschnitt.`,
+        blockId,
+      })
+    } else if (kette.slice(t + 1).some(gliedNebenweg)) {
+      // Im BPMN liefe der Nebenweg zurück in den Ablauf, und alles danach liefe doppelt.
+      add(nebenwegEnde(wer, blockId, ausgangId))
+    } else if (kette.slice(t + 1).some(gliedNebenlaeufig)) {
+      add({ schluessel: `verklemmung:${ausgangId}`, schwere: 'fehler', titel: 'Verklemmung', text: rueckVerklemmtText(wer, kette.slice(t + 1)), blockId })
+    }
+  }
+
+  /**
+   * Unterbrechungen eines Schritts: Anteile (unterbrechend zusammen höchstens
+   * 100 %, Nebenweg je Ausführung ≥ 0), Frist, höchstens drei an einer Aufgabe,
+   * „Danach“ wie bei Ausgängen von Entscheidungen; ein Nebenweg endet für sich.
+   */
+  function pruefeUnterbrechungen(b: Unterbrechbar, vorfahren: Block[], kette: Glied[]) {
+    const liste = b.unterbrechungen ?? []
+    if (liste.length === 0) return
+    const titel = blockTitel(b)
+    const std = p.arbeitsstundenProTag
+    const unterbrechend = liste.filter((u) => u.unterbrechend)
+    const summe = unterbrechend.reduce((s, u) => s + u.anteil, 0)
+    if (summe > 1 + TOLERANZ) {
+      add({
+        schluessel: `usumme:${b.id}`,
+        schwere: 'fehler',
+        titel: 'Unterbrechungen über 100 %',
+        text: `„${titel}“ wird laut den Angaben in ${formatiereProzent(summe, 1)} der Ausführungen unterbrochen. Die Unterbrechungen schließen sich aus: Zusammen sind es höchstens 100 %, der Rest endet normal.`,
+        blockId: b.id,
+      })
+    } else if (unterbrechend.length > 0 && summe >= 1 - TOLERANZ) {
+      add({ schluessel: `unormal:${b.id}`, schwere: 'hinweis', titel: 'Schritt endet nie normal', text: `Die Unterbrechungen von „${titel}“ ergeben zusammen 100 %: Der Schritt wird immer abgebrochen und endet nie normal.`, blockId: b.id })
+    }
+    if (b.typ === 'aufgabe' && liste.length > 3) {
+      add({
+        schluessel: `uviele:${b.id}`,
+        schwere: 'fehler',
+        titel: 'Mehr als drei Unterbrechungen',
+        text: `An „${titel}“ hängen ${liste.length} Unterbrechungen; an einer Aufgabe haben im Diagramm höchstens drei Platz. Fasse den Schritt zu einem Abschnitt zusammen und trag die Unterbrechungen dort ein, oder lege ähnliche zusammen.`,
+        blockId: b.id,
+      })
+    }
+    if (kette.some((g) => g.block.typ === 'wiederholung' || (g.block.typ === 'mehrfach' && gliedRahmen(g)))) {
+      add({ schluessel: `umehrmals:${b.id}`, schwere: 'hinweis', titel: 'Anteil je Ausführung', text: `„${titel}“ kann je Vorgang mehrmals laufen. Die Angaben zu den Unterbrechungen gelten je Ausführung des Schritts, nicht je Vorgang.`, blockId: b.id })
+    }
+    liste.forEach((u, i) => {
+      const name = u.bezeichnung.trim() || `Unterbrechung ${i + 1}`
+      const wer = `„${name}“ an „${titel}“`
+      if (!u.bezeichnung.trim()) {
+        add({ schluessel: `ubezeichnung:${u.id}`, schwere: 'warnung', titel: 'Unterbrechung ohne Bezeichnung', text: `Was kommt bei „${titel}“ dazwischen, z. B. „Kunde storniert“ oder „Frist abgelaufen“?`, blockId: b.id })
+      }
+      if (u.unterbrechend) {
+        if (!(u.anteil >= 0 && u.anteil <= 1)) add({ schluessel: `uanteil:${u.id}`, schwere: 'fehler', titel: 'Anteil ungültig', text: `${wer} hat einen Anteil außerhalb von 0 bis 100 %.`, blockId: b.id })
+        else if (u.anteil <= 0) add({ schluessel: `unie:${u.id}`, schwere: 'hinweis', titel: 'Unterbrechung kommt nie vor', text: `${wer} hat den Anteil 0 % und kommt nie vor. Anteil angeben oder die Unterbrechung entfernen.`, blockId: b.id })
+      } else {
+        if (!(u.anteil >= 0)) add({ schluessel: `uanteil:${u.id}`, schwere: 'fehler', titel: 'Anzahl ungültig', text: `Wie oft ${wer} je Ausführung vorkommt, darf nicht negativ sein.`, blockId: b.id })
+        if (u.schritte.length === 0) add({ schluessel: `uleer:${u.id}`, schwere: 'warnung', titel: 'Nebenweg ohne Schritte', text: `Im Nebenweg ${wer} passiert nichts. Schritte ergänzen oder die Unterbrechung entfernen.`, blockId: b.id })
+        if (u.ende !== null || u.zurueckZu !== null) add(nebenwegEnde(`Der Nebenweg ${wer}`, b.id, u.id))
+      }
+      if (u.art === 'zeit') {
+        if (!(u.fristMin > 0)) add({ schluessel: `ufrist:${u.id}`, schwere: 'fehler', titel: 'Frist fehlt', text: `Die Frist von ${wer} muss über 0 liegen.`, blockId: b.id })
+        else if (u.unterbrechend) pruefeFrist(b, u, wer, std)
+      }
+      if (u.ende !== null && u.zurueckZu !== null) {
+        add({ schluessel: `doppelt:${u.id}`, schwere: 'fehler', titel: 'Endet und springt zurück', text: `Nach ${wer} kann der Prozess nicht zugleich enden und zurückspringen.`, blockId: b.id })
+      }
+      pruefeSequenzen([u.schritte])
+      if (!u.unterbrechend) return
+      // Der Ausnahmeweg liegt neben dem Schritt: in derselben Umgebung, bei einem Rahmen außerhalb von ihm
+      const weg: Glied[] = [...kette, { block: b, sequenz: u }]
+      if (u.ende !== null) {
+        if (weg.some(gliedNebenweg)) add(nebenwegEnde(`Nach ${wer}`, b.id, u.id))
+        else if (endeVerklemmt(weg)) {
+          add({ schluessel: `verklemmung:${u.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Nach ${wer} endet der Prozess innerhalb von „Gleichzeitig“. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
+        } else if (weg.some(gliedNebenlaeufig)) {
+          add({
+            schluessel: `abbruch:${u.id}`,
+            schwere: 'fehler',
+            titel: 'Ende neben gleichzeitig laufenden Schritten',
+            text: `Nach ${wer} endet der Prozess ${nebenlaeufigText(weg)}. Was daneben noch läuft, müsste dann abgebrochen werden; das rechnet der Prozesslotse noch nicht. Lass es danach weitergehen.`,
+            blockId: b.id,
+          })
+        }
+      }
+      if (u.zurueckZu !== null) pruefeRuecksprung(`Nach ${wer} geht es zurück; der Rücksprung`, `oder an „${titel}“`, u.zurueckZu, u.id, b.id, [...vorfahren, b], weg)
+      if ((u.ende !== null || u.zurueckZu !== null) && u.schritte.length > 0 && !ausgaengeSequenz(u.schritte).has('weiter')) {
+        add({
+          schluessel: `totesende:${u.id}`,
+          schwere: u.ende !== null ? 'fehler' : 'warnung',
+          titel: u.ende !== null ? 'Ende wird nie erreicht' : 'Rücksprung wird nie erreicht',
+          text: `Im Ausnahmeweg ${wer} geht es vor dem ${u.ende !== null ? `Ende „${u.ende}“` : 'Rücksprung'} nie normal weiter; ${u.ende !== null ? 'dieses Ende' : 'dieser Rücksprung'} kommt nie vor.`,
+          blockId: b.id,
+        })
+      }
+    })
+  }
+
+  /**
+   * Frist einer Unterbrechung: An einer Aufgabe kürzer als Liegezeit und
+   * Bearbeitung, würde sie immer überschritten. An einem Rahmen zeigen die
+   * Zeiten darin, wie oft der Durchlauf länger dauert als die Frist; ist das
+   * deutlich öfter als angegeben, eine Warnung (gerechnet wird mit der Angabe).
+   */
+  function pruefeFrist(b: Unterbrechbar, u: Unterbrechung, wer: string, std: number) {
+    if (b.typ === 'aufgabe') {
+      const dauer = b.liegezeitMin + b.bearbeitungMin
+      if (u.fristMin < dauer - TOLERANZ) {
+        add({
+          schluessel: `ufristkurz:${u.id}`,
+          schwere: 'warnung',
+          titel: 'Frist kürzer als der Schritt',
+          text: `Die Frist von ${wer} (${formatiereDauer(u.fristMin, std)}) ist kürzer als Liegezeit und Bearbeitung zusammen (${formatiereDauer(dauer, std)}). Laut den Zeiten würde sie in jedem Fall überschritten, angegeben sind ${formatiereProzent(u.anteil)}.`,
+          blockId: b.id,
+        })
+      }
+      return
+    }
+    const v = verteilungBlock({ ...b, unterbrechungen: undefined }, 'gesamt')
+    const laenger = [v.weiter, ...v.rueck.values(), ...v.ende.values()].reduce((s, d) => s + masseUeber(d, u.fristMin), 0)
+    if (laenger > u.anteil + 0.005) {
+      add({
+        schluessel: `ufristrahmen:${u.id}`,
+        schwere: 'warnung',
+        titel: 'Frist laut den Zeiten öfter überschritten',
+        text: `Laut den Zeiten in „${blockTitel(b)}“ dauern ${formatiereProzent(laenger)} der Fälle länger als die Frist von ${formatiereDauer(u.fristMin, std)}, angegeben sind ${formatiereProzent(u.anteil)}. Gerechnet wird mit der Angabe.`,
+        blockId: b.id,
+      })
+    }
   }
 
   /** Alle Schritte eines Rahmens stehen in einer Bahn; der äußerste Rahmen bestimmt sie. Arbeiten darin mehrere Rollen, ein Hinweis. */
@@ -535,6 +686,22 @@ export function pruefeProzess(p: Prozess): Befund[] {
   }
 
   return sortiereBefunde(befunde)
+}
+
+/** Ein Nebenweg endet für sich: „Prozess endet“ und Rücksprünge sind dort nicht möglich. */
+function nebenwegEnde(wer: string, blockId: Id, id: Id): Befund {
+  return {
+    schluessel: `nebenende:${id}`,
+    schwere: 'fehler',
+    titel: 'Ende oder Rücksprung im Nebenweg',
+    text: `${wer} beendet den Prozess oder springt zurück, liegt aber in einem Nebenweg. Ein Nebenweg läuft neben dem Schritt her und endet für sich, ohne Ergebnis; zurück in den Ablauf liefe danach alles doppelt. Soll der Schritt abgebrochen werden, wähle „Wird die Arbeit daran abgebrochen? – ja“.`,
+    blockId,
+  }
+}
+
+/** Masse einer Verteilung mit Werten über t */
+function masseUeber(v: Verteilung, t: number): number {
+  return v.wert.reduce((s, w, i) => (w > t + 1e-9 ? s + v.masse[i] : s), 0)
 }
 
 /** Gibt es Fehler, die Berechnungen unzuverlässig machen? */

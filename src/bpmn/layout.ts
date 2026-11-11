@@ -27,10 +27,26 @@
  * den Rahmen (Bahnwechsel neben Rahmen).
  */
 import { anzahlVerteilung, kannNull } from '../modell/anzahl'
-import { alsMarkierteAufgabe, durchlaufe, oderWahrscheinlichkeiten, oderZiehung, rahmenRolle } from '../modell/operationen'
-import { fuehreLinien, RAHMEN_RAND, type NachrichtAuftrag } from './linien'
-import { unerwartet, type Aufgabe, type Block, type EntscheidungsZweig, type Id, type Mehrfach, type MehrfachStreuung, type OderZweig, type Prozess, type Rolle, type Sequenz, type Teilprozess, type Wiederholung } from '../modell/typen'
-import { formatiereProzent } from '../modell/zeit'
+import { alsMarkierteAufgabe, durchlaufe, nebenwegAnzahl, oderWahrscheinlichkeiten, oderZiehung, rahmenRolle, unterbrechungsAnteile } from '../modell/operationen'
+import { fuehreLinien, RAHMEN_RAND, type NachrichtAuftrag, type RandAbgang } from './linien'
+import {
+  unerwartet,
+  type Aufgabe,
+  type Block,
+  type EntscheidungsZweig,
+  type Id,
+  type Mehrfach,
+  type MehrfachStreuung,
+  type OderZweig,
+  type Prozess,
+  type Rolle,
+  type Sequenz,
+  type Teilprozess,
+  type Unterbrechbar,
+  type Unterbrechung,
+  type Wiederholung,
+} from '../modell/typen'
+import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
 
 export const MASSE = {
   spalte: 170,
@@ -60,6 +76,18 @@ export const RAHMEN = {
   randAbstand: 38,
   /** Halbe Breite der Mehrfach-Markierung in der Mitte der Unterkante, mit Rand; dort sitzt kein Randereignis */
   markeHalb: 18,
+}
+
+/** Randereignisse an Aufgaben und waagerechte Stücke unter einem Schritt */
+export const RAND = {
+  /** Mittelpunkt des rechten Randereignisses links der rechten Kante einer Aufgabe (drei passen auf 120 px) */
+  aufgabeRechts: 22,
+  /** Erstes waagerechtes Stück unter der Unterkante des Schritts (unter den Kreisen, die 18 px hinunterreichen) */
+  ersteStufe: 26,
+  /** Abstand der waagerechten Stücke unter einem Schritt */
+  stufe: 8,
+  /** Höchstens so viele Randereignisse an einer Aufgabe */
+  maxAufgabe: 3,
 }
 
 /** Mehrfachinstanz („für jedes Stück“) an einer Aufgabe oder einem Rahmen; Anzahl und Streuung braucht das Tokenspiel. */
@@ -103,8 +131,19 @@ export interface LayoutKnoten extends Rechteck {
   rahmen?: string | null
   /** Fehler-Ende und Fehler-Randereignis: Kennung des bpmn:error */
   fehler?: string
-  /** Randereignis: Rahmen, an dessen Unterkante es sitzt */
+  /** Randereignis: Aufgabe oder Rahmen, an dessen Unterkante es sitzt */
   wirt?: string
+  /** Randereignis: false = nicht unterbrechend (Nebenweg); fehlt = unterbrechend */
+  unterbrechend?: boolean
+  /**
+   * Randereignis: Platz auf der Unterkante (0 = ganz rechts), Höhe seines ersten
+   * waagerechten Stücks (`stufe`, nur über die Abgangsspur) und seiner Nachricht
+   * (`nachrichtStufe`), jeweils gezählt ab dem ersten Stück unter dem Schritt;
+   * `abgangsspur` ist die Spur dafür unter dem Schritt.
+   */
+  randLage?: { nr: number; stufe?: number; nachrichtStufe?: number; abgangsspur?: number }
+  /** Dokumentation im BPMN (Randereignisse: Anteil, Frist, Danach) */
+  doku?: string
   /** Zweige, in denen der Knoten liegt, von außen nach innen (`Verzweigung|Zweig|Baustein`); für das Rücken hinter Rahmen */
   zweigPfad?: string[]
   /** Aufgabe mit Markierung der Mehrfachinstanz („für jedes Stück“ mit einer einzelnen Aufgabe) */
@@ -219,6 +258,8 @@ interface Austritt {
   ueber?: Spur
   anteil?: number
   standard?: boolean
+  /** Der Fluss beginnt an einem Randereignis (leerer Ausnahmeweg) */
+  abgang?: boolean
 }
 
 /** Noch offener Rücksprung aus einem Ausgang; der Bereich mit `ziel` zeichnet die Kante. */
@@ -228,6 +269,8 @@ interface Sprung {
   name: string
   doku: string
   anteil?: number
+  /** Der Rücksprung beginnt an einem Randereignis (leerer Ausnahmeweg) */
+  abgang?: boolean
 }
 
 /** Rahmen in relativen Spalten und Spuren */
@@ -279,6 +322,8 @@ interface Kontext {
   fehler: Map<string, string>
   /** Bahnwechsel neben Rahmen: kleinste Startspalte eines Bausteins in seinem Zweig, relativ zur Verzweigung */
   schub: Map<Id, number>
+  /** Stunden je Arbeitstag (für Zeiten in der Dokumentation) */
+  stunden: number
 }
 
 function neuerTeil(bahn: string): Teil {
@@ -324,7 +369,7 @@ function kante(ctx: Kontext, von: string, nach: string, o: KantenOptionen = {}):
 
 /** Kante, die einen offenen Austritt (ggf. mit Beschriftung eines leeren Zweigs) fortsetzt. */
 function kanteAus(ctx: Kontext, a: Austritt, nach: string): LayoutKante {
-  return kante(ctx, a.knoten, nach, { name: a.name, doku: a.doku, ueber: a.ueber, anteil: a.anteil, standard: a.standard })
+  return kante(ctx, a.knoten, nach, { name: a.name, doku: a.doku, ueber: a.ueber, anteil: a.anteil, standard: a.standard, abgang: a.abgang })
 }
 
 function verschiebeSpur(s: Spur | undefined, dSpur: Map<string, number>): void {
@@ -335,6 +380,7 @@ function verschiebe(t: Teil, dSpalte: number, dSpur: Map<string, number>): void 
   for (const k of t.knoten) {
     k.spalte += dSpalte
     k.spur += dSpur.get(k.bahn) ?? 0
+    if (k.randLage?.abgangsspur !== undefined) k.randLage.abgangsspur += dSpur.get(k.bahn) ?? 0
   }
   for (const e of t.kanten) {
     verschiebeSpur(e.ueber, dSpur)
@@ -427,22 +473,27 @@ function layoutSequenz(schritte: Block[], bahn: string, ctx: Kontext): Teil {
   return t
 }
 
+function layoutAufgabe(b: Aufgabe, ctx: Kontext): Teil {
+  const rolleBahn = bahnVon(ctx, b.rolleId)
+  const eigeneBahn = ctx.bahnZwang ?? rolleBahn
+  // Im Rahmen stehen alle Schritte in einer Bahn; Schritte anderer Rollen tragen die Rolle im Namen.
+  const name = eigeneBahn !== rolleBahn ? `${b.name} (${ctx.rollen.find((r) => r.id === b.rolleId)?.name || 'ohne Rolle'})` : b.name
+  const t = neuerTeil(eigeneBahn)
+  const id = xmlId(b.id)
+  t.knoten.push(knoten(ctx, { id, art: 'aufgabe', name, blockId: b.id, bahn: eigeneBahn, spalte: 0, spur: 0, aufgabe: b, an: b.nachrichtAn ?? null, von: b.nachrichtVon ?? null }))
+  belege(t, eigeneBahn, 1)
+  t.breite = 1
+  t.eintritt = id
+  t.austritt = { knoten: id, name: '', doku: '' }
+  t.anker.set(eigeneBahn, 0)
+  return t
+}
+
 function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
   switch (b.typ) {
     case 'aufgabe': {
-      const rolleBahn = bahnVon(ctx, b.rolleId)
-      const eigeneBahn = ctx.bahnZwang ?? rolleBahn
-      // Im Rahmen stehen alle Schritte in einer Bahn; Schritte anderer Rollen tragen die Rolle im Namen.
-      const name = eigeneBahn !== rolleBahn ? `${b.name} (${ctx.rollen.find((r) => r.id === b.rolleId)?.name || 'ohne Rolle'})` : b.name
-      const t = neuerTeil(eigeneBahn)
-      const id = xmlId(b.id)
-      t.knoten.push(knoten(ctx, { id, art: 'aufgabe', name, blockId: b.id, bahn: eigeneBahn, spalte: 0, spur: 0, aufgabe: b, an: b.nachrichtAn ?? null, von: b.nachrichtVon ?? null }))
-      belege(t, eigeneBahn, 1)
-      t.breite = 1
-      t.eintritt = id
-      t.austritt = { knoten: id, name: '', doku: '' }
-      t.anker.set(eigeneBahn, 0)
-      return t
+      const t = layoutAufgabe(b, ctx)
+      return b.unterbrechungen?.length ? layoutRandwege(b, t, [], ctx) : t
     }
     case 'warten': {
       const t = neuerTeil(bahn)
@@ -466,7 +517,7 @@ function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
     case 'wiederholung':
       return layoutWiederholung(b, bahn, ctx)
     case 'teilprozess':
-      return layoutRahmen(b, bahn, ctx)
+      return layoutRahmenMitRand(b, bahn, ctx)
     case 'mehrfach':
       return layoutMehrfach(b, bahn, ctx)
     default:
@@ -478,10 +529,16 @@ function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
 function layoutMehrfach(b: Mehrfach, bahn: string, ctx: Kontext): Teil {
   const marke: MehrfachMarke = { nacheinander: b.ausfuehrung === 'nacheinander', anzahl: b.anzahl, streuung: b.streuung }
   const einzeln = alsMarkierteAufgabe(b)
-  if (!einzeln) return layoutRahmen(b, bahn, ctx, marke)
+  if (!einzeln) return layoutRahmenMitRand(b, bahn, ctx, marke)
   const t = layoutBlock(einzeln, bahn, ctx)
   Object.assign(t.knoten[0], { mehrfach: marke, mehrfachBlock: b.id })
   return t
+}
+
+/** Rahmen samt Randereignissen: Ausstiege für Enden darin (nur am äußersten Rahmen) und Unterbrechungen. */
+function layoutRahmenMitRand(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, marke?: MehrfachMarke): Teil {
+  const { teil, fehler } = layoutRahmen(b, bahn, ctx, marke)
+  return fehler.length > 0 || b.unterbrechungen?.length ? layoutRandwege(b, teil, fehler, ctx) : teil
 }
 
 interface ZweigLayout {
@@ -698,7 +755,7 @@ function layoutWiederholung(b: Wiederholung, bahn: string, ctx: Kontext): Teil {
     const sortiert = [...eigene].sort((x, y) => spalteVon(x.von) - spalteVon(y.von) || spurVon(y.von) - spurVon(x.von))
     for (const s of eigene) {
       const spur = rueckSpur + sortiert.indexOf(s)
-      t.kanten.push(kante(ctx, s.von, einId, { name: s.name, doku: s.doku, anteil: s.anteil, sprung: { bahn, spur } }))
+      t.kanten.push(kante(ctx, s.von, einId, { name: s.name, doku: s.doku, anteil: s.anteil, sprung: { bahn, spur }, abgang: s.abgang }))
     }
     belege(t, bahn, rueckSpur + Math.max(1, eigene.length))
     t.austritt = koerper.eintritt ? koerper.austritt : { knoten: einId, name: '', doku: '' }
@@ -718,10 +775,15 @@ function layoutWiederholung(b: Wiederholung, bahn: string, ctx: Kontext): Teil {
   return t
 }
 
-/** Mindestzahl innerer Spalten, damit `anzahl` Randereignisse rechts der Mehrfach-Markierung Platz haben (Rahmen mindestens 42 px breiter als seine Spalten). */
-function spaltenFuerRand(anzahl: number): number {
+/**
+ * Mindestzahl innerer Spalten, damit `anzahl` Randereignisse auf der Unterkante
+ * Platz haben, bei einer Mehrfachinstanz rechts der Markierung (Rahmen sind
+ * mindestens 42 px breiter als ihre Spalten).
+ */
+function spaltenFuerRand(anzahl: number, mehrfach: boolean): number {
   if (anzahl <= 0) return 0
-  const noetig = 2 * (RAHMEN.markeHalb + MASSE.ereignis.breite / 2 + RAHMEN.randRechts + (anzahl - 1) * RAHMEN.randAbstand)
+  const rechts = MASSE.ereignis.breite / 2 + RAHMEN.randRechts + (anzahl - 1) * RAHMEN.randAbstand
+  const noetig = mehrfach ? 2 * (RAHMEN.markeHalb + rechts) : rechts + MASSE.ereignis.breite / 2 + 6
   return Math.ceil((noetig - 42) / MASSE.spalte)
 }
 
@@ -729,13 +791,12 @@ function spaltenFuerRand(anzahl: number): number {
  * Rahmen (Abschnitt oder „für jedes Stück“, im BPMN ein aufgeklappter
  * Teilprozess) in einer Bahn mit innerem Start, dem Körper und innerem Ende.
  * Kopfspur oben, Fußspur unten. Der äußerste Rahmen fängt die Fehler-Enden
- * darin mit je einem Randereignis auf seiner Unterkante; der Fluss läuft von
- * dort zu einem Ende mit dem Ergebnis in einem eigenen Band darunter, in der
- * Spalte hinter dem Rahmen. Bei einer Mehrfachinstanz bleibt die Mitte der
- * Unterkante für die Markierung frei; reicht der Platz rechts davon nicht,
- * bekommt der Rahmen am Ende leere Spalten.
+ * darin; `fehler` nennt sie, die Randereignisse dafür legt `layoutRandwege`
+ * wie Unterbrechungen. Bei einer Mehrfachinstanz bleibt die Mitte der
+ * Unterkante für die Markierung frei; reicht der Platz für die Randereignisse
+ * nicht, bekommt der Rahmen am Ende leere Spalten.
  */
-function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, marke?: MehrfachMarke): Teil {
+function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, marke?: MehrfachMarke): { teil: Teil; fehler: string[] } {
   const eigeneBahn = ctx.bahnZwang ?? rahmenBahn(b, bahn, ctx)
   const id = xmlId(b.id)
   const aussen = { bahnZwang: ctx.bahnZwang, rahmen: ctx.rahmen }
@@ -752,8 +813,10 @@ function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, mar
   uebernimm(t, koerper)
   // Läuft der Körper nie normal zu Ende (jeder Weg endet vorher), gibt es kein inneres Ende und, außer ohne Stück, keinen Ausgang.
   const normalesEnde = !koerper.eintritt || koerper.austritt !== null
-  const randAnzahl = aussen.rahmen === null && marke ? new Set(koerper.knoten.filter((k) => k.art === 'ende' && k.fehler).map((k) => k.fehler)).size : 0
-  const endSpalte = Math.max(normalesEnde ? 1 + koerper.breite : koerper.breite, spaltenFuerRand(randAnzahl))
+  // Fehler steigen durch geschachtelte Rahmen auf; nur der äußerste fängt sie, je Ergebnis ein Randereignis.
+  const fehler = aussen.rahmen === null ? [...new Set(koerper.knoten.filter((k) => k.art === 'ende' && k.fehler).map((k) => k.fehler!))] : []
+  const randAnzahl = fehler.length + (b.unterbrechungen?.length ?? 0)
+  const endSpalte = Math.max(normalesEnde ? 1 + koerper.breite : koerper.breite, spaltenFuerRand(randAnzahl, !!marke))
   if (normalesEnde) {
     t.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: '', blockId: b.id, bahn: eigeneBahn, spalte: endSpalte, spur: ankerSpur }))
     t.kanten.push(kante(ctx, startId, koerper.eintritt ?? endeId))
@@ -775,22 +838,221 @@ function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, mar
   t.austritt = normalesEnde || ohneStueck ? { knoten: id, name: '', doku: '' } : null
   t.austrittsBahn = eigeneBahn
   t.anker.set(eigeneBahn, ankerSpur)
+  return { teil: t, fehler }
+}
 
-  if (aussen.rahmen === null) {
-    // Fehler steigen durch geschachtelte Rahmen auf; nur der äußerste fängt sie, je Ergebnis ein Randereignis.
-    const fehler = [...new Set(t.knoten.filter((k) => k.art === 'ende' && k.fehler).map((k) => k.fehler!))]
-    const ergebnis = new Map([...ctx.fehler].map(([e, f]) => [f, e]))
-    fehler.forEach((f, j) => {
-      const randId = xmlId(`${b.id}_fehler_${j + 1}`)
-      const zielId = xmlId(`${b.id}_fehler_${j + 1}_ende`)
-      t.knoten.push(knoten(ctx, { id: randId, art: 'rand', name: '', blockId: b.id, bahn: eigeneBahn, spalte: endSpalte, spur: fussSpur, wirt: id, fehler: f }))
-      t.knoten.push(knoten(ctx, { id: zielId, art: 'ende', name: ergebnis.get(f) ?? '', blockId: b.id, bahn: eigeneBahn, spalte: endSpalte + 1, spur: fussSpur + 1 + j }))
-      t.kanten.push(kante(ctx, randId, zielId, { abgang: true }))
-    })
-    if (fehler.length > 0) {
-      belege(t, eigeneBahn, fussSpur + 1 + fehler.length)
-      t.breite = endSpalte + 2
+/** Ein Weg, der an einem Randereignis beginnt: Ausnahmeweg einer Unterbrechung oder Ausstieg aus einem Rahmen für ein Ergebnis. */
+interface Randweg {
+  randId: string
+  name: string
+  doku: string
+  ereignis: 'nachricht' | 'zeit' | null
+  /** Fehler-Randereignis: Kennung des bpmn:error */
+  fehler?: string
+  unterbrechend: boolean
+  /** Absender einer Nachricht (externer Beteiligter) */
+  von: Id | null
+  /** Anteil (unterbrechend) bzw. Anzahl je Ausführung (Nebenweg), für das Tokenspiel */
+  anteil?: number
+  teil: Teil
+  /** Geht danach hinter dem Schritt weiter */
+  weiter: boolean
+  /** Rücksprungziel eines Wegs ohne Schritte */
+  sprung?: Id
+  leer: boolean
+  /** Spur der Linie eines leeren Wegs, der weiterführt */
+  linie?: Spur
+  /** Beginnt in der Bahn des Schritts; sonst wechselt der Fluss die Höhe über die Abgangsspur */
+  inBahn: boolean
+}
+
+const ZEITPUNKT_TEXT: Record<Unterbrechung['zeitpunkt'], string> = { vorher: 'bevor jemand anfängt', waehrend: 'während der Arbeit', unbekannt: 'zu einem unbekannten Zeitpunkt' }
+
+/** Dokumentation eines Randereignisses: wie oft, wann, was danach passiert. */
+function unterbrechungDoku(b: Unterbrechbar, u: Unterbrechung, anteil: number, std: number): string {
+  if (!u.unterbrechend) {
+    return `Läuft nebenher, im Schnitt ${formatiereZahl(anteil, 2)}-mal je Ausführung${u.art === 'zeit' ? ` nach ${formatiereDauer(u.fristMin, std)}` : ''}; der Schritt läuft weiter, der Nebenweg endet für sich`
+  }
+  const wann =
+    u.art === 'zeit'
+      ? `Frist ${formatiereDauer(u.fristMin, std)} ab Eingang, überschritten in ${formatiereProzent(anteil, 1)} der Ausführungen`
+      : `Kommt in ${formatiereProzent(anteil, 1)} der Ausführungen, ${b.typ === 'aufgabe' ? `meist ${ZEITPUNKT_TEXT[u.zeitpunkt]}` : 'im Schnitt nach der Hälfte'}`
+  const danach = u.ende !== null ? `danach endet der Vorgang („${u.ende}“)` : u.zurueckZu !== null ? 'danach zurück zu einem früheren Schritt' : 'danach weiter hinter dem Schritt'
+  return `${wann}; bricht die Arbeit ab; ${danach}`
+}
+
+/**
+ * Schritt mit Randereignissen (Block „Schritt mit Unterbrechungen“), gelegt wie
+ * eine Verzweigung: Der Schritt steht vorn (Aufgabe oder Rahmen), jeder
+ * Ausnahmeweg bekommt dahinter ein eigenes Band unter dem Band des Schritts,
+ * gestapelt wie Zweige, auch in anderen Bahnen. Der normale Ausgang läuft gerade
+ * weiter; führen Ausnahmewege danach weiter, steht hinter dem breitesten Weg eine
+ * Zusammenführung. Die Randereignisse sitzen auf der Unterkante, von rechts nach
+ * links: zuerst die Wege, die über die Abgangsspur in eine andere Höhe wechseln,
+ * dann die übrigen in der Reihenfolge ihrer Bänder. So schachteln sich die
+ * Abgänge ohne Kreuzung. Die Abgangsspur liegt dünn direkt unter dem Schritt und
+ * trägt auch die Nachrichtenflüsse zu den Randereignissen.
+ */
+function layoutRandwege(b: Unterbrechbar, schritt: Teil, fehler: string[], ctx: Kontext): Teil {
+  const bahn = schritt.austrittsBahn
+  const wirt = schritt.eintritt!
+  const ws = schritt.breite
+  const anteile = unterbrechungsAnteile(b)
+  const wege: Randweg[] = []
+  for (const u of b.unterbrechungen ?? []) {
+    const teil = layoutSequenz(u.schritte, bahn, ctx)
+    const leer = teil.eintritt === null
+    const anteil = u.unterbrechend ? (anteile.je.get(u.id) ?? 0) : nebenwegAnzahl(u)
+    const weg: Randweg = { randId: xmlId(`${u.id}_rand`), name: u.bezeichnung, doku: unterbrechungDoku(b, u, anteil, ctx.stunden), ereignis: u.art, unterbrechend: u.unterbrechend, von: u.art === 'nachricht' ? u.von : null, anteil, teil, weiter: false, leer, inBahn: true }
+    const mitEnde = (name: string, fehlerId?: string) => {
+      const endeId = xmlId(`${u.id}_ende`)
+      const endBahn = teil.austrittsBahn
+      const spur = teil.anker.get(endBahn) ?? 0
+      teil.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name, blockId: b.id, bahn: endBahn, spalte: teil.breite, spur, ...(fehlerId ? { fehler: fehlerId } : {}) }))
+      belege(teil, endBahn, spur + 1)
+      if (teil.austritt) teil.kanten.push(kanteAus(ctx, teil.austritt, endeId))
+      if (leer) teil.eintritt = endeId
+      teil.breite += 1
+      teil.austritt = null
     }
+    if (!u.unterbrechend) {
+      // Nebenweg: eigenes Ende ohne Ergebnis, auch in einem Rahmen kein Fehler-Ende (der Rahmen wartet auf ihn)
+      mitEnde('')
+    } else if (u.ende !== null) {
+      // Ende je nach Ort: in einem Rahmen ein Fehler-Ende, das der äußerste Rahmen fängt
+      mitEnde(u.ende, ctx.rahmen !== null ? fehlerId(ctx, u.ende) : undefined)
+    } else if (u.zurueckZu !== null) {
+      // Die Kante zeichnet der Rücksprungbereich; ohne Schritte beginnt sie am Randereignis.
+      if (leer) weg.sprung = u.zurueckZu
+      else if (teil.austritt) teil.spruenge.push({ von: teil.austritt.knoten, ziel: u.zurueckZu, name: teil.austritt.name, doku: teil.austritt.doku, anteil: teil.austritt.anteil, abgang: teil.austritt.abgang })
+      teil.austritt = null
+    } else weg.weiter = true
+    if (leer && weg.weiter) belege(teil, bahn, 1)
+    merkeZweig(teil, b.id, wege.length)
+    wege.push(weg)
+  }
+  // Ausstieg aus dem Rahmen für ein Ergebnis: Fehler-Randereignis, dahinter ein Ende mit dem Ergebnis
+  const ergebnis = new Map([...ctx.fehler].map(([e, f]) => [f, e]))
+  fehler.forEach((f, j) => {
+    const teil = neuerTeil(bahn)
+    const zielId = xmlId(`${b.id}_fehler_${j + 1}_ende`)
+    teil.knoten.push(knoten(ctx, { id: zielId, art: 'ende', name: ergebnis.get(f) ?? '', blockId: b.id, bahn, spalte: 0, spur: 0 }))
+    belege(teil, bahn, 1)
+    teil.breite = 1
+    teil.eintritt = zielId
+    merkeZweig(teil, b.id, wege.length)
+    wege.push({ randId: xmlId(`${b.id}_fehler_${j + 1}`), name: '', doku: '', ereignis: null, fehler: f, unterbrechend: true, von: null, teil, weiter: false, leer: false, inBahn: true })
+  })
+
+  // Beginnt der Weg in der Bahn des Schritts, läuft der Abgang senkrecht bis auf seine Höhe; sonst über die Abgangsspur.
+  for (const w of wege) {
+    if (w.sprung !== undefined) w.inBahn = false
+    else if (!w.leer || !w.weiter) w.inBahn = (w.teil.knoten.find((k) => k.id === w.teil.eintritt)?.bahn ?? w.teil.rahmen.find((r) => r.id === w.teil.eintritt)?.bahn) === bahn
+  }
+  const mitAbgangsspur = wege.some((w) => !w.inBahn || w.von)
+  const hs = schritt.hoehe.get(bahn) ?? 1
+  const abgangsspur = mitAbgangsspur ? hs : undefined
+  // Bänder stapeln: in der Bahn des Schritts unter ihm (und der Abgangsspur), in anderen Bahnen von oben
+  const versatz = new Map<string, number>([[bahn, hs + (mitAbgangsspur ? 1 : 0)]])
+  for (const w of wege) {
+    const d = new Map<string, number>()
+    for (const bz of w.teil.hoehe.keys()) d.set(bz, versatz.get(bz) ?? 0)
+    verschiebe(w.teil, ws, d)
+    if (w.leer && w.weiter) w.linie = { bahn, spur: d.get(bahn) ?? 0 }
+    for (const [bz, h] of w.teil.hoehe) versatz.set(bz, (versatz.get(bz) ?? 0) + h)
+  }
+  // Bahnwechsel neben Rahmen: Bausteine, deren senkrechte Stücke einen Rahmen eines anderen Wegs querten, rücken dahinter.
+  for (const w of wege) {
+    for (const blk of w.teil.bloecke) {
+      const ab = ctx.schub.get(blk.id)
+      if (ab !== undefined && ab > blk.start) rueckeAb(w.teil, blk.start, ab - blk.start)
+    }
+  }
+  const maxBreite = Math.max(1, ...wege.map((w) => w.teil.breite))
+
+  const t = neuerTeil(bahn)
+  uebernimm(t, schritt)
+  t.eintritt = schritt.eintritt
+  t.anker = new Map(schritt.anker)
+  for (const w of wege) {
+    t.knoten.push(...w.teil.knoten)
+    t.kanten.push(...w.teil.kanten)
+    t.spruenge.push(...w.teil.spruenge)
+    t.rahmen.push(...w.teil.rahmen)
+  }
+  for (const [bz, h] of versatz) belege(t, bz, h)
+
+  // Plätze auf der Unterkante von rechts, Höhen der waagerechten Stücke darunter. Über die Abgangsspur zuerst der Weg
+  // mit dem höchsten Ziel (Bahn weiter oben, dann Band weiter oben), Rücksprünge zuletzt: So kreuzen sich die Abgänge nicht.
+  const bahnNr = (b: string) => (b === OHNE_ROLLE ? ctx.rollen.length : ctx.rollen.findIndex((r) => r.id === b))
+  const zielHoehe = (w: Randweg): [number, number] => {
+    if (w.sprung !== undefined) return [bahnNr(bahn), Infinity]
+    const k = w.teil.knoten.find((x) => x.id === w.teil.eintritt)
+    const r = w.teil.rahmen.find((x) => x.id === w.teil.eintritt)
+    return [bahnNr(k?.bahn ?? r?.bahn ?? bahn), k?.spur ?? r?.ankerSpur ?? 0]
+  }
+  const ueberAbgangsspur = wege.filter((w) => !w.inBahn).sort((a, b) => {
+    const [ba, sa] = zielHoehe(a)
+    const [bb, sb] = zielHoehe(b)
+    return ba - bb || sa - sb
+  })
+  const reihe = [...ueberAbgangsspur, ...wege.filter((w) => w.inBahn)]
+  const nachrichten = [...reihe].reverse().filter((w) => w.von)
+  const ueberSpur = reihe.filter((w) => !w.inBahn)
+  reihe.forEach((w, nr) => {
+    const ziel = w.linie?.spur ?? w.teil.knoten.find((k) => k.id === w.teil.eintritt)?.spur ?? w.teil.rahmen.find((r) => r.id === w.teil.eintritt)?.ankerSpur ?? 0
+    const nachrichtStufe = w.von ? nachrichten.indexOf(w) : undefined
+    const stufe = w.inBahn ? undefined : nachrichten.length + ueberSpur.indexOf(w)
+    t.knoten.push(
+      knoten(ctx, {
+        id: w.randId,
+        art: 'rand',
+        name: w.name,
+        blockId: b.id,
+        bahn,
+        spalte: ws - 1,
+        spur: w.inBahn ? ziel : abgangsspur!,
+        wirt,
+        ereignis: w.ereignis,
+        unterbrechend: w.unterbrechend,
+        von: w.von,
+        randLage: { nr, stufe, nachrichtStufe, abgangsspur },
+        ...(w.fehler ? { fehler: w.fehler } : {}),
+        ...(w.doku ? { doku: w.doku } : {}),
+      }),
+    )
+  })
+  for (const w of wege) {
+    if (w.sprung !== undefined) t.spruenge.push({ von: w.randId, ziel: w.sprung, name: '', doku: w.doku, anteil: w.anteil, abgang: true })
+    else if (!w.leer || !w.weiter) t.kanten.push(kante(ctx, w.randId, w.teil.eintritt!, { abgang: true, anteil: w.anteil, doku: w.doku }))
+  }
+
+  // Normaler Ausgang und Ausnahmewege, die weiterführen; ab zweien eine Zusammenführung hinter dem breitesten Weg
+  const weiterWege = wege.filter((w) => w.weiter && (w.leer || w.teil.austritt !== null))
+  const anzahl = (schritt.austritt ? 1 : 0) + weiterWege.length
+  if (anzahl >= 2) {
+    const zuId = xmlId(`${b.id}_weiter`)
+    t.knoten.push(knoten(ctx, { id: zuId, art: 'xor', name: '', blockId: b.id, bahn, spalte: ws + maxBreite, spur: schritt.anker.get(bahn) ?? 0, richtung: 'zu' }))
+    if (schritt.austritt) t.kanten.push(kanteAus(ctx, schritt.austritt, zuId))
+    for (const w of weiterWege) {
+      if (w.leer) t.kanten.push(kante(ctx, w.randId, zuId, { abgang: true, anteil: w.anteil, doku: w.doku, ueber: w.linie }))
+      else t.kanten.push(kanteAus(ctx, w.teil.austritt!, zuId))
+    }
+    t.austritt = { knoten: zuId, name: '', doku: '' }
+    t.austrittsBahn = bahn
+    t.breite = ws + maxBreite + 1
+  } else if (anzahl === 1 && schritt.austritt) {
+    t.austritt = schritt.austritt
+    t.austrittsBahn = bahn
+    t.breite = ws + maxBreite
+  } else if (anzahl === 1) {
+    const w = weiterWege[0]
+    t.austritt = w.leer ? { knoten: w.randId, name: '', doku: w.doku, ueber: w.linie, anteil: w.anteil, abgang: true } : w.teil.austritt
+    t.austrittsBahn = w.leer ? bahn : w.teil.austrittsBahn
+    t.breite = ws + maxBreite
+  } else {
+    t.austritt = null
+    t.breite = ws + maxBreite
   }
   return t
 }
@@ -890,7 +1152,6 @@ function hinterRahmen(l: Layout): [Id, number][] {
   for (const r of l.rahmen) for (const e of r.zweigPfad) merke(e, r.spalteBis)
   const ergebnis: [Id, number][] = []
   for (const e of l.kanten) {
-    if (e.abgang) continue
     const quelle = knotenNach.get(e.von)
     const quellRahmen = rahmenNach.get(e.von)
     const ebene = quellRahmen ? quellRahmen.eltern : (quelle?.rahmen ?? null)
@@ -908,11 +1169,13 @@ function hinterRahmen(l: Layout): [Id, number][] {
         const [v2, z2, b2] = r.zweigPfad[j].split('|')
         if (v1 !== v2) break
         if (z1 !== z2) {
-          const auf = knotenNach.get(xmlId(`${v1}_auf`))
-          if (!auf || !b1 || !b2) break
+          // Anfang des Blocks: die Raute der Verzweigung bzw. der Schritt mit Unterbrechungen (Aufgabe oder Rahmen)
+          const anker = knotenNach.get(xmlId(`${v1}_auf`)) ?? knotenNach.get(xmlId(v1)) ?? rahmenNach.get(xmlId(v1))
+          if (!anker || !b1 || !b2) break
+          const anfang = 'spalteVon' in anker ? anker.spalteVon : anker.spalte
           // Der Baustein im unteren Zweig rückt hinter den im oberen.
-          if (Number(z1) > Number(z2)) ergebnis.push([b1, letzte.get(r.zweigPfad[j])! - auf.spalte + 1])
-          else ergebnis.push([b2, letzte.get(pfad[j])! - auf.spalte + 1])
+          if (Number(z1) > Number(z2)) ergebnis.push([b1, letzte.get(r.zweigPfad[j])! - anfang + 1])
+          else ergebnis.push([b2, letzte.get(pfad[j])! - anfang + 1])
           break
         }
         if (pfad[j] !== r.zweigPfad[j]) break
@@ -923,7 +1186,7 @@ function hinterRahmen(l: Layout): [Id, number][] {
 }
 
 function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
-  const ctx: Kontext = { rollenIds: new Set(p.rollen.map((r) => r.id)), rollen: p.rollen, kantenNr: 0, bahnZwang: null, rahmen: null, fehler: new Map(), schub }
+  const ctx: Kontext = { rollenIds: new Set(p.rollen.map((r) => r.id)), rollen: p.rollen, kantenNr: 0, bahnZwang: null, rahmen: null, fehler: new Map(), schub, stunden: p.arbeitsstundenProTag }
   const ersteBahn = ersteBahnVon(p, ctx)
 
   const haupt = layoutSequenz(p.ablauf.schritte, ersteBahn, ctx)
@@ -974,6 +1237,18 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
       const breite = (r.spalteBis - r.spalteVon) * MASSE.spalte + 2 * (MASSE.ereignis.breite / 2 + RAHMEN_RAND.innen)
       const noetig = RAHMEN.oben + RAHMEN.text + rahmenZeilen(r.name, breite) * RAHMEN.zeile + 6
       hoehen[r.spurVon] = Math.max(hoehen[r.spurVon], noetig)
+    }
+    // Die Abgangsspur unter einem Schritt fasst alle waagerechten Stücke darunter (Abgänge und Nachrichten), 8 px auseinander
+    for (const k of t.knoten) {
+      const lage = k.randLage
+      if (k.art !== 'rand' || k.bahn !== bahn || lage?.abgangsspur === undefined) continue
+      const stufen = Math.max(lage.stufe ?? 0, lage.nachrichtStufe ?? 0)
+      // Abstand der Unterkante des Schritts zur Oberkante der Abgangsspur: eine Aufgabe sitzt mittig in ihrer Spur, ein Rahmen endet in der Mitte seiner Fußspur
+      const rahmenWirt = t.rahmen.find((r) => r.id === k.wirt)
+      const darueber = hoehen[lage.abgangsspur - 1] ?? MASSE.spur
+      const abstand = rahmenWirt ? darueber / 2 : (darueber - MASSE.aufgabe.hoehe) / 2
+      const noetig = RAND.ersteStufe + stufen * RAND.stufe + 12 - abstand
+      hoehen[lage.abgangsspur] = Math.max(hoehen[lage.abgangsspur] ?? MASSE.spurDuenn, noetig)
     }
     spurHoehen.set(bahn, hoehen)
   }
@@ -1071,11 +1346,44 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
   })
   const rahmenEin = new Map(rahmen.map((r) => [r.id, ersatz(r, r.spalteVon)]))
   const rahmenAus = new Map(rahmen.map((r) => [r.id, ersatz(r, r.spalteBis)]))
+  const rahmenNach = new Map(rahmen.map((r) => [r.id, r]))
+
+  // Randereignisse auf der Unterkante ihres Wirts, von rechts nach links: Spalte, Abstand des Mittelpunkts von der Spaltenmitte, Unterkante
+  const randGeo = new Map<string, { spalte: number; ersteSpalte: number; dx: number; unten: number }>()
+  for (const k of t.knoten) {
+    if (k.art !== 'rand') continue
+    const nr = k.randLage?.nr ?? 0
+    const aufgabe = knotenNach.get(k.wirt!)
+    const r = rahmenNach.get(k.wirt!)
+    if (aufgabe && aufgabe.art !== 'rand') {
+      randGeo.set(k.id, { spalte: aufgabe.spalte, ersteSpalte: aufgabe.spalte, dx: MASSE.aufgabe.breite / 2 - RAND.aufgabeRechts - nr * RAHMEN.randAbstand, unten: aufgabe.y + MASSE.aufgabe.hoehe })
+    } else if (r) {
+      randGeo.set(k.id, { spalte: r.spalteBis, ersteSpalte: r.spalteVon, dx: (belegt.get(r.spalteBis) ?? 0) + RAHMEN_RAND.innen - RAHMEN.randRechts - nr * RAHMEN.randAbstand, unten: r.y + r.hoehe })
+    }
+  }
+  // Der Fluss eines Randereignisses beginnt unten am Kreis und läuft senkrecht bis zur Höhe seines ersten Ziels bzw. seiner Stufe in der Abgangsspur
+  const randAus = new Map<string, RandAbgang>()
+  for (const e of t.kanten) {
+    const k = knotenNach.get(e.von)
+    const g = randGeo.get(e.von)
+    if (!k || !g) continue
+    const stufe = k.randLage?.stufe
+    const ziel = rahmenEin.get(e.nach) ?? knotenNach.get(e.nach)
+    const hoehe =
+      e.ueber && !e.sprung
+        ? spurMitte(e.ueber)
+        : stufe !== undefined
+          ? g.unten + RAND.ersteStufe + stufe * RAND.stufe
+          : ziel
+            ? ziel.y + ziel.hoehe / 2
+            : g.unten + RAND.ersteStufe
+    randAus.set(e.von, { knoten: { ...k, spalte: g.spalte, x: 0, y: hoehe, breite: 0, hoehe: 0 }, dx: g.dx, vonY: g.unten + MASSE.ereignis.hoehe / 2 })
+  }
   const pools = externePools(p, { x: 0, y: 0, breite: 0, hoehe: y }, t.knoten)
-  const auftraege = nachrichtAuftraege(t.knoten, pools)
+  const auftraege = nachrichtAuftraege(t.knoten, pools, randGeo)
   const linien = fuehreLinien({
     knoten: gitter,
-    kanten: t.kanten.filter((e) => !e.abgang),
+    kanten: t.kanten,
     nachrichten: auftraege,
     spurMitte,
     belegt,
@@ -1086,6 +1394,7 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
     spalteFrei,
     rahmenEin,
     rahmenAus,
+    randAus,
   })
 
   const poolBreite = linien.spalteMitte(maxSpalte) + MASSE.spalte / 2 + MASSE.rand + linien.zusatzRechts
@@ -1114,32 +1423,15 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
       r.beschriftung = { x: r.x + (r.breite - breite) / 2, y: r.y + RAHMEN.text, breite, hoehe }
     }
   }
-  // Randereignisse auf der Unterkante ihres Rahmens, von rechts nach links in der Reihenfolge ihrer Bänder
-  const rahmenNach = new Map(rahmen.map((r) => [r.id, r]))
-  const randZahl = new Map<string, number>()
+  // Randereignisse: Mittelpunkt auf der Unterkante des Wirts
   for (const k of t.knoten) {
-    if (k.art !== 'rand') continue
-    const r = rahmenNach.get(k.wirt!)!
-    const j = randZahl.get(r.id) ?? 0
-    randZahl.set(r.id, j + 1)
-    k.x = r.x + r.breite - RAHMEN.randRechts - j * RAHMEN.randAbstand - k.breite / 2
-    k.y = r.y + r.hoehe - k.hoehe / 2
+    const g = randGeo.get(k.id)
+    if (!g) continue
+    k.x = linien.spalteMitte(g.spalte) + g.dx - k.breite / 2
+    k.y = g.unten - k.hoehe / 2
   }
 
-  for (const e of t.kanten) {
-    if (e.abgang) {
-      // vom Kreis senkrecht hinunter bis zur Höhe des Ziels, dann waagerecht hinein
-      const a = knotenNach.get(e.von)!
-      const z = knotenNach.get(e.nach)!
-      const cx = a.x + a.breite / 2
-      const zy = z.y + z.hoehe / 2
-      e.punkte = [
-        { x: cx, y: a.y + a.hoehe },
-        { x: cx, y: zy },
-        { x: z.x, y: zy },
-      ]
-    } else e.punkte = linien.kanten.get(e.id) ?? []
-  }
+  for (const e of t.kanten) e.punkte = linien.kanten.get(e.id) ?? []
 
   const nachrichten: LayoutNachricht[] = auftraege.map((n) => {
     const pl = pools.find((x) => x.teilnehmerId === (n.richtung === 'an' ? n.knoten.an : n.knoten.von))!
@@ -1172,9 +1464,17 @@ function externePools(p: Prozess, haupt: Rechteck, knoten: LayoutKnoten[]): Layo
   return pools
 }
 
-/** Nachrichtenflüsse je Knoten und Richtung; die Linien legt `fuehreLinien` fest. */
-function nachrichtAuftraege(knotenListe: LayoutKnoten[], pools: LayoutPool[]): NachrichtAuftrag[] {
+/**
+ * Nachrichtenflüsse je Knoten und Richtung; die Linien legt `fuehreLinien`
+ * fest. Eine Nachricht zu einem Randereignis kommt von unten links an den
+ * Kreis (45°): ein Stummel hinunter bis zu ihrer Stufe unter dem Schritt,
+ * waagerecht in die Lücke vor dem Schritt und dort zum Pool. Eigene
+ * Nachrichten einer Aufgabe mit Randereignissen laufen über die Oberkante.
+ */
+function nachrichtAuftraege(knotenListe: LayoutKnoten[], pools: LayoutPool[], randGeo: Map<string, { spalte: number; ersteSpalte: number; dx: number; unten: number }>): NachrichtAuftrag[] {
   const liste: NachrichtAuftrag[] = []
+  const mitRand = new Set(knotenListe.filter((k) => k.art === 'rand').map((k) => k.wirt))
+  const diagonal = (MASSE.ereignis.breite / 2) * Math.SQRT1_2
   for (const k of knotenListe) {
     const beide = !!k.an && !!k.von
     for (const richtung of ['von', 'an'] as const) {
@@ -1182,6 +1482,7 @@ function nachrichtAuftraege(knotenListe: LayoutKnoten[], pools: LayoutPool[]): N
       const pl = tn ? pools.find((x) => x.teilnehmerId === tn) : undefined
       if (!pl) continue
       const oben = pl.lage === 'oben'
+      const g = k.art === 'rand' ? randGeo.get(k.id) : undefined
       liste.push({
         id: `Nachricht_${liste.length + 1}`,
         knoten: k,
@@ -1189,6 +1490,18 @@ function nachrichtAuftraege(knotenListe: LayoutKnoten[], pools: LayoutPool[]): N
         oben,
         richtung,
         dx: beide ? (richtung === 'an' ? 15 : -15) : 0,
+        ...(mitRand.has(k.id) ? { ueberOben: true } : {}),
+        ...(g
+          ? {
+              rand: {
+                spalte: g.spalte,
+                dx: g.dx - diagonal,
+                y: g.unten + diagonal,
+                ebene: g.unten + RAND.ersteStufe + (k.randLage?.nachrichtStufe ?? 0) * RAND.stufe,
+                luecke: g.ersteSpalte - 1,
+              },
+            }
+          : {}),
       })
     }
   }
@@ -1289,7 +1602,13 @@ function platziereBeschriftungen(knoten: LayoutKnoten[], kanten: LayoutKante[], 
     return bester
   }
   // zuerst die Knoten (Frage über dem Gateway, Name unter dem Ereignis), dann die Flüsse
-  for (const k of knoten) if (k.beschriftung) k.beschriftung = waehle(plaetzeUm(k, k.beschriftung), k)
+  for (const k of knoten) {
+    if (k.art === 'rand' && k.name) {
+      // Name eines Randereignisses: entlang seines Abgangs, so nah am Kreis wie möglich
+      const e = kanten.find((x) => x.von === k.id)
+      if (e) k.beschriftung = waehle(plaetzeEntlang({ ...e, name: k.name }), k)
+    } else if (k.beschriftung) k.beschriftung = waehle(plaetzeUm(k, k.beschriftung), k)
+  }
   for (const e of kanten) {
     if (!e.name) continue
     const a = nachId.get(e.von)

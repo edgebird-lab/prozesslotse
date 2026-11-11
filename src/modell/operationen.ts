@@ -5,7 +5,24 @@
  */
 import { anzahlVerteilung, kannNull } from './anzahl'
 import { neuerMehrfach, neuerOderZweig, neuerRuecksprungBereich, neuerTeilprozess, neueSequenz } from './bausteine'
-import { unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type Mehrfach, type Oder, type Prozess, type Sequenz, type Teilprozess, type Wiederholung } from './typen'
+import {
+  istUnterbrechbar,
+  unerwartet,
+  unterbrechungenVon,
+  type Aufgabe,
+  type Block,
+  type Entscheidung,
+  type EntscheidungsZweig,
+  type Id,
+  type Mehrfach,
+  type Oder,
+  type Prozess,
+  type Sequenz,
+  type Teilprozess,
+  type Unterbrechbar,
+  type Unterbrechung,
+  type Wiederholung,
+} from './typen'
 
 /** Ein Schritt auf dem Weg von außen nach innen: ein Baustein und die Kindsequenz, in der es weitergeht. */
 export interface Glied {
@@ -23,7 +40,12 @@ export interface Fundstelle {
   kette: Glied[]
 }
 
-/** Zweige einer Entscheidung oder Parallele, Körper einer Wiederholung, eines Abschnitts oder von „für jedes Stück“. */
+/**
+ * Zweige einer Entscheidung oder Parallele, Körper einer Wiederholung, eines
+ * Abschnitts oder von „für jedes Stück“; dazu die Ausnahmewege der
+ * Unterbrechungen einer Aufgabe, eines Abschnitts oder von „für jedes Stück“
+ * (nach dem Körper).
+ */
 export function kinderSequenzen(b: Block): Sequenz[] {
   switch (b.typ) {
     case 'entscheidung':
@@ -35,15 +57,21 @@ export function kinderSequenzen(b: Block): Sequenz[] {
     case 'wiederholung':
       return [b.koerper]
     case 'teilprozess':
-      return [b.koerper]
+      return [b.koerper, ...(b.unterbrechungen ?? [])]
     case 'mehrfach':
-      return [b.koerper]
+      return [b.koerper, ...(b.unterbrechungen ?? [])]
     case 'aufgabe':
+      return b.unterbrechungen ?? []
     case 'warten':
       return []
     default:
       return unerwartet(b)
   }
+}
+
+/** Die Unterbrechung des Blocks, deren Ausnahmeweg die Sequenz ist; sonst null. */
+export function unterbrechungVon(b: Block, sequenzId: Id): Unterbrechung | null {
+  return unterbrechungenVon(b).find((u) => u.id === sequenzId) ?? null
 }
 
 /** Alle Blöcke in Lesereihenfolge (Tiefensuche). */
@@ -96,10 +124,14 @@ export function anzahlBloecke(p: Prozess): number {
 /**
  * Läuft die Kindsequenz des Glieds womöglich neben anderen Teilen desselben
  * Vorgangs (ein Zweig von Gleichzeitig, ein ODER-Weg, der Körper von „für jedes
- * Stück“, wenn die Stücke gleichzeitig laufen)? Dort darf der Prozess (noch)
- * nicht enden, und kein Rücksprung darf herausführen.
+ * Stück“, wenn die Stücke gleichzeitig laufen, ein Nebenweg)? Dort darf der
+ * Prozess (noch) nicht enden, und kein Rücksprung darf herausführen. Der
+ * Ausnahmeweg einer unterbrechenden Unterbrechung ist nicht nebenläufig: Der
+ * Schritt ist dann abgebrochen.
  */
 export function gliedNebenlaeufig(g: Glied): boolean {
+  const u = unterbrechungVon(g.block, g.sequenz.id)
+  if (u) return !u.unterbrechend
   const b = g.block
   switch (b.typ) {
     case 'parallel': {
@@ -150,15 +182,29 @@ export function istRahmen(b: Block): b is Teilprozess | Mehrfach {
   return b.typ === 'teilprozess' || b.typ === 'mehrfach'
 }
 
-/** Wird „für jedes Stück“ als einzelne Aufgabe mit Markierung gezeichnet (statt als Rahmen)? Dann die Aufgabe, sonst null. */
+/**
+ * Wird „für jedes Stück“ als einzelne Aufgabe mit Markierung gezeichnet (statt
+ * als Rahmen)? Nur, wenn weder der Baustein noch die Aufgabe Unterbrechungen
+ * hat; dann die Aufgabe, sonst null.
+ */
 export function alsMarkierteAufgabe(b: Mehrfach): Aufgabe | null {
   const [erste, ...rest] = b.koerper.schritte
-  return erste?.typ === 'aufgabe' && rest.length === 0 ? erste : null
+  if (erste?.typ !== 'aufgabe' || rest.length > 0) return null
+  return unterbrechungenVon(b).length === 0 && unterbrechungenVon(erste).length === 0 ? erste : null
+}
+
+/**
+ * Liegt die Kindsequenz des Glieds im Rahmen seines Blocks? Das gilt für den
+ * Körper von Abschnitt und „für jedes Stück“; der Ausnahmeweg einer
+ * Unterbrechung liegt außerhalb des Rahmens (er beginnt am Randereignis).
+ */
+export function gliedRahmen(g: Glied): boolean {
+  return istRahmen(g.block) && g.sequenz.id === g.block.koerper.id
 }
 
 /** Alle Rahmen über der Stelle am Ende der Kette, von außen nach innen. */
 export function rahmenUeber(kette: Glied[]): Block[] {
-  return kette.map((g) => g.block).filter(istRahmen)
+  return kette.filter(gliedRahmen).map((g) => g.block)
 }
 
 /**
@@ -253,15 +299,22 @@ function abbildeBlock(b: Block, f: SchrittAbbildung): Block {
     case 'wiederholung':
       return { ...b, koerper: abbildeSequenz(b.koerper, f) }
     case 'teilprozess':
-      return { ...b, koerper: abbildeSequenz(b.koerper, f) }
+      return mitAbgebildetenUnterbrechungen({ ...b, koerper: abbildeSequenz(b.koerper, f) }, f)
     case 'mehrfach':
-      return { ...b, koerper: abbildeSequenz(b.koerper, f) }
+      return mitAbgebildetenUnterbrechungen({ ...b, koerper: abbildeSequenz(b.koerper, f) }, f)
     case 'aufgabe':
+      return mitAbgebildetenUnterbrechungen(b, f)
     case 'warten':
       return b
     default:
       return unerwartet(b)
   }
+}
+
+/** Wendet die Abbildung auch auf die Ausnahmewege an; ohne Unterbrechungen bleibt der Block, wie er ist. */
+function mitAbgebildetenUnterbrechungen<B extends Unterbrechbar>(b: B, f: SchrittAbbildung): B {
+  if (!b.unterbrechungen) return b
+  return { ...b, unterbrechungen: b.unterbrechungen.map((u) => abbildeSequenz(u, f)) }
 }
 
 /** Wendet `f` auf die Schrittliste jeder Sequenz an, innen zuerst. */
@@ -336,7 +389,9 @@ export function entferneMedium(p: Prozess, mediumId: Id): Prozess {
 export function entferneTeilnehmer(p: Prozess, teilnehmerId: Id): Prozess {
   const ohne = (x: Id | null | undefined) => (x === teilnehmerId ? null : (x ?? null))
   const neu = abbildeAblauf(p, (schritte) =>
-    schritte.map((b) => {
+    schritte.map((alt) => {
+      // Unterbrechungen durch eine Nachricht dieses Teilnehmers verlieren ihren Absender
+      const b = istUnterbrechbar(alt) && alt.unterbrechungen?.some((u) => u.von === teilnehmerId) ? { ...alt, unterbrechungen: alt.unterbrechungen.map((u) => (u.von === teilnehmerId ? { ...u, von: null } : u)) } : alt
       if (b.typ === 'aufgabe' && (b.nachrichtAn === teilnehmerId || b.nachrichtVon === teilnehmerId)) return { ...b, nachrichtAn: ohne(b.nachrichtAn), nachrichtVon: ohne(b.nachrichtVon) }
       if (b.typ === 'warten' && b.von === teilnehmerId) return { ...b, von: null }
       if (b.typ === 'entscheidung' && b.zweige.some((z) => z.ereignis?.von === teilnehmerId)) {
@@ -358,7 +413,7 @@ export function teilnehmerName(p: Prozess, id: Id | null | undefined): string {
 
 /** Nachrichten mit externen Teilnehmern: Stelle im Modell, Richtung und Teilnehmer. */
 export interface NachrichtVerweis {
-  /** Baustein (Aufgabe, Warten), Ausgang (Ereignis) oder 'start' für den Auslöser */
+  /** Baustein (Aufgabe, Warten), Ausgang (Ereignis), Unterbrechung oder 'start' für den Auslöser */
   ort: Id
   richtung: 'an' | 'von'
   teilnehmerId: Id
@@ -368,6 +423,8 @@ export function nachrichtenVerweise(p: Prozess): NachrichtVerweis[] {
   const liste: NachrichtVerweis[] = []
   if (p.ausloeser.art === 'nachricht' && p.ausloeser.von) liste.push({ ort: 'start', richtung: 'von', teilnehmerId: p.ausloeser.von })
   for (const { block: b } of durchlaufe(p.ablauf)) {
+    // Eine Unterbrechung durch eine Nachricht von außen: Nachrichtenfluss zum Randereignis
+    for (const u of unterbrechungenVon(b)) if (u.art === 'nachricht' && u.von) liste.push({ ort: u.id, richtung: 'von', teilnehmerId: u.von })
     if (b.typ === 'aufgabe') {
       if (b.nachrichtVon) liste.push({ ort: b.id, richtung: 'von', teilnehmerId: b.nachrichtVon })
       if (b.nachrichtAn) liste.push({ ort: b.id, richtung: 'an', teilnehmerId: b.nachrichtAn })
@@ -449,7 +506,7 @@ export function ruecksprungZiele(p: Prozess, sequenzId: Id, index: number, mitSe
     ebenen.push(seq.sequenz.schritte.slice(ab, bis + 1).map((b) => ({ id: b.id, titel: bereichTitel(b) })))
     const besitzer = seq.besitzer
     const glied = seq.kette[seq.kette.length - 1]
-    if (!besitzer || !glied || gliedNebenlaeufig(glied) || istRahmen(besitzer)) break
+    if (!besitzer || !glied || gliedNebenlaeufig(glied) || gliedRahmen(glied)) break
     const ort = findeBlock(p, besitzer.id)
     if (!ort) break
     seq = findeSequenz(p, ort.sequenz.id)
@@ -460,21 +517,28 @@ export function ruecksprungZiele(p: Prozess, sequenzId: Id, index: number, mitSe
 }
 
 /**
- * Lässt einen Ausgang zum Anfang von `zielId` zurückspringen. Dafür wird der
- * Abschnitt vom Ziel bis zum Block, der die Entscheidung enthält, zu einem
- * Rücksprungbereich zusammengefasst. Ist das Ziel schon ein Rücksprungbereich,
- * wird dieser erweitert. So bleibt das Modell blockstrukturiert.
+ * Lässt einen Ausgang zum Anfang von `zielId` zurückspringen. Quelle ist ein
+ * Ausgang einer Entscheidung oder eine unterbrechende Unterbrechung eines
+ * Schritts (`quelleId` = Entscheidung bzw. Schritt, `ausgangId` = Ausgang bzw.
+ * Unterbrechung). Dafür wird der Abschnitt vom Ziel bis zum Block, der die
+ * Quelle enthält, zu einem Rücksprungbereich zusammengefasst. Ist das Ziel
+ * schon ein Rücksprungbereich, wird dieser erweitert. So bleibt das Modell
+ * blockstrukturiert. „Noch einmal von vorn“ ist der Rücksprung einer
+ * Unterbrechung zu ihrem eigenen Schritt.
  */
-export function setzeRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id, zielId: Id): Prozess {
+export function setzeRuecksprung(p: Prozess, quelleId: Id, ausgangId: Id, zielId: Id): Prozess {
   const ziel = findeBlock(p, zielId)
-  const ent = findeBlock(p, entscheidungId)
+  const ent = findeBlock(p, quelleId)
   if (!ziel || !ent) return p
+  const unterbrechung = unterbrechungVon(ent.block, ausgangId)
+  if (ent.block.typ !== 'entscheidung' && !unterbrechung?.unterbrechend) return p
   const kette = [...ent.vorfahren, ent.block]
   const imZiel = kette.findIndex((b) => ziel.sequenz.schritte.includes(b))
   if (imZiel < 0) return p
-  // Liegt auf dem Weg vom Zielabschnitt zur Entscheidung eine nebenläufige Umgebung (auch als Block im Zielabschnitt selbst),
-  // wäre der Rücksprung eine Verklemmung; liegt dort ein Rahmen, querte er dessen Grenze.
-  if (ent.kette.slice(imZiel).some(gliedNebenlaeufig) || kette.slice(imZiel, -1).some(istRahmen)) return p
+  // Liegt auf dem Weg vom Zielabschnitt zur Quelle eine nebenläufige Umgebung (auch als Block im Zielabschnitt selbst),
+  // wäre der Rücksprung eine Verklemmung; liegt dort ein Rahmen, querte er dessen Grenze. Der Ausnahmeweg einer
+  // Unterbrechung liegt neben dem Schritt, also außerhalb seines Rahmens.
+  if (ent.kette.slice(imZiel).some((g) => gliedNebenlaeufig(g) || gliedRahmen(g))) return p
   const i = ziel.index
   const j = ziel.sequenz.schritte.indexOf(kette[imZiel])
   if (j < i) return p
@@ -496,26 +560,30 @@ export function setzeRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id, zi
     bereichId = bereich.id
     q = ersetzeBereich(p, ziel.sequenz.id, i, j - i + 1, [bereich])
   }
-  q = aendereBlock(q, entscheidungId, (b) =>
-    b.typ === 'entscheidung' ? { ...b, zweige: b.zweige.map((z) => (z.id === zweigId ? { ...z, ende: null, zurueckZu: bereichId } : z)) } : b,
-  )
+  q = setzeAusgang(q, quelleId, ausgangId, { ende: null, zurueckZu: bereichId })
   return normalisiere(q)
 }
 
-/** Entfernt den Rücksprung eines Ausgangs; ein danach leerer Bereich wird aufgelöst. */
-export function entferneRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id): Prozess {
-  return normalisiere(
-    aendereBlock(p, entscheidungId, (b) =>
-      b.typ === 'entscheidung' ? { ...b, zweige: b.zweige.map((z) => (z.id === zweigId ? { ...z, zurueckZu: null } : z)) } : b,
-    ),
-  )
+/** Setzt Ende und Rücksprung eines Ausgangs (Entscheidung) bzw. einer Unterbrechung (Schritt). */
+function setzeAusgang(p: Prozess, quelleId: Id, ausgangId: Id, werte: { ende?: string | null; zurueckZu?: Id | null }): Prozess {
+  return aendereBlock(p, quelleId, (b) => {
+    if (b.typ === 'entscheidung') return { ...b, zweige: b.zweige.map((z) => (z.id === ausgangId ? { ...z, ...werte } : z)) }
+    if (istUnterbrechbar(b) && b.unterbrechungen) return { ...b, unterbrechungen: b.unterbrechungen.map((u) => (u.id === ausgangId ? { ...u, ...werte } : u)) }
+    return b
+  })
 }
 
-/** Alle Ziele, auf die Ausgänge zurückspringen. */
+/** Entfernt den Rücksprung eines Ausgangs oder einer Unterbrechung; ein danach leerer Bereich wird aufgelöst. */
+export function entferneRuecksprung(p: Prozess, quelleId: Id, ausgangId: Id): Prozess {
+  return normalisiere(setzeAusgang(p, quelleId, ausgangId, { zurueckZu: null }))
+}
+
+/** Alle Ziele, auf die Ausgänge und Unterbrechungen zurückspringen. */
 function ruecksprungZielIds(p: Prozess): Set<Id> {
   const ziele = new Set<Id>()
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ === 'entscheidung') for (const z of block.zweige) if (z.zurueckZu) ziele.add(z.zurueckZu)
+    for (const u of unterbrechungenVon(block)) if (u.zurueckZu) ziele.add(u.zurueckZu)
   }
   return ziele
 }
@@ -537,16 +605,17 @@ export function normalisiere(p: Prozess): Prozess {
   for (const { block } of durchlaufe(aufgeloest.ablauf)) if (block.typ === 'wiederholung' && block.modus === 'ruecksprung') bereiche.add(block.id)
   const verwaist = [...ziele].filter((id) => !bereiche.has(id))
   if (verwaist.length === 0) return geaendert ? aufgeloest : p
+  const ohne = <T extends { zurueckZu: Id | null }>(x: T): T => (x.zurueckZu && verwaist.includes(x.zurueckZu) ? { ...x, zurueckZu: null } : x)
   return abbildeAblauf(aufgeloest, (schritte) =>
-    schritte.map((b) =>
-      b.typ === 'entscheidung' && b.zweige.some((z) => z.zurueckZu && verwaist.includes(z.zurueckZu))
-        ? { ...b, zweige: b.zweige.map((z) => (z.zurueckZu && verwaist.includes(z.zurueckZu) ? { ...z, zurueckZu: null } : z)) }
-        : b,
-    ),
+    schritte.map((b) => {
+      if (b.typ === 'entscheidung' && b.zweige.some((z) => z.zurueckZu && verwaist.includes(z.zurueckZu))) return { ...b, zweige: b.zweige.map(ohne) }
+      if (istUnterbrechbar(b) && b.unterbrechungen?.some((u) => u.zurueckZu && verwaist.includes(u.zurueckZu))) return { ...b, unterbrechungen: b.unterbrechungen.map(ohne) }
+      return b
+    }),
   )
 }
 
-/** Verlässt der Ablauf den Block vorzeitig (Prozessende oder Rücksprung nach außen)? */
+/** Verlässt der Ablauf den Block vorzeitig (Prozessende oder Rücksprung nach außen), auch über eine Unterbrechung? */
 export function verlaesstBlock(b: Block): boolean {
   const innen = new Set<Id>()
   const sammle = (x: Block) => {
@@ -554,8 +623,10 @@ export function verlaesstBlock(b: Block): boolean {
     for (const s of kinderSequenzen(x)) s.schritte.forEach(sammle)
   }
   sammle(b)
+  const verlaesst = (a: { ende: string | null; zurueckZu: Id | null }) => a.ende !== null || (a.zurueckZu !== null && !innen.has(a.zurueckZu))
   const pruefe = (x: Block): boolean => {
-    if (x.typ === 'entscheidung' && x.zweige.some((z) => z.ende !== null || (z.zurueckZu !== null && !innen.has(z.zurueckZu)))) return true
+    if (x.typ === 'entscheidung' && x.zweige.some(verlaesst)) return true
+    if (unterbrechungenVon(x).some(verlaesst)) return true
     return kinderSequenzen(x).some((s) => s.schritte.some(pruefe))
   }
   return pruefe(b)
@@ -579,6 +650,9 @@ export function folgtEntscheidung(p: Prozess, f: Fundstelle): boolean {
   const besitzer = f.vorfahren[f.vorfahren.length - 1]
   if (!besitzer) return false
   if (besitzer.typ === 'wiederholung' && besitzer.modus === 'anteil') return true
+  // Am Ende eines Ausnahmewegs geht es nur bei „weiter“ hinter dem Schritt weiter; ein Nebenweg endet für sich.
+  const u = unterbrechungVon(besitzer, f.sequenz.id)
+  if (u && (!u.unterbrechend || u.ende !== null || u.zurueckZu !== null)) return false
   const ort = findeBlock(p, besitzer.id)
   return ort ? folgtEntscheidung(p, ort) : false
 }
@@ -632,7 +706,25 @@ export function ausgaengeSequenz(schritte: Block[]): Set<Ausgang> {
   return aus
 }
 
+/**
+ * Alle Wege aus einem Block, auch über seine Unterbrechungen: Ein
+ * unterbrechender Ausnahmeweg führt weiter, endet oder springt zurück;
+ * Nebenwege enden für sich und ändern nichts am Ablauf. Der normale Ausgang des
+ * Schritts zählt immer mit, auch wenn die Anteile zusammen 100 % ergeben
+ * (strukturell, ohne Anteile).
+ */
 export function ausgaengeBlock(b: Block): Set<Ausgang> {
+  const aus = ausgaengeOhneUnterbrechung(b)
+  for (const u of unterbrechungenVon(b)) {
+    if (!u.unterbrechend) continue
+    const a = ausgaengeSequenz(u.schritte)
+    vereinige(aus, a, 'weiter')
+    if (a.has('weiter')) aus.add(u.ende !== null ? 'ende' : u.zurueckZu !== null ? `rueck:${u.zurueckZu}` : 'weiter')
+  }
+  return aus
+}
+
+function ausgaengeOhneUnterbrechung(b: Block): Set<Ausgang> {
   switch (b.typ) {
     case 'aufgabe':
     case 'warten':
@@ -689,6 +781,7 @@ function ruecksprungVerweise(schritte: Block[]): { ziele: Set<Id>; bereiche: Set
   const bereiche = new Set<Id>()
   for (const { block } of durchlaufe({ id: '', schritte })) {
     if (block.typ === 'entscheidung') for (const z of block.zweige) if (z.zurueckZu) ziele.add(z.zurueckZu)
+    for (const u of unterbrechungenVon(block)) if (u.zurueckZu) ziele.add(u.zurueckZu)
     if (block.typ === 'wiederholung' && block.modus === 'ruecksprung') bereiche.add(block.id)
   }
   return { ziele, bereiche }
@@ -715,11 +808,111 @@ export function fasseZusammen(p: Prozess, sequenzId: Id, von: number, bis: numbe
   return ersetzeBereich(p, sequenzId, von, bis - von + 1, [abschnitt])
 }
 
-/** Löst einen Abschnitt auf: Seine Schritte stehen danach wieder direkt in der umgebenden Folge. */
+/**
+ * Löst einen Abschnitt auf: Seine Schritte stehen danach wieder direkt in der
+ * umgebenden Folge. Unterbrechungen des Abschnitts entfallen (die Oberfläche
+ * fragt vorher nach); Rücksprungbereiche, auf die dann nichts mehr zeigt, werden aufgelöst.
+ */
 export function loeseAbschnittAuf(p: Prozess, abschnittId: Id): Prozess {
   const f = findeBlock(p, abschnittId)
   if (!f || f.block.typ !== 'teilprozess') return p
-  return ersetzeBereich(p, f.sequenz.id, f.index, 1, f.block.koerper.schritte)
+  const q = ersetzeBereich(p, f.sequenz.id, f.index, 1, f.block.koerper.schritte)
+  return f.block.unterbrechungen?.length ? normalisiere(q) : q
+}
+
+// ---------------------------------------------------------------------------
+// Unterbrechungen
+
+/** Ändert die Liste der Unterbrechungen eines Schritts (Aufgabe, Abschnitt, für jedes Stück). */
+export function aendereUnterbrechungen(p: Prozess, blockId: Id, f: (liste: Unterbrechung[]) => Unterbrechung[]): Prozess {
+  return aendereBlock(p, blockId, (b) => {
+    if (!istUnterbrechbar(b)) return b
+    const neu = f(b.unterbrechungen ?? [])
+    if (neu.length > 0) return { ...b, unterbrechungen: neu }
+    // ohne Unterbrechungen fällt das Feld weg, damit ältere Dateien und neue gleich aussehen
+    const { unterbrechungen: _weg, ...ohne } = b
+    return ohne as typeof b
+  })
+}
+
+/** Entfernt eine Unterbrechung mit ihrem Ausnahmeweg; ein danach leerer Rücksprungbereich wird aufgelöst. */
+export function entferneUnterbrechung(p: Prozess, blockId: Id, unterbrechungId: Id): Prozess {
+  return normalisiere(aendereUnterbrechungen(p, blockId, (liste) => liste.filter((u) => u.id !== unterbrechungId)))
+}
+
+/**
+ * Hängt eine Unterbrechung an einen anderen Schritt um, z. B. von einer Aufgabe
+ * in „für jedes Stück“ an den ganzen Baustein („gilt für die ganze Liste“).
+ * Ein Rücksprung der Unterbrechung entfällt, denn sein Bereich gehört zum alten Schritt.
+ */
+export function verschiebeUnterbrechung(p: Prozess, vonId: Id, unterbrechungId: Id, nachId: Id): Prozess {
+  const von = findeBlock(p, vonId)?.block
+  const u = von ? unterbrechungVon(von, unterbrechungId) : null
+  const nach = findeBlock(p, nachId)?.block
+  if (!u || !nach || !istUnterbrechbar(nach)) return p
+  const ohne = aendereUnterbrechungen(p, vonId, (liste) => liste.filter((x) => x.id !== unterbrechungId))
+  return normalisiere(aendereUnterbrechungen(ohne, nachId, (liste) => [...liste, { ...u, zurueckZu: null }]))
+}
+
+/**
+ * „Gilt für mehrere Schritte“: fasst die Schritte `von` bis `bis` der Sequenz zu
+ * einem Abschnitt zusammen und hängt die Unterbrechung des Schritts an diesen
+ * Abschnitt. Der Schritt muss im Bereich liegen.
+ */
+export function unterbrechungFuerAbschnitt(p: Prozess, sequenzId: Id, von: number, bis: number, name: string, blockId: Id, unterbrechungId: Id, abschnittId: Id): Prozess {
+  const seq = findeSequenz(p, sequenzId)
+  const i = seq?.sequenz.schritte.findIndex((b) => b.id === blockId) ?? -1
+  if (i < von || i > bis) return p
+  const zusammen = fasseZusammen(p, sequenzId, von, bis, name, abschnittId)
+  if (zusammen === p) return p
+  return verschiebeUnterbrechung(zusammen, blockId, unterbrechungId, abschnittId)
+}
+
+/**
+ * Anteile der unterbrechenden Ereignisse eines Schritts, in den gültigen Bereich
+ * gezogen; ergeben sie zusammen mehr als 100 %, werden sie anteilig gekürzt
+ * (die Prüfung meldet das). `normal` ist der Rest: Der Schritt endet normal.
+ */
+export function unterbrechungsAnteile(b: Block): { normal: number; je: Map<Id, number> } {
+  const je = new Map<Id, number>()
+  let summe = 0
+  for (const u of unterbrechungenVon(b)) {
+    if (!u.unterbrechend) continue
+    const q = Number.isFinite(u.anteil) ? Math.min(1, Math.max(0, u.anteil)) : 0
+    je.set(u.id, q)
+    summe += q
+  }
+  if (summe > 1) for (const [id, q] of je) je.set(id, q / summe)
+  return { normal: Math.max(0, 1 - Math.min(1, summe)), je }
+}
+
+/** Wie oft ein Nebenweg je Ausführung läuft (≥ 0). */
+export function nebenwegAnzahl(u: Unterbrechung): number {
+  return Number.isFinite(u.anteil) ? Math.max(0, u.anteil) : 0
+}
+
+/**
+ * Zeitpunkt einer Unterbrechung ab Eingang beim Schritt: die Frist; bei einer
+ * Nachricht an einer Aufgabe mit Liegezeit L und Bearbeitung B nach dem
+ * angegebenen Zeitpunkt (vorher L/2, während der Arbeit L + B/2, unbekannt
+ * (L + B)/2). An einem Rahmen kommt eine Nachricht nach der Hälfte der Dauer
+ * des Durchlaufs: dann null.
+ */
+export function unterbrechungsZeit(b: Unterbrechbar, u: Unterbrechung): number | null {
+  if (u.art === 'zeit') return Math.max(0, Number.isFinite(u.fristMin) ? u.fristMin : 0)
+  if (b.typ !== 'aufgabe') return null
+  const l = Math.max(0, b.liegezeitMin)
+  const bearbeitung = Math.max(0, b.bearbeitungMin)
+  switch (u.zeitpunkt) {
+    case 'vorher':
+      return l / 2
+    case 'waehrend':
+      return l + bearbeitung / 2
+    case 'unbekannt':
+      return (l + bearbeitung) / 2
+    default:
+      return unerwartet(u.zeitpunkt)
+  }
 }
 
 /** Kann der Ablauf hinter diesem Block normal weiterlaufen? */

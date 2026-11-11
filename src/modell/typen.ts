@@ -83,12 +83,49 @@ export interface Aufgabe {
   nachrichtAn?: Id | null
   /** Wartet auf eine Nachricht dieses externen Teilnehmers. */
   nachrichtVon?: Id | null
+  /** Was während des Schritts dazwischenkommen kann (Randereignisse); fehlt = keine. */
+  unterbrechungen?: Unterbrechung[]
 }
 
 /** Eine Folge von Schritten. Der Hauptablauf und jeder Zweig sind Sequenzen. */
 export interface Sequenz {
   id: Id
   schritte: Block[]
+}
+
+/** Wann eine Nachricht, die eine Aufgabe unterbricht, meist kommt. */
+export type NachrichtZeitpunkt = 'vorher' | 'waehrend' | 'unbekannt'
+
+/**
+ * Unterbrechung eines Schritts (Aufgabe, Abschnitt, „für jedes Stück“): im
+ * BPMN ein Randereignis (Zeit oder Nachricht) mit Ausnahmeweg. Die Sequenz ist
+ * der Ausnahmeweg, wie bei `EntscheidungsZweig`.
+ *
+ * - **unterbrechend**: Die Arbeit am Schritt wird abgebrochen; das kommt in
+ *   einem festen Anteil der Ausführungen vor. Danach geht es hinter dem
+ *   Schritt weiter, springt zurück (`zurueckZu`) oder der Vorgang endet (`ende`).
+ * - **Nebenweg** (nicht unterbrechend): Der Schritt läuft weiter, der
+ *   Ausnahmeweg läuft im Schnitt `anteil`-mal je Ausführung nebenher und endet
+ *   für sich; er hat kein „Danach“ und verlängert den Vorgang nicht (Annahme).
+ */
+export interface Unterbrechung extends Sequenz {
+  /** z. B. „Kunde storniert“, „Frist abgelaufen“ */
+  bezeichnung: string
+  art: WarteArt
+  /** nur bei Nachricht: externer Absender, sonst null */
+  von: Id | null
+  /** true: Die Arbeit am Schritt wird abgebrochen. false: Nebenweg, der Schritt läuft weiter. */
+  unterbrechend: boolean
+  /** unterbrechend: Anteil der Ausführungen des Schritts (0–1). Nebenweg: wie oft je Ausführung (≥ 0, auch über 1). */
+  anteil: number
+  /** nur Zeit: Frist in Minuten ab Eingang beim Schritt (Beginn der Liegezeit bzw. des Rahmens) */
+  fristMin: number
+  /** nur Nachricht an einer Aufgabe: wann sie meist kommt */
+  zeitpunkt: NachrichtZeitpunkt
+  /** nur unterbrechend: Ergebnis, wenn der Vorgang danach endet */
+  ende: string | null
+  /** nur unterbrechend: Rücksprungbereich; `ende` und `zurueckZu` null = weiter hinter dem Schritt */
+  zurueckZu: Id | null
 }
 
 /** Ereignis am Anfang eines Ausgangs einer Ereignis-Entscheidung. */
@@ -216,6 +253,8 @@ export interface Teilprozess {
   /** Name des Abschnitts, z. B. „Ware versenden“ */
   name: string
   koerper: Sequenz
+  /** Was während des Abschnitts dazwischenkommen kann; fehlt = keine. */
+  unterbrechungen?: Unterbrechung[]
 }
 
 /** fest: immer etwa gleich viele Stücke; schwankt: die Zahl streut stark (geometrisch ab 1) */
@@ -242,10 +281,24 @@ export interface Mehrfach {
   /** Liegezeit einmal vor dem ersten Stück, in Minuten */
   liegezeitMin: number
   koerper: Sequenz
+  /** Was während der ganzen Liste dazwischenkommen kann; fehlt = keine. */
+  unterbrechungen?: Unterbrechung[]
 }
 
 export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten | Teilprozess | Mehrfach
 export type BlockTyp = Block['typ']
+
+/** Schritte, die Unterbrechungen haben können (Randereignisse im BPMN). */
+export type Unterbrechbar = Aufgabe | Teilprozess | Mehrfach
+
+export function istUnterbrechbar(b: Block): b is Unterbrechbar {
+  return b.typ === 'aufgabe' || b.typ === 'teilprozess' || b.typ === 'mehrfach'
+}
+
+/** Unterbrechungen eines Bausteins; leer, wenn er keine haben kann oder keine hat. */
+export function unterbrechungenVon(b: Block): Unterbrechung[] {
+  return istUnterbrechbar(b) ? (b.unterbrechungen ?? []) : []
+}
 
 /** Für erschöpfende Unterscheidungen: Der Übersetzer meldet jeden vergessenen Fall. */
 export function unerwartet(x: never): never {

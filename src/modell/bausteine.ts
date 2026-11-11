@@ -16,6 +16,7 @@ import {
   type Sequenz,
   type Teilnehmer,
   type Teilprozess,
+  type Unterbrechung,
   type Warten,
   type Wiederholung,
 } from './typen'
@@ -94,6 +95,28 @@ export function neuerTeilprozess(werte: Partial<Teilprozess> = {}): Teilprozess 
 /** Neuer Baustein „für jedes Stück einer Liste“: im Schnitt drei Stücke, immer etwa gleich viele, eine Person arbeitet sie der Reihe nach ab. */
 export function neuerMehrfach(werte: Partial<Mehrfach> = {}): Mehrfach {
   return { typ: 'mehrfach', id: neueId('mf'), name: '', anzahl: 3, streuung: 'fest', ausfuehrung: 'nacheinander', liegezeitMin: 0, koerper: neueSequenz(), ...werte }
+}
+
+/**
+ * Neue Unterbrechung eines Schritts: eine Nachricht, die die Arbeit in 10 % der
+ * Ausführungen abbricht, meist während der Arbeit; danach geht es hinter dem
+ * Schritt weiter. Die Frist (nur bei Art „Zeit“) steht auf einem Arbeitstag.
+ */
+export function neueUnterbrechung(werte: Partial<Unterbrechung> = {}): Unterbrechung {
+  return {
+    id: neueId('ub'),
+    schritte: [],
+    bezeichnung: '',
+    art: 'nachricht',
+    von: null,
+    unterbrechend: true,
+    anteil: 0.1,
+    fristMin: 480,
+    zeitpunkt: 'waehrend',
+    ende: null,
+    zurueckZu: null,
+    ...werte,
+  }
 }
 
 export function neueWiederholung(werte: Partial<Wiederholung> = {}): Wiederholung {

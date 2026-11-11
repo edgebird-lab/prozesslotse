@@ -28,6 +28,20 @@ function pruefeSequenz(x: unknown, wo: string): asserts x is Sequenz {
   x.schritte.forEach((b, i) => pruefeBlock(b, `${wo}, Schritt ${i + 1}`))
 }
 
+/** Unterbrechungen eines Schritts (seit Format 4, optional): je ein Ausnahmeweg mit Art, Anteil, Frist und „Danach“. */
+function pruefeUnterbrechungen(x: Obj, wo: string): void {
+  if (x.unterbrechungen === undefined) return
+  fordere(Array.isArray(x.unterbrechungen), `${wo}: Unterbrechungen ungültig.`)
+  x.unterbrechungen.forEach((u, i) => {
+    const hier = `${wo}, Unterbrechung ${i + 1}`
+    pruefeSequenz(u, hier)
+    const v = u as unknown as Obj
+    fordere(istText(v.bezeichnung) && (v.art === 'zeit' || v.art === 'nachricht') && typeof v.unterbrechend === 'boolean' && istZahl(v.anteil) && istZahl(v.fristMin), `${hier}: Angaben fehlen.`)
+    fordere(v.zeitpunkt === 'vorher' || v.zeitpunkt === 'waehrend' || v.zeitpunkt === 'unbekannt', `${hier}: unbekannter Zeitpunkt.`)
+    fordere((v.von === null || istText(v.von)) && (v.ende === null || istText(v.ende)) && (v.zurueckZu === null || istText(v.zurueckZu)), `${hier}: Verweis ungültig.`)
+  })
+}
+
 function pruefeBlock(x: unknown, wo: string): asserts x is Block {
   fordere(istObj(x) && istText(x.id) && istText(x.typ), `${wo}: kein gültiger Baustein.`)
   switch (x.typ) {
@@ -37,6 +51,7 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       fordere(istZahl(x.freigabeQuote), `${wo}: Freigabequote fehlt.`)
       fordere(x.uebertragung === null || (istObj(x.uebertragung) && istZahl(x.uebertragung.minuten)), `${wo}: Übertragung ungültig.`)
       fordere(istVerweis(x.nachrichtAn) && istVerweis(x.nachrichtVon), `${wo}: Nachrichtenverweis ungültig.`)
+      pruefeUnterbrechungen(x, wo)
       return
     case 'entscheidung':
       fordere(istText(x.frage) && Array.isArray(x.zweige) && (x.art === 'daten' || x.art === 'ereignis'), `${wo}: Entscheidung unvollständig.`)
@@ -67,12 +82,14 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
     case 'teilprozess':
       fordere(istText(x.name), `${wo}: Abschnitt ohne Namensfeld.`)
       pruefeSequenz(x.koerper, `${wo}, Abschnitt`)
+      pruefeUnterbrechungen(x, wo)
       return
     case 'mehrfach':
       fordere(istText(x.name) && istZahl(x.anzahl) && istZahl(x.liegezeitMin), `${wo}: „Für jedes Stück“ unvollständig.`)
       fordere(x.streuung === 'fest' || x.streuung === 'schwankt', `${wo}: unbekannte Streuung der Anzahl.`)
       fordere(x.ausfuehrung === 'nacheinander' || x.ausfuehrung === 'gleichzeitig', `${wo}: unbekannte Ausführung von „Für jedes Stück“.`)
       pruefeSequenz(x.koerper, `${wo}, je Stück`)
+      pruefeUnterbrechungen(x, wo)
       return
     case 'wiederholung':
       fordere(istText(x.frage) && istZahl(x.anteilWiederholung) && (x.modus === 'anteil' || x.modus === 'ruecksprung'), `${wo}: Wiederholung unvollständig.`)
@@ -106,12 +123,18 @@ function pruefeProzess(x: unknown, wo: string): asserts x is Prozess {
 /**
  * Ein Absender („von“) gehört nur zu Nachrichten; ein Nachrichtenfluss darf nicht an
  * einem Zeit- oder Bedingungsereignis enden. Ältere Stände konnten ihn nach einem
- * Wechsel der Art behalten; er wird beim Laden entfernt.
+ * Wechsel der Art behalten; er wird beim Laden entfernt, auch bei Unterbrechungen.
  */
 function entferneFremdeAbsender(p: Prozess): void {
   if (p.ausloeser.art !== 'nachricht') p.ausloeser.von = null
   const sequenz = (schritte: Block[]) => {
     for (const b of schritte) {
+      if (b.typ === 'aufgabe' || b.typ === 'teilprozess' || b.typ === 'mehrfach') {
+        for (const u of b.unterbrechungen ?? []) {
+          if (u.art !== 'nachricht') u.von = null
+          sequenz(u.schritte)
+        }
+      }
       if (b.typ === 'warten' && b.art !== 'nachricht') b.von = null
       if (b.typ === 'entscheidung') {
         for (const z of b.zweige) {
