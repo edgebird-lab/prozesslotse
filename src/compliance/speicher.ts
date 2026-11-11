@@ -11,7 +11,7 @@
 import { alleAufgaben } from '../modell/operationen'
 import { Formatfehler, leseProjekt } from '../modell/speicher'
 import type { Id, Prozess } from '../modell/typen'
-import { istIsoDatum } from './datum'
+import { istIsoDatum, istPlausiblesDatum } from './datum'
 import {
   ABLAGEFORMEN,
   AUFBEWAHRUNGSARTEN,
@@ -45,7 +45,10 @@ type Obj = Record<string, unknown>
 const istObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x)
 
 function fehler(pfad: string, was: string): never {
-  throw new Formatfehler(`Compliance-Angaben: ‚${pfad}‘ ${was}.`)
+  const e = new Formatfehler(`Compliance-Angaben: ‚${pfad}‘ ${was}.`)
+  e.feld = pfad
+  e.was = was
+  throw e
 }
 
 function obj(x: unknown, pfad: string): Obj {
@@ -75,6 +78,8 @@ function datum(o: Obj, feld: string, pfad: string, mitNull = true): void {
   const x = o[feld]
   if (mitNull && x === null) return
   if (typeof x !== 'string' || !istIsoDatum(x)) fehler(`${pfad}.${feld}`, 'ist kein gültiges Datum')
+  // Wie bei der Eingabe: Mit Jahren wie 9995 rechnen die Fristen fünfstellige Jahre aus, die sich nicht darstellen lassen
+  if (!istPlausiblesDatum(x)) fehler(`${pfad}.${feld}`, 'liegt nicht zwischen 1900 und 2199')
 }
 
 function wert<T extends string>(o: Obj, feld: string, katalog: readonly Eintrag<T>[], pfad: string, mitNull = false): void {
@@ -242,7 +247,7 @@ function pruefeEingefrorenenProzess(x: unknown, pfad: string): void {
     const formatVersion = istObj(x) ? x.formatVersion : undefined
     leseProjekt({ formatVersion, ist: x, soll: null, massnahmen: [], verworfen: [] })
   } catch (e) {
-    if (e instanceof Formatfehler) throw new Formatfehler(`Compliance-Angaben: ‚${pfad}‘ ist kein gültiger Prozess (${e.message.replace(/^Ist-Prozess:?\s*/, '')})`)
+    if (e instanceof Formatfehler) fehler(pfad, `ist kein gültiger Prozess (${e.message.replace(/^Ist-Prozess[:,]?\s*/, '').replace(/\.$/, '')})`)
     throw e
   }
 }
@@ -263,6 +268,8 @@ function pruefeVersionen(x: unknown[]): void {
     if ((o.gueltigAb as string) <= letztesGueltigAb) fehler(`${p}.gueltigAb`, 'liegt nicht nach dem der vorigen Version')
     letztesGueltigAb = o.gueltigAb as string
     textListe(o, 'geaenderteKapitel', p)
+    // Kleinigkeit, still behoben: eine Prüfsumme in Großbuchstaben (z. B. von Hand übertragen) wird klein geschrieben
+    if (/^[0-9a-f]{64}$/i.test(o.pruefsumme as string)) o.pruefsumme = (o.pruefsumme as string).toLowerCase()
     if (!/^[0-9a-f]{64}$/.test(o.pruefsumme as string)) fehler(`${p}.pruefsumme`, 'ist keine SHA-256-Prüfsumme')
     pruefeEingefrorenenProzess(o.prozess, `${p}.prozess`)
     pruefeDokument(o.verfahrensdoku, `${p}.verfahrensdoku`, 'verfahrensdokumentation')

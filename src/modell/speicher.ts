@@ -11,7 +11,28 @@ const DOKUMENT_SCHLUESSEL = 'prozesslotse:dokument'
 /** Freigegebene Versionen der Compliance-Doku liegen getrennt, damit nicht jeder Tastendruck sie neu schreibt. */
 const VERSIONEN_SCHLUESSEL = 'prozesslotse:versionen'
 
-export class Formatfehler extends Error {}
+export class Formatfehler extends Error {
+  /** Feld, an dem die Prüfung scheiterte, z. B. „systeme.med_erp.seit“ (nur bei Compliance-Angaben gesetzt) */
+  feld?: string
+  /** Was an dem Feld nicht stimmt, z. B. „ist kein gültiges Datum“ */
+  was?: string
+}
+
+/**
+ * Nur der Compliance-Teil einer sonst gültigen Datei ist fehlerhaft. `ohneCompliance`
+ * ist das geprüfte Projekt ohne diesen Teil; `detail` nennt Feld und Fehler für Meldungen.
+ */
+export class ComplianceFormatfehler extends Formatfehler {
+  readonly detail: string
+  readonly ohneCompliance: Projekt
+  constructor(ursache: Formatfehler, ohneCompliance: Projekt) {
+    super(ursache.message)
+    this.feld = ursache.feld
+    this.was = ursache.was
+    this.detail = ursache.feld ? `${ursache.feld}: ${ursache.was}` : ursache.message.replace(/\.$/, '')
+    this.ohneCompliance = ohneCompliance
+  }
+}
 
 type Obj = Record<string, unknown>
 
@@ -132,7 +153,16 @@ export function leseProjekt(daten: unknown): Projekt {
   if (daten.soll !== null) pruefeProzess(daten.soll, 'Soll-Prozess')
   fordere(Array.isArray(daten.massnahmen) && Array.isArray(daten.verworfen), 'Maßnahmenliste fehlt.')
   // optional; ältere Dateien haben keine Compliance-Angaben und laden unverändert
-  if (daten.compliance !== undefined) validiereCompliance(daten.compliance)
+  if (daten.compliance !== undefined) {
+    try {
+      validiereCompliance(daten.compliance)
+    } catch (e) {
+      if (!(e instanceof Formatfehler)) throw e
+      // Der Prozess ist gültig: Wer will, öffnet ihn ohne den fehlerhaften Teil
+      const { compliance: _weg, ...ohne } = daten
+      throw new ComplianceFormatfehler(e, ohne as unknown as Projekt)
+    }
+  }
   return daten as unknown as Projekt
 }
 

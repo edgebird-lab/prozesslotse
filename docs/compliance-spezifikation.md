@@ -558,6 +558,8 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 - `compliance` ist optional. Ältere Dateien laden unverändert; `compliance` bleibt dann `undefined`. Version 0.2.0 lädt Dateien mit `compliance` und behält das Feld beim Speichern, weil `leseProjekt` unbekannte Felder nicht entfernt.
 - `FORMAT_VERSION` ist schon 3 (Modellierung v3). Die Compliance-Doku braucht keinen eigenen Sprung, prüft aber `compliance.version === 1`.
 - `validiereCompliance(x)` in `src/compliance/speicher.ts` prüft beim Laden: Typen aller Felder, Werte aus den Katalogen, Datumsfelder als gültiges `JJJJ-MM-TT` oder `null`, Zahlen endlich und ganzzahlig (`personenMitDaten` ≥ 0, `aufbewahrungJahre` 0–30, `Frist.anzahl` 0–100). Ids in `unterlagen` und `ablageorte` sind eindeutig; `zugriffe`, `datenobjekte` und `ablageSpeicherIds` verweisen auf vorhandene Einträge. Fehler werfen `Formatfehler` mit Feldnamen, z. B. „Compliance-Angaben: ‚systeme.med_erp.seit‘ ist kein gültiges Datum.“
+- Datumsfelder liegen wie bei der Eingabe zwischen 1900 und 2199 („… liegt nicht zwischen 1900 und 2199.“); mit Jahren wie 9995 rechneten die Fristen sonst fünfstellige Jahre aus. Eine Prüfsumme in Großbuchstaben wird still klein geschrieben; das ist die einzige stille Korrektur.
+- Ist nur der Compliance-Teil fehlerhaft, wirft `leseProjekt` einen `ComplianceFormatfehler` (Unterklasse von `Formatfehler`) mit `detail` („Feld: Fehler“) und dem geprüften Projekt ohne Compliance-Teil. Beim Öffnen fragt die App: „Die Compliance-Angaben in „{Datei}“ sind beschädigt ({Feld}: {Fehler}). Nur den Prozess öffnen?“ „Nur den Prozess öffnen“ lädt ihn als neues, ungespeichertes Dokument ohne Pfad, damit Speichern die Originaldatei nie überschreibt, und meldet das. Die Datei bleibt unverändert.
 - Versionen: `nummer` aufsteigend ab 1, `gueltigAb` streng aufsteigend, Dokumente mit gültigen Abschnittsarten. Der eingefrorene `prozess` durchläuft dieselbe Migration und Strukturprüfung wie `ist` (private Funktion `pruefeProzess` in `src/modell/speicher.ts`, dafür exportieren). Damit gilt jede künftige Formatmigration auch für alte Versionen.
 - `bereinigeCompliance(c, ist)`: entfernt Einträge in `systeme`, `rollen`, `kontrollen` und `zugriffe`, deren Medium, Rolle oder Aufgabe im Ist-Prozess fehlt. `Ablageort.mediumId` wird dann `null`; Unterlagen und ihre Angaben bleiben. Der Reducer ruft sie nach jeder Aktion auf, die den Ist-Prozess ändert (`prozess`, `projekt`), im selben Rückgängig-Schritt. Änderungen am Soll-Prozess bereinigen nichts.
 - Ein Eintrag in `kontrollen` bleibt erhalten, wenn die Aufgabe nur ihre Art wechselt; die Generatoren lesen ihn dann nicht.
@@ -1061,7 +1063,7 @@ Das Programm ist seit Commit `90aaba0` umgesetzt (`src-tauri`, `src/plattform`).
 - **Vertraulich:** Die Angaben beschreiben Schwachstellen, etwa fehlende Sicherung oder fehlende Zwei-Faktor-Anmeldung. Hinweisband und README raten, Projektdatei und Ausgaben vertraulich zu behandeln.
 - **BPMN-Export:** Das eingebettete Projekt enthält heute alles, also auch Compliance-Angaben und Versionen. Wer das BPMN an Dritte gibt, gibt diese mit. Der Export bekommt deshalb die Option „ohne Compliance-Angaben“. Dann fehlt `compliance` nur in der Datei, das Projekt in der App bleibt unverändert.
 - **Browser-Speicher:** `localStorage` ist unverschlüsselt. Die App weist im Menüpunkt „Daten im Browser löschen“ auf gemeinsam genutzte Rechner hin.
-- **Laden:** `validiereCompliance` prüft jede Datei streng (4.4). Unbekannte Werte lösen einen `Formatfehler` aus, keinen Absturz.
+- **Laden:** `validiereCompliance` prüft jede Datei streng (4.4). Unbekannte Werte lösen einen `Formatfehler` aus, keinen Absturz. Ist nur der Compliance-Teil fehlerhaft, lässt sich der Prozess allein öffnen (4.4).
 - **Ausgabe:** React maskiert alle Texte, kein `dangerouslySetInnerHTML`. `docx` erzeugt XML mit Maskierung. Der BPMN-Export maskiert wie bisher mit `esc`.
 - **Integrität:** Die Prüfsumme erkennt Beschädigung, nicht Manipulation; der Text in der App sagt das.
 - **Rechtlicher Rahmen:** Hinweis A.0 auf Deckblatt, Fußzeile und Hinweisband; „Entwurf“ bis zur Freigabe; Rechtsstand in jedem Dokument; nirgends „GoBD-konform“, „DSGVO-konform“ oder „rechtssicher“ (Test in 9.6). Befunde sind als Hinweise formuliert („prüfen“, „klären“), nicht als Rechtsauskunft. Die README nennt Grenzen und schließt eine Gewähr für Vollständigkeit aus.
@@ -1235,6 +1237,9 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | `compliance.version = 2` | Formatfehler „Compliance-Angaben in Version 2 werden nicht unterstützt.“ |
 | `systeme.med_erp.seit = '2026-13-01'` | Formatfehler mit Feldnamen |
 | unbekannter Katalogwert | Formatfehler |
+| Compliance-Teil fehlerhaft, Prozess gültig | `ComplianceFormatfehler` mit `detail` „systeme.med_erp.seit: ist kein gültiges Datum“ und dem Projekt ohne `compliance` |
+| `versionen.0.gueltigAb = '9995-01-01'` | Formatfehler „… liegt nicht zwischen 1900 und 2199.“ |
+| Prüfsumme in Großbuchstaben | lädt, Prüfsumme klein geschrieben |
 | Unterlage löschen | Eintrag in `compliance.datenobjekte` und ihre Zugriffe entfernt; Rückgängig stellt beides wieder her |
 | Aufgabe `auf_rechnung` im Ist löschen | Zugriffe auf sie entfernt, Unterlage „Ausgangsrechnung“ bleibt; Rückgängig stellt alles wieder her |
 | Medium `med_papier` im Ist löschen | `dsp_ordner.mediumId` wird `null` |

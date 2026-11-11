@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, type Dispatch } from 'react'
 import { leseDatei } from '../bpmn/einbettung'
 import { bpmnFuerExport } from '../bpmn/export'
 import { neuerProzess, neuesProjekt } from '../modell/bausteine'
-import { alsJson, vergissImBrowser } from '../modell/speicher'
+import { alsJson, ComplianceFormatfehler, vergissImBrowser } from '../modell/speicher'
 import type { Projekt } from '../modell/typen'
 import { plattform, type Datei, type DateiArt } from '../plattform'
 import { istGeaendert, type Aktion, type Schritt, type Zustand } from '../zustand'
@@ -112,7 +112,7 @@ export function useDateiBefehle({ z, dispatch, melde, zeigeFremd }: Optionen): D
   const darfVerwerfen = useCallback(async () => (await entscheide()) !== 'abbrechen', [entscheide])
 
   const uebernimm = useCallback(
-    (d: Datei) => {
+    async (d: Datei) => {
       try {
         const g = leseDatei(d.inhalt)
         if (g.art === 'fremdesBpmn') {
@@ -125,15 +125,29 @@ export function useDateiBefehle({ z, dispatch, melde, zeigeFremd }: Optionen): D
         dispatch({ typ: 'laden', projekt: g.projekt, schritt: 'ablauf', ansicht: g.ansicht, dokument: ausBpmn ? {} : { pfad: d.pfad, name: d.name } })
         melde(`„${d.name}“ geladen.`)
       } catch (err) {
-        melde(`Datei nicht geladen: ${fehlertext(err)}`)
+        if (!(err instanceof ComplianceFormatfehler)) return melde(`Datei nicht geladen: ${fehlertext(err)}`)
+        // Nur der Compliance-Teil ist fehlerhaft: Der Prozess lässt sich trotzdem öffnen
+        const wahl = await frage({
+          titel: 'Compliance-Angaben beschädigt',
+          text: `Die Compliance-Angaben in „${d.name}“ sind beschädigt (${err.detail}). Nur den Prozess öffnen?`,
+          knoepfe: [
+            { wert: 'prozess', text: 'Nur den Prozess öffnen', art: 'haupt' },
+            { wert: 'abbrechen', text: 'Abbrechen' },
+          ],
+          abbrechen: 'abbrechen',
+        })
+        if (wahl !== 'prozess') return melde(`Datei nicht geladen: ${fehlertext(err)}`)
+        // Als neues, ungespeichertes Dokument ohne Pfad: Speichern überschreibt die Originaldatei nie
+        dispatch({ typ: 'laden', projekt: err.ohneCompliance, schritt: 'ablauf', dokument: { gespeichert: null } })
+        melde(`Aus „${d.name}“ ist nur der Prozess geöffnet, als neues Dokument ohne Compliance-Angaben. Die Datei bleibt unverändert.`)
       }
     },
-    [dispatch, melde, zeigeFremd],
+    [dispatch, melde, zeigeFremd, frage],
   )
 
   const oeffneDatei = useCallback(
     async (d: Datei) => {
-      if (await darfVerwerfen()) uebernimm(d)
+      if (await darfVerwerfen()) await uebernimm(d)
     },
     [darfVerwerfen, uebernimm],
   )
@@ -142,7 +156,7 @@ export function useDateiBefehle({ z, dispatch, melde, zeigeFremd }: Optionen): D
     if (!(await darfVerwerfen())) return
     try {
       const d = await plattform.oeffnen()
-      if (d) uebernimm(d)
+      if (d) await uebernimm(d)
     } catch (err) {
       melde(`Datei nicht geladen: ${fehlertext(err)}`)
     }
@@ -152,7 +166,7 @@ export function useDateiBefehle({ z, dispatch, melde, zeigeFremd }: Optionen): D
     async (pfad: string) => {
       if (!(await darfVerwerfen())) return
       try {
-        uebernimm(await plattform.oeffneZuletzt(pfad))
+        await uebernimm(await plattform.oeffneZuletzt(pfad))
       } catch (err) {
         melde(`Datei nicht geladen: ${fehlertext(err)}`)
       }
