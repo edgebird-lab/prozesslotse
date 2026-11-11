@@ -701,6 +701,8 @@ Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem 
 - Teilschritte, Tabs und Dialog sind per Tastatur bedienbar; der Dialog hält den Fokus und schließt mit Escape.
 - Hell- und Dunkelmodus nutzen die bestehenden Farbvariablen; der Druck ist immer hell (bestehende Druckregeln).
 - axe meldet in keinem Teilschritt schwere oder kritische Befunde, hell wie dunkel.
+- Wiederholte Knöpfe nennen ihr Objekt im zugänglichen Namen; er beginnt mit dem sichtbaren Text (WCAG 2.5.3), z. B. „Beheben: Schutzmaßnahmen fehlen – Verschlüsselung“, „Angaben bearbeiten: Tourenliste“, „DOCX: Version 1.0, Verfahrensdokumentation als Word-Datei“.
+- Wiederholte Kontaktfelder (Datenschutzbeauftragter, gemeinsam Verantwortlicher, Vertreter) stehen in einem `fieldset` mit Legende „Kontakt: {wer}“ (für Screenreader).
 
 ## 6. Regeln, Berechnungen und Prüfungen
 
@@ -1254,7 +1256,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 3. Version freigeben: Liste zeigt „1.0 · gültig ab 11.11.2026“. Im Schritt „Ablauf“ eine Aufgabe umbenennen: „Lücken“ zeigt V2 mit „Seit Version 1.0 geändert“.
 4. „Als Word-Datei“: Download mit Namen `…-verfahrensdokumentation-v1-0.docx`, größer als 5 KB.
 5. Druckansicht (`emulateMedia print`): Hinweis sichtbar, Teilschritt-Leiste unsichtbar.
-6. axe in allen acht Teilschritten und im Freigabe-Dialog, hell und dunkel: keine schweren oder kritischen Befunde.
+6. axe in allen acht Teilschritten und im Freigabe-Dialog, hell und dunkel, sowie nach einer Freigabe (Versionsliste): keine schweren oder kritischen Befunde.
 7. Tastatur: Teilschritte, Chips und Dialog vollständig ohne Maus bedienbar.
 8. „Verbessern“: Vorschlag „Freigabe „Rechnung freigeben“ streichen“ zeigt den Hinweis auf die dokumentierte Kontrolle.
 

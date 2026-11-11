@@ -254,7 +254,8 @@ function Versionsliste({ versionen, ansicht, onAnsehen, onDocx, art }: { version
                         <button type="button" className="knopf knopf-klein" aria-label={`Version ${v.bezeichnung} ansehen`} onClick={() => onAnsehen(v.nummer)}>
                           Ansehen
                         </button>
-                        <button type="button" className="knopf knopf-klein" aria-label={`Version ${v.bezeichnung} als Word-Datei (${art === 'verfahrensdokumentation' ? 'Verfahrensdokumentation' : 'Verarbeitungsverzeichnis'})`} onClick={() => onDocx(v)}>
+                        {/* Der Name beginnt mit dem sichtbaren Wort, damit Sprachsteuerung („Klick DOCX“) den Knopf findet */}
+                        <button type="button" className="knopf knopf-klein" aria-label={`DOCX: Version ${v.bezeichnung}, ${art === 'verfahrensdokumentation' ? 'Verfahrensdokumentation' : 'Verarbeitungsverzeichnis'} als Word-Datei`} onClick={() => onDocx(v)}>
                           DOCX
                         </button>
                       </div>

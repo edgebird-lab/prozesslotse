@@ -59,11 +59,49 @@ test('Empfänger: keine Vorschläge, die schon Betroffene sind; Vorschläge mit 
   await expect(vorschlaege.getByRole('button', { name: '+ Kunde' })).toBeVisible()
 })
 
+test('nach einer Freigabe ohne schwere Barrieren (DOCX-Knopf der Versionsliste)', async ({ page }) => {
+  await start(page)
+  await freigeben(page)
+  const ergebnis = await new AxeBuilder({ page }).exclude('.djs-container').analyze()
+  const schwer = ergebnis.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  expect(schwer.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
+  await expect(page.getByRole('button', { name: 'DOCX: Version 1.0, Verfahrensdokumentation als Word-Datei' })).toBeVisible()
+})
+
 test('„Schutzmaßnahmen“ ohne Sprung in der Überschriftenfolge', async ({ page }) => {
   await start(page)
   await teil(page, 'Schutzmaßnahmen').click()
   const ergebnis = await new AxeBuilder({ page }).exclude('.djs-container').withRules(['heading-order']).analyze()
   expect(ergebnis.violations.map((v) => v.nodes.map((n) => n.target.join(' ')).join(', '))).toEqual([])
+})
+
+test('Kontaktfelder stehen in benannten Gruppen', async ({ page }) => {
+  await start(page)
+  await page.getByRole('group', { name: 'Ist ein Datenschutzbeauftragter benannt?' }).locator('label', { hasText: 'Ja' }).click()
+  const dsb = page.getByRole('group', { name: 'Kontakt: Datenschutzbeauftragter' })
+  await expect(dsb.getByRole('textbox', { name: 'Straße und Hausnummer' })).toBeVisible()
+  await expect(dsb.getByRole('textbox', { name: 'E-Mail' })).toBeVisible()
+})
+
+test('„Beheben“-Knöpfe nennen ihr Objekt', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-11T10:00:00'))
+  await page.goto('/')
+  await page.getByRole('button', { name: /Beispiel „Onlinebestellung“/ }).click()
+  await schritt(page, 'Dokumentieren').click()
+  await teil(page, 'Lücken').click()
+  const namen = await page.getByRole('button', { name: /^Beheben/ }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? e.textContent ?? ''))
+  expect(namen.length).toBeGreaterThan(10)
+  expect(new Set(namen).size, namen.join('\n')).toBe(namen.length)
+  expect(namen).toContain('Beheben: Schutzmaßnahmen fehlen – Verschlüsselung')
+})
+
+test('Karten der Unterlagen: Umschalter nennen die Unterlage', async ({ page }) => {
+  await start(page)
+  await teil(page, 'Belege und Daten').click()
+  const umschalter = page.locator('.karte-umschalter')
+  const karten = await umschalter.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))
+  expect(new Set(karten).size).toBe(karten.length)
+  await expect(page.getByRole('button', { name: 'Angaben bearbeiten: Tourenliste' })).toBeVisible()
 })
 
 test('Texte erklären Fachbegriffe und Abkürzungen', async ({ page }) => {

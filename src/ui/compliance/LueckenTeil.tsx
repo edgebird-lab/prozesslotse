@@ -3,9 +3,10 @@ import type { ComplianceBefund } from '../../compliance/typen'
 import { SCHWERE_TEXT, zaehle } from '../befundtext'
 import { StatusSymbol } from '../schritte/PruefenSchritt'
 import { useCompliance } from './analyse'
+import { behebenName } from './beheben'
 
 export function LueckenTeil({ onBeheben }: { onBeheben: (b: ComplianceBefund) => void }) {
-  const { befunde } = useCompliance()
+  const { befunde, k } = useCompliance()
   const gruppen = TEILSCHRITTE.filter((t) => t.id !== 'luecken')
     .map((t) => ({ t, liste: befunde.filter((b) => b.teilschritt === t.id) }))
     .filter((g) => g.liste.length > 0)
@@ -33,7 +34,7 @@ export function LueckenTeil({ onBeheben }: { onBeheben: (b: ComplianceBefund) =>
                   <p>{b.text}</p>
                   {b.quelle && <small className="leise">Quelle: {b.quelle}</small>}
                 </div>
-                <button type="button" className="knopf knopf-klein" aria-label={`Beheben: ${b.titel}`} onClick={() => onBeheben(b)}>
+                <button type="button" className="knopf knopf-klein" aria-label={behebenName(b, k)} onClick={() => onBeheben(b)}>
                   Beheben
                 </button>
               </li>

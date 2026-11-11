@@ -11,8 +11,10 @@ import { CFeld, DatumFeld, JaNeinOffen, KatalogAuswahl, KatalogListe, OptionaleZ
 
 function KontaktFelder({ kontakt, onAendern, wer }: { kontakt: Kontakt; onAendern: (k: Kontakt, feld: string) => void; wer: string }) {
   const anschrift = (werte: Partial<Anschrift>, feld: string) => onAendern({ ...kontakt, anschrift: { ...kontakt.anschrift, ...werte } }, feld)
+  // Eigene Gruppe, damit sich „Straße und Hausnummer“ usw. von den Firmenfeldern unterscheiden lassen
   return (
-    <div className="eingerueckt felder">
+    <fieldset className="eingerueckt felder">
+      <legend className="sr">Kontakt: {wer}</legend>
       <TextFeld label={`Name (${wer})`} wert={kontakt.name} onAendern={(name) => onAendern({ ...kontakt, name }, 'name')} />
       <TextFeld label="Straße und Hausnummer" wert={kontakt.anschrift.strasse} onAendern={(strasse) => anschrift({ strasse }, 'strasse')} />
       <div className="feldreihe">
@@ -23,7 +25,7 @@ function KontaktFelder({ kontakt, onAendern, wer }: { kontakt: Kontakt; onAender
         <TextFeld label="Telefon" typ="tel" wert={kontakt.telefon} onAendern={(telefon) => onAendern({ ...kontakt, telefon }, 'telefon')} />
         <TextFeld label="E-Mail" typ="email" wert={kontakt.email} onAendern={(email) => onAendern({ ...kontakt, email }, 'email')} />
       </div>
-    </div>
+    </fieldset>
   )
 }
 

@@ -202,7 +202,14 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
       <p className="leise klein">
         {zusammenfassung(d)} · entsteht in {schritteText(k, erst)} · genutzt in {schritteText(k, nutz)}
       </p>
-      <button type="button" className="knopf knopf-klein karte-umschalter" aria-expanded={offen} aria-controls={koerperId} onClick={() => onOffen(!offen)}>
+      <button
+        type="button"
+        className="knopf knopf-klein karte-umschalter"
+        aria-label={`${offen ? 'Angaben zuklappen' : 'Angaben bearbeiten'}: ${name}`}
+        aria-expanded={offen}
+        aria-controls={koerperId}
+        onClick={() => onOffen(!offen)}
+      >
         {offen ? 'Angaben zuklappen' : 'Angaben bearbeiten'}
       </button>
       {offen && (
