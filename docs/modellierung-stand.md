@@ -23,7 +23,7 @@
 
 ## Schritt 1 – Teilprozess, mit den gemeinsamen Grundlagen
 
-Fertig am 2026-11-11, Commit „Abschnitt mit Namen (aufgeklappter Teilprozess), Dateiformat 4“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 1)“.
+Fertig am 2026-11-11, Commit 37363b9 „Abschnitt mit Namen (aufgeklappter Teilprozess), Dateiformat 4“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 1)“.
 
 - [x] `FORMAT_VERSION = 4`, Migration 3 → 4 (`Parallel.art = 'alle'`), Test mit einer Format-3-Datei (gleiches Projekt, gleiche Kennzahlen, BPMN beider Beispiele per Prüfsumme gleich dem Stand von Format 3)
 - [x] Typen `Teilprozess`, `ParallelArt = 'alle'`; `neuerTeilprozess`; `pruefeBlock`
@@ -105,4 +105,4 @@ Hinweise für Schritt 2 und später:
 | Stand | Unit-Tests | Browsertests |
 | --- | --- | --- |
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
-| Schritt 1, Abschnitt | 151 in 18 Dateien | 19 |
+| Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
