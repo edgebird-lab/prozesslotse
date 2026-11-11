@@ -317,7 +317,8 @@ describe('Allgemein', () => {
     for (const d of [...Object.values(dokumente()), v.verfahrensdoku, v.verzeichnis]) {
       expect(d.rechtsstand).toBe(RECHTSSTAND)
       const hinweis = d.abschnitte.find((a) => a.art === 'hinweis')
-      expect(hinweis && 'text' in hinweis ? hinweis.text : '').toMatch(/^Vorlage, erstellt mit dem Prozesslotsen am .*Rechtsstand 11\.11\.2026\./)
+      // Entwurf: Vorlage zur Prüfung; freigegeben: Verantwortung beim Unternehmen (recht-5, freigabe-vorlage.test.ts)
+      expect(hinweis && 'text' in hinweis ? hinweis.text : '').toMatch(/^(Vorlage, erstellt mit dem Prozesslotsen am |Aus einer Vorlage mit dem Prozesslotsen erstellt; ).*Rechtsstand 11\.11\.2026\./)
     }
     expect(v.verfahrensdoku.versionText).toBe('1.0')
     expect(v.verfahrensdoku.abschnitte[0]).toEqual({ art: 'absatz', text: 'Version 1.0 · gültig ab 11.11.2026' })

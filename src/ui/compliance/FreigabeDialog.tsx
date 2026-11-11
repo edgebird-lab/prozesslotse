@@ -145,6 +145,19 @@ export function FreigabeDialog({
           }
           onAendern={(aenderung) => setE({ ...e, aenderung })}
         />
+        <div className="feldreihe">
+          <TextFeld
+            label="Fachlich geprüft von"
+            id={id('geprueftVon')}
+            wert={e.geprueftVon ?? ''}
+            platzhalter="z. B. Steuerberatung Muster"
+            onAendern={(geprueftVon) => setE({ ...e, geprueftVon })}
+          />
+          <CFeld label="Geprüft am" id={id('geprueftAm')}>
+            {(fid) => <DatumEingabe id={fid} wert={e.geprueftAm ?? null} onAendern={(geprueftAm) => setE({ ...e, geprueftAm })} />}
+          </CFeld>
+        </div>
+        <p className="feld-hilfe">Optional. Wer die Fassung vor der Freigabe fachlich geprüft hat, steht auf dem Deckblatt und in der Änderungshistorie.</p>
         <p>
           Freigegeben am: <strong>{formatiereDatum(heute)}</strong>
         </p>

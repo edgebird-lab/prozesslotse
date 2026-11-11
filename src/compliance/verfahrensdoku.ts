@@ -55,6 +55,7 @@ import {
   GLOSSAR,
   GRUNDLAGEN,
   HISTORIE,
+  geprueftText,
   hinweisVerfahrensdoku,
   iks,
   KRITERIEN,
@@ -84,6 +85,11 @@ export function firmenName(c: ComplianceProjekt): string {
 export function anschriftText(a: { strasse: string; plz: string; ort: string }): string {
   const ort = [a.plz.trim(), a.ort.trim()].filter(Boolean).join(' ')
   return [a.strasse.trim(), ort].filter(Boolean).join(', ') || 'offen'
+}
+
+/** Erster Buchstabe groß, für Sätze aus Satzteilen wie „fachlich geprüft von …“ */
+export function satzAnfang(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 /** Zeile für das Deckblatt: „Version 1.0 · gültig ab 11.11.2026“ oder „Entwurf · Stand 11.11.2026“ */
@@ -129,9 +135,10 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   const liste = (punkte: string[]) => a.push({ art: 'liste', punkte })
   const tabelle = (kopf: string[], zeilen: string[][]) => a.push({ art: 'tabelle', kopf, zeilen })
 
-  // Deckblatt
+  // Deckblatt; eine freigegebene Fassung trägt statt des Vorlagenhinweises die Verantwortung des Unternehmens (recht-5)
   absatz(versionsZeile(kx))
-  a.push({ art: 'hinweis', text: hinweisVerfahrensdoku(name, kx.heute, RECHTSSTAND) })
+  if (kx.version?.fachlichGeprueft) absatz(`${satzAnfang(geprueftText(kx.version.fachlichGeprueft))}.`)
+  a.push({ art: 'hinweis', text: hinweisVerfahrensdoku(name, kx.heute, RECHTSSTAND, kx.version !== null) })
 
   // 1
   h(1, '1', 'Vorbemerkungen zur Verfahrensdokumentation')
@@ -443,7 +450,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
           v.bezeichnung,
           formatiereDatum(v.gueltigAb),
           rueckzug ? `zurückgezogen am ${formatiereDatum(rueckzug.am)}` : bis ? formatiereDatum(bis) : 'laufend',
-          `${formatiereDatum(v.freigegebenAm)}, ${v.freigegebenVon.trim() || 'offen'}`,
+          `${formatiereDatum(v.freigegebenAm)}, ${v.freigegebenVon.trim() || 'offen'}${v.fachlichGeprueft ? `; ${geprueftText(v.fachlichGeprueft)}` : ''}`,
           kapitelText(v.geaenderteKapitel, 'verfahrensdokumentation') || '–',
           rueckzug ? `${v.aenderung.trim() || '–'}; zurückgezogen: ${rueckzug.grund.trim()}` : v.aenderung.trim() || '–',
           rueckzug ? 'mit der Änderungshistorie' : aufbewahrenBisText(bis),

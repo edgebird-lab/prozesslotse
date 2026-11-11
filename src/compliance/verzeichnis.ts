@@ -8,9 +8,9 @@ import { hatPersonenbezug, kontext, mitDienstleister, rollenAngaben, rollenMitZu
 import { formatiereDatum } from './datum'
 import { istKaufmann, loeschText } from './fristen'
 import { AUSNAHMEN_ART9, BESONDERE_KATEGORIEN, BETROFFENE, DATENKATEGORIEN, GARANTIEN, RECHTSGRUNDLAGEN, RECHTSSTAND, STRAFRECHTLICH_TEXT, textVon, TOM_BEREICHE, type Eintrag } from './standard'
-import { hinweisVerzeichnis } from './textbausteine'
+import { geprueftText, hinweisVerzeichnis } from './textbausteine'
 import type { Abschnitt, ComplianceProjekt, Dokument, Kontakt, VersionKopf } from './typen'
-import { anschriftText, firmenName, prozessName, unterlagenNachEntstehung, versionsZeile, type DokuKontext } from './verfahrensdoku'
+import { anschriftText, firmenName, satzAnfang, prozessName, unterlagenNachEntstehung, versionsZeile, type DokuKontext } from './verfahrensdoku'
 
 function vereinigt<T extends string>(katalog: readonly Eintrag<T>[], werte: T[][]): Eintrag<T>[] {
   const alle = new Set(werte.flat())
@@ -34,9 +34,10 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
   const liste = (punkte: string[]) => a.push({ art: 'liste', punkte })
   const tabelle = (kopf: string[], zeilen: string[][]) => a.push({ art: 'tabelle', kopf, zeilen })
 
-  // Deckblatt
+  // Deckblatt; eine freigegebene Fassung trägt statt des Vorlagenhinweises die Verantwortung des Unternehmens (recht-5)
   absatz(versionsZeile(kx))
-  a.push({ art: 'hinweis', text: hinweisVerzeichnis(name, kx.heute, RECHTSSTAND) })
+  if (kx.version?.fachlichGeprueft) absatz(`${satzAnfang(geprueftText(kx.version.fachlichGeprueft))}.`)
+  a.push({ art: 'hinweis', text: hinweisVerzeichnis(name, kx.heute, RECHTSSTAND, kx.version !== null) })
 
   // A
   h(1, 'A', 'Angaben zum Verantwortlichen')
@@ -207,8 +208,11 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
   h(1, 'D', 'Änderungen')
   if (kx.historie.length > 0) {
     // Eine zurückgezogene Freigabe galt nie; sie bleibt mit Datum und Grund sichtbar
-    const aenderung = (x: VersionKopf) =>
-      x.zurueckgezogen ? `${x.aenderung.trim() || '–'}; zurückgezogen am ${formatiereDatum(x.zurueckgezogen.am)}: ${x.zurueckgezogen.grund.trim()}` : x.aenderung.trim() || '–'
+    const aenderung = (x: VersionKopf) => {
+      const text = x.aenderung.trim() || '–'
+      const geprueft = x.fachlichGeprueft ? `; ${geprueftText(x.fachlichGeprueft)}` : ''
+      return x.zurueckgezogen ? `${text}${geprueft}; zurückgezogen am ${formatiereDatum(x.zurueckgezogen.am)}: ${x.zurueckgezogen.grund.trim()}` : `${text}${geprueft}`
+    }
     tabelle(['Version', 'gültig ab', 'Änderung'], kx.historie.map((x) => [x.bezeichnung, formatiereDatum(x.gueltigAb), aenderung(x)]))
   } else absatz('Noch keine Version freigegeben.')
   tabelle(['Ort, Datum', 'Unterschrift des Verantwortlichen'], [['', '']])

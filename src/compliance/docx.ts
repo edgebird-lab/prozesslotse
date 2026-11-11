@@ -6,7 +6,7 @@
  */
 import { gliederung } from './dokument'
 import { textBreite } from './schriftbreite'
-import { FUSSZEILE_VORLAGE } from './textbausteine'
+import { fusszeile, istEntwurf } from './textbausteine'
 import type { Dokument } from './typen'
 import { festeLeerzeichen } from './typografie'
 
@@ -93,7 +93,6 @@ export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
   // Abstand vor und nach Überschriften; Ebene 1 beginnt ohnehin auf einer neuen Seite
   const abstand = { 1: { after: NACH }, 2: { before: 240, after: 80 }, 3: { before: 180, after: 60 } } as const
   const grau = { type: ShadingType.CLEAR, color: 'auto', fill: 'EDEDEB' }
-  const version = d.versionText === 'Entwurf' ? 'Entwurf' : `Version ${d.versionText}`
   /** Text mit geschützten Leerzeichen nach §, Abs., Nr. usw. */
   const lauf = (text: string) => new TextRun(festeLeerzeichen(text))
 
@@ -164,7 +163,7 @@ export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: `${FUSSZEILE_VORLAGE} · ${d.titel} · ${version} · Seite `, size: klein }),
+          new TextRun({ text: `${fusszeile(d)} · Seite `, size: klein }),
           new TextRun({ children: [PageNumber.CURRENT], size: klein }),
           new TextRun({ text: ' von ', size: klein }),
           new TextRun({ children: [PageNumber.TOTAL_PAGES], size: klein }),
@@ -178,7 +177,8 @@ export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
     // sonst „Un-named“, der Standard der Bibliothek
     lastModifiedBy: 'Prozesslotse',
     title: `${d.titel} – ${d.untertitel}`,
-    description: 'Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten.',
+    // Entwurf: Vorlage zur Prüfung; freigegeben: Verantwortung beim Unternehmen (recht-5)
+    description: istEntwurf(d) ? 'Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten.' : 'Aus einer Vorlage mit dem Prozesslotsen erstellt; die Verantwortung für den Inhalt liegt beim Unternehmen.',
     // Deutsch auch in einem anders eingestellten Word: Rechtschreibprüfung, Silbentrennung, Sprache im PDF
     styles: { default: { document: { run: { font: 'Calibri', size: 21, language: { value: 'de-DE' } } } } },
     hyphenation: silbentrennung ? { autoHyphenation: true } : undefined,
