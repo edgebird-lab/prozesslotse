@@ -1,5 +1,7 @@
 # Vollständige Modellierung (Dateiformat 3)
 
+> Umgesetzt sind daraus Externe und die ODER-Verzweigung. Für Teilprozess, „für jede Position“, Unterbrechungen, „weiter beim ersten“, beliebige Reihenfolge und Abbruch gilt das Design [Format 4](modellierung-v4.md); die Abschnitte dazu hier sind überholt.
+
 Stand 2026-11-11. Ziel: Kunden und andere Externe, ODER-Verzweigungen, „für jede Position“, Teilprozesse, Unterbrechungen laufender Arbeit, Abbruch, „weiter beim ersten von n“ und beliebige Reihenfolge abbildbar machen. Jede Form bekommt eine Frage im Assistenten, eine Rechnung in Kennzahlen und Simulation, ein BPMN-Element, Prüfregeln und Tests mit dem Tokenspiel. Das Modell bleibt blockstrukturiert; dadurch bleiben die Kennzahlen exakt.
 
 ## Überblick

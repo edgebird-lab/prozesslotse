@@ -73,7 +73,7 @@ Prüfungen und Freigaben werden nie mit anderen Schritten zusammengelegt (Vier-A
 | `src/plattform` | Öffnen, Speichern und Fenster: im Browser per Download, im Programm über den Rust-Teil |
 | `src-tauri` | Windows-Programm: Dateibefehle nur für vom Benutzer gewählte Pfade, Menü, PDF über WebView2, Installer |
 | `e2e` | Browsertests mit Playwright und axe |
-| `docs` | [Datenmodell](docs/datenmodell.md) mit Zeichenregeln, [Fragenkatalog](docs/fragenkatalog.md), [Modellierung, Format 3](docs/modellierung-v3.md), [Compliance-Doku](docs/compliance-spezifikation.md) |
+| `docs` | [Datenmodell](docs/datenmodell.md) mit Zeichenregeln, [Fragenkatalog](docs/fragenkatalog.md), [Modellierung, Format 3](docs/modellierung-v3.md), [Modellierung, Format 4](docs/modellierung-v4.md) mit [Stand](docs/modellierung-stand.md), [Compliance-Doku](docs/compliance-spezifikation.md) |
 
 Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur der Anzeige; Layout und BPMN-Export sind selbst geschrieben.
 
@@ -114,7 +114,7 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build
 - Wartezeiten durch Auslastung gehen nicht in die Durchlaufzeit ein; dafür stehen die geschätzten Liegezeiten. Das Warteschlangenmodell bewertet nur, ab wann eine Rolle zum Engpass wird. Es nimmt zufällig eintreffende Arbeit an und ist für geplante, gebündelte Arbeit eher zu vorsichtig.
 - Bei „Gleichzeitig“ gelten die Zweige als unabhängig. Arbeitet dieselbe Person in mehreren Zweigen, ist die berechnete Dauer zu niedrig; ein Hinweis meldet das.
 - Rücksprünge führen nur zu früheren Schritten derselben oder einer umgebenden Ebene, nie aus „Gleichzeitig“ heraus.
-- Noch nicht abbildbar (in Arbeit, siehe [Modellierung, Format 3](docs/modellierung-v3.md)): Mehrfachinstanzen („für jede Position“, nur als Wiederholung angenähert), Abbruch und Eskalation über Randereignisse, aufgeklappte Unterprozesse, „weiter beim ersten“ und „in beliebiger Reihenfolge“. Externe Beteiligte sind leere Pools (Black Box); ihr innerer Ablauf wird nicht modelliert.
+- Noch nicht abbildbar (in Arbeit, Design in [Modellierung, Format 4](docs/modellierung-v4.md)): Mehrfachinstanzen („für jede Position“, nur als Wiederholung angenähert), Abbruch und Eskalation über Randereignisse, aufgeklappte Unterprozesse, „weiter beim ersten“ und „in beliebiger Reihenfolge“. Externe Beteiligte sind leere Pools (Black Box); ihr innerer Ablauf wird nicht modelliert.
 
 ## Lizenz
 
