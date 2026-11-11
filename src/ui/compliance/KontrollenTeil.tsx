@@ -84,9 +84,12 @@ export function KontrollenTeil() {
       <section aria-labelledby="einweisung-titel" className="felder" id="ziel-einweisung" tabIndex={-1}>
         <h3 id="einweisung-titel">Einweisung</h3>
         <KatalogAuswahl label="Wie werden Beteiligte eingewiesen?" katalog={EINWEISUNGEN} wert={c.einweisung.turnus} spalten={3} onAendern={(turnus) => aendere((x) => ({ ...x, einweisung: { ...x.einweisung, turnus } }))} />
-        <Schalter an={c.einweisung.protokoll} onAendern={(protokoll) => aendere((x) => ({ ...x, einweisung: { ...x.einweisung, protokoll } }))}>
-          Die Einweisung wird schriftlich festgehalten
-        </Schalter>
+        {/* Bei „Keine“ gibt es nichts festzuhalten; der gespeicherte Wert bleibt, zählt aber im Dokument nicht */}
+        {c.einweisung.turnus !== 'keine' && (
+          <Schalter an={c.einweisung.protokoll} onAendern={(protokoll) => aendere((x) => ({ ...x, einweisung: { ...x.einweisung, protokoll } }))}>
+            Die Einweisung wird schriftlich festgehalten
+          </Schalter>
+        )}
       </section>
     </div>
   )

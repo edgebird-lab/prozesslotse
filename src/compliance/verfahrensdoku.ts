@@ -40,8 +40,8 @@ import {
   textVon,
   UNVERAENDERBARKEIT,
 } from './standard'
-import { AUFBAU_RZ153, DATENSCHUTZ, FRISTEN_TABELLE, FRISTENREGEL, GLOSSAR, GRUNDLAGEN, HISTORIE, hinweisVerfahrensdoku, IKS, KRITERIEN, SYSTEMWECHSEL } from './textbausteine'
-import type { Abschnitt, ComplianceProjekt, DatenobjektAngaben, Dokument, IsoDatum, SystemAngaben, VersionKopf } from './typen'
+import { AUFBAU_RZ153, DATENSCHUTZ, FRISTEN_TABELLE, FRISTENREGEL, GLOSSAR, GRUNDLAGEN, HISTORIE, hinweisVerfahrensdoku, iks, KRITERIEN, SYSTEMWECHSEL } from './textbausteine'
+import type { Abschnitt, ComplianceProjekt, DatenobjektAngaben, Dokument, IsoDatum, Nachweis, SystemAngaben, VersionKopf } from './typen'
 
 /** Wofür ein Dokument erzeugt wird: Version (null = Entwurf), bisherige Versionen, Bezugsjahr, Tag. */
 export interface DokuKontext {
@@ -187,8 +187,19 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   h(2, '2.5', 'Einweisung in das Verfahren')
   const turnus = c.einweisung.turnus
-  absatz(turnus === 'einmalig' ? 'Wer mitarbeitet, wird vor Beginn eingewiesen.' : turnus === 'jaehrlich' ? 'Wer mitarbeitet, wird vor Beginn und danach jährlich eingewiesen.' : 'Eine Einweisung ist nicht festgelegt.')
-  if (c.einweisung.protokoll) absatz('Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).')
+  // Protokoll (2.5, 9.2) und „eingewiesene Personen“ (3.3) nur bei festgelegter Einweisung; bei „Keine“ ist der Schalter ausgeblendet
+  const eingewiesen = turnus === 'einmalig' || turnus === 'jaehrlich'
+  const protokoll = eingewiesen && c.einweisung.protokoll
+  absatz(
+    turnus === 'einmalig'
+      ? 'Wer mitarbeitet, wird vor Beginn eingewiesen.'
+      : turnus === 'jaehrlich'
+        ? 'Wer mitarbeitet, wird vor Beginn und danach jährlich eingewiesen.'
+        : turnus === 'keine'
+          ? 'Eine Einweisung ist nicht vorgesehen.'
+          : 'Eine Einweisung ist nicht festgelegt.',
+  )
+  if (protokoll) absatz('Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).')
 
   h(2, '2.6', 'Abgrenzung der Bearbeitungsbereiche')
   const extern: string[] = []
@@ -248,18 +259,25 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   )
 
   h(2, '3.3', 'Organisation und Internes Kontrollsystem')
-  absatz(IKS)
   const ablauf = ablaufBeschreibung(k)
   const kontrollen = k.aufgaben.filter((x) => x.art === 'pruefung' || x.art === 'freigabe')
+  // Kontrollen ohne Nachweis im System oder per Kürzel bzw. ohne Zuständige; A.4 nennt sie, statt Festlegung zuzusichern
+  const offen = { nachweis: [] as string[], zustaendigkeit: [] as string[] }
+  const vermerke = (name: string, nachweis: Nachweis | null, wer: string) => {
+    if (nachweis !== 'system' && nachweis !== 'abzeichnen') offen.nachweis.push(name)
+    if (!wer) offen.zustaendigkeit.push(name)
+  }
   const zeilen = [
     ...kontrollen.map((x) => {
       const angabe = kontrollAngaben(c, x.id)
+      const wer = ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() ?? ''
+      vermerke(schrittText(k, x), angabe?.nachweis ?? null, wer)
       // Liegt die Kontrolle in einem Zweig, läuft sie nur unter dessen Bedingung (wie „Nur wenn“ in Kapitel 4)
       const bedingungen = ablauf.bedingungen.get(x.id) ?? []
       return [
         schrittText(k, x),
         angabe ? textVon(KONTROLLARTEN, angabe.art, 'dok') : 'offen',
-        ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() || 'offen',
+        wer || 'offen',
         angabe?.ziel.trim() || 'offen',
         angabe ? textVon(NACHWEISE, angabe.nachweis, 'dok') : 'offen',
         bedingungen.length > 0 ? `${wennText(bedingungen)} (siehe ${k.nummer.get(x.id) ?? '4.?'})` : 'bei jedem Vorgang',
@@ -267,6 +285,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
     }),
     ...c.weitereKontrollen.map((w) => {
       const bezug = k.aufgaben.find((x) => x.id === w.bezugAufgabeId)
+      vermerke(w.name.trim() || 'Weitere Kontrolle', w.nachweis, w.verantwortlich.trim())
       return [
         w.name.trim() || 'Weitere Kontrolle',
         textVon(KONTROLLARTEN, w.art, 'dok'),
@@ -277,6 +296,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       ]
     }),
   ]
+  absatz(iks(eingewiesen, offen))
   if (zeilen.length > 0) tabelle(['Kontrolle', 'Art', 'Wer', 'Was geprüft wird', 'Nachweis', 'Häufigkeit'], zeilen)
   else absatz('Im Ablauf ist keine Kontrolle beschrieben.')
 
@@ -360,7 +380,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   h(1, '9', 'Anlage')
   h(2, '9.1', 'Ablaufdiagramm')
   a.push({ art: 'diagramm' })
-  if (c.einweisung.protokoll) {
+  if (protokoll) {
     h(2, '9.2', 'Nachweis der Einweisung')
     tabelle(
       ['Datum', 'Name', 'Rolle', 'Unterschrift'],

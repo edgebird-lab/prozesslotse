@@ -599,8 +599,19 @@ function pruefeKontrollen(k: Kontext, objekte: Objekt[], add: Add): void {
       ziel: { art: 'kontrolle', id: 'weitere' },
     })
   }
-  if (c.einweisung.turnus === null || c.einweisung.turnus === 'keine') {
+  if (c.einweisung.turnus === null) {
     add({ regel: 'K6', teilschritt: 'kontrollen', schwere: 'hinweis', titel: 'Einweisung nicht festgelegt', text: 'Wie werden Beteiligte in das Verfahren eingewiesen?', quelle: 'Muster BStBK/DStV, Kap. 2.5', ziel: { art: 'einweisung' } })
+  } else if (c.einweisung.turnus === 'keine' && !(interne.length > 0 && personen <= 1)) {
+    // „Keine“ ist eine Antwort; im Ein-Personen-Betrieb (Bedingung wie K5) ist niemand einzuweisen
+    add({
+      regel: 'K6',
+      teilschritt: 'kontrollen',
+      schwere: 'hinweis',
+      titel: 'Keine Einweisung vorgesehen',
+      text: 'Wer im Prozess mitarbeitet, sollte das Verfahren kennen. Wähle „Einmalig vor Beginn“, sobald jemand mitarbeitet.',
+      quelle: 'Muster BStBK/DStV, Kap. 2.5',
+      ziel: { art: 'einweisung' },
+    })
   }
 }
 

@@ -660,7 +660,7 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 
 - Je Aufgabe der Art Prüfung oder Freigabe: Kontrollart, „Was wird geprüft?“, Nachweis. Daneben der Vier-Augen-Status, z. B. „Erstellt: Buchhaltung · Freigabe: Niederlassungsleitung · andere Rolle“.
 - „+ Weitere Kontrolle“ für Kontrollen außerhalb des Ablaufs: Name, Art, verantwortlich, extern ja oder nein, Häufigkeit, Nachweis, „sichert ab: Aufgabe …“ (optional).
-- Einweisung: „Wie werden Beteiligte eingewiesen?“ (einmalig vor Beginn · vor Beginn und jährlich · keine) und „Wird die Einweisung schriftlich festgehalten?“.
+- Einweisung: „Wie werden Beteiligte eingewiesen?“ (einmalig vor Beginn · vor Beginn und jährlich · keine) und „Wird die Einweisung schriftlich festgehalten?“; der Schalter fehlt bei „keine“, der gespeicherte Wert bleibt und zählt nur bei einmalig oder jährlich.
 - Ohne Prüfung oder Freigabe im Ablauf erklärt ein Hinweis, wie man im Schritt „Ablauf“ eine Aufgabe als Prüfung oder Freigabe kennzeichnet.
 
 **6 Schutzmaßnahmen**
@@ -817,7 +817,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | K3 | Kontrolle ohne Angaben | Hinweis | Aufgabe der Art Prüfung oder Freigabe ohne Eintrag in `kontrollen` | „Was prüft „{A}“, und wie wird es nachgewiesen?“ | GoBD Rz. 102 | kontrollen |
 | K4 | Keine Kontrolle | Hinweis | ein Objekt der Art `buchungsbeleg` oder `buecher`, keine Prüfung oder Freigabe im Ablauf, keine weitere Kontrolle | „Im Prozess entstehen Buchungsbelege, aber keine Kontrolle ist beschrieben.“ | GoBD Rz. 100–102 | kontrollen |
 | K5 | Ein-Personen-Betrieb ohne Ausgleich | Hinweis | Summe `personen` aller internen Rollen mit Aufgaben ≤ 1 und keine weitere Kontrolle mit `extern = true` | „Alle Schritte erledigt eine Person; Funktionstrennung ist nicht möglich. Ausgleich: regelmäßige Stichproben durch die Steuerberatung als weitere Kontrolle eintragen.“ | Muster 3.2 | kontrollen |
-| K6 | Einweisung nicht festgelegt | Hinweis | Turnus `null` oder `keine` | „Wie werden Beteiligte in das Verfahren eingewiesen?“ | Muster 2.5 | kontrollen |
+| K6 | Einweisung nicht festgelegt; bei `keine`: Keine Einweisung vorgesehen | Hinweis | Turnus `null`, oder Turnus `keine` außer im Ein-Personen-Betrieb (Summe `personen` aller internen Rollen mit Aufgaben ≤ 1, wie K5) | `null`: „Wie werden Beteiligte in das Verfahren eingewiesen?“ · `keine`: „Wer im Prozess mitarbeitet, sollte das Verfahren kennen. Wähle „Einmalig vor Beginn“, sobald jemand mitarbeitet.“ | Muster 2.5 | kontrollen |
 | T1 | Schutzmaßnahmen fehlen | Warnung; Bereich Pseudonymisierung: Hinweis | je Bereich: keine Maßnahme und `nichtZutreffend` leer | „Für „{Bereich}“ ist keine Maßnahme eingetragen. Maßnahme wählen oder begründen, warum der Bereich nicht zutrifft.“ | Art. 32 Abs. 1 DSGVO; DSK Ziff. 6.7, 6.8 | tom |
 | V1 | Noch nicht freigegeben | Hinweis | keine Version | „Die Dokumente sind ein Entwurf. Erst eine Freigabe mit Gültig-ab-Datum macht sie zur gültigen Fassung.“ | Muster Kap. 1; GoBD Rz. 154 | dokumente |
 | V2 | Geändert seit der letzten Freigabe | Warnung | `geaenderteKapitel` gegenüber der letzten Version nicht leer (6.8) | „Seit Version {x} geändert: {Kapitel}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.“ | GoBD Rz. 154 | dokumente |
@@ -842,7 +842,7 @@ Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 2.2.3 Einsatzorte | Standorte als Liste; Papierablagen (Ablageorte mit Medium Papier) | Unternehmen, Ablageorte |
 | 2.3 Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien | Textbaustein A.2, Fristentabelle aus 3.2, Kriterientabelle A.3; bei längerer Aufbewahrung: „Länger als vorgeschrieben werden aufbewahrt: {Liste}. Grund: {Begründung}.“ | fest, Angaben |
 | 2.4 Relevante Dokumente | Tabelle Unterlage · Einordnung · Form · Entsteht in · Ablage · Aufbewahrung · Beispiel {Bezugsjahr}; Zeilen nach Nummer von `entstehtIn`, Objekte ohne Ersteller am Ende nach Name | Datenobjekte |
-| 2.5 Einweisung in das Verfahren | einmalig: „Wer mitarbeitet, wird vor Beginn eingewiesen.“ · jährlich: „… vor Beginn und danach jährlich eingewiesen.“ · keine bzw. null: „Eine Einweisung ist nicht festgelegt.“ · Protokoll: „Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).“ | Einweisung |
+| 2.5 Einweisung in das Verfahren | einmalig: „Wer mitarbeitet, wird vor Beginn eingewiesen.“ · jährlich: „… vor Beginn und danach jährlich eingewiesen.“ · keine: „Eine Einweisung ist nicht vorgesehen.“ · null: „Eine Einweisung ist nicht festgelegt.“ · Protokoll, nur bei einmalig oder jährlich: „Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).“ | Einweisung |
 | 2.6 Abgrenzung der Bearbeitungsbereiche | externe Rollen, Dienstleister und externe Teilnehmer (Format 3) als Liste, sonst „Alle Schritte finden im Unternehmen statt.“; dazu „Mit externen Stellen ist diese Dokumentation abzustimmen.“ | Rollen, Systeme, Teilnehmer |
 | 3 Organisation und Sicherheit des IT-gestützten Verfahrens | – | – |
 | 3.1 Eingesetzte Hard- und Software | Tabelle System · Art · Hersteller · Version · im Einsatz seit · Betrieb · Dienstleister und Standort; Satz „Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.“ | digitale Medien im Einsatz, Reihenfolge wie `p.medien` |
@@ -854,7 +854,7 @@ Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` | Systeme, Angaben |
 | 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“) | Historie |
 | 8 Glossar | Tabelle aus A.6 | fest |
-| 9 Anlage | 9.1 Ablaufdiagramm (Abschnitt `diagramm`); 9.2 Nachweis der Einweisung nur bei Protokoll: Tabelle Datum · Name · Rolle · Unterschrift mit 8 leeren Zeilen | Prozess |
+| 9 Anlage | 9.1 Ablaufdiagramm (Abschnitt `diagramm`); 9.2 Nachweis der Einweisung nur bei Protokoll und Turnus einmalig oder jährlich: Tabelle Datum · Name · Rolle · Unterschrift mit 8 leeren Zeilen | Prozess |
 
 #### 6.6.1 Ablaufbeschreibung (Kapitel 4)
 
@@ -934,7 +934,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
   | 11 | Integrität | Inhalte bleiben vollständig und unverfälscht. |
   | 12 | Authentizität | Herkunft und Urheber einer Unterlage stehen eindeutig fest. |
   | 13 | Vertraulichkeit | Nur Berechtigte können lesen oder ändern. |
-- **A.4 Kapitel 3.3:** „Nur eingewiesene Personen arbeiten in den Schritten aus Kapitel 4, und zwar stets so, wie dort beschrieben. Für jede Kontrolle ist festgelegt, wer sie ausübt und wie sie belegt wird (GoBD Rz. 100). Weicht die Praxis von dieser Beschreibung ab, erfährt es die Geschäftsleitung; Anlass und Maßnahme werden schriftlich festgehalten.“
+- **A.4 Kapitel 3.3:** „Nur eingewiesene Personen arbeiten in den Schritten aus Kapitel 4, und zwar stets so, wie dort beschrieben. Für jede Kontrolle ist festgelegt, wer sie ausübt und wie sie belegt wird (GoBD Rz. 100). Weicht die Praxis von dieser Beschreibung ab, erfährt es die Geschäftsleitung; Anlass und Maßnahme werden schriftlich festgehalten.“ Der Baustein sichert nur zu, was die Angaben tragen: Ohne Einweisung (Turnus `keine` oder `null`) lautet der erste Satz „In den Schritten aus Kapitel 4 wird stets so gearbeitet, wie dort beschrieben.“ Hat eine Kontrolle der Tabelle keinen Nachweis „im System protokolliert“ oder „abgezeichnet …“ oder niemanden, der sie ausübt, lautet der zweite Satz „Kontrollen sind so auszuüben und zu belegen, wie in der Tabelle angegeben (GoBD Rz. 100).“, gefolgt von „Nachweis offen bei: {Kontrollen}.“ bzw. „Zuständigkeit offen bei: {Kontrollen}.“
 - **A.5 Kapitel 3.4:** „Zugriff auf die Unterlagen haben nur berechtigte Personen, vom Entstehen bis zur Vernichtung. Wann vernichtet und gelöscht wird, regelt das letzte Unterkapitel von Kapitel 4. Die Schutzmaßnahmen im Einzelnen nennt das Verzeichnis von Verarbeitungstätigkeiten in Abschnitt C.“
 - **A.6 Glossar:** zehn Begriffe, je ein Satz mit Fundstelle. Begriffe: Aufbewahrungsfrist, Auftragsverarbeiter, Beleg, E-Rechnung, Geschäftsbrief, GoBD, Internes Kontrollsystem, Unveränderbarkeit, Verfahrensdokumentation, Vier-Augen-Prinzip. Beispiel: „Unveränderbarkeit: Einmal erfasste Informationen dürfen nicht ohne Kenntlichmachung geändert oder gelöscht werden (§ 146 Abs. 4 AO, GoBD Rz. 107 ff.).“
 
