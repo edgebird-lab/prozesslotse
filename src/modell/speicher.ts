@@ -2,11 +2,14 @@
  * Speichern im Browser und als JSON-Datei. Beim Laden wird die Struktur
  * geprüft, damit eine beschädigte oder fremde Datei keinen Absturz auslöst.
  */
+import { validiereCompliance } from '../compliance/speicher'
 import { FORMAT_VERSION, type Block, type Projekt, type Prozess, type Sequenz } from './typen'
 
 const PROJEKT_SCHLUESSEL = 'prozesslotse:projekt'
 const EINSTELLUNGEN_SCHLUESSEL = 'prozesslotse:einstellungen'
 const DOKUMENT_SCHLUESSEL = 'prozesslotse:dokument'
+/** Freigegebene Versionen der Compliance-Doku liegen getrennt, damit nicht jeder Tastendruck sie neu schreibt. */
+const VERSIONEN_SCHLUESSEL = 'prozesslotse:versionen'
 
 export class Formatfehler extends Error {}
 
@@ -128,6 +131,8 @@ export function leseProjekt(daten: unknown): Projekt {
   pruefeProzess(daten.ist, 'Ist-Prozess')
   if (daten.soll !== null) pruefeProzess(daten.soll, 'Soll-Prozess')
   fordere(Array.isArray(daten.massnahmen) && Array.isArray(daten.verworfen), 'Maßnahmenliste fehlt.')
+  // optional; ältere Dateien haben keine Compliance-Angaben und laden unverändert
+  if (daten.compliance !== undefined) validiereCompliance(daten.compliance)
   return daten as unknown as Projekt
 }
 
@@ -150,19 +155,48 @@ export function alsJson(p: Projekt): string {
 export function ladeAusBrowser(): Projekt | null {
   try {
     const text = globalThis.localStorage?.getItem(PROJEKT_SCHLUESSEL)
-    return text ? leseProjektText(text) : null
+    if (!text) return null
+    const daten: unknown = JSON.parse(text)
+    // Versionen der Compliance-Doku liegen unter eigenem Schlüssel und kommen vor der Prüfung wieder dazu
+    const versionen = globalThis.localStorage?.getItem(VERSIONEN_SCHLUESSEL)
+    if (versionen && istObj(daten) && istObj(daten.compliance)) daten.compliance.versionen = JSON.parse(versionen)
+    return leseProjekt(daten)
   } catch {
     return null
   }
 }
 
+/** Zuletzt geschriebene Versionen (Referenz); nur eine neue Liste wird erneut geschrieben. */
+let geschriebeneVersionen: unknown = undefined
+
 export function speichereImBrowser(p: Projekt): boolean {
   try {
-    globalThis.localStorage?.setItem(PROJEKT_SCHLUESSEL, JSON.stringify(p))
+    const speicher = globalThis.localStorage
+    if (!speicher) return true
+    const versionen = p.compliance?.versionen ?? null
+    if (versionen !== geschriebeneVersionen) {
+      if (versionen && versionen.length > 0) speicher.setItem(VERSIONEN_SCHLUESSEL, JSON.stringify(versionen))
+      else speicher.removeItem(VERSIONEN_SCHLUESSEL)
+      geschriebeneVersionen = versionen
+    }
+    const ohneVersionen = p.compliance && p.compliance.versionen.length > 0 ? { ...p, compliance: { ...p.compliance, versionen: [] } } : p
+    speicher.setItem(PROJEKT_SCHLUESSEL, JSON.stringify(ohneVersionen))
     return true
   } catch {
     return false
   }
+}
+
+/** „Daten im Browser löschen“: Projekt, Versionen, Dateiangaben und Einstellungen. */
+export function loescheBrowserDaten(): void {
+  for (const s of [PROJEKT_SCHLUESSEL, VERSIONEN_SCHLUESSEL, DOKUMENT_SCHLUESSEL, EINSTELLUNGEN_SCHLUESSEL]) {
+    try {
+      globalThis.localStorage?.removeItem(s)
+    } catch {
+      // nicht kritisch
+    }
+  }
+  geschriebeneVersionen = undefined
 }
 
 /** Zur Wiederherstellung: zu welcher Datei das Projekt im Browserspeicher gehört und ob es ungespeicherte Änderungen hat. */
@@ -198,6 +232,8 @@ export function vergissImBrowser(): void {
   try {
     globalThis.localStorage?.removeItem(PROJEKT_SCHLUESSEL)
     globalThis.localStorage?.removeItem(DOKUMENT_SCHLUESSEL)
+    globalThis.localStorage?.removeItem(VERSIONEN_SCHLUESSEL)
+    geschriebeneVersionen = undefined
   } catch {
     // nicht kritisch
   }
