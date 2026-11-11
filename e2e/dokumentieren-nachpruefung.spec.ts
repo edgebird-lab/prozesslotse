@@ -163,3 +163,27 @@ test('bedienung-6: Die Auswahl „Nachweis“ einer weiteren Kontrolle zeigt ihr
   // rund 24 px braucht der Pfeil der Auswahl
   expect(mass.text + 24, JSON.stringify(mass)).toBeLessThanOrEqual(mass.innen)
 })
+
+test('bedienung-17: einheitliche Wörter für Unterlage, Datenkategorien, besonders geschützte Daten und Verarbeitungsverzeichnis', async ({ page }) => {
+  await start(page)
+  await schritt(page, 'Dokumentieren').click()
+  // Die Einleitung führt die Kurzform ein, die der Reiter in „Dokumente“ nutzt
+  await expect(page.getByText(/^Aus dem Ablauf entstehen zwei Dokumente/)).toContainText('das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO (kurz: Verarbeitungsverzeichnis)')
+  await teil(page, 'Belege und Daten').click()
+  // Lernhinweis ohne das Wort „Datenobjekt“
+  const lernhinweis = page.getByRole('complementary', { name: 'Lernhinweis: Belege und Daten' })
+  await expect(lernhinweis).toContainText('Jede Unterlage, die im Prozess entsteht oder genutzt wird, gehört hierher.')
+  await expect(page.getByRole('region', { name: 'Assistent' })).not.toContainText('Datenobjekt')
+  // Fragen nennen die Unterlage statt „es“
+  const neu = page.getByRole('form', { name: 'Neue Unterlage' })
+  await neu.getByLabel('Name, z. B. „Ausgangsrechnung“').fill('Gutschrift')
+  await neu.getByLabel('In welchem Schritt entsteht die Unterlage?').selectOption({ label: '4.16 Rechnung erstellen' })
+  await expect(neu.getByText('In welchen Schritten wird sie genutzt?')).toBeVisible()
+  await neu.getByRole('button', { name: '+ Unterlage anlegen' }).click()
+  const karte = page.getByRole('region', { name: 'Gutschrift' })
+  await karte.getByRole('group', { name: 'Enthält es Angaben zu Personen?' }).getByText('Ja', { exact: true }).click()
+  await expect(karte.getByRole('group', { name: 'Welche Daten (Datenkategorien)?' })).toBeVisible()
+  await karte.getByText('Besonders geschützte Daten (Art. 9 und 10 DSGVO)').click()
+  await expect(karte.getByRole('group', { name: 'Welche besonders geschützten Daten?' })).toBeVisible()
+  await expect(karte.locator('legend').filter({ hasText: /^(Welche Daten\?|Besondere Kategorien)$/ })).toHaveCount(0)
+})

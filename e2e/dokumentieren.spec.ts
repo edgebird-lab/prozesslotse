@@ -61,7 +61,7 @@ test('legt eine Unterlage an, ordnet sie ein und legt sie ab', async ({ page }) 
   await teil(page, 'Belege und Daten').click()
   const neu = page.getByRole('form', { name: 'Neue Unterlage' })
   await neu.getByLabel('Name, z. B. „Ausgangsrechnung“').fill('Gutschrift')
-  await neu.getByLabel('In welchem Schritt entsteht es?').selectOption({ label: '4.16 Rechnung erstellen' })
+  await neu.getByLabel('In welchem Schritt entsteht die Unterlage?').selectOption({ label: '4.16 Rechnung erstellen' })
   await neu.getByRole('button', { name: '+ Unterlage anlegen' }).click()
 
   const karte = page.getByRole('region', { name: 'Gutschrift' })

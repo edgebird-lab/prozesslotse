@@ -18,7 +18,7 @@ export const COMPLIANCE_LERNINHALTE: Record<ComplianceThema, ComplianceLerninhal
   belege: {
     titel: 'Belege und Daten',
     quelle: '§ 147 AO; § 31 Abs. 1 UStDV; Art. 30 Abs. 1 lit. b und c DSGVO',
-    text: 'Jede Unterlage, die im Prozess entsteht oder genutzt wird, ist ein Datenobjekt. Ihre Einordnung bestimmt die Aufbewahrungsfrist: Buchungsbelege 8 Jahre, Bücher und Organisationsunterlagen 10, Geschäftsbriefe 6. Verweist die Rechnung auf einen Lieferschein, etwa für das Lieferdatum, gehört er zur Rechnung und ist wie sie aufzubewahren. Enthält eine Unterlage Angaben zu Personen, gehört sie ins Verzeichnis von Verarbeitungstätigkeiten.',
+    text: 'Jede Unterlage, die im Prozess entsteht oder genutzt wird, gehört hierher. Ihre Einordnung bestimmt die Aufbewahrungsfrist: Buchungsbelege 8 Jahre, Bücher und Organisationsunterlagen 10, Geschäftsbriefe 6. Verweist die Rechnung auf einen Lieferschein, etwa für das Lieferdatum, gehört er zur Rechnung und ist wie sie aufzubewahren. Enthält eine Unterlage Angaben zu Personen, gehört sie ins Verzeichnis von Verarbeitungstätigkeiten.',
   },
   systeme: {
     titel: 'Systeme und Dienstleister',

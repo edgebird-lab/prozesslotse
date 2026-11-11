@@ -156,7 +156,7 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
           if (n.trim()) setFehler(null)
         }}
       />
-      <CFeld label="In welchem Schritt entsteht es?" hilfe="Die Nummer ist das Kapitel in der Verfahrensdokumentation.">
+      <CFeld label="In welchem Schritt entsteht die Unterlage?" hilfe="Die Nummer ist das Kapitel in der Verfahrensdokumentation.">
         {(id) => (
           <select id={id} value={entstehtIn} onChange={(e) => setEntstehtIn(e.target.value)}>
             <option value="">kommt von außen oder noch offen</option>
@@ -170,7 +170,7 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
       </CFeld>
       {k.aufgaben.length > 0 && (
         <details className="aufklapp">
-          <summary>In welchen Schritten wird es genutzt?</summary>
+          <summary>In welchen Schritten wird sie genutzt?</summary>
           <Chips legende="Genutzt in" optionen={aufgabenOptionen(k)} werte={genutztIn} onAendern={setGenutztIn} />
         </details>
       )}
@@ -273,12 +273,12 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
           {d.personenbezogen === true && (
             <div className="eingerueckt felder">
               <Chips id={`${ziel}-betroffene`} legende="Wer ist betroffen?" optionen={BETROFFENE} werte={d.betroffene} onAendern={(betroffene) => setze({ betroffene }, 'betroffene')} />
-              <Chips id={`${ziel}-kategorien`} legende="Welche Daten?" optionen={DATENKATEGORIEN} werte={d.datenkategorien} onAendern={(datenkategorien) => setze({ datenkategorien }, 'kategorien')} />
+              <Chips id={`${ziel}-kategorien`} legende="Welche Daten (Datenkategorien)?" optionen={DATENKATEGORIEN} werte={d.datenkategorien} onAendern={(datenkategorien) => setze({ datenkategorien }, 'kategorien')} />
               <details className="aufklapp">
                 <summary>
                   Besonders geschützte Daten (Art. 9 und 10 DSGVO){d.besondereKategorien.length > 0 || d.strafrechtlich ? ': angegeben' : ''}
                 </summary>
-                <Chips id={`${ziel}-besondere`} legende="Besondere Kategorien" optionen={BESONDERE_KATEGORIEN} werte={d.besondereKategorien} onAendern={(besondereKategorien) => setze({ besondereKategorien }, 'besondere')} />
+                <Chips id={`${ziel}-besondere`} legende="Welche besonders geschützten Daten?" optionen={BESONDERE_KATEGORIEN} werte={d.besondereKategorien} onAendern={(besondereKategorien) => setze({ besondereKategorien }, 'besondere')} />
                 <Schalter an={d.strafrechtlich} onAendern={(strafrechtlich) => setze({ strafrechtlich }, 'straf')}>
                   Daten über strafrechtliche Verurteilungen und Straftaten
                 </Schalter>

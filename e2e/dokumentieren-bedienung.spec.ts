@@ -318,7 +318,7 @@ test('Karten der Unterlagen: Umschalter nennen die Unterlage', async ({ page }) 
 test('Texte erklären Fachbegriffe und Abkürzungen', async ({ page }) => {
   await start(page)
   await expect(page.locator('.dokumentieren > p.leise').first()).toHaveText(
-    'Aus dem Ablauf entstehen zwei Dokumente: die Verfahrensdokumentation, die das Finanzamt nach den GoBD (Regeln für die elektronische Buchführung) erwartet, und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO. Beide beschreiben den Ist-Prozess.',
+    'Aus dem Ablauf entstehen zwei Dokumente: die Verfahrensdokumentation, die das Finanzamt nach den GoBD (Regeln für die elektronische Buchführung) erwartet, und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO (kurz: Verarbeitungsverzeichnis). Beide beschreiben den Ist-Prozess.',
   )
   await expect(page.getByText('Bleibt das Feld leer, steht hier der Name des Prozesses.')).toBeVisible()
   await expect(page.getByText('Unabhängig von der Zahl kann ein Datenschutzbeauftragter nötig sein, etwa wenn')).toBeVisible()

@@ -673,14 +673,14 @@ Oben steht „Wozu werden die Daten in diesem Prozess verarbeitet?“ (Liste der
 | Wo wird es aufbewahrt? | Mehrfachauswahl der Ablageorte; „+ Ablageort“ legt einen Ablageort mit System an |
 | In welcher Form? | Ablageform; bei Papier mit Scan: „Wird das Papier danach vernichtet?“; bei „Ja“ zusätzlich „Gibt es eine eigene Verfahrensdokumentation zum ersetzenden Scannen?“ (Ja · Nein · Weiß nicht, bei Ja „Stand“), eine Angabe für alle gescannten Unterlagen (`ersetzendesScannen`) |
 | Enthält es Angaben zu Personen? | Ja · Nein · Weiß nicht |
-| Wer ist betroffen? Welche Daten? | Chips Betroffene, Chips Datenkategorien, aufklappbar besondere Kategorien und Art. 10 |
+| Wer ist betroffen? Welche Daten (Datenkategorien)? | Chips Betroffene, Chips Datenkategorien, aufklappbar „Besonders geschützte Daten (Art. 9 und 10 DSGVO)“ mit „Welche besonders geschützten Daten?“ und Art. 10 |
 | Warum dürfen die Daten verarbeitet werden? | Chips Rechtsgrundlage; bei lit. f Textfeld „Welches Interesse?“ |
 | Welche Ausnahme nach Art. 9 Abs. 2 DSGVO gilt? (nur bei besonderen Kategorien) | Auswahl lit. a bis j, leer „offen“; Hilfe: zusätzlich zur Rechtsgrundlage, ob daneben eine Vorschrift des BDSG gilt, mit dem Datenschutz klären |
 | Wer bekommt die Daten außerhalb des Unternehmens? | Liste: Kategorie, Name, Standort, bei Drittland Land und Garantie. Bei Drittland ist der Name Pflicht. Hinweis „Wer nur seine eigenen Daten bekommt, etwa der Kunde seine Rechnung, ist kein Empfänger.“ Externe Teilnehmer des Prozesses (Format 3) stehen als Vorschlag bereit, eingeleitet mit „Externe aus dem Ablauf – nur, wenn sie Daten anderer Personen bekommen:“; nicht vorgeschlagen wird, wer zu einer angehakten Gruppe der Betroffenen gehört (Kunde ↔ Kunden, `empfaengerVorschlaege`). Die Auswahl der Garantie heißt „Absicherung der Übermittlung“ und sagt, wo sie steht. |
 
 Leerer Zustand: „Noch keine Belege oder Daten. Lege an, welche Unterlagen im Prozess entstehen.“
 
-- Das Formular fragt den Namen, „In welchem Schritt entsteht es?“ (Auswahl der Aufgaben) und „In welchen Schritten wird es genutzt?“.
+- Das Formular fragt den Namen, „In welchem Schritt entsteht die Unterlage?“ (Auswahl der Aufgaben) und „In welchen Schritten wird sie genutzt?“.
 - Angelegt wird über die Operationen aus `unterlagen.ts` (4.1).
 - Ein fester Hinweis bittet, keine echten Kundendaten einzutragen.
 
@@ -734,7 +734,7 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 
 - Statuszeile: „Entwurf, nicht freigegeben“ oder „Gültige Version 1.0 seit 11.11.2026“; stimmt die Prüfsumme der genannten Version nicht, folgt „ – Prüfsumme stimmt nicht“ (Regel V4); bei Regel V2 zusätzlich „geändert seit der Freigabe: Verfahrensdokumentation 3.2 und 4“ (Kapitel ausgeschrieben mit `kapitelText`, 6.8).
 - Hinweisband (`role="note"`): „Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten. Keine Rechts- oder Steuerberatung. Rechtsstand 11.11.2026.“ Zweiter Satz: „Die Dokumente nennen Schutzmaßnahmen und Lücken. Vertraulich behandeln.“
-- Umschalter (`role="tablist"`): Verfahrensdokumentation · Verarbeitungsverzeichnis.
+- Umschalter (`role="tablist"`): Verfahrensdokumentation · Verarbeitungsverzeichnis. Die Kurzform führt die Einleitung des Schritts ein („… Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO (kurz: Verarbeitungsverzeichnis)“).
 - Knöpfe: „Drucken oder als PDF speichern“ (Hauptknopf), „Als Word-Datei (DOCX)“, „Version freigeben …“, „Geprüft, keine Änderung“ (nur mit Versionen und ohne V2; setzt `zuletztGeprueft`).
 - Vorschau: `DokumentAnsicht` rendert das gewählte Dokument als HTML. Beim Ansehen einer alten Version führt „Zurück zum aktuellen Entwurf“ zurück.
 - Versionsliste mit den Spalten Version, gültig ab, gültig bis, freigegeben am und von, geänderte Kapitel, aufbewahren bis, Prüfsumme (12 Zeichen und Ergebnis des Nachrechnens, 6.8). Je Zeile die Knöpfe „Ansehen“ und „DOCX“.

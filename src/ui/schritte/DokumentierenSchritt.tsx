@@ -56,7 +56,7 @@ export function DokumentierenSchritt() {
       <h2>6 · Dokumentieren</h2>
       <p className="leise">
         Aus dem Ablauf entstehen zwei Dokumente: die Verfahrensdokumentation, die das Finanzamt nach den GoBD (Regeln für die elektronische Buchführung) erwartet, und das Verzeichnis
-        von Verarbeitungstätigkeiten nach Art. 30 DSGVO. Beide beschreiben den Ist-Prozess.
+        von Verarbeitungstätigkeiten nach Art. 30 DSGVO (kurz: Verarbeitungsverzeichnis). Beide beschreiben den Ist-Prozess.
       </p>
       <Teilschritte befunde={befunde} />
       <ComplianceLernhinweis thema={z.teilschritt} />
