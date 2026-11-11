@@ -75,16 +75,25 @@ Hinweise für Schritt 3 und später:
 
 ## Schritt 3 – Unterbrechung
 
-- [ ] Typ `Unterbrechung extends Sequenz`, optionale `unterbrechungen` an Aufgabe, Teilprozess, Mehrfach; `pruefeBlock`, `entferneFremdeAbsender`
-- [ ] Operationen: Kindsequenzen, Rücksprung aus dem Ausnahmeweg (`zurueckZu`), `normalisiere`, `ausgaengeBlock`, `verlaesstBlock`, Führung („im Ausnahmeweg … von …“)
-- [ ] Prüfregeln (Summe > 100 %, Frist, Nebenweg ohne Ende und Rücksprung, höchstens drei an einer Aufgabe, Hinweise)
-- [ ] Kennzahlen, Verteilung (Aufgabe und Rahmen, ½K), Simulation, TCT, Übergaben
-- [ ] Layout: Block „Schritt mit Unterbrechungen“, Randereignisse auf der Unterkante, Abgang, Abgangsspur, Nachrichten zu Randereignissen, Zusammenführung für „weiter“; Fehler-Randereignisse aus Schritt 1 nach demselben Muster
-- [ ] Export: `boundaryEvent` (message, timer), Nachrichtenfluss zum Randereignis, Nebenweg mit eigenem Ende
-- [ ] Tokenspiel: Wahl an Aufgabe und Rahmen, Nebenweg-Marken
-- [ ] Schwachstellen: viel abgebrochene Arbeit, Frist oft überschritten, Nebenweg länger als sein Schritt
-- [ ] Zufallsgenerator (auch ungültige Varianten), Oberfläche (Einstieg im Formular, Fragen, „gilt für mehrere“, Danach, Gliederungszeile, Lernhinweis), Tests von Hand, Browsertest, Diagramm angesehen, Doku
-- [ ] Commit und Push
+Fertig am 2026-11-11, Commits 5d73e28 „Unterbrechungen (Randereignisse): Modell, Rechnung, BPMN und Tokenspiel“ und „Unterbrechungen: Oberfläche, Browsertests und Doku“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 3)“.
+
+- [x] Typ `Unterbrechung extends Sequenz`, optionale `unterbrechungen` an Aufgabe, Teilprozess, Mehrfach; `pruefeBlock`, `entferneFremdeAbsender`
+- [x] Operationen: Kindsequenzen, Ketten-Prädikate je Glied (`gliedRahmen`, `gliedNebenlaeufig`), Rücksprung aus dem Ausnahmeweg (`zurueckZu`, auch „noch einmal von vorn“), `normalisiere`, `ausgaengeBlock`, `verlaesstBlock`, `verschiebeUnterbrechung`, `unterbrechungFuerAbschnitt`, Führung („im Ausnahmeweg … von …“, „im Nebenweg …“)
+- [x] Prüfregeln (Summe > 100 %, Anteil, Frist, Nebenweg ohne Ende und Rücksprung, höchstens drei an einer Aufgabe, Fristen gegen die Zeiten, Hinweise); „Verklemmung“ nur noch bei „Gleichzeitig“
+- [x] Kennzahlen, Verteilung (Aufgabe und Rahmen, ½K), Simulation, TCT, Übergaben, Kontakte
+- [x] Layout: Block „Schritt mit Unterbrechungen“, Randereignisse auf der Unterkante, Abgang, Abgangsspur, Nachrichten zu Randereignissen, Zusammenführung für „weiter“; Fehler-Randereignisse aus Schritt 1 nach demselben Muster
+- [x] Export: `boundaryEvent` (message, timer), Nachrichtenfluss zum Randereignis, Nebenweg mit eigenem Ende
+- [x] Tokenspiel: Wahl an Aufgabe und Rahmen (auch vor einem Fehler-Ende im Körper), Nebenwege als eigene Instanzen, vorrangig geschaltet
+- [x] Schwachstellen: viel abgebrochene Arbeit, Frist oft überschritten, Nebenweg länger als sein Schritt
+- [x] Zufallsgenerator (eigener Zufallsstrom, auch ungültige Varianten), Oberfläche (Einstieg im Formular, Fragen, „gilt für die ganze Liste“, „gilt für mehrere“, Danach, Gliederungszeile, Lernhinweis, Symbole), Tests von Hand (`src/analyse/unterbrechung.test.ts`), Browsertests (`e2e/unterbrechung.spec.ts`), Diagramme mit `render.mjs` angesehen (Aufgabe mit drei Randereignissen in drei Bahnen, Abschnitt mit Ende und zwei Unterbrechungen, „für jedes Stück“ mit Nebenweg, „von vorn“, Weg nach oben, drei Zufallsprozesse), Doku
+- [x] Commit und Push
+
+Hinweise für Schritt 4 und später:
+
+- Ein Ausnahmeweg ist eine Kindsequenz wie ein Zweig. Neue Bausteine mit Kindsequenzen müssen in `gliedNebenlaeufig` und `gliedRahmen` sagen, ob ihre Kindsequenz nebenläufig bzw. im Rahmen liegt; Ketten-Prädikate nie über `istRahmen(block)` allein entscheiden.
+- „Weiter beim ersten“ und „in beliebiger Reihenfolge“ sind Rahmen: `layoutRahmen` liefert die Fehler, `layoutRandwege` legt Randereignisse dafür und für Unterbrechungen; `spaltenFuerRand` sorgt für Platz. Der Ad-hoc-Rahmen braucht für seine Zweig-Teilprozesse ebenfalls `merkeZweig`.
+- Tokenspiel: Die Wahl an einem Rahmen fällt in `moeglichkeiten` beim Abschluss der Instanz (`art: 'schritt'`); Abbrüche tragen eine Liste `folgen` (Unterbrechungen der Rahmen auf dem Weg, dann der Abbruch). Eine Terminierung im Rahmen (Schritt 4) läuft über dieselbe Stelle (`abbruch`).
+- Schritt 5: Ein Ende im Ausnahmeweg eines Schritts in nebenläufiger Umgebung ist bis dahin `verklemmung` (Gleichzeitig) bzw. `abbruch` (ODER, Stücke zur selben Zeit); `flussMitUnterbrechungen` zählt Enden im Körper eines Rahmens nur mit dem normalen Anteil, das bleibt so.
 
 ## Schritt 4 – Gleichzeitig: erster und nacheinander
 
@@ -108,7 +117,8 @@ Hinweise für Schritt 3 und später:
 
 - Bedienprobe: Eine Person ohne BPMN-Kenntnis bildet drei Fälle ab (Kunde schickt Unterlagen; Ausweis und/oder Nachweis fehlt; je Position kommissionieren); danach die Texte anpassen.
 - Bewusst nicht übernommen: ODER als Kombinationen abfragen (Format 3 fragt Häufigkeiten je Weg), „übrige Zweige laufen zu Ende“ bei „weiter beim ersten“, zugeklappte Teilprozesse.
-- Annahmen, die in die README-Grenzen kommen: abgebrochene Arbeit zählt voll; Nebenwege verlängern nichts; Unterbrechungen mit festen Anteilen; „in beliebiger Reihenfolge“ in Listenreihenfolge.
+- Annahmen, die in die README-Grenzen kommen: abgebrochene Arbeit zählt voll; „in beliebiger Reihenfolge“ in Listenreihenfolge. (Nebenwege verlängern nichts und Unterbrechungen mit festen Anteilen stehen seit Schritt 3 in den Grenzen.)
+- Abweichungen aus Schritt 3 abnehmen (Details in modellierung-v4.md, „Umsetzung (Schritt 3)“): „Verklemmung“ nur noch bei „Gleichzeitig“, ein Ende in einem ODER-Weg ist der Fehler „Ende neben gleichzeitig laufenden Schritten“; Gliederung mit Symbol statt „⚡“; über die Abgangsspur steht das höchste Ziel ganz rechts; Nebenwege beginnen bei Übergaben an der letzten Aufgabe eines Rahmens; der Anteil einer Unterbrechung an „für jedes Stück“ gilt auch für Vorgänge ohne Stück.
 
 ## Testzahlen
 
@@ -117,3 +127,4 @@ Hinweise für Schritt 3 und später:
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
 | Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
 | Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
+| Schritt 3, Unterbrechung (Commits 5d73e28 und Oberfläche) | 210 in 20 Dateien | 23 |

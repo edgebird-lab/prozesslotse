@@ -1,7 +1,21 @@
-import { unerwartet, type Block } from '../modell/typen'
+import { unerwartet, unterbrechungenVon, type Block } from '../modell/typen'
+
+/** Was bei den Unterbrechungen eines neuen Schritts fehlt: Bezeichnung, Frist über 0, unterbrechende Anteile zusammen höchstens 100 %. */
+function fehltBeiUnterbrechungen(b: Block): string | null {
+  const liste = unterbrechungenVon(b)
+  if (liste.some((u) => !u.bezeichnung.trim())) return 'Jede Unterbrechung braucht eine Bezeichnung, z. B. „Kunde storniert“.'
+  if (liste.some((u) => u.art === 'zeit' && !(u.fristMin > 0))) return 'Eine Frist muss über 0 liegen.'
+  const summe = liste.filter((u) => u.unterbrechend).reduce((s, u) => s + u.anteil, 0)
+  if (summe > 1 + 1e-6) return 'Unterbrechungen, die die Arbeit abbrechen, kommen zusammen in höchstens 100 % der Ausführungen vor.'
+  return null
+}
 
 /** Was fehlt, bevor ein neuer Baustein eingefügt werden kann; `null` wenn alles da ist. */
 export function fehltNoch(b: Block): string | null {
+  return fehltAmBaustein(b) ?? fehltBeiUnterbrechungen(b)
+}
+
+function fehltAmBaustein(b: Block): string | null {
   switch (b.typ) {
     case 'aufgabe':
       return b.name.trim() ? null : 'Gib der Aufgabe zuerst einen Namen.'

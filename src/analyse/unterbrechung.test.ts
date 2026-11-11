@@ -195,6 +195,32 @@ describe('Unterbrechung: Rechnung', () => {
     const sim = simuliere(frist().p, 2_000, 5)
     expect(new Set(sim.zeiten)).toEqual(new Set([540, 1455]))
   })
+
+  it('zählt bei einer Frist am Rahmen die Bearbeitung bis zur Frist, höchstens die des Durchlaufs', () => {
+    // Abschnitt [A: liegt 40, Bearbeitung 30]; Frist 20 Min. in 50 %, danach weiter ohne Schritte
+    const a = aufgabe('Ware prüfen', 30, LAGER, 40)
+    const u = neueUnterbrechung({ bezeichnung: 'Frist', art: 'zeit', fristMin: 20, anteil: 0.5 })
+    const k = berechneKennzahlen(prozess([neuerTeilprozess({ name: 'Prüfen', koerper: neueSequenz([a]), unterbrechungen: [u] })]))
+    // Durchlaufzeit 0,5 · 70 + 0,5 · 20 = 45; TCT 0,5 · 30 + 0,5 · min(20, 30) = 25
+    expect(k.durchlaufzeitMin).toBeCloseTo(45, 9)
+    expect(k.kritischeArbeitMin).toBeCloseTo(25, 9)
+    // die Arbeit zählt voll: 30 Min.
+    expect(k.arbeitszeitMin).toBeCloseTo(30, 9)
+  })
+
+  it('zählt Übergaben vom Rahmen in den Ausnahmeweg und von dort zum Nachfolger', () => {
+    // Abschnitt [A Lager] mit Nachricht 10 %, Ausnahmeweg [B Büro], danach weiter zu C Lager
+    const a = aufgabe('Ware entnehmen', 10)
+    const b = aufgabe('Kunden anrufen', 10, BUERO)
+    const c = aufgabe('Ware verpacken', 10)
+    const u = neueUnterbrechung({ bezeichnung: 'Rückfrage', anteil: 0.1, schritte: [b] })
+    const k = berechneKennzahlen(prozess([neuerTeilprozess({ name: 'Bereitstellen', koerper: neueSequenz([a]), unterbrechungen: [u] }), c]))
+    // A → B (Lager → Büro) 0,1 und B → C (Büro → Lager) 0,1; A → C 0,9 bleibt in der Rolle
+    expect(k.paare.get(`${a.id}>${b.id}`)).toBeCloseTo(0.1, 12)
+    expect(k.paare.get(`${b.id}>${c.id}`)).toBeCloseTo(0.1, 12)
+    expect(k.paare.get(`${a.id}>${c.id}`)).toBeCloseTo(0.9, 12)
+    expect(k.uebergaben).toBeCloseTo(0.2, 12)
+  })
 })
 
 function anteile(layout: ReturnType<typeof erzeugeBpmn>['layout']): Map<string, number> {

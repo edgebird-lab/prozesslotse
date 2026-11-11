@@ -1,13 +1,33 @@
 import { useState } from 'react'
 import { useBestaetigen } from '../frage'
-import { neuerOderZweig, neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
-import { alsMarkierteAufgabe, blockTitel, freigabeAusgang } from '../../modell/operationen'
+import { neuerOderZweig, neueRolle, neuerTeilnehmer, neuesMedium, neueSequenz, neueUnterbrechung, neuerZweig } from '../../modell/bausteine'
+import { alsMarkierteAufgabe, blockTitel, freigabeAusgang, rolleName } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
 import type { RuecksprungZiel } from '../../modell/operationen'
-import { MEDIUM_ARTEN, unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Mehrfach, type Oder, type OderZweig, type Parallel, type Teilprozess, type Warten, type Wiederholung } from '../../modell/typen'
+import {
+  MEDIUM_ARTEN,
+  unerwartet,
+  type Aufgabe,
+  type Block,
+  type Entscheidung,
+  type EntscheidungsZweig,
+  type Id,
+  type MediumArt,
+  type Mehrfach,
+  type NachrichtZeitpunkt,
+  type Oder,
+  type OderZweig,
+  type Parallel,
+  type Teilprozess,
+  type Unterbrechbar,
+  type Unterbrechung,
+  type Warten,
+  type Wiederholung,
+} from '../../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../../modell/zeit'
 import { Auswahl, Feld, ProzentEingabe, ZahlEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
+import { Lernhinweis } from '../Lernhinweis'
 import { Kreuz, Symbol } from '../Symbol'
 
 /** Wie es nach einem Ausgang weitergeht. */
@@ -35,6 +55,27 @@ export interface FormularKontext {
   ersterImKoerper?: boolean
   /** Nur bestehender Abschnitt: löst ihn auf, seine Schritte stehen danach wieder in der Folge */
   loeseAuf?: () => void
+  /** Unterbrechungen: Ziele für „zurück zu …“ (ohne den Schritt selbst) */
+  unterbrechungZiele?: RuecksprungZiel[]
+  /** Unterbrechungen: Ziel für „noch einmal von vorn“ (der Schritt selbst oder der Bereich, der mit ihm beginnt) */
+  vonVornZiel?: Id | null
+  /** Ändert, wie es nach einer Unterbrechung weitergeht; bei bestehenden Schritten ändert ein Rücksprung die Struktur. */
+  setzeUnterbrechungDanach?: (unterbrechungId: Id, danach: Danach) => void
+  /** Wie oft der Schritt je Vorgang läuft, falls bekannt (für „bei Ø 2 Ausführungen …“) */
+  haeufigkeit?: number
+  /** Setzt die Einfügeposition in den Ausnahmeweg (bestehende Schritte) */
+  oeffneWeg?: (unterbrechungId: Id) => void
+  /** „Gilt für die ganze Liste“: hängt die Unterbrechung an den umgebenden Baustein „für jedes Stück“ */
+  fuerListe?: { name: string; anwenden: (unterbrechungId: Id) => void }
+  /** „Gilt für mehrere Schritte“: mögliche letzte Schritte des neuen Abschnitts und das Zusammenfassen */
+  fuerMehrere?: { bis: { index: number; titel: string }[]; anwenden: (unterbrechungId: Id, bis: number, name: string) => void }
+}
+
+/** Setzt die Unterbrechungen eines Schritts; ohne Unterbrechungen fällt das Feld weg. */
+function mitUnterbrechungen<B extends Unterbrechbar>(b: B, liste: Unterbrechung[]): B {
+  if (liste.length > 0) return { ...b, unterbrechungen: liste }
+  const { unterbrechungen: _weg, ...ohne } = b
+  return ohne as B
 }
 
 interface Props<B extends Block> {
@@ -297,6 +338,7 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
           {(id) => <ProzentEingabe id={id} anteil={a.freigabeQuote} onAendern={(freigabeQuote) => setze({ freigabeQuote })} />}
         </Feld>
       ))}
+      <UnterbrechungenFeld schritt={a} onAendern={(liste) => onAendern(mitUnterbrechungen(a, liste))} kontext={kontext} />
     </>
   )
 }
@@ -665,6 +707,7 @@ function TeilprozessFormular({ block: t, onAendern, kontext }: Props<Teilprozess
           <span className="leise">Die Schritte bleiben, nur der Rahmen fällt weg.</span>
         </div>
       )}
+      <UnterbrechungenFeld schritt={t} onAendern={(liste) => onAendern(mitUnterbrechungen(t, liste))} kontext={kontext} />
     </>
   )
 }
@@ -721,6 +764,7 @@ function MehrfachFormular({ block: m, onAendern, kontext }: Props<Mehrfach>) {
             ? `Im Diagramm stehen die Schritte je Stück in einem Rahmen in der Bahn „${bahn}“; Schritte anderer Rollen tragen die Rolle in Klammern.`
             : 'Im Diagramm stehen die Schritte je Stück in einem Rahmen mit Markierung, in der Bahn der Rolle mit den meisten Schritten darin. Ist es nur eine Aufgabe, trägt sie die Markierung selbst.'}
       </p>
+      <UnterbrechungenFeld schritt={m} onAendern={(liste) => onAendern(mitUnterbrechungen(m, liste))} kontext={kontext} />
     </>
   )
 }
@@ -745,5 +789,292 @@ function WartenFormular({ block: w, onAendern, kontext }: Props<Warten>) {
       <Feld label="Wie lange im Schnitt?">{(id) => <ZeitEingabe id={id} wert={w.dauerMin} stundenProTag={p.arbeitsstundenProTag} onAendern={(dauerMin) => onAendern({ ...w, dauerMin })} />}</Feld>
       {w.art === 'nachricht' && <TeilnehmerWahl label="Von wem kommt die Nachricht?" keinText="Von innerhalb (kein externer Beteiligter)" wert={w.von} onAendern={(von) => onAendern({ ...w, von })} />}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Unterbrechungen (Randereignisse) an Aufgabe, Abschnitt und „für jedes Stück“
+
+/** „Kann während dieses Schritts etwas dazwischenkommen?“ mit einer Zeile je Unterbrechung und „normal: …“ darunter. */
+function UnterbrechungenFeld({ schritt, onAendern, kontext }: { schritt: Unterbrechbar; onAendern: (liste: Unterbrechung[]) => void; kontext: FormularKontext }) {
+  const { p } = useApp()
+  const liste = schritt.unterbrechungen ?? []
+  const summe = liste.filter((u) => u.unterbrechend).reduce((s, u) => s + u.anteil, 0)
+  const voll = schritt.typ === 'aufgabe' && liste.length >= 3
+  return (
+    <fieldset className="zweige unterbrechungen">
+      <legend>Kann während dieses Schritts etwas dazwischenkommen?</legend>
+      {liste.length === 0 ? <p className="feld-hilfe">z. B. Kunde storniert, Frist läuft ab. Im Diagramm wird daraus ein Ereignis am Rand des Schritts mit einem eigenen Weg.</p> : <Lernhinweis thema="unterbrechung" />}
+      {liste.map((u, i) => (
+        <UnterbrechungZeile
+          key={u.id}
+          u={u}
+          nr={i + 1}
+          schritt={schritt}
+          kontext={kontext}
+          onAendern={(neu) => onAendern(liste.map((x) => (x.id === u.id ? neu : x)))}
+          onEntfernen={() => onAendern(liste.filter((x) => x.id !== u.id))}
+        />
+      ))}
+      {liste.some((u) => u.unterbrechend) && (
+        <p className={`summe${summe > 1 + 1e-6 ? ' summe-falsch' : ''}`} role="status">
+          {summe > 1 + 1e-6 ? `Zusammen ${formatiereProzent(summe, 1)}: Die Unterbrechungen schließen sich aus, zusammen sind es höchstens 100 %.` : `normal: ${formatiereProzent(Math.max(0, 1 - summe), 1)}`}
+        </p>
+      )}
+      <button type="button" className="knopf knopf-leise" disabled={voll} onClick={() => onAendern([...liste, neueUnterbrechung({ fristMin: 60 * p.arbeitsstundenProTag })])}>
+        + Unterbrechung
+      </button>
+      {voll && <p className="feld-hilfe">An einer Aufgabe haben im Diagramm höchstens drei Unterbrechungen Platz. Für mehr die Schritte zu einem Abschnitt zusammenfassen.</p>}
+    </fieldset>
+  )
+}
+
+function danachVonUnterbrechung(u: Unterbrechung): string {
+  if (u.ende !== null) return 'ende'
+  if (u.zurueckZu !== null) return `zurueck:${u.zurueckZu}`
+  return 'weiter'
+}
+
+/** Eine Unterbrechung: was, Nachricht oder Frist, bricht ab oder nebenher, wie oft, wann, danach. */
+function UnterbrechungZeile({ u, nr, schritt, kontext, onAendern, onEntfernen }: { u: Unterbrechung; nr: number; schritt: Unterbrechbar; kontext: FormularKontext; onAendern: (u: Unterbrechung) => void; onEntfernen: () => void }) {
+  const { p } = useApp()
+  const bestaetige = useBestaetigen()
+  const [mehrere, setMehrere] = useState(false)
+  const std = p.arbeitsstundenProTag
+  const setze = (w: Partial<Unterbrechung>) => onAendern({ ...u, ...w })
+  const name = u.bezeichnung.trim() || `Unterbrechung ${nr}`
+  const titel = blockTitel(schritt)
+  const eingang = schritt.typ === 'aufgabe' ? `bei ${rolleName(p, schritt.rolleId)}` : `bei „${titel}“`
+  const h = kontext.haeufigkeit
+  const q = Math.min(1, Math.max(0, u.anteil))
+  const jeVorgang = h !== undefined && h > 1.05 ? ` Bei Ø ${formatiereZahl(h, 1)} Ausführungen je Vorgang etwa ${formatiereProzent(1 - (1 - q) ** h)} der Vorgänge.` : ''
+  const ziele = kontext.unterbrechungZiele ?? []
+  const danach = (wert: string) => {
+    const d: Danach = wert === 'ende' ? { art: 'ende' } : wert.startsWith('zurueck:') ? { art: 'zurueck', zielId: wert.slice(8) } : { art: 'weiter' }
+    if (kontext.setzeUnterbrechungDanach) return kontext.setzeUnterbrechungDanach(u.id, d)
+    setze({ ende: d.art === 'ende' ? (u.ende ?? '') : null, zurueckZu: d.art === 'zurueck' ? d.zielId : null })
+  }
+  const zielBekannt = u.zurueckZu === null || u.zurueckZu === kontext.vonVornZiel || ziele.some((t) => t.id === u.zurueckZu)
+  return (
+    <div className="zweig-block unterbrechung">
+      <div className="zweig-zeile">
+        <Symbol art={u.unterbrechend ? 'unterbrechung' : 'unterbrechung-neben'} groesse={22} />
+        <input type="text" aria-label={`Was kommt dazwischen? (Unterbrechung ${nr})`} value={u.bezeichnung} placeholder="Was kommt dazwischen? z. B. Kunde storniert" onChange={(e) => setze({ bezeichnung: e.target.value })} />
+        <button
+          type="button"
+          className="knopf-icon"
+          aria-label={`Unterbrechung „${name}“ entfernen`}
+          title="Unterbrechung entfernen"
+          onClick={async () => {
+            if (u.schritte.length > 0 && !(await bestaetige('Unterbrechung entfernen?', `Der Weg nach „${name}“ enthält ${u.schritte.length} Schritte. Sie werden mit entfernt.`, 'Mit Schritten entfernen'))) return
+            onEntfernen()
+          }}
+        >
+          <Kreuz />
+        </button>
+      </div>
+      <div className="eingerueckt">
+        <Auswahl
+          label="Eine Nachricht oder eine Frist?"
+          wert={u.art}
+          spalten={2}
+          optionen={[
+            { wert: 'nachricht', text: 'Eine Nachricht kommt', beschreibung: 'z. B. Storno, Rückfrage', symbol: <Symbol art="warten-nachricht" groesse={22} /> },
+            { wert: 'zeit', text: 'Eine Frist läuft ab', symbol: <Symbol art="warten-zeit" groesse={22} /> },
+          ]}
+          onAendern={(art) => setze({ art, von: art === 'nachricht' ? u.von : null })}
+        />
+        {u.art === 'nachricht' ? (
+          <AbsenderWahl wert={u.von} onAendern={(von) => setze({ von })} />
+        ) : (
+          <Feld label={`Nach welcher Frist, gerechnet ab Eingang ${eingang}?`} hilfe="Ab dem Moment, in dem der Vorgang dort ankommt, Liegezeit eingeschlossen.">
+            {(id) => <ZeitEingabe id={id} wert={u.fristMin} stundenProTag={std} onAendern={(fristMin) => setze({ fristMin })} />}
+          </Feld>
+        )}
+        <Auswahl
+          label="Wird die Arbeit daran dann abgebrochen?"
+          wert={u.unterbrechend ? 'ja' : 'nein'}
+          spalten={2}
+          optionen={[
+            { wert: 'ja', text: 'Ja', beschreibung: 'danach geht es auf dem neuen Weg weiter' },
+            { wert: 'nein', text: 'Nein, sie läuft weiter', beschreibung: 'und zusätzlich passiert etwas' },
+          ]}
+          onAendern={(w) => {
+            const unterbrechend = w === 'ja'
+            if (unterbrechend === u.unterbrechend) return
+            // Ein Nebenweg hat kein „Danach“ (ein Rücksprungbereich ohne Rücksprung löst sich beim Speichern auf); ein Anteil ist höchstens 100 %
+            setze({ unterbrechend, ende: null, zurueckZu: null, anteil: unterbrechend ? Math.min(1, u.anteil) : u.anteil })
+          }}
+        />
+        {u.unterbrechend ? (
+          <>
+            <Feld label={u.art === 'zeit' ? 'Wie oft wird sie überschritten? (in % der Ausführungen)' : 'Wie oft kommt das vor? (in % der Ausführungen)'} hilfe={`Je Ausführung von „${titel}“.${jeVorgang}`}>
+              {(id) => <ProzentEingabe id={id} anteil={u.anteil} onAendern={(anteil) => setze({ anteil })} />}
+            </Feld>
+            {u.art === 'nachricht' && schritt.typ === 'aufgabe' && (
+              <Auswahl
+                label="Wann kommt sie meist?"
+                wert={u.zeitpunkt}
+                spalten={3}
+                optionen={[
+                  { wert: 'vorher' as NachrichtZeitpunkt, text: 'Bevor jemand anfängt' },
+                  { wert: 'waehrend' as NachrichtZeitpunkt, text: 'Während der Arbeit' },
+                  { wert: 'unbekannt' as NachrichtZeitpunkt, text: 'Weiß nicht' },
+                ]}
+                onAendern={(zeitpunkt) => setze({ zeitpunkt })}
+              />
+            )}
+            <div className="zweig-zeile">
+              <label className="danach">
+                <span className="leise">Danach:</span>
+                <select aria-label={`Wie es nach „${name}“ weitergeht`} value={danachVonUnterbrechung(u)} onChange={(e) => danach(e.target.value)}>
+                  <option value="weiter">weiter mit dem nächsten Schritt („{titel}“ bleibt unerledigt)</option>
+                  {!kontext.inParallele && kontext.vonVornZiel && <option value={`zurueck:${kontext.vonVornZiel}`}>„{titel}“ noch einmal von vorn</option>}
+                  {!kontext.inParallele &&
+                    ziele.map((t) => (
+                      <option key={t.id} value={`zurueck:${t.id}`}>
+                        zurück zu „{t.titel}“
+                      </option>
+                    ))}
+                  {!kontext.inParallele && <option value="ende">Prozess endet</option>}
+                  {!zielBekannt && <option value={`zurueck:${u.zurueckZu}`}>zurück (Ziel nicht mehr gültig)</option>}
+                </select>
+              </label>
+              {u.ende !== null && (
+                <input type="text" className="zweig-ende" aria-label={`Ergebnis, wenn „${name}“`} value={u.ende} placeholder="Mit welchem Ergebnis? z. B. Bestellung storniert" onChange={(e) => setze({ ende: e.target.value })} />
+              )}
+            </div>
+          </>
+        ) : (
+          <Feld label="Wie oft im Schnitt je Ausführung?" hilfe={`Auch mehr als einmal, z. B. 1,5. Der Nebenweg läuft neben „${titel}“ her, endet für sich und verlängert den Vorgang nicht.`}>
+            {(id) => <ZahlEingabe id={id} wert={u.anteil} min={0} max={100} onAendern={(anteil) => setze({ anteil })} />}
+          </Feld>
+        )}
+        {(kontext.oeffneWeg || kontext.fuerListe || kontext.fuerMehrere) && (
+          <div className="knopfreihe">
+            {kontext.oeffneWeg && (
+              <button type="button" className="knopf knopf-klein" onClick={() => kontext.oeffneWeg!(u.id)}>
+                Schritte {u.unterbrechend ? 'nach' : 'im Nebenweg'} „{name}“ ({u.schritte.length})
+              </button>
+            )}
+            {kontext.fuerListe && (
+              <button type="button" className="knopf knopf-klein" onClick={() => kontext.fuerListe!.anwenden(u.id)}>
+                Gilt für die ganze Liste „{kontext.fuerListe.name}“
+              </button>
+            )}
+            {kontext.fuerMehrere && kontext.fuerMehrere.bis.length > 0 && (
+              <button type="button" className="knopf knopf-klein" aria-expanded={mehrere} onClick={() => setMehrere((x) => !x)}>
+                Gilt für mehrere Schritte …
+              </button>
+            )}
+          </div>
+        )}
+        {mehrere && kontext.fuerMehrere && <FuerMehrere u={u} name={name} fuerMehrere={kontext.fuerMehrere} onFertig={() => setMehrere(false)} />}
+      </div>
+    </div>
+  )
+}
+
+/** „Gilt für mehrere Schritte“: bis zu welchem Schritt, und wie heißt der neue Abschnitt? */
+function FuerMehrere({ u, name, fuerMehrere, onFertig }: { u: Unterbrechung; name: string; fuerMehrere: NonNullable<FormularKontext['fuerMehrere']>; onFertig: () => void }) {
+  const [bis, setBis] = useState(fuerMehrere.bis[0]?.index ?? 0)
+  const [abschnitt, setAbschnitt] = useState('')
+  return (
+    <div className="eingerueckt" role="group" aria-label={`„${name}“ für mehrere Schritte`}>
+      <p className="feld-hilfe">Die Schritte werden zu einem Abschnitt zusammengefasst; „{name}“ gilt dann für den ganzen Abschnitt.</p>
+      <div className="feldreihe">
+        <Feld label="Bis einschließlich">
+          {(id) => (
+            <select id={id} value={bis} onChange={(e) => setBis(Number(e.target.value))}>
+              {fuerMehrere.bis.map((x) => (
+                <option key={x.index} value={x.index}>
+                  {x.titel}
+                </option>
+              ))}
+            </select>
+          )}
+        </Feld>
+        <Feld label="Wie heißt der Abschnitt?" hilfe="z. B. „Ware bereitstellen“">
+          {(id) => <input id={id} type="text" value={abschnitt} placeholder="z. B. Ware bereitstellen" onChange={(e) => setAbschnitt(e.target.value)} />}
+        </Feld>
+      </div>
+      <div className="knopfreihe">
+        <button
+          type="button"
+          className="knopf knopf-haupt"
+          disabled={!abschnitt.trim()}
+          onClick={() => {
+            fuerMehrere.anwenden(u.id, bis, abschnitt.trim())
+            onFertig()
+          }}
+        >
+          Zusammenfassen
+        </button>
+        <button type="button" className="knopf knopf-leise" onClick={onFertig}>
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Absender einer Nachricht: von innerhalb oder ein externer Beteiligter, auch neu angelegt. */
+function AbsenderWahl({ wert, onAendern }: { wert: Id | null; onAendern: (id: Id | null) => void }) {
+  const { p, aendere } = useApp()
+  const [neu, setNeu] = useState<string | null>(null)
+  const anlegen = () => {
+    if (!neu?.trim()) return
+    const t = neuerTeilnehmer(neu.trim())
+    aendere((q) => ({ ...q, teilnehmer: [...q.teilnehmer, t] }))
+    onAendern(t.id)
+    setNeu(null)
+  }
+  return (
+    <Feld label="Von wem?" hilfe="Ein externer Beteiligter bekommt im Diagramm einen eigenen Pool; seine Nachricht läuft zum Ereignis am Schritt.">
+      {(id) =>
+        neu === null ? (
+          <select
+            id={id}
+            value={wert ?? ''}
+            onChange={(e) => {
+              if (e.target.value === '__neu__') setNeu('')
+              else onAendern(e.target.value || null)
+            }}
+          >
+            <option value="">von innerhalb (kein externer Beteiligter)</option>
+            {p.teilnehmer.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name || 'Unbenannt'}
+              </option>
+            ))}
+            <option value="__neu__">+ Neuer externer Beteiligter …</option>
+          </select>
+        ) : (
+          <span className="inline-anlegen">
+            <input
+              id={id}
+              type="text"
+              autoFocus
+              value={neu}
+              placeholder="z. B. Kunde"
+              onChange={(e) => setNeu(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  anlegen()
+                }
+                if (e.key === 'Escape') setNeu(null)
+              }}
+            />
+            <button type="button" className="knopf" onClick={anlegen}>
+              Anlegen
+            </button>
+            <button type="button" className="knopf knopf-leise" onClick={() => setNeu(null)}>
+              Abbrechen
+            </button>
+          </span>
+        )
+      }
+    </Feld>
   )
 }

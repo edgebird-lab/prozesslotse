@@ -22,6 +22,7 @@ export type LernThema =
   | 'warten'
   | 'teilprozess'
   | 'mehrfach'
+  | 'unterbrechung'
   | 'pruefen'
   | 'verbessern'
 
@@ -103,6 +104,12 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Mehrfachinstanz (Multi-Instance)',
     symbol: 'mehrfach',
     text: 'Die Schritte laufen einmal je Stück, z. B. für jede Position einer Bestellung oder für jeden Lieferanten. Im Diagramm zeigt eine Markierung unten in der Mitte, wie: drei waagerechte Striche heißen der Reihe nach, drei senkrechte zur selben Zeit. Ist es nur eine Aufgabe, trägt sie die Markierung selbst; mehrere Schritte stehen in einem Rahmen. Die Liegezeit, bis jemand mit dem ersten Stück anfängt, zählt einmal, die Bearbeitung je Stück. Zur selben Zeit heißt: so viele Leute wie Stücke, oder man wartet auf mehrere Antworten zugleich.',
+  },
+  unterbrechung: {
+    titel: 'Unterbrechung',
+    bpmn: 'Randereignis (Boundary Event)',
+    symbol: 'unterbrechung',
+    text: 'Ein Ereignis am Rand eines Schritts, z. B. eine Nachricht des Kunden oder eine abgelaufene Frist. Tritt es ein, solange der Schritt läuft, geht es auf dem Weg weiter, der am Ereignis beginnt. Ein durchgezogener Doppelkreis bricht die Arbeit am Schritt ab; danach geht es hinter dem Schritt weiter, zurück, oder der Vorgang endet. Ein gestrichelter Doppelkreis läuft nebenher: Der Schritt geht weiter, und der Nebenweg endet für sich. Wie oft das vorkommt, steht als fester Anteil der Ausführungen am Ereignis.',
   },
   pruefen: {
     titel: 'Was die Zahlen bedeuten',

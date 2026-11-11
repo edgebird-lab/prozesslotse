@@ -1,9 +1,11 @@
-import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useBestaetigen } from '../frage'
+import { berechneKennzahlen } from '../../analyse/kennzahlen'
 import { neueAufgabe, neueEntscheidung, neueId, neuerMehrfach, neueOder, neueParallel, neuerTeilprozess, neuesWarten, neueWiederholung } from '../../modell/bausteine'
 import { abschnittFertig, beschreibeCursor, cursorNachEinfuegen } from '../../modell/fuehrung'
 import {
   aendereBlock,
+  aendereUnterbrechungen,
   bereichTitel,
   blockTitel,
   durchlaufe,
@@ -14,6 +16,7 @@ import {
   findeBlock,
   findeSequenz,
   fuegeEin,
+  gliedRahmen,
   istRahmen,
   kannZusammenfassen,
   kinderSequenzen,
@@ -25,10 +28,14 @@ import {
   rolleName,
   ruecksprungZiele,
   setzeRuecksprung,
+  unterbrechungFuerAbschnitt,
+  unterbrechungVon,
   verschiebeBlock,
+  verschiebeUnterbrechung,
   type Glied,
+  type SequenzFundstelle,
 } from '../../modell/operationen'
-import { unerwartet, type Block, type BlockTyp, type Cursor, type Id, type Mehrfach, type Prozess, type Sequenz, type Teilprozess } from '../../modell/typen'
+import { istUnterbrechbar, unerwartet, unterbrechungenVon, type Block, type BlockTyp, type Cursor, type Id, type Mehrfach, type Prozess, type Sequenz, type Teilprozess, type Unterbrechung } from '../../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../../modell/zeit'
 import { wirksamerCursor } from '../../zustand'
 import { useApp } from '../kontext'
@@ -62,11 +69,50 @@ const TYPNAME: Record<BlockTyp, string> = {
   mehrfach: 'Für jedes Stück',
 }
 
-/** Innerster Baustein „für jedes Stück“ auf der Kette und ob die Stelle als erste direkt in seinem Körper liegt. */
+/** Innerster Baustein „für jedes Stück“ auf der Kette (die Stelle liegt in seinem Körper) und ob sie als erste direkt in seinem Körper liegt. */
 function mehrfachUeber(kette: Glied[], sequenzId: Id, index: number): { mehrfach: Mehrfach | null; ersterImKoerper: boolean } {
-  const glied = [...kette].reverse().find((g) => g.block.typ === 'mehrfach')
+  const glied = [...kette].reverse().find((g) => g.block.typ === 'mehrfach' && gliedRahmen(g))
   const mehrfach = glied?.block.typ === 'mehrfach' ? glied.block : null
   return { mehrfach, ersterImKoerper: !!mehrfach && mehrfach.koerper.id === sequenzId && index === 0 }
+}
+
+/**
+ * Ziele für „zurück zu …“ nach einer Unterbrechung eines Schritts an der Stelle
+ * (Sequenz, Index): die Schritte davor und der Schritt selbst („noch einmal von
+ * vorn“). Beginnt ein Rücksprungbereich mit dem Schritt, ist der Bereich das Ziel.
+ */
+function unterbrechungsZiele(p: Prozess, seq: SequenzFundstelle | null, index: number, schrittId: Id): { vonVorn: Id; ziele: { id: Id; titel: string }[] } {
+  const besitzer = seq?.besitzer
+  const vonVorn = index === 0 && besitzer?.typ === 'wiederholung' && besitzer.modus === 'ruecksprung' ? besitzer.id : schrittId
+  const ziele = seq ? ruecksprungZiele(p, seq.sequenz.id, index, true).filter((z) => z.id !== vonVorn) : []
+  return { vonVorn, ziele }
+}
+
+/** Ändert, wie es nach einer Unterbrechung weitergeht; Rücksprünge verändern die Struktur (wie bei Entscheidungen). */
+function setzeUnterbrechungDanach(q: Prozess, schrittId: Id, unterbrechungId: Id, danach: Danach): Prozess {
+  const schritt = findeBlock(q, schrittId)?.block
+  const u = schritt ? unterbrechungVon(schritt, unterbrechungId) : null
+  if (!u) return q
+  if (danach.art === 'zurueck' && u.zurueckZu === danach.zielId) return q
+  let r = u.zurueckZu !== null ? entferneRuecksprung(q, schrittId, unterbrechungId) : q
+  const setzeEnde = (ende: string | null) => aendereUnterbrechungen(r, schrittId, (liste) => liste.map((x) => (x.id === unterbrechungId ? { ...x, ende } : x)))
+  if (danach.art === 'ende') r = setzeEnde(u.ende ?? '')
+  else if (danach.art === 'weiter') r = setzeEnde(null)
+  else r = setzeRuecksprung(setzeEnde(null), schrittId, unterbrechungId, danach.zielId)
+  return r
+}
+
+/** Kurzer Text einer Unterbrechung für die Gliederung: „Kunde storniert · 10 % · bricht ab · danach endet „storniert““. */
+function unterbrechungText(p: Prozess, u: Unterbrechung): string {
+  const std = p.arbeitsstundenProTag
+  const teile = [u.bezeichnung || 'Unterbrechung ohne Bezeichnung']
+  if (u.art === 'zeit') teile.push(`Frist ${formatiereDauer(u.fristMin, std)}`)
+  if (!u.unterbrechend) return [...teile, 'nebenher', `${formatiereZahl(u.anteil, 2)}-mal`].join(' · ')
+  teile.push(formatiereProzent(u.anteil), 'bricht ab')
+  if (u.ende !== null) teile.push(`danach endet „${u.ende || 'Ende'}“`)
+  else if (u.zurueckZu !== null) teile.push(`danach zurück zu „${zielTitel(p, u.zurueckZu)}“`)
+  else teile.push('danach weiter')
+  return teile.join(' · ')
 }
 
 function lernthema(b: Block): LernThema {
@@ -213,16 +259,26 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
     if (fehlt) return
     aendere(
       (q) => {
-        if (entwurf.typ !== 'entscheidung') return fuegeEin(q, cursor.sequenzId, cursor.index, entwurf)
         // Rücksprungziele sind im Entwurf Block-Kennungen; der Bereich entsteht erst nach dem Einfügen.
-        const ohneZiele = { ...entwurf, zweige: entwurf.zweige.map((z) => ({ ...z, zurueckZu: null })) }
-        let r = fuegeEin(q, cursor.sequenzId, cursor.index, ohneZiele)
-        for (const z of entwurf.zweige) if (z.zurueckZu) r = setzeRuecksprung(r, entwurf.id, z.id, z.zurueckZu)
-        return r
+        if (entwurf.typ === 'entscheidung') {
+          const ohneZiele = { ...entwurf, zweige: entwurf.zweige.map((z) => ({ ...z, zurueckZu: null })) }
+          let r = fuegeEin(q, cursor.sequenzId, cursor.index, ohneZiele)
+          for (const z of entwurf.zweige) if (z.zurueckZu) r = setzeRuecksprung(r, entwurf.id, z.id, z.zurueckZu)
+          return r
+        }
+        if (istUnterbrechbar(entwurf) && entwurf.unterbrechungen?.some((u) => u.zurueckZu)) {
+          const ohneZiele = { ...entwurf, unterbrechungen: entwurf.unterbrechungen.map((u) => ({ ...u, zurueckZu: null })) }
+          let r = fuegeEin(q, cursor.sequenzId, cursor.index, ohneZiele)
+          for (const u of entwurf.unterbrechungen) if (u.zurueckZu) r = setzeRuecksprung(r, entwurf.id, u.id, u.zurueckZu)
+          return r
+        }
+        return fuegeEin(q, cursor.sequenzId, cursor.index, entwurf)
       },
       { cursor: cursorNachEinfuegen(entwurf, cursor), auswahl: null },
     )
   }
+  const stelle = findeSequenz(p, cursor.sequenzId)
+  const zielVorher = ruecksprungZiele(p, cursor.sequenzId, cursor.index, false)
   return (
     <form className="karte karte-frage" onSubmit={hinzufuegen} aria-labelledby="entwurf-titel">
       <h3 id="entwurf-titel">
@@ -237,12 +293,15 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
         onAendern={setEntwurf}
         kontext={{
           vorgaenger: ort.vorgaenger,
-          nachfolger: findeSequenz(p, cursor.sequenzId)?.sequenz.schritte[cursor.index] ?? null,
+          nachfolger: stelle?.sequenz.schritte[cursor.index] ?? null,
           inParallele: ort.inParallele,
           neu: true,
-          ziele: ruecksprungZiele(p, cursor.sequenzId, cursor.index, false),
-          rahmenBahn: istRahmen(entwurf) ? bahnDesAbschnitts(p, entwurf, findeSequenz(p, cursor.sequenzId)?.kette ?? []) : undefined,
-          ...mehrfachUeber(findeSequenz(p, cursor.sequenzId)?.kette ?? [], cursor.sequenzId, cursor.index),
+          ziele: zielVorher,
+          rahmenBahn: istRahmen(entwurf) ? bahnDesAbschnitts(p, entwurf, stelle?.kette ?? []) : undefined,
+          ...mehrfachUeber(stelle?.kette ?? [], cursor.sequenzId, cursor.index),
+          // Unterbrechungen eines neuen Schritts: zurück zu Schritten davor oder zu ihm selbst; ein Bereich entsteht beim Hinzufügen
+          unterbrechungZiele: zielVorher,
+          vonVornZiel: entwurf.id,
         }}
       />
       {fehlt && <p className="feld-hilfe">{fehlt}</p>}
@@ -263,13 +322,18 @@ function BlockBearbeiten() {
   const bestaetige = useBestaetigen()
   const [zusammenfassen, setZusammenfassen] = useState(false)
   const fund = z.auswahl ? findeBlock(p, z.auswahl) : null
+  // Wie oft der Schritt je Vorgang läuft, nur für Schritte mit Unterbrechungen (Live-Anzeige „bei Ø 2 Ausführungen …“)
+  const mitUnterbrechung = !!fund && unterbrechungenVon(fund.block).length > 0
+  const haeufigkeiten = useMemo(() => (mitUnterbrechung ? berechneKennzahlen(p).haeufigkeiten : null), [p, mitUnterbrechung])
   if (!fund) return null
   const b = fund.block
   const vorgaenger = fund.index > 0 ? fund.sequenz.schritte[fund.index - 1] : null
   const kinder = kinderSequenzen(b)
   const anzahlInnen = kinder.reduce((s, k) => s + k.schritte.length, 0)
-  const zweigName = (i: number) =>
-    b.typ === 'entscheidung'
+  const zweigName = (i: number) => {
+    const u = unterbrechungVon(b, kinder[i].id)
+    if (u) return `${u.unterbrechend ? 'Nach' : 'Nebenweg'} „${u.bezeichnung || 'Unterbrechung'}“`
+    return b.typ === 'entscheidung'
       ? `Ausgang „${b.zweige[i].bezeichnung || i + 1}“`
       : b.typ === 'oder'
         ? `Weg „${b.zweige[i].bezeichnung || i + 1}“`
@@ -280,6 +344,13 @@ function BlockBearbeiten() {
             : b.typ === 'mehrfach'
               ? 'Schritte je Stück'
               : 'Wiederholte Schritte'
+  }
+  const seq = findeSequenz(p, fund.sequenz.id)
+  const { vonVorn, ziele: unterbrechungZiele } = unterbrechungsZiele(p, seq, fund.index, b.id)
+  // „Gilt für die ganze Liste“: der innerste Baustein „für jedes Stück“, in dessen Körper der Schritt liegt
+  const liste = mehrfachUeber(fund.kette, fund.sequenz.id, fund.index).mehrfach
+  // „Gilt für mehrere Schritte“: bis zu einem späteren Schritt derselben Folge, soweit kein Rücksprung die neue Grenze quert
+  const bisKandidaten = fund.sequenz.schritte.map((x, i) => ({ index: i, titel: blockTitel(x) })).filter(({ index }) => index > fund.index && kannZusammenfassen(p, fund.sequenz.id, fund.index, index))
 
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return <BereichBearbeiten bereichId={b.id} />
 
@@ -301,7 +372,30 @@ function BlockBearbeiten() {
           setzeDanach: (zweigId, danach) => aendere((q) => setzeDanach(q, b.id, zweigId, danach)),
           rahmenBahn: istRahmen(b) ? bahnDesAbschnitts(p, b, fund.kette) : undefined,
           ...mehrfachUeber(fund.kette, fund.sequenz.id, fund.index),
-          loeseAuf: b.typ === 'teilprozess' ? () => aendere((q) => loeseAbschnittAuf(q, b.id), { auswahl: null }) : undefined,
+          loeseAuf:
+            b.typ === 'teilprozess'
+              ? async () => {
+                  const n = b.unterbrechungen?.length ?? 0
+                  if (n > 0 && !(await bestaetige('Abschnitt auflösen?', `Der Abschnitt hat ${n === 1 ? 'eine Unterbrechung' : `${n} Unterbrechungen`}. Sie gelten nur für den Abschnitt und entfallen mit ihren Wegen.`, 'Auflösen'))) return
+                  aendere((q) => loeseAbschnittAuf(q, b.id), { auswahl: null })
+                }
+              : undefined,
+          unterbrechungZiele,
+          vonVornZiel: vonVorn,
+          setzeUnterbrechungDanach: (uId, danach) => aendere((q) => setzeUnterbrechungDanach(q, b.id, uId, danach)),
+          haeufigkeit: haeufigkeiten?.get(b.id),
+          oeffneWeg: (uId) => {
+            const weg = unterbrechungVon(b, uId)
+            if (weg) dispatch({ typ: 'cursor', cursor: { sequenzId: weg.id, index: weg.schritte.length } })
+          },
+          fuerListe: liste && liste.id !== b.id ? { name: blockTitel(liste), anwenden: (uId) => aendere((q) => verschiebeUnterbrechung(q, b.id, uId, liste.id)) } : undefined,
+          fuerMehrere: {
+            bis: bisKandidaten,
+            anwenden: (uId, bis, name) => {
+              const id = neueId('tp')
+              aendere((q) => unterbrechungFuerAbschnitt(q, fund.sequenz.id, fund.index, bis, name, b.id, uId, id), { auswahl: id })
+            },
+          },
         }}
       />
       {zusammenfassen && <Zusammenfassen sequenz={fund.sequenz} von={fund.index} onFertig={() => setZusammenfassen(false)} />}
@@ -509,6 +603,8 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
     if (b.streuung === 'schwankt') meta += ' · schwankt'
     if (b.liegezeitMin > 0) meta += ` · liegt ${formatiereDauer(b.liegezeitMin, std)}`
   }
+  const unterbrechungen = unterbrechungenVon(b)
+  if (unterbrechungen.length > 0) meta += ` · ${unterbrechungen.length === 1 ? '1 Unterbrechung' : `${unterbrechungen.length} Unterbrechungen`}`
   const gewaehlt = z.auswahl === b.id
   return (
     <>
@@ -565,6 +661,14 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
           <SequenzListe seq={b.koerper} cursor={cursor} />
         </div>
       )}
+      {unterbrechungen.map((u) => (
+        <div key={u.id} className="zweig zweig-unterbrechung">
+          <div className="zweig-kopf">
+            <Symbol art={u.unterbrechend ? 'unterbrechung' : 'unterbrechung-neben'} groesse={16} /> {unterbrechungText(p, u)}
+          </div>
+          <SequenzListe seq={u} cursor={cursor} />
+        </div>
+      ))}
     </>
   )
 }

@@ -74,12 +74,23 @@ const KURZ: Record<string, string> = {
   viele: 'Sehr viele Stücke',
   doppelt: 'Endet und springt',
   ereignis: 'Ereignis fehlt',
+  usumme: 'Unterbrechungen über 100 %',
+  uanteil: 'Anteil ungültig',
+  ufrist: 'Frist fehlt',
+  uviele: 'Zu viele Unterbrechungen',
+  nebenende: 'Ende im Nebenweg',
+  ubezeichnung: 'Unterbrechung ohne Namen',
+  uleer: 'Nebenweg leer',
+  ufristkurz: 'Frist zu kurz',
+  ufristrahmen: 'Frist öfter überschritten',
+  abgebrochen: 'Oft abgebrochen',
+  frist: 'Frist überschritten',
 }
 
 /** Befunde, die im Diagramm ein Abzeichen bekommen (Benennungshinweise nicht). */
 function zeigen(b: Befund): boolean {
   const art = b.schluessel.split(':')[0]
-  return b.schwere !== 'hinweis' || ['freigabe', 'nacharbeit', 'pingpong'].includes(art)
+  return b.schwere !== 'hinweis' || ['freigabe', 'nacharbeit', 'pingpong', 'abgebrochen', 'frist'].includes(art)
 }
 
 /** Das sichtbarste BPMN-Element eines Bausteins: Aufgabe, Verzweigung oder Frage der Wiederholung. */

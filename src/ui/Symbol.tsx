@@ -24,6 +24,8 @@ export type SymbolArt =
   | 'teilprozess'
   | 'mehrfach'
   | 'mehrfach-gleichzeitig'
+  | 'unterbrechung'
+  | 'unterbrechung-neben'
 
 export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
   return (
@@ -182,6 +184,18 @@ function inhalt(art: SymbolArt) {
           <path d="M13 15v7M16 15v7M19 15v7" {...strich} strokeWidth={1.5} />
         </>
       )
+    case 'unterbrechung':
+    case 'unterbrechung-neben': {
+      // Aufgabe mit Doppelkreis auf der Unterkante: durchgezogen bricht ab, gestrichelt läuft nebenher
+      const linie = art === 'unterbrechung-neben' ? { strokeDasharray: '2.2 1.6' } : {}
+      return (
+        <>
+          <path d="M14.5 22H7a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4h18a4 4 0 0 1 4 4v10a4 4 0 0 1-2.2 3.6" {...strich} />
+          <circle cx="20" cy="22" r="5.6" {...strich} strokeWidth={1.4} {...linie} />
+          <circle cx="20" cy="22" r="3.8" {...strich} strokeWidth={1.1} {...linie} />
+        </>
+      )
+    }
     case 'ruecksprung':
       return (
         <>
