@@ -86,3 +86,16 @@ test('Ersetzendes Scannen: offene Vernichtung und eigene Verfahrensdokumentation
   await expect(vorschau(page).getByText('Für „Lieferschein“ gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).')).toBeVisible()
   await expect(vorschau(page).getByText('Verfahrensdokumentation zum ersetzenden Scannen, Stand 01.03.2026')).toBeVisible()
 })
+
+test('„Nicht aufbewahrungspflichtig“ gilt nur steuerlich: Hinweis in der Karte und Einordnung im Dokument (recht-14)', async ({ page }) => {
+  await start(page)
+  await teil(page, 'Belege und Daten').click()
+  const karte = page.getByRole('region', { name: 'Bestellnotiz' })
+  await aufklappen(karte)
+  await karte.getByText('Nicht aufbewahrungspflichtig').click()
+  await expect(karte.getByText('Keine steuerliche Aufbewahrungspflicht; andere Gesetze können eigene Fristen vorschreiben.', { exact: false })).toBeVisible()
+
+  await teil(page, 'Dokumente').click()
+  await expect(vorschau(page).getByRole('cell', { name: 'keine steuerliche Aufbewahrungspflicht' })).toHaveCount(2)
+  await expect(vorschau(page).getByText('nicht aufbewahrungspflichtig')).toHaveCount(0)
+})

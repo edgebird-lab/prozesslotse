@@ -112,7 +112,9 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   // 1
   h(1, '1', 'Vorbemerkungen zur Verfahrensdokumentation')
-  absatz(`Gegenstand dieser Dokumentation ist der Prozess „${name}“ bei ${firma}. Inhalt und jede Änderung bedürfen der Zustimmung von ${u.geschaeftsleitung.trim() || 'offen'} (Geschäftsleitung).`)
+  // Satzbau ohne Artikel vor Freitext; offene Angaben ergeben keinen Satz wie „bei offen“
+  const unternehmen = u.name.trim() ? ` des Unternehmens ${u.name.trim()}` : '; der Name des Unternehmens ist offen'
+  absatz(`Gegenstand dieser Dokumentation ist der Prozess „${name}“${unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung der Geschäftsleitung (${u.geschaeftsleitung.trim() || 'Name offen'}).`)
   absatz(
     kx.version
       ? `Version ${kx.version.bezeichnung}, freigegeben von ${kx.version.freigegebenVon.trim() || 'offen'} am ${formatiereDatum(kx.version.freigegebenAm)}. Sie gilt für das Verfahren, wie es seit dem ${formatiereDatum(kx.version.gueltigAb)} angewandt wird.`
@@ -165,14 +167,15 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   h(2, '2.3', 'Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien')
   absatz(GRUNDLAGEN)
   absatz(FRISTENREGEL)
-  tabelle(['Unterlagen', 'Vorschrift', 'Frist'], FRISTEN_TABELLE)
+  // Kopie: eingefrorene Versionen teilen sich sonst das Modul-Array
+  tabelle(['Unterlagen', 'Vorschrift', 'Frist'], FRISTEN_TABELLE.map((z) => [...z]))
   tabelle(
     ['Nr.', 'Anforderung', 'Bedeutung'],
     KRITERIEN.map(([anforderung, bedeutung], i) => [String(i + 1), anforderung, bedeutung]),
   )
   const unterlagen = unterlagenNachEntstehung(k)
   const laenger = unterlagen.filter((o) => laengerAlsVorgeschrieben(o.d))
-  if (laenger.length > 0) absatz(`Länger als vorgeschrieben werden aufbewahrt: ${laenger.map((o) => o.name).join(', ')}. Grund: ${c.begruendungLaengereAufbewahrung.trim() || 'offen'}.`)
+  if (laenger.length > 0) absatz(`Länger als vorgeschrieben werden aufbewahrt: ${laenger.map((o) => o.name).join(', ')}. Grund: ${c.begruendungLaengereAufbewahrung.trim().replace(/[.\s]+$/, '') || 'offen'}.`)
 
   h(2, '2.4', 'Relevante Dokumente')
   if (unterlagen.length > 0) {
@@ -247,7 +250,8 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   h(2, '3.2', 'Zuständigkeiten')
   tabelle(
-    ['Schritt', 'Rolle', 'System'],
+    // Freigabe und Durchführung der Löschung sind Freitext, dort steht oft ein Name
+    ['Schritt', 'Rolle oder Person', 'System'],
     [
       ...k.aufgaben.map((x) => [
         schrittText(k, x),
@@ -330,11 +334,14 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       const orte = ablageVonObjekt(k, o.d).map((s) => s.name.trim() || 'Unbenannter Ablageort')
       return `„${o.name}“: aufbewahren ${aufbewahrungText(o.d)}; Ablage: ${orte.join(', ') || 'offen'}.`
     }),
-    ...unterlagen.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true && o.d.loeschfrist).map((o) => `„${o.name}“: nicht aufbewahrungspflichtig; löschen ${fristText(o.d.loeschfrist!)}.`),
+    // Beurteilt ist nur das Steuerrecht; andere Gesetze können eigene Fristen haben
+    ...unterlagen.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true && o.d.loeschfrist).map((o) => `„${o.name}“: keine steuerliche Aufbewahrungspflicht (§ 147 AO); löschen ${fristText(o.d.loeschfrist!)}.`),
   ]
   if (saetze.length > 0) liste(saetze)
+  // Aufzählung statt Satz: Rollen und Namen sind Freitext ohne bekannten Artikel
+  const loeschTurnus = c.loeschung.turnus === null ? 'offen' : c.loeschung.turnus === 'keiner' ? 'kein fester' : textVon(LOESCH_TURNUS, c.loeschung.turnus, 'dok')
   absatz(
-    `Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Die Löschung gibt ${c.loeschung.freigabe.trim() || 'offen'} frei, durchgeführt wird sie von ${c.loeschung.durchfuehrung.trim() || 'offen'}, ${c.loeschung.turnus ? textVon(LOESCH_TURNUS, c.loeschung.turnus, 'dok') : 'Turnus offen'}.`,
+    `Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Freigabe der Löschung: ${c.loeschung.freigabe.trim() || 'offen'}. Durchführung: ${c.loeschung.durchfuehrung.trim() || 'offen'}. Turnus: ${loeschTurnus}.`,
   )
 
   // 5

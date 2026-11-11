@@ -220,7 +220,7 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
             {istPflichtig(d.aufbewahrungsart)
               ? `Aufbewahrung: ${aufbewahrungText(d)}${jahre !== null ? `; aus ${jahrVon(heute)} also ${beispielBis(d, jahrVon(heute))}` : ''}.`
               : d.aufbewahrungsart === 'keine'
-                ? 'Keine Aufbewahrungspflicht; enthält es Angaben zu Personen, braucht es eine Löschfrist (Teilschritt „Aufbewahrung und Löschung“).'
+                ? 'Keine steuerliche Aufbewahrungspflicht; andere Gesetze können eigene Fristen vorschreiben. Enthält es Angaben zu Personen, braucht es eine Löschfrist (Teilschritt „Aufbewahrung und Löschung“).'
                 : 'Im Zweifel die Steuerberatung fragen.'}
           </p>
           <KatalogAuswahl label="Wie kommt es an oder entsteht es?" katalog={BELEGFORMEN} wert={d.form} spalten={2} onAendern={(form) => setze({ form }, 'form')} />

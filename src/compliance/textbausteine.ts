@@ -77,7 +77,8 @@ export function iks(mitEinweisung: boolean, offen: { nachweis: string[]; zustaen
 export const DATENSCHUTZ =
   'Zugriff auf die Unterlagen haben nur berechtigte Personen, vom Entstehen bis zur Vernichtung. Wann vernichtet und gelöscht wird, regelt das letzte Unterkapitel von Kapitel 4. Die Schutzmaßnahmen im Einzelnen nennt das Verzeichnis von Verarbeitungstätigkeiten in Abschnitt C.'
 
-export const SYSTEMWECHSEL = 'Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.'
+/** Kapitel 3.1: Vorgabe statt Zusicherung, die Lesbarkeit nach einem Wechsel fragt die App nicht ab */
+export const SYSTEMWECHSEL = 'Bei einem Systemwechsel ist die Lesbarkeit der aufbewahrten Unterlagen sicherzustellen; der Wechsel wird in Kapitel 7 festgehalten.'
 
 export const HISTORIE = 'Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.'
 

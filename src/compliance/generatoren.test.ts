@@ -87,7 +87,7 @@ describe('Verfahrensdokumentation Lieferdienst (9.6)', () => {
     expect(k4).toContain('„Nein“: weiter mit 4.5, danach endet der Vorgang mit „Bestellung storniert“')
     expect(k4).toContain('Wiederholung: 4.6 bis 4.7 laufen mindestens einmal und erneut, solange „Fehler gefunden?“ mit „Ja“ beantwortet wird.')
     expect(k4).toContain('Medienbruch: Daten aus Papier werden von Hand übertragen.')
-    expect(k4).toContain('Kontrolle: Vier-Augen-Prinzip; geprüft wird: Rechnung sachlich und rechnerisch richtig; Nachweis: Im System protokolliert.')
+    expect(k4).toContain('Kontrolle: Vier-Augen-Prinzip; geprüft wird: Rechnung sachlich und rechnerisch richtig; Nachweis: im System protokolliert.')
     expect(k4).toContain('Warten: Neuen Liefertermin abwarten (auf eine Nachricht von Kunde).')
     expect(k4).toContain('Nachricht an Kunde.')
   })

@@ -67,10 +67,20 @@ export function aufbewahrungText(d: DatenobjektAngaben): string {
   return d.aufbewahrungsart === 'keine' ? '–' : 'offen'
 }
 
-/** Löschfrist als Text, z. B. „30 Tage ab Entstehung bzw. Eingang“. */
+/** Löschfrist als Text, z. B. „30 Tage ab Entstehung bzw. Eingang“; Frist 0 ohne Menge, z. B. „bei „Vertragsende““. */
 export function fristText(f: Frist): string {
   const einheit = ZEITEINHEITEN.find((e) => e.wert === f.einheit)
   const menge = `${f.anzahl} ${f.anzahl === 1 ? einheit?.eins : einheit?.viele}`
+  if (f.anzahl === 0) {
+    switch (f.beginn) {
+      case 'entstehung':
+        return 'bei Entstehung bzw. Eingang'
+      case 'jahresende':
+        return 'mit Ende des Kalenderjahres der Entstehung'
+      case 'ereignis':
+        return `bei „${f.ereignis.trim() || 'offen'}“`
+    }
+  }
   switch (f.beginn) {
     case 'entstehung':
       return `${menge} ab Entstehung bzw. Eingang`
