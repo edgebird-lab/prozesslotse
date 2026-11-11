@@ -3,6 +3,7 @@ import { neueAufgabe, neuerProzess } from '../modell/bausteine'
 import { beispielLieferdienst } from '../modell/beispiel'
 import { aendereBlock, fuegeEin } from '../modell/operationen'
 import type { Aufgabe, Prozess } from '../modell/typen'
+import { COMPLIANCE_LERNINHALTE } from '../ui/compliance/lerninhalte'
 import { complianceLieferdienst } from './beispiel'
 import { offenePunkte, pruefeCompliance } from './regeln'
 import { leererKontakt, neueFrist } from './standard'
@@ -258,6 +259,14 @@ describe('recht-21: Länder ohne Artikel in D8 und S3', () => {
   })
 })
 
+describe('recht-21: Lernhinweis zum Löschrecht', () => {
+  it('das Recht auf Löschung tritt bis zum Ende der Aufbewahrungsfrist zurück, nicht bis zu ihrem Beginn (Art. 17 Abs. 3 lit. b DSGVO)', () => {
+    const text = COMPLIANCE_LERNINHALTE.fristen.text
+    expect(text).not.toContain('Bis dahin')
+    expect(text).toContain('Bis die Frist abgelaufen ist, tritt das Recht auf Löschung zurück.')
+  })
+})
+
 describe('bedienung-1: Ablauf ohne Unterlagen', () => {
   const ohneUnterlagen = () =>
     mitAngaben((c) => {
@@ -288,5 +297,10 @@ describe('bedienung-1: Ablauf ohne Unterlagen', () => {
 describe('bedienung-17: ein Wort für dasselbe', () => {
   it('D2 heißt wie sein Text „Datenkategorien“', () => {
     expect(finde(pruefe(mitAngaben((c) => (c.datenobjekte.dob_tourenliste.datenkategorien = []))), 'compliance:D2:dob_tourenliste')?.titel).toBe('Betroffene oder Datenkategorien fehlen')
+  })
+
+  it('der Lernhinweis „Unternehmen“ sagt „besonders geschützte Daten“ wie das Formular, nicht „heikle Daten“', () => {
+    expect(COMPLIANCE_LERNINHALTE.unternehmen.text).not.toContain('heikle')
+    expect(COMPLIANCE_LERNINHALTE.unternehmen.text).toContain('etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören')
   })
 })

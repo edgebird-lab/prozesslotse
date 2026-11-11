@@ -50,7 +50,7 @@ export function VerbessernSchritt() {
   // Streicht ein Vorschlag eine Kontrolle, die in der Verfahrensdokumentation steht, braucht es einen Ersatz
   const gestrichen = useMemo(() => {
     const namen = new Map(alleAufgaben(projekt.ist).map((a) => [a.id, a.name]))
-    return new Map(vorschlaege.map((v) => [v.schluessel, gestricheneKontrollen(projekt, v.anwenden(basis)).map((id) => namen.get(id) || 'Unbenannter Schritt')]))
+    return new Map(vorschlaege.map((v) => [v.schluessel, gestricheneKontrollen(projekt, v.anwenden(basis), basis).map((id) => namen.get(id) || 'Unbenannter Schritt')]))
   }, [vorschlaege, projekt, basis])
   const ist = useAnalyse(projekt.ist).kennzahlen
   const soll = useAnalyse(basis).kennzahlen

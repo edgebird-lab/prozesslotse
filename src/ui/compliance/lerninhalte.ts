@@ -13,7 +13,7 @@ export const COMPLIANCE_LERNINHALTE: Record<ComplianceThema, ComplianceLerninhal
   unternehmen: {
     titel: 'Wer verantwortlich ist',
     quelle: 'Art. 30 Abs. 1 lit. a DSGVO; § 38 BDSG',
-    text: 'Das Verzeichnis nennt den Verantwortlichen mit Anschrift und Kontakt, die Verfahrensdokumentation die Geschäftsleitung, die sie freigibt. Ein Datenschutzbeauftragter ist nötig, wenn in der Regel mindestens 20 Personen ständig mit personenbezogenen Daten am Computer arbeiten. Es gibt weitere Auslöser, etwa wenn heikle Daten zum Kern des Geschäfts gehören.',
+    text: 'Das Verzeichnis nennt den Verantwortlichen mit Anschrift und Kontakt, die Verfahrensdokumentation die Geschäftsleitung, die sie freigibt. Ein Datenschutzbeauftragter ist nötig, wenn in der Regel mindestens 20 Personen ständig mit personenbezogenen Daten am Computer arbeiten. Es gibt weitere Auslöser, etwa wenn besonders geschützte Daten zum Kern des Geschäfts gehören.',
   },
   belege: {
     titel: 'Belege und Daten',
@@ -28,7 +28,7 @@ export const COMPLIANCE_LERNINHALTE: Record<ComplianceThema, ComplianceLerninhal
   fristen: {
     titel: 'Aufbewahren und Löschen',
     quelle: '§ 147 Abs. 3 und 4 AO; Art. 5 Abs. 1 lit. e, Art. 17 Abs. 3 DSGVO',
-    text: 'Die Frist beginnt mit dem Ende des Jahres, in dem die Unterlage entstanden ist. Bis dahin tritt das Recht auf Löschung zurück. Personenbezogene Daten ohne Aufbewahrungspflicht brauchen eine eigene Löschfrist; wer länger aufbewahrt als vorgeschrieben, braucht dafür einen Grund.',
+    text: 'Die Frist beginnt mit dem Ende des Jahres, in dem die Unterlage entstanden ist. Bis die Frist abgelaufen ist, tritt das Recht auf Löschung zurück. Personenbezogene Daten ohne Aufbewahrungspflicht brauchen eine eigene Löschfrist; wer länger aufbewahrt als vorgeschrieben, braucht dafür einen Grund.',
   },
   kontrollen: {
     titel: 'Internes Kontrollsystem',

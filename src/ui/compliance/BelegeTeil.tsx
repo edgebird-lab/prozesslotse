@@ -160,7 +160,8 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
 /** Kurzfassung für eine eingeklappte Karte */
 function zusammenfassung(d: DatenobjektAngaben): string {
   const teile = [
-    textVon(AUFBEWAHRUNGSARTEN, d.aufbewahrungsart, 'dok'),
+    // „offen“ allein sagt nicht, was offen ist; Kapitel 2.4 hat dafür die Spalte „Einordnung“
+    d.aufbewahrungsart === 'unklar' ? 'Einordnung offen' : textVon(AUFBEWAHRUNGSARTEN, d.aufbewahrungsart, 'dok'),
     d.form ? textVon(BELEGFORMEN, d.form, 'dok') : 'Form offen',
     d.personenbezogen === true ? 'personenbezogen' : d.personenbezogen === false ? 'ohne Personenbezug' : 'Personenbezug offen',
   ]

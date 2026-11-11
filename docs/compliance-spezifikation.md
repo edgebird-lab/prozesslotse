@@ -658,7 +658,7 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 
 **4 Aufbewahrung und Löschung**
 
-- Tabelle aller Datenobjekte: Unterlage · Einordnung · gesetzliche Frist · gewählte Frist (Zahl in Jahren, leer = gesetzlich) · frühestes Löschdatum für das laufende Jahr.
+- Tabelle aller Datenobjekte: Unterlage · Einordnung · gesetzliche Frist · gewählte Frist (Zahl in Jahren, leer = gesetzlich) · frühestes Löschdatum für das laufende Jahr, immer der Tag nach dem Fristende: bei Aufbewahrung `vernichtungAb`, bei Löschfristen `fristEnde` plus ein Tag (gleicher Fristtext, gleiches Datum).
 - Knopf „Alle aufbewahrungspflichtigen Unterlagen einheitlich 10 Jahre“ mit Erklärung: Das Muster der BStBK/DStV empfiehlt das; bei personenbezogenen Daten ist eine Begründung nötig. Das Feld „Begründung für die längere Aufbewahrung“ erscheint, sobald eine gewählte Frist über der gesetzlichen liegt.
 - Für personenbezogene Daten ohne Aufbewahrungspflicht: Löschfrist mit Zahl, Einheit (Tage, Monate, Jahre) und Beginn (ab Entstehung bzw. Eingang · ab Ende des Kalenderjahres · nach einem Ereignis mit Text).
 - Löschorganisation: „Wer gibt die Löschung nach Fristablauf frei?“, „Wer führt sie durch?“, „Wie oft wird gelöscht?“ (jährlich · halbjährlich · kein fester Turnus).
@@ -949,7 +949,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 ### 6.10 Weitere Funktionen
 
 - `uebernimmFirmenangaben(ziel, quelle)`: kopiert `unternehmen`, `toms`, `einweisung`, `loeschung`, `begruendungLaengereAufbewahrung`; alles andere bleibt.
-- `gestricheneKontrollen(projekt, kandidat: Prozess): Id[]`: Ids aus `kontrollen`, deren Aufgabe im Ist existiert, im Kandidaten aber nicht. Betroffen ist heute die Regel `freigabe` aus `src/analyse/regeln.ts` (Vorschlag „Freigabe „…“ streichen“). Im Schritt „Verbessern“ zeigt ein Vorschlag dann: „„{Aufgabe}“ ist in der Verfahrensdokumentation als Kontrolle eingetragen. Wird sie gestrichen, braucht es einen Ersatz, z. B. eine Stichprobe.“
+- `gestricheneKontrollen(projekt, kandidat: Prozess, basis: Prozess = Ist): Id[]`: Ids aus `kontrollen`, deren Aufgabe im Ist und in `basis` existiert, im Kandidaten aber nicht. `basis` ist der Prozess, auf den der Vorschlag angewandt wird; „Verbessern“ übergibt das Soll, falls es eines gibt. Fehlt die Kontrolle dort schon (Vorschlag übernommen oder von Hand gelöscht), streicht sie kein weiterer Vorschlag. Betroffen ist heute die Regel `freigabe` aus `src/analyse/regeln.ts` (Vorschlag „Freigabe „…“ streichen“). Im Schritt „Verbessern“ zeigt ein Vorschlag dann: „„{Aufgabe}“ ist in der Verfahrensdokumentation als Kontrolle eingetragen. Wird sie gestrichen, braucht es einen Ersatz, z. B. eine Stichprobe.“
 - Stand je Teilschritt (`fortschritt.ts`): offene Punkte = Befunde der Schwere Fehler oder Warnung mit diesem Teilschritt (`offenePunkte`). Ohne offene Punkte zeigt die Leiste ein Häkchen nur, wenn `hatAngaben(k, t)` gilt, sonst einen grauen Kreis. `hatAngaben` heißt: Unternehmen: ein Feld von `unternehmen` oder `verarbeitung` gefüllt (ohne die vorbelegte laufende Nummer und ohne die Zwecke); Belege: eine Unterlage oder ein Zweck; Systeme: Angaben zu einem System im Einsatz; Fristen: eine gewählte Frist, eine Löschfrist, die Begründung oder die Löschorganisation; Kontrollen: Angaben zu einer Prüfung oder Freigabe im Ablauf, eine weitere Kontrolle oder die Einweisung; Schutzmaßnahmen: eine Maßnahme oder Begründung; Lücken: einer dieser sechs; Dokumente: eine freigegebene Version. Leerzeichen zählen nicht.
 
 ## 7. Technik
@@ -1265,6 +1265,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | Tippen in einem Feld bei 3 Versionen | Schlüssel `prozesslotse:versionen` wird nicht neu geschrieben |
 | `uebernimmFirmenangaben` | 5 Felder übernommen, Unterlagen und Versionen unverändert |
 | `gestricheneKontrollen(9.1, Ergebnis der Regel `freigabe`, Vorschlag „Freigabe „Rechnung freigeben“ streichen“)` | `['auf_freigeben']` |
+| dasselbe mit Soll ohne „Rechnung freigeben“ (Vorschlag übernommen oder von Hand gelöscht), alle Vorschläge auf das Soll angewandt | `[]` bei jedem Vorschlag |
 | `bpmnFuerExport` mit Option „ohne Compliance-Angaben“ | eingebettetes Projekt ohne `compliance`; Projekt in der App unverändert |
 
 ### 9.10 Browsertests (Playwright, Uhr fest auf 11.11.2026)

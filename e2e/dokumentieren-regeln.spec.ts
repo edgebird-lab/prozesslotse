@@ -39,6 +39,8 @@ test('Teilschritte ohne Angaben bleiben neutral; „Beheben“ bei fehlenden Unt
   await expect(name).toBeFocused()
   await name.fill('Rechnung')
   await page.getByRole('button', { name: '+ Unterlage anlegen' }).click()
+  // Die Kartenzeile sagt, was offen ist (bedienung-17)
+  await expect(page.getByText(/^Einordnung offen · Form offen · Personenbezug offen · entsteht in/)).toBeVisible()
   await teil(page, 'Lücken').click()
   await expect(page.getByText('Keine Unterlagen angelegt')).toHaveCount(0)
 })
@@ -94,4 +96,23 @@ test('Ablage im Drittland: Warnung bis zur Bewilligung des Finanzamts, Kapitel 3
   await expect(page.getByText('keine Fehler · 4 Warnungen · 3 Hinweise')).toBeVisible()
   await teil(page, 'Dokumente').click()
   await expect(page.getByRole('tabpanel')).toContainText('„Warenwirtschaft“ bewahrt „Bestellung“ und „Ausgangsrechnung“ im Drittland (USA) auf. Bewilligung des Finanzamts nach § 146 Abs. 2b AO vom 01.02.2026.')
+})
+
+test('„Frühestens löschen“ meint bei Aufbewahrungs- und Löschfrist denselben Tag (logik-10)', async ({ page }) => {
+  await start(page)
+  await teil(page, 'Aufbewahrung und Löschung').click()
+  const tabelle = page.locator('.fristen-tabelle')
+  const fruehestens = (name: string) => tabelle.getByRole('row').filter({ has: page.getByRole('rowheader', { name, exact: true }) }).getByRole('cell').last()
+  // Bestellung: 6 Jahre ab Ende des Kalenderjahres, die Frist endet am 31.12.2032
+  await expect(fruehestens('Bestellung')).toHaveText('01.01.2033')
+
+  const frist = page.getByRole('group', { name: 'Tourenliste' })
+  await frist.getByRole('button', { name: 'Löschfrist festlegen' }).click()
+  // 30 Tage ab Entstehung am 11.11.2026: die Frist endet am 11.12.2026, gelöscht wird frühestens am Tag danach
+  await expect(fruehestens('Tourenliste')).toHaveText('12.12.2026')
+  // dieselbe Frist wie bei der Bestellung ergibt denselben Tag
+  await frist.getByLabel('Anzahl').fill('6')
+  await frist.getByLabel('Einheit').selectOption({ label: 'Jahre' })
+  await frist.getByText('Ab Ende des Kalenderjahres').click()
+  await expect(fruehestens('Tourenliste')).toHaveText('01.01.2033')
 })
