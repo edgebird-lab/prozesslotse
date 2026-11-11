@@ -4,10 +4,10 @@
  */
 import { bereichTitel, blockTitel, durchlaufe, folgtEntscheidung, freigabeQuote, mediumName, parallelName, rolleName, unterbrechungsAnteile } from '../modell/operationen'
 import { sortiereBefunde, type Befund } from '../modell/pruefung'
-import { istUnterbrechbar, type Aufgabe, type Id, type Prozess, type Unterbrechbar } from '../modell/typen'
+import { istUnterbrechbar, type Aufgabe, type Block, type Id, type Prozess, type Unterbrechbar } from '../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
 import type { Kennzahlen } from './kennzahlen'
-import { erwartungGesamt, verteilungBlock, verteilungSequenz } from './verteilung'
+import { erwartungGesamt, masse, verteilungBlock, verteilungSequenz } from './verteilung'
 import { bedienende, WARTEFAKTOR_SCHWELLE } from './warteschlange'
 
 export { WARTEFAKTOR_SCHWELLE }
@@ -70,6 +70,29 @@ function unterbrechungsHinweise(p: Prozess, b: Unterbrechbar, add: (x: Befund) =
   }
 }
 
+/**
+ * Abbruch neben gleichzeitig laufenden Schritten (Gleichzeitig, ODER, Stücke
+ * zur selben Zeit): Endet der Block oft vorzeitig, arbeiten die übrigen Zweige
+ * bis dahin umsonst. Abhilfe ist meist, die Prüfung, die zum Abbruch führt,
+ * vorzuziehen (Knock-out zuerst).
+ */
+function abbruchHinweis(b: Block, add: (x: Befund) => void): void {
+  const gleichlaufend = (b.typ === 'parallel' && b.art === 'alle') || b.typ === 'oder' || (b.typ === 'mehrfach' && b.ausfuehrung === 'gleichzeitig')
+  if (!gleichlaufend) return
+  const teile = verteilungBlock(b.typ === 'mehrfach' ? { ...b, unterbrechungen: undefined } : b, 'gesamt')
+  const abbruch = [...teile.ende.values()].reduce((s, v) => s + masse(v), 0)
+  if (abbruch < UNTERBRECHUNG_SCHWELLE) return
+  const wer = b.typ === 'mehrfach' ? 'ein Stück' : b.typ === 'oder' ? 'ein Weg' : 'ein Zweig'
+  const uebrige = b.typ === 'mehrfach' ? 'die übrigen Stücke' : b.typ === 'oder' ? 'die übrigen Wege' : 'die übrigen Zweige'
+  add({
+    schluessel: `abbruchzweig:${b.id}`,
+    schwere: 'hinweis',
+    titel: 'Arbeit in gleichzeitig laufenden Zweigen wird oft umsonst getan',
+    text: `„${blockTitel(b)}“ endet in ${formatiereProzent(abbruch)} der Durchläufe vorzeitig, weil ${wer} den Vorgang beendet. Was ${uebrige} bis dahin getan haben, ist dann umsonst; die Rechnung zählt es voll. Lässt sich die Prüfung, die zum Abbruch führt, vorziehen, so dass die übrige Arbeit erst danach beginnt?`,
+    blockId: b.id,
+  })
+}
+
 function personenText(n: number, dativ = false): string {
   return n === 1 ? (dativ ? 'einer Person' : 'eine Person') : `${n} Personen`
 }
@@ -110,6 +133,7 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
     const block = fund.block
     const kz = k.schritte.get(block.id)
     if (istUnterbrechbar(block)) unterbrechungsHinweise(p, block, add)
+    abbruchHinweis(block, add)
     if (block.typ === 'aufgabe') {
       aufgaben.set(block.id, block)
       if (kz && k.durchlaufzeitMin > 0 && kz.beitragWartenMin / k.durchlaufzeitMin >= LIEGEZEIT_SCHWELLE) {

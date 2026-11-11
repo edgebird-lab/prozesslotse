@@ -21,6 +21,7 @@ import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { berechneKennzahlen } from './kennzahlen'
 import { simuliere, zufallMitStartwert } from './simulation'
 import { erwartung, masse, verteilungSequenz } from './verteilung'
+import { tokenZeiten } from '../testhilfen/tokenzeiten'
 
 const LAGER = neueRolle('Lager', { personen: 3 })
 const VERSAND = neueRolle('Versand')
@@ -140,7 +141,7 @@ describe('Abschnitt: Rechnung', () => {
       if (Math.abs(gesamt - 1) > 1e-5 || Math.abs(mittel - k.durchlaufzeitMin) > 1e-4 * Math.max(1, k.durchlaufzeitMin)) abweichungen.push(`Startwert ${s}: Teilverteilungen Masse ${gesamt}, Mittel ${mittel} statt ${k.durchlaufzeitMin}`)
       // Häufigkeiten aus dem Tokenspiel = Formeln
       const { layout } = erzeugeBpmn(p)
-      const gezaehltJe = zaehleMitFehler(graphAusLayout(layout), anteile(layout), 3_000, zufallMitStartwert(s))
+      const gezaehltJe = zaehleMitFehler(graphAusLayout(layout), anteile(layout), 3_000, zufallMitStartwert(s), tokenZeiten(p, layout))
       for (const { block } of durchlaufe(p.ablauf)) {
         if (block.typ !== 'aufgabe') continue
         const formel = k.schritte.get(block.id)?.haeufigkeit ?? 0
@@ -211,7 +212,7 @@ describe('Abschnitt: BPMN', () => {
       expect(pruefeSoundness(g).fehler).toEqual([])
       expect(pruefeSoundness(x).fehler).toEqual([])
       const k = berechneKennzahlen(p)
-      const n = zaehleMitFehler(g, anteile(layout), 20_000, zufallMitStartwert(7))
+      const n = zaehleMitFehler(g, anteile(layout), 20_000, zufallMitStartwert(7), tokenZeiten(p, layout))
       for (const { block } of durchlaufe(p.ablauf)) {
         if (block.typ !== 'aufgabe') continue
         const zaehlung = n.get(block.id)!
@@ -361,14 +362,19 @@ describe('Abschnitt: Prüfregeln', () => {
     expect(geometrieFehler(erzeugeBpmn(p).layout)).toEqual([])
   })
 
-  it('meldet ein Ende in einem Abschnitt, der selbst in einem Zweig von Gleichzeitig liegt', () => {
+  it('erlaubt ein Ende in einem Abschnitt, der selbst in einem Zweig von Gleichzeitig liegt (Terminierung hinter dem Randereignis)', () => {
     const par = neueParallel(2)
-    par.zweige[0].schritte = [lieferbar().tp]
+    const { tp } = lieferbar()
+    par.zweige[0].schritte = [tp]
     par.zweige[1].schritte = [aufgabe('Rechnung schreiben', 5)]
     const p = prozess([par])
-    expect(schluessel(p)).toContain('fehler:verklemmung')
-    // Das Tokenspiel bestätigt: Die Zusammenführung wartet ewig.
-    expect(pruefeSoundness(graphAusLayout(erzeugeBpmn(p).layout)).sound).toBe(false)
+    expect(schluessel(p).filter((s) => s.startsWith('fehler'))).toEqual([])
+    // Das Randereignis am Abschnitt führt zu einer Terminierung: Sie bricht auch den anderen Zweig ab, die Zusammenführung wartet nicht ewig.
+    const { layout } = erzeugeBpmn(p)
+    const hinterRand = layout.knoten.filter((k) => k.art === 'ende' && k.blockId === tp.id && (k.rahmen ?? null) === null)
+    expect(hinterRand.length).toBeGreaterThan(0)
+    expect(hinterRand.every((k) => k.terminierung)).toBe(true)
+    expect(pruefeSoundness(graphAusLayout(layout)).fehler).toEqual([])
   })
 })
 
@@ -441,7 +447,8 @@ describe('Tokenspiel mit Rahmen', () => {
     }
     expect(pruefeSoundness(g).fehler).toEqual([])
     const n = zaehleAusfuehrungen(g, new Map([['h2', 0.75], ['h3', 0.25]]), 1, zufallMitStartwert(1))
-    expect(n.size).toBe(0) // keine Aktivitäten, aber der Lauf endet ohne Verklemmung
+    // keine Aktivitäten, nur Endereignisse: Der Lauf endet ohne Verklemmung
+    expect([...n.keys()].every((id) => g.knoten.find((k) => k.id === id)?.typ === 'ende')).toBe(true)
   })
 
   it('beendet mit einer Terminierung nur die eigene Ebene', () => {

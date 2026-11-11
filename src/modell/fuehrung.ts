@@ -2,7 +2,7 @@
  * Führung durch den Ablauf: Wo steht die Einfügeposition, wohin springt sie
  * nach dem Einfügen und was passiert bei „Abschnitt fertig“.
  */
-import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, nebenlaeufig, parallelName, unterbrechungVon } from './operationen'
+import { bereichTitel, blockTitel, findeBlock, findeSequenz, gliedNebenweg, kannWeiterlaufen, nebenlaeufig, parallelName, unterbrechungVon } from './operationen'
 import { unerwartet, type Block, type Cursor, type Prozess } from './typen'
 
 export interface Ort {
@@ -12,8 +12,10 @@ export interface Ort {
   position: string
   /** Schritte an dieser Stelle würden nie erreicht. */
   unerreichbar: boolean
-  /** In nebenläufiger Umgebung (Gleichzeitig, ODER, Stücke zur selben Zeit) darf der Prozess noch nicht enden. */
+  /** In nebenläufiger Umgebung (Gleichzeitig, ODER, Stücke zur selben Zeit): Ein Ende bricht ab, was gleichzeitig läuft; Rücksprünge nur innerhalb. */
   inParallele: boolean
+  /** In einem Nebenweg: Er endet für sich, „Prozess endet“ gibt es dort nicht. */
+  imNebenweg: boolean
   vorgaenger: Block | null
   /** Was „Abschnitt fertig“ bewirkt, als kurzer Text. */
   weiterText: string
@@ -58,6 +60,7 @@ export function beschreibeCursor(p: Prozess, c: Cursor): Ort {
     position: vorgaenger ? `nach „${blockTitel(vorgaenger)}“` : 'am Anfang',
     unerreichbar,
     inParallele: f ? nebenlaeufig(f.kette) : false,
+    imNebenweg: f ? f.kette.some(gliedNebenweg) : false,
     vorgaenger,
     weiterText,
   }

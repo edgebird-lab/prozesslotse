@@ -38,6 +38,7 @@ import { berechneKennzahlen } from './kennzahlen'
 import { findeVorschlaege } from './regeln'
 import { simuliere, zufallMitStartwert } from './simulation'
 import { erwartung, masse, verteilungSequenz } from './verteilung'
+import { tokenZeiten } from '../testhilfen/tokenzeiten'
 
 const LAGER = neueRolle('Lager', { personen: 2 })
 const BUERO = neueRolle('Büro')
@@ -239,7 +240,7 @@ function form(g: TokenGraph): string[] {
 function tokenAbweichungen(p: Prozess, laeufe: number, startwert: number): string[] {
   const { layout } = erzeugeBpmn(p)
   const k = berechneKennzahlen(p)
-  const gezaehlt = zaehleMitFehler(graphAusLayout(layout), anteile(layout), laeufe, zufallMitStartwert(startwert))
+  const gezaehlt = zaehleMitFehler(graphAusLayout(layout), anteile(layout), laeufe, zufallMitStartwert(startwert), tokenZeiten(p, layout))
   const abweichungen: string[] = []
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ !== 'aufgabe') continue
@@ -464,20 +465,25 @@ describe('Unterbrechung: Prüfregeln und Schwachstellen', () => {
     expect(pruefeSoundness(graphAusLayout(erzeugeBpmn(tief).layout)).fehler).toEqual([])
   })
 
-  it('meldet ein Ende nach einer Unterbrechung in „Gleichzeitig“ als Verklemmung, in einem ODER-Weg als Abbruch', () => {
+  it('erlaubt ein Ende nach einer Unterbrechung in „Gleichzeitig“ und in einem ODER-Weg (Terminierung), nicht im Nebenweg', () => {
     const u = neueUnterbrechung({ bezeichnung: 'Storno', anteil: 0.1, ende: 'storniert' })
     const par = neueParallel(2)
     par.zweige[0].schritte = [aufgabe('Ware packen', 10, LAGER, 0, [u])]
     par.zweige[1].schritte = [aufgabe('Rechnung schreiben', 10, BUERO)]
     const p = prozess([par])
-    expect(schluessel(p)).toContain('fehler:verklemmung')
-    expect(pruefeSoundness(graphAusLayout(erzeugeBpmn(p).layout)).sound).toBe(false)
+    expect(schluessel(p).filter((s) => s.startsWith('fehler'))).toEqual([])
+    const { layout } = erzeugeBpmn(p)
+    expect(layout.knoten.find((k) => k.id === `${u.id}_ende`)?.terminierung).toBe(true)
+    expect(pruefeSoundness(graphAusLayout(layout)).fehler).toEqual([])
     const oder = neueOder({ frage: 'Was fehlt?', standard: null, zweige: [neuerOderZweig('A', 0.7, { schritte: [aufgabe('Ware packen', 10, LAGER, 0, [u])] }), neuerOderZweig('B', 0.6, { schritte: [aufgabe('Rechnung schreiben', 10, BUERO)] })] })
     const o = prozess([oder])
-    expect(schluessel(o)).toContain('fehler:abbruch')
-    expect(schluessel(o)).not.toContain('fehler:verklemmung')
-    // die inklusive Zusammenführung wartet nicht auf den beendeten Weg
+    expect(schluessel(o).filter((s) => s.startsWith('fehler'))).toEqual([])
+    // Die inklusive Zusammenführung wartet nicht auf den beendeten Weg; die Terminierung beendet alles.
     expect(pruefeSoundness(graphAusLayout(erzeugeBpmn(o).layout)).fehler).toEqual([])
+    // Im Nebenweg bleibt ein Ende ein Fehler: Ein Nebenweg endet für sich.
+    const ende = neueEntscheidung({ frage: 'Geklärt?', zweige: [neuerZweig('Ja', 0.8), neuerZweig('Nein', 0.2, { ende: 'offen' })] })
+    const neben = prozess([aufgabe('Ware packen', 10, LAGER, 0, [neueUnterbrechung({ bezeichnung: 'Rückfrage', unterbrechend: false, anteil: 0.5, schritte: [aufgabe('Kunde informieren', 5, BUERO), ende] })])])
+    expect(schluessel(neben)).toContain('fehler:nebenende')
   })
 
   it('erlaubt ein Ende nach der Unterbrechung eines Schritts in einem Abschnitt (Fehler-Ende, gefangen am Abschnitt)', () => {

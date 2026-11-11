@@ -116,18 +116,32 @@ Hinweise für Schritt 5:
 
 ## Schritt 5 – Abbruch in nebenläufiger Umgebung
 
-- [ ] „Prozess endet“ an nebenläufigen Stellen erlauben (außer Nebenweg), Formulartext, Prüfregel „Verklemmung“ nur noch für Rücksprünge
-- [ ] Export: Terminierung auf Prozessebene, Fehler-Ende mit Terminierung hinter dem Randereignis
-- [ ] Abbruchkombination für Gleichzeitig, ODER (mit und ohne Standardweg), Mehrfach gleichzeitig, erster; Ergebnisanteile mit Gleichstandsregel; Simulation (frühester Abbruch)
-- [ ] Korrektur ODER-Übergaben (Vorgänger läuft nur über leere gewählte Wege durch)
-- [ ] Zufallsgenerator, Tests von Hand, Browsertest, Diagramm angesehen, README-Grenzen vollständig
-- [ ] Commit und Push
+Fertig am 2026-11-11, Commit „Abbruch neben gleichzeitig laufenden Schritten“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 5)“.
+
+- [x] „Prozess endet“ an nebenläufigen Stellen erlauben (außer Nebenweg), Formulartext „Prozess endet sofort; was gleichzeitig läuft, wird abgebrochen“, Prüfregel „Verklemmung“ nur noch für Rücksprünge; `ausgaengeBlock` für ODER (weiter, wenn eine mögliche Auswahl weiterkommt)
+- [x] Export: Terminierung mit Ergebnis auf Prozessebene, Fehler-Ende im Rahmen mit Terminierung hinter dem Randereignis, wenn der äußerste Rahmen nebenläufig liegt; Gleichzeitig ohne Zusammenführung, wenn ein Zweig immer endet
+- [x] Abbruchkombination (`gleichlauf` mit `Mischung`) für Gleichzeitig und ODER (mit und ohne Standardweg), `stueckeGleichzeitig` für Mehrfach gleichzeitig, „erster“ wie gehabt; Ergebnisanteile aus den Zeiten mit Gleichstandsregel; TCT mit Bearbeitungszeiten; Simulation (frühester Abbruch)
+- [x] Korrektur der Übergaben bei ODER (und Gleichzeitig): Vorgänger läuft nur durch, wenn ein gewählter Weg ohne Aufgabe bleibt und alle weiterlaufen
+- [x] Tokenspiel: Uhren je Marke für die Zählung, Wahl des Abbruchs (`waehleAbbruch`), Unterbrechungen je Rahmen-Ausführung einmal gewürfelt, ODER-Zusammenführung wartet auf Abbrüche in ihren Wegen (auch in der Suche), Richtung der Gateways aus Layout und XML; Ergebnisanteile werden verglichen
+- [x] Schwachstelle „Arbeit in gleichzeitig laufenden Zweigen wird oft umsonst getan“ (ab 20 % Abbruch), Abzeichen „Arbeit umsonst“
+- [x] Oberfläche: Option je Ort, nicht im Nebenweg, Lernhinweis „Prozess endet sofort“ mit Symbol, Lernhinweis „Gleichzeitig“ angepasst, Gliederung „endet sofort“
+- [x] Numerik: Massen über Rundungsrauschen bleiben erhalten, Rest der geometrischen Reihe exakt (Masse der Teilverteilungen 1 auch bei tiefen Schleifen)
+- [x] Zufallsgenerator (eigene Zufallsströme), Tests von Hand (`src/analyse/abbruch.test.ts`), Browsertest (`e2e/abbruch.spec.ts`), Diagramme mit `render.mjs` angesehen (Gleichzeitig mit Terminierung und Abschnitt, ODER mit Standardweg, Stücke zur selben Zeit mit Unterbrechung, Gleichzeitig ohne Zusammenführung, zwei Zufallsprozesse), README-Grenzen vollständig, `datenmodell.md`, `fragenkatalog.md`
+- [x] Commit und Push
+
+Hinweise für die abschließende Prüfung:
+
+- Die Zählung im Tokenspiel braucht die Zeiten aus dem Modell (`tokenZeiten`); ohne sie entscheidet bei mehreren anstehenden Abbrüchen nur die Stelle im Modell. Auf dem aus dem XML gelesenen Graph wird deshalb nur die Soundness geprüft, nicht gezählt.
+- Die Regel „ODER-Zusammenführung wartet auf Abbrüche in ihren Wegen“ gilt jetzt auch in der Suche. Ohne sie sprengten fünf Zufallsprozesse (Schleife um eine ODER-Verzweigung mit Abbruch) den Zustandsraum, weil nach „Abbruch zuletzt“ die Schleife weiterlief und sich Marken vor der Terminierung stauten. Sie ist eine Reihenfolge, die BPMN erlaubt; die README nennt die Abweichung zur Zeitsemantik.
+- Rücksprünge innerhalb eines Zweigs von Gleichzeitig erlauben Modell und Prüfung, das Formular bietet sie nicht an (unverändert seit Format 3).
+- Probe außerhalb der festen Tests: alle 226 Zufallsprozesse mit Abbruch unter den Startwerten 1 bis 600 stimmen in Simulation, Verteilung, Tokenspiel (Häufigkeiten und Ergebnisse) und Soundness überein.
 
 ## Offen für Robin
 
 - Bedienprobe: Eine Person ohne BPMN-Kenntnis bildet drei Fälle ab (Kunde schickt Unterlagen; Ausweis und/oder Nachweis fehlt; je Position kommissionieren); danach die Texte anpassen.
 - Bewusst nicht übernommen: ODER als Kombinationen abfragen (Format 3 fragt Häufigkeiten je Weg), „übrige Zweige laufen zu Ende“ bei „weiter beim ersten“, zugeklappte Teilprozesse.
-- Annahmen in den README-Grenzen: abgebrochene Arbeit zählt voll, „weiter beim ersten“ bricht ab, „in beliebiger Reihenfolge“ in Listenreihenfolge (seit Schritt 4), Nebenwege verlängern nichts und Unterbrechungen mit festen Anteilen (seit Schritt 3).
+- Annahmen in den README-Grenzen: abgebrochene Arbeit zählt voll, „weiter beim ersten“ bricht ab, „in beliebiger Reihenfolge“ in Listenreihenfolge (seit Schritt 4), Nebenwege verlängern nichts und Unterbrechungen mit festen Anteilen (seit Schritt 3), der früheste Abbruch nach Durchschnittszeiten und Schritte hinter einer ODER-Zusammenführung zählen nicht, wenn ein Weg den Vorgang beendet (seit Schritt 5).
+- Abweichungen aus Schritt 5 abnehmen (Details in modellierung-v4.md, „Umsetzung (Schritt 5)“): Die Übergaben-Korrektur gilt auch für Gleichzeitig (vorher das Maximum über die Zweige); Gleichzeitig mit einem Zweig, der immer endet, hat keine Zusammenführung, die übrigen Zweige enden ohne Ergebnis; neue Schwachstelle „Arbeit umsonst“.
 - Abweichungen aus Schritt 4 abnehmen (Details in modellierung-v4.md, „Umsetzung (Schritt 4)“): neuer Hinweis und neue Warnung zur Listenreihenfolge bei „in beliebiger Reihenfolge“; „kein Zeitgewinn“ auch dann, wenn ein Zweig sicher gewinnt; Ein- und Austritt des Ad-hoc-Rahmens liegen auf der Höhe der ersten Aktivität, der Pfeil endet also kurz vor deren Rahmen.
 - Abweichungen aus Schritt 3 abnehmen (Details in modellierung-v4.md, „Umsetzung (Schritt 3)“): „Verklemmung“ nur noch bei „Gleichzeitig“, ein Ende in einem ODER-Weg ist der Fehler „Ende neben gleichzeitig laufenden Schritten“; Gliederung mit Symbol statt „⚡“; über die Abgangsspur steht das höchste Ziel ganz rechts; Nebenwege beginnen bei Übergaben an der letzten Aufgabe eines Rahmens; der Anteil einer Unterbrechung an „für jedes Stück“ gilt auch für Vorgänge ohne Stück.
 
@@ -140,3 +154,4 @@ Hinweise für Schritt 5:
 | Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
 | Schritt 3, Unterbrechung (Commits 5d73e28 und addb89b) | 210 in 20 Dateien | 23 |
 | Schritt 4, Gleichzeitig-Arten (Commit 3c1d07f) | 231 in 21 Dateien | 25 |
+| Schritt 5, Abbruch | 253 in 22 Dateien | 26 |

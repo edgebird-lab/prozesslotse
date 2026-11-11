@@ -69,7 +69,6 @@ const KURZ: Record<string, string> = {
   zeit: 'Ohne Zeit',
   rueckziel: 'Rücksprung ins Leere',
   rahmenrueck: 'Rücksprung aus Rahmen',
-  abbruch: 'Ende neben Gleichzeitigem',
   anzahl: 'Anzahl ungültig',
   nie: 'Läuft nie',
   viele: 'Sehr viele Stücke',
@@ -86,12 +85,13 @@ const KURZ: Record<string, string> = {
   ufristrahmen: 'Frist öfter überschritten',
   abgebrochen: 'Oft abgebrochen',
   frist: 'Frist überschritten',
+  abbruchzweig: 'Arbeit umsonst',
 }
 
 /** Befunde, die im Diagramm ein Abzeichen bekommen (Benennungshinweise nicht). */
 function zeigen(b: Befund): boolean {
   const art = b.schluessel.split(':')[0]
-  return b.schwere !== 'hinweis' || ['freigabe', 'nacharbeit', 'pingpong', 'abgebrochen', 'frist'].includes(art)
+  return b.schwere !== 'hinweis' || ['freigabe', 'nacharbeit', 'pingpong', 'abgebrochen', 'frist', 'abbruchzweig'].includes(art)
 }
 
 /** Das sichtbarste BPMN-Element eines Bausteins: Aufgabe, Verzweigung oder Frage der Wiederholung. */

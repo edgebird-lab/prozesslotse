@@ -23,7 +23,8 @@ import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { findeSchwachstellen } from './hinweise'
 import { berechneKennzahlen } from './kennzahlen'
 import { simuliere, zufallMitStartwert } from './simulation'
-import { erwartung, masse, verteilungSequenz, zuerstFertig } from './verteilung'
+import { erwartung, ersterAusgang, masse, verteilungSequenz, zuerstFertig } from './verteilung'
+import { tokenZeiten } from '../testhilfen/tokenzeiten'
 
 const LAGER = neueRolle('Lager', { personen: 1 })
 const BUERO = neueRolle('Büro')
@@ -78,7 +79,7 @@ function form(g: TokenGraph): string[] {
 function tokenAbweichungen(p: Prozess, laeufe: number, startwert: number): string[] {
   const { layout } = erzeugeBpmn(p)
   const k = berechneKennzahlen(p)
-  const gezaehlt = zaehleMitFehler(graphAusLayout(layout), anteile(layout), laeufe, zufallMitStartwert(startwert))
+  const gezaehlt = zaehleMitFehler(graphAusLayout(layout), anteile(layout), laeufe, zufallMitStartwert(startwert), tokenZeiten(p, layout))
   const abweichungen: string[] = []
   const vergleiche = (name: string, id: string, formel: number) => {
     const x = gezaehlt.get(id) ?? { mittel: 0, fehler: 0 }
@@ -86,8 +87,12 @@ function tokenAbweichungen(p: Prozess, laeufe: number, startwert: number): strin
   }
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ === 'aufgabe') vergleiche(block.name, block.id, k.schritte.get(block.id)?.haeufigkeit ?? 0)
-    // Wie oft ein Zweig von „weiter beim ersten“ zuerst fertig ist: am Endereignis gewürfelt, gezählt wie die Terminierung
-    if (block.typ === 'parallel' && block.art === 'erster') for (const z of block.zweige) vergleiche(`zuerst ${z.id}`, `${z.id}_ende`, k.zuerstFertig.get(z.id) ?? 0)
+    // Wie oft ein Zweig von „weiter beim ersten“ normal zuerst fertig ist, gezählt an seiner Terminierung (wer mit einem Ende
+    // gewinnt, endet am Fehler-Ende); ohne Enden in den Zweigen ist das `zuerstFertig`
+    if (block.typ === 'parallel' && block.art === 'erster') {
+      const je = ersterAusgang(block, 'gesamt').je
+      block.zweige.forEach((z, i) => vergleiche(`zuerst ${z.id}`, `${z.id}_ende`, (k.haeufigkeiten.get(block.id) ?? 0) * je[i].weiter))
+    }
   }
   return abweichungen
 }
@@ -209,19 +214,20 @@ describe('In beliebiger Reihenfolge: Rechnung', () => {
 describe('Arten von Gleichzeitig: Prüfregeln und Operationen', () => {
   const schluessel = (p: Prozess) => pruefeProzess(p).map((b) => `${b.schwere}:${b.schluessel.split(':')[0]}`)
 
-  it('erlaubt ein Ende nur in „in beliebiger Reihenfolge“; bei „weiter beim ersten“ ist es bis zum Abbruch ein Fehler', () => {
+  it('erlaubt ein Ende in den Zweigen aller Arten; es bricht ab, was gleichzeitig läuft', () => {
     const endet = () => neueEntscheidung({ frage: 'Abgelehnt?', zweige: [neuerZweig('Nein', 0.8), neuerZweig('Ja', 0.2, { ende: 'abgelehnt' })] })
     const erster = prozess([gleichzeitig('erster', [aufgabe('A', 10), endet()], [aufgabe('B', 20)])])
-    const befund = pruefeProzess(erster).find((b) => b.schluessel.startsWith('abbruch:'))
-    expect(befund?.schwere).toBe('fehler')
-    expect(befund?.text).toContain('in einem Zweig von „Weiter beim ersten“')
+    expect(schluessel(erster).filter((s) => s.startsWith('fehler'))).toEqual([])
     const nacheinander = prozess([gleichzeitig('nacheinander', [aufgabe('A', 10), endet()], [aufgabe('B', 20)])])
     expect(schluessel(nacheinander).filter((s) => s.startsWith('fehler'))).toEqual([])
     // Zweig 1 kann den Vorgang beenden: Die Reihenfolge der Liste zählt für die Rechnung
     expect(schluessel(nacheinander)).toContain('hinweis:adhocreihe')
-    // In einem Zweig von „Gleichzeitig“ verklemmt das Ende: Die Zusammenführung wartet ewig
-    const verklemmt = prozess([gleichzeitig('alle', [gleichzeitig('nacheinander', [aufgabe('A', 10), endet()], [aufgabe('B', 20)])], [aufgabe('C', 5)])])
-    expect(schluessel(verklemmt)).toContain('fehler:verklemmung')
+    // In einem Zweig von „Gleichzeitig“ (bis Schritt 5 eine Verklemmung): Fehler-Ende im Ad-hoc-Rahmen, hinter dessen Randereignis eine Terminierung
+    const aussen = prozess([gleichzeitig('alle', [gleichzeitig('nacheinander', [aufgabe('A', 10), endet()], [aufgabe('B', 20)])], [aufgabe('C', 5)])])
+    expect(schluessel(aussen).filter((s) => s.startsWith('fehler'))).toEqual([])
+    const { layout } = erzeugeBpmn(aussen)
+    expect(layout.knoten.filter((k) => k.art === 'ende' && k.name === 'abgelehnt').map((k) => (k.fehler ? 'fehler' : k.terminierung ? 'terminierung' : 'normal')).sort()).toEqual(['fehler', 'terminierung'])
+    expect(pruefeSoundness(graphAusLayout(layout)).fehler).toEqual([])
   })
 
   it('warnt, wenn ein Zweig vorn den Vorgang immer beendet', () => {

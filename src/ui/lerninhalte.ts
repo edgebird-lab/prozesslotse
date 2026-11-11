@@ -25,6 +25,7 @@ export type LernThema =
   | 'teilprozess'
   | 'mehrfach'
   | 'unterbrechung'
+  | 'abbruch'
   | 'pruefen'
   | 'verbessern'
 
@@ -75,7 +76,7 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     titel: 'Gleichzeitig',
     bpmn: 'Paralleles Gateway (AND)',
     symbol: 'und',
-    text: 'Eine Raute mit Plus: Alle Zweige laufen gleichzeitig los. Weiter geht es erst, wenn alle fertig sind; die Dauer bestimmt der längste Zweig. Deshalb darf ein Zweig hier den Prozess nicht beenden, sonst würde die Zusammenführung ewig warten.',
+    text: 'Eine Raute mit Plus: Alle Zweige laufen gleichzeitig los. Weiter geht es erst, wenn alle fertig sind; die Dauer bestimmt der längste Zweig. Beendet ein Zweig den Prozess, wird abgebrochen, was in den anderen Zweigen noch läuft (im Diagramm ein dicker Kreis mit gefülltem Punkt).',
   },
   erster: {
     titel: 'Weiter beim ersten',
@@ -124,6 +125,12 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Randereignis (Boundary Event)',
     symbol: 'unterbrechung',
     text: 'Ein Ereignis am Rand eines Schritts, z. B. eine Nachricht des Kunden oder eine abgelaufene Frist. Tritt es ein, solange der Schritt läuft, geht es auf dem Weg weiter, der am Ereignis beginnt. Ein durchgezogener Doppelkreis bricht die Arbeit am Schritt ab; danach geht es hinter dem Schritt weiter, zurück, oder der Vorgang endet. Ein gestrichelter Doppelkreis läuft nebenher: Der Schritt geht weiter, und der Nebenweg endet für sich. Wie oft das vorkommt, steht als fester Anteil der Ausführungen am Ereignis.',
+  },
+  abbruch: {
+    titel: 'Prozess endet sofort',
+    bpmn: 'Terminierungs-Endereignis',
+    symbol: 'ende-terminierung',
+    text: 'Endet der Prozess an einer Stelle, neben der noch etwas anderes läuft (ein anderer Zweig, ein anderer Weg, ein anderes Stück), wird alles abgebrochen, was noch läuft. Im Diagramm ist das ein dicker Kreis mit gefülltem Punkt (Terminierung). In einem Rahmen steht stattdessen ein Ende mit Blitz: der Ausstieg aus dem Rahmen, kein technischer Fehler; hinter dem Blitz am Rand folgt die Terminierung. Gerechnet wird mit dem ersten Abbruch; was die anderen Zweige bis dahin getan haben, zählt voll.',
   },
   pruefen: {
     titel: 'Was die Zahlen bedeuten',

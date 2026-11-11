@@ -16,6 +16,9 @@
  *    Bei Gleichzeitig zählt der Erwartungswert des Maximums der Zweige, aus
  *    den Verteilungen der Zweigdauern berechnet (verteilung.ts); das
  *    Maximum der Erwartungswerte wäre zu optimistisch, sobald Zweige streuen.
+ *    Beendet ein Zweig (ODER-Weg, Stück zur selben Zeit) den Vorgang, gilt der
+ *    früheste Abbruch (Abbruchkombination in verteilung.ts); die Arbeit der
+ *    übrigen zählt voll, die Ergebnisanteile kommen aus den Zeiten.
  *    Die Flusseffizienz ist TCT / CT (Dumas u. a.): dieselben Regeln, einmal
  *    nur mit Bearbeitungszeiten (TCT) und einmal mit allen Zeiten (CT).
  *
@@ -32,8 +35,8 @@
  * an einem Rahmen die halbe Dauer des Durchlaufs; Nebenwege verlängern nichts.
  */
 import { anzahlVerteilung, erwartungLaeufe, erwartungPotenz, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
-import { durchlaufe, nachrichtenVerweise, nebenwegAnzahl, oderWahrscheinlichkeiten, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
-import { erwartungGesamt, erwartungMaximum, erwartungMinimum, erwartungOder, ersterAusgang, masse, verteilungMehrfach } from './verteilung'
+import { alleMischung, durchlaufe, nachrichtenVerweise, nebenwegAnzahl, oderMischung, oderWahrscheinlichkeiten, unterbrechungsAnteile, unterbrechungsZeit, type Mischung } from '../modell/operationen'
+import { erwartungGesamt, erwartungMinimum, ersterAusgang, gleichlauf, masse, verteilungMehrfach, verteilungOder, verteilungSequenz, type Teilverteilungen } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
 import { unerwartet, unterbrechungenVon, type Aufgabe, type Block, type Id, type Mehrfach, type Parallel, type Prozess, type Rolle, type Teilnehmer, type Unterbrechbar } from '../modell/typen'
 
@@ -320,40 +323,28 @@ function flussOhneUnterbrechung(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): E
           return unerwartet(art)
       }
       if (b.zweige.length === 0) return { aus: f, rueck: new Map() }
-      let anteil = Infinity
-      const letzte = new Map<string, number>()
-      const rueck = new Map<Id, Fluss>()
-      for (const zweig of b.zweige) {
-        const o = flussSequenz(zweig.schritte, f, z, ctx)
-        addiereRueck(rueck, o.rueck)
-        anteil = Math.min(anteil, o.aus.anteil)
-        for (const [k, w] of o.aus.letzte) {
-          // Läuft derselbe Vorgänger durch mehrere Zweige ohne Aufgabe, zählt er einmal.
-          if (f.letzte.has(k)) letzte.set(k, Math.max(letzte.get(k) ?? 0, w))
-          else plus(letzte, k, w)
-        }
-      }
-      return { aus: { anteil, letzte }, rueck }
+      // Alle Zweige laufen ganz; der früheste Abbruch beendet den Vorgang (Abbruchkombination).
+      return flussGleichlauf(
+        b.zweige.map((zweig) => zweig.schritte),
+        b.zweige.map(() => 1),
+        alleMischung,
+        gleichlauf(b.zweige.map((zweig) => verteilungSequenz(zweig.schritte, 'gesamt')), alleMischung),
+        f,
+        z,
+        ctx,
+      )
     }
-    case 'oder': {
-      // Jeder Weg läuft mit seiner Wahrscheinlichkeit; danach geht es mit dem ganzen Fluss weiter.
-      const p = oderWahrscheinlichkeiten(b)
-      const letzte = new Map<string, number>()
-      const rueck = new Map<Id, Fluss>()
-      let weiter = 1
-      b.zweige.forEach((zweig, i) => {
-        const o = flussSequenz(zweig.schritte, skaliere(f, p[i]), z, ctx)
-        addiereRueck(rueck, o.rueck)
-        // Ein Weg, der den Prozess beendet, nimmt seinen Anteil mit (die Prüfung meldet das als Fehler).
-        if (f.anteil > 0) weiter *= 1 - p[i] + o.aus.anteil / f.anteil
-        for (const [k, w] of o.aus.letzte) {
-          if (f.letzte.has(k)) letzte.set(k, Math.max(letzte.get(k) ?? 0, w))
-          else plus(letzte, k, w)
-        }
-      })
-      // Es läuft immer mindestens ein Weg (Standardweg oder „mindestens einer“).
-      return { aus: { anteil: f.anteil * weiter, letzte }, rueck }
-    }
+    case 'oder':
+      // Jeder Weg läuft so oft, wie er vorkommt; weiter geht es, wenn alle gewählten Wege normal fertig sind.
+      return flussGleichlauf(
+        b.zweige.map((zweig) => zweig.schritte),
+        oderWahrscheinlichkeiten(b),
+        oderMischung(b),
+        verteilungOder(b, 'gesamt'),
+        f,
+        z,
+        ctx,
+      )
     case 'wiederholung': {
       // Antwort des Körpers auf einen Einheitsfluss, ohne zu zählen.
       const sonde = flussSequenz(b.koerper.schritte, { anteil: 1, letzte: new Map([[SONDE, 1]]) }, neueZaehler(), ctx)
@@ -383,6 +374,67 @@ function flussOhneUnterbrechung(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): E
     default:
       return unerwartet(b)
   }
+}
+
+let durchNr = 0
+
+/**
+ * Teile, die zugleich laufen (Zweige von Gleichzeitig, ODER-Wege): Teil i läuft
+ * mit dem Zufluss · `auswahl[i]` (wie oft er vorkommt) und zählt ganz, auch wenn
+ * ein anderer Teil den Vorgang vorher beendet (abgebrochene Arbeit zählt voll).
+ * Mit cᵢ = P(Teil i endet normal | er läuft) geht es mit mischung(c) weiter. Die
+ * Enden kommen aus der Abbruchkombination `kombi` (der früheste Abbruch gewinnt),
+ * die Rücksprünge (nur in ungültigen Modellen) ebenso.
+ *
+ * Letzte Aufgaben: Aufgabe x, mit der Teil i in εᵢ seiner Läufe normal endet,
+ * zählt mit mischung(c, aᵢ = εᵢ) − mischung(c, aᵢ = 0): Teil i läuft und endet
+ * mit x, alle anderen laufenden enden normal. Ein Vorgänger läuft durch, wenn
+ * alle laufenden Teile normal enden und mindestens einer ohne Aufgabe bleibt:
+ * mischung(c) − mischung(c − q), qᵢ = P(Teil i ohne Aufgabe und normal | er läuft).
+ * Bei ODER ist das die Wahrscheinlichkeit, dass ein gewählter Weg leer bleibt,
+ * nicht das Maximum über die Wege.
+ */
+function flussGleichlauf(zweige: Block[][], auswahl: number[], mischung: Mischung, kombi: Teilverteilungen, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
+  // Ein eigener Schlüssel misst, wie oft der Ablauf einen Teil ohne Aufgabe durchläuft (wie ein Vorgänger mit Gewicht 1).
+  const durch = `\u0000durch${++durchNr}`
+  const c: number[] = []
+  const q: number[] = []
+  const ausLetzte: Map<string, number>[] = []
+  zweige.forEach((schritte, i) => {
+    const ein = skaliere({ anteil: f.anteil, letzte: new Map([...f.letzte, [durch, 1]]) }, auswahl[i])
+    const { zz, zurueck } = mitEigenenEnden(z)
+    const o = flussSequenz(schritte, ein, zz, ctx)
+    zurueck()
+    const lauf = f.anteil * auswahl[i]
+    const letzte = new Map(o.aus.letzte)
+    const qi = auswahl[i] > 0 ? (letzte.get(durch) ?? 0) / auswahl[i] : 0
+    letzte.delete(durch)
+    c.push(lauf > 0 ? Math.min(1, o.aus.anteil / lauf) : 1)
+    q.push(Math.min(qi, c[i]))
+    // Was ein Vorgänger beim Durchlaufen beiträgt, gehört nicht zu den Aufgaben des Teils.
+    for (const [k, w] of f.letzte) if (letzte.has(k)) letzte.set(k, Math.max(0, letzte.get(k)! - w * auswahl[i] * qi))
+    ausLetzte.push(letzte)
+  })
+  const weiter = mischung(c)
+  const letzte = new Map<string, number>()
+  ausLetzte.forEach((liste, i) => {
+    const lauf = f.anteil * auswahl[i]
+    if (lauf <= 0) return
+    const a = [...c]
+    a[i] = 0
+    const ohne = mischung(a)
+    for (const [x, w] of liste) {
+      if (w <= 0) continue
+      a[i] = Math.min(1, w / lauf)
+      plus(letzte, x, f.anteil * (mischung(a) - ohne))
+    }
+  })
+  const leerDurch = weiter - mischung(c.map((ci, i) => Math.max(0, ci - q[i])))
+  if (leerDurch > 1e-15) for (const [k, w] of f.letzte) plus(letzte, k, w * leerDurch)
+  for (const [e, v] of kombi.ende) plus(z.enden, e, f.anteil * masse(v))
+  const rueck = new Map<Id, Fluss>()
+  for (const [id, v] of kombi.rueck) rueck.set(id, { anteil: f.anteil * masse(v), letzte: new Map() })
+  return { aus: { anteil: f.anteil * weiter, letzte }, rueck }
 }
 
 /**
@@ -445,19 +497,15 @@ function flussMehrfach(b: Mehrfach, f: Fluss, z: Zaehler, ctx: Kontext): Ergebni
       return { aus, rueck: o.rueck }
     }
     case 'gleichzeitig': {
-      // Enden im Körper meldet die Prüfung bis zum Abbruch in nebenläufiger Umgebung als Fehler; hier zählen sie anteilig.
-      const zz: Zaehler = { ...z, enden: new Map() }
+      // Alle Stücke laufen ganz; der früheste Abbruch eines Stücks beendet den Vorgang (Abbruchkombination, aus den Zeiten).
+      const { zz, zurueck } = mitEigenenEnden(z)
       const zufluss = f.anteil * v.n
       const letzte = new Map<string, number>()
       addiereLetzte(letzte, f.letzte, p1)
       const o = flussSequenz(b.koerper.schritte, { anteil: zufluss, letzte }, zz, ctx)
-      z.uebergaben = zz.uebergaben
-      z.systemwechsel = zz.systemwechsel
-      z.medienbrueche = zz.medienbrueche
-      z.uebertragungMin = zz.uebertragungMin
+      zurueck()
       const weiter = erwartungPotenz(v, c)
-      const endSumme = [...zz.enden.values()].reduce((s, x) => s + x, 0)
-      for (const [e, x] of zz.enden) plus(z.enden, e, endSumme > 0 ? (x / endSumme) * f.anteil * Math.max(0, 1 - weiter) : 0)
+      for (const [e, d] of verteilungMehrfach(b, 'gesamt').ende) plus(z.enden, e, f.anteil * masse(d))
       // ein Strang heraus: die letzte Aufgabe eines Stücks, bei N = 0 der Vorgänger
       const aus: Fluss = { anteil: f.anteil * weiter, letzte: new Map() }
       const mitStueck = weiter - p0
@@ -539,6 +587,11 @@ function addiereBeitraege(ziel: Map<Id, Beitrag>, quelle: Map<Id, Beitrag>, fakt
     const alt = ziel.get(id) ?? { warten: 0, arbeit: 0 }
     ziel.set(id, { warten: alt.warten + b.warten * faktor, arbeit: alt.arbeit + b.arbeit * faktor })
   }
+}
+
+/** Wahrscheinlichkeit je Rücksprungbereich aus den Teilverteilungen eines Blocks. */
+function rueckMassen(t: Teilverteilungen): Map<Id, number> {
+  return new Map([...t.rueck].map(([id, v]) => [id, masse(v)]))
 }
 
 function dauerSequenz(schritte: Block[]): Dauer {
@@ -647,28 +700,30 @@ function dauerOhneUnterbrechung(b: Block): Dauer {
       const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
       if (zweige.length === 0) return { gesamt: 0, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map() }
       const laengster = zweige.reduce((a, x) => (x.gesamt > a.gesamt ? x : a))
-      // Erwartungswert des Maximums aus den Verteilungen der Zweige (CT), ebenso nur für Bearbeitungszeiten (TCT)
-      const folgen = b.zweige.map((z) => z.schritte)
-      const gesamt = erwartungMaximum(folgen, 'gesamt')
-      const arbeit = erwartungMaximum(folgen, 'arbeit')
+      // Abbruchkombination aus den Verteilungen der Zweige (CT), ebenso nur für Bearbeitungszeiten (TCT):
+      // der früheste Abbruch, sonst das späteste normale Ende
+      const kombi = (art: 'gesamt' | 'arbeit') => gleichlauf(b.zweige.map((z) => verteilungSequenz(z.schritte, art)), alleMischung)
+      const teile = kombi('gesamt')
+      const gesamt = erwartungGesamt(teile)
+      const arbeit = erwartungGesamt(kombi('arbeit'))
       // Beiträge zur Durchlaufzeit: der im Mittel längste Zweig, auf den exakten Erwartungswert hochgerechnet
       const beitraege = new Map<Id, Beitrag>()
       addiereBeitraege(beitraege, laengster.beitraege, laengster.gesamt > 0 ? gesamt / laengster.gesamt : 1)
       // Rücksprünge aus „Gleichzeitig“ heraus meldet die Prüfung als Fehler.
-      return { gesamt, arbeit, weiter: Math.min(...zweige.map((x) => x.weiter)), rueck: new Map(), beitraege }
+      return { gesamt, arbeit, weiter: masse(teile.weiter), rueck: rueckMassen(teile), beitraege }
     }
     case 'oder': {
       const p = oderWahrscheinlichkeiten(b)
       const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
-      // Erwartungswert des Maximums der gewählten Wege, aus ihren Verteilungen
-      const gesamt = erwartungOder(b, 'gesamt')
-      const arbeit = erwartungOder(b, 'arbeit')
+      // Abbruchkombination der gewählten Wege, aus ihren Verteilungen
+      const teile = verteilungOder(b, 'gesamt')
+      const gesamt = erwartungGesamt(teile)
+      const arbeit = erwartungGesamt(verteilungOder(b, 'arbeit'))
       // Beiträge: jeder Weg mit seiner Wahrscheinlichkeit, auf den exakten Erwartungswert umgerechnet
       const beitraege = new Map<Id, Beitrag>()
       const naiv = zweige.reduce((s, x, i) => s + p[i] * x.gesamt, 0)
       zweige.forEach((x, i) => addiereBeitraege(beitraege, x.beitraege, naiv > 0 ? (p[i] * gesamt) / naiv : p[i]))
-      const weiter = zweige.reduce((w, x, i) => w * (1 - p[i] + p[i] * x.weiter), 1)
-      return { gesamt, arbeit, weiter, rueck: new Map(), beitraege }
+      return { gesamt, arbeit, weiter: masse(teile.weiter), rueck: rueckMassen(teile), beitraege }
     }
     case 'wiederholung': {
       const x = dauerSequenz(b.koerper.schritte)

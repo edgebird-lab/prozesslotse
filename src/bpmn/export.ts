@@ -117,7 +117,8 @@ const EREIGNIS_DEFINITION: Record<string, string> = {
 function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], blockDoku: Map<string, string>, standardFluss: Map<string, string>, e: string): string {
   const flussRefs = rein.map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + raus.map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
   const fehlerDefinition = k.fehler ? `${e}  <bpmn:errorEventDefinition id="${k.id}_def" errorRef="${k.fehler}" />\n` : ''
-  // Terminierung: beendet den Teilprozess „weiter beim ersten“ und bricht die übrigen Zweige ab
+  // Terminierung: beendet ihre Ebene, also den Teilprozess „weiter beim ersten“ (die übrigen Zweige werden abgebrochen)
+  // oder auf Prozessebene den ganzen Vorgang, auch was gleichzeitig läuft
   const endDefinition = k.terminierung ? `${e}  <bpmn:terminateEventDefinition id="${k.id}_def" />\n` : fehlerDefinition
   const definition = (art: string | null | undefined) => {
     if (!art || !EREIGNIS_DEFINITION[art]) return ''

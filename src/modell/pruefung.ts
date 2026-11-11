@@ -13,6 +13,7 @@ import {
   blockTitel,
   durchlaufe,
   gliedNebenlaeufig,
+  gliedNebenweg,
   gliedRahmen,
   heisstBeides,
   istMengenschleife,
@@ -25,7 +26,6 @@ import {
   rahmenInhalt,
   rahmenRolle,
   rahmenUeber,
-  unterbrechungVon,
   wirktExtern,
   type Glied,
   type Rahmenbaustein,
@@ -77,35 +77,6 @@ export function istObjektVerbName(name: string): boolean {
 }
 
 const TOLERANZ = 1e-6
-
-/** Wo eine nebenläufige Umgebung liegt, für Texte: „in „Gleichzeitig““, „in einem ODER-Weg“, „bei Stücken, die zur selben Zeit laufen“. */
-function nebenlaeufigText(kette: Glied[]): string {
-  const g = kette.filter(gliedNebenlaeufig).pop()
-  if (g?.block.typ === 'oder') return 'in einem Weg einer ODER-Verzweigung'
-  if (g?.block.typ === 'mehrfach' && gliedRahmen(g)) return `in „${blockTitel(g.block)}“, wo die Stücke zur selben Zeit laufen`
-  if (g?.block.typ === 'parallel') return `in einem Zweig von „${parallelName(g.block)}“`
-  return 'in einem Zweig von „Gleichzeitig“'
-}
-
-/**
- * Führt ein Ende an dieser Stelle zur Verklemmung? Im BPMN wird ein Ende in
- * einem Rahmen zum Fehler-Ende, das der äußerste Rahmen fängt; dann wartet nur
- * ein „Gleichzeitig“ außerhalb dieses Rahmens ewig auf den beendeten Zweig.
- * Eine ODER-Zusammenführung wartet nach der Regel der Norm nicht auf einen Weg,
- * der beendet ist, und ein Nebenweg endet ohnehin für sich. In diesen Fällen
- * müsste der Rest abgebrochen werden; die Rechnung dafür folgt erst mit dem
- * Abbruch in nebenläufiger Umgebung.
- */
-function endeVerklemmt(kette: Glied[]): boolean {
-  const aeusserster = kette.findIndex(gliedRahmen)
-  return kette.slice(0, aeusserster < 0 ? kette.length : aeusserster).some((g) => g.block.typ === 'parallel' && gliedNebenlaeufig(g))
-}
-
-/** Ist das Glied ein Nebenweg (nicht unterbrechender Ausnahmeweg)? Er endet für sich. */
-function gliedNebenweg(g: Glied): boolean {
-  const u = unterbrechungVon(g.block, g.sequenz.id)
-  return u !== null && !u.unterbrechend
-}
 
 /** Text für einen Rücksprung, der eine nebenläufige Umgebung verlässt. */
 function rueckVerklemmtText(wer: string, kette: Glied[]): string {
@@ -206,26 +177,8 @@ export function pruefeProzess(p: Prozess): Befund[] {
           if (!z.bezeichnung.trim()) {
             add({ schluessel: `bezeichnung:${z.id}`, schwere: 'warnung', titel: 'Ausgang ohne Bezeichnung', text: `Ausgang ${i + 1} von „${blockTitel(b)}“ braucht eine Antwort, z. B. „Ja“ oder „Nein“.`, blockId: b.id })
           }
-          if (z.ende !== null && kette.some(gliedNebenweg)) {
-            add(nebenwegEnde(`Der Ausgang „${z.bezeichnung}“`, b.id, z.id))
-          } else if (z.ende !== null && endeVerklemmt(kette)) {
-            add({
-              schluessel: `verklemmung:${z.id}`,
-              schwere: 'fehler',
-              titel: 'Verklemmung',
-              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“${rahmenUeber(kette).length > 0 ? ' (der Rahmen darum liegt selbst in einem seiner Zweige)' : ''}. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`,
-              blockId: b.id,
-            })
-          } else if (z.ende !== null && kette.some(gliedNebenlaeufig)) {
-            const wo = nebenlaeufigText(kette)
-            add({
-              schluessel: `abbruch:${z.id}`,
-              schwere: 'fehler',
-              titel: 'Ende neben gleichzeitig laufenden Schritten',
-              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess ${wo}. Was daneben noch läuft, müsste dann abgebrochen werden; das rechnet der Prozesslotse noch nicht.${kette.some((g) => gliedNebenlaeufig(g) && g.block.typ === 'mehrfach') ? ' Werden die Stücke der Reihe nach erledigt, darf ein Ausgang den Prozess beenden.' : kette.some((g) => gliedNebenlaeufig(g) && g.block.typ === 'parallel') ? ' Lass den Ausgang weiterlaufen, oder lass eine Person die Zweige nacheinander erledigen (in beliebiger Reihenfolge); dort darf ein Zweig den Prozess beenden.' : ' Lass den Ausgang weiterlaufen.'}`,
-              blockId: b.id,
-            })
-          }
+          // An nebenläufigen Stellen beendet ein Ende den ganzen Vorgang und bricht ab, was gleichzeitig läuft; nur ein Nebenweg endet für sich.
+          if (z.ende !== null && kette.some(gliedNebenweg)) add(nebenwegEnde(`Der Ausgang „${z.bezeichnung}“`, b.id, z.id))
           if ((z.ende !== null || z.zurueckZu !== null) && z.schritte.length > 0 && !ausgaengeSequenz(z.schritte).has('weiter')) {
             add({
               schluessel: `totesende:${z.id}`,
@@ -573,20 +526,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
       if (!u.unterbrechend) return
       // Der Ausnahmeweg liegt neben dem Schritt: in derselben Umgebung, bei einem Rahmen außerhalb von ihm
       const weg: Glied[] = [...kette, { block: b, sequenz: u }]
-      if (u.ende !== null) {
-        if (weg.some(gliedNebenweg)) add(nebenwegEnde(`Nach ${wer}`, b.id, u.id))
-        else if (endeVerklemmt(weg)) {
-          add({ schluessel: `verklemmung:${u.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Nach ${wer} endet der Prozess innerhalb von „Gleichzeitig“. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
-        } else if (weg.some(gliedNebenlaeufig)) {
-          add({
-            schluessel: `abbruch:${u.id}`,
-            schwere: 'fehler',
-            titel: 'Ende neben gleichzeitig laufenden Schritten',
-            text: `Nach ${wer} endet der Prozess ${nebenlaeufigText(weg)}. Was daneben noch läuft, müsste dann abgebrochen werden; das rechnet der Prozesslotse noch nicht. Lass es danach weitergehen.`,
-            blockId: b.id,
-          })
-        }
-      }
+      if (u.ende !== null && weg.some(gliedNebenweg)) add(nebenwegEnde(`Nach ${wer}`, b.id, u.id))
       if (u.zurueckZu !== null) pruefeRuecksprung(`Nach ${wer} geht es zurück; der Rücksprung`, `oder an „${titel}“`, u.zurueckZu, u.id, b.id, [...vorfahren, b], weg)
       if ((u.ende !== null || u.zurueckZu !== null) && u.schritte.length > 0 && !ausgaengeSequenz(u.schritte).has('weiter')) {
         add({

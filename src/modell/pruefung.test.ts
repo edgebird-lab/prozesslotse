@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { neueAufgabe, neueEntscheidung, neueParallel, neuerProzess, neueRolle, neuerZweig, neueWiederholung } from './bausteine'
+import { neueAufgabe, neueEntscheidung, neueParallel, neuerProzess, neueRolle, neuerRuecksprungBereich, neuerZweig, neueWiederholung } from './bausteine'
 import { beispielLieferdienst } from './beispiel'
 import { aendereBlock, fuegeEin } from './operationen'
 import { istObjektVerbName, pruefeProzess } from './pruefung'
@@ -41,13 +41,20 @@ describe('Prüfregeln', () => {
     expect(fehler[0].blockId).toBe(danach.id)
   })
 
-  it('erkennt eine Verklemmung, wenn der Prozess innerhalb von „Gleichzeitig“ endet', () => {
+  it('erlaubt ein Ende innerhalb von „Gleichzeitig“; ein Rücksprung aus einem Zweig heraus bleibt eine Verklemmung', () => {
     const par = neueParallel()
     const ent = neueEntscheidung({ frage: 'Teil fehlt?', zweige: [neuerZweig('Ja', 0.1, { ende: 'Abbruch' }), neuerZweig('Nein', 0.9)] })
     par.zweige[0].schritte.push(ent)
     par.zweige[1].schritte.push(neueAufgabe({ name: 'Teil bestellen' }))
     const p = fuegeEin(neuerProzess({ name: 'Montage' }), 'haupt', 0, par)
-    expect(schluessel(p, 'fehler')).toContain('verklemmung')
+    expect(schluessel(p, 'fehler')).toEqual([])
+    // Rücksprung aus dem Zweig zu einem Schritt davor (nur in von Hand gebauten Dateien möglich)
+    const erfassen = neueAufgabe({ name: 'Auftrag erfassen' })
+    const zurueck = { ...ent, zweige: [ent.zweige[0], ent.zweige[1]] }
+    const bereich = neuerRuecksprungBereich([erfassen, { ...par, zweige: [{ ...par.zweige[0], schritte: [zurueck] }, par.zweige[1]] }])
+    zurueck.zweige[0] = { ...ent.zweige[0], ende: null, zurueckZu: bereich.id }
+    const q = fuegeEin(neuerProzess({ name: 'Montage' }), 'haupt', 0, bereich)
+    expect(schluessel(q, 'fehler')).toContain('verklemmung')
   })
 
   it('meldet leere Zweige und leere Wiederholungen als Fehler', () => {

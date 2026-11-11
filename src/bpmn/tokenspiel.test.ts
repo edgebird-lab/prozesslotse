@@ -9,6 +9,7 @@ import { graphAusXml } from '../testhilfen/bpmn-graph'
 import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { erzeugeBpmn } from './export'
 import { graphAusLayout, pruefeSoundness, zaehleMitFehler, type TokenGraph } from './tokenspiel'
+import { tokenZeiten } from '../testhilfen/tokenzeiten'
 
 /** Vergleichbare Form eines Graphen: Knoten mit Typ, Rahmen und Art (Ende, Randereignis, Mehrfachinstanz), Flüsse von → nach */
 function form(g: TokenGraph): string[] {
@@ -83,7 +84,7 @@ describe('Tokenspiel auf dem exportierten BPMN', () => {
 function haeufigkeitsAbweichungen(p: Prozess, laeufe: number, startwert: number): string[] {
   const { layout } = erzeugeBpmn(p)
   const anteil = new Map(layout.kanten.filter((k) => k.anteil !== undefined).map((k) => [k.id, k.anteil!]))
-  const simuliert = zaehleMitFehler(graphAusLayout(layout), anteil, laeufe, zufallMitStartwert(startwert))
+  const simuliert = zaehleMitFehler(graphAusLayout(layout), anteil, laeufe, zufallMitStartwert(startwert), tokenZeiten(p, layout))
   const k = berechneKennzahlen(p)
   const abweichungen: string[] = []
   for (const { block } of durchlaufe(p.ablauf)) {

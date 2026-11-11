@@ -28,7 +28,9 @@ import { istUnterbrechbar, type Block, type NachrichtZeitpunkt, type ParallelArt
  * Rahmen (Zeit oder Nachricht, unterbrechend mit „weiter“, Ende oder
  * Rücksprung, oder als Nebenweg), „weiter beim ersten“ und „in beliebiger
  * Reihenfolge“ (mit Enden und Rücksprüngen in den Zweigen), vorzeitige Enden und
- * Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche.
+ * Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche, und
+ * Enden neben gleichzeitig laufenden Schritten (Abbruch: in Zweigen von
+ * Gleichzeitig, ODER-Wegen, Stücken zur selben Zeit, nach Unterbrechungen).
  */
 export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: boolean } = {}): Prozess {
   // auchUngueltig: jeder Ausgang darf enden oder zurückspringen, also auch alle; dann entstehen unerreichbare Schritte und Endlosschleifen
@@ -37,6 +39,9 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
   const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
   // Die Art von „Gleichzeitig“ kommt aus einem eigenen Zufallsstrom; Prozesse ohne die neuen Arten bleiben, wie sie waren.
   const artZufall = zufallMitStartwert(startwert * 104_729 + 31)
+  // Enden neben gleichzeitig laufenden Schritten (Abbruch) ebenso: Prozesse ohne Nebenläufigkeit bleiben, wie sie waren.
+  const abbruchZufall = zufallMitStartwert(startwert * 7_368_787 + 13)
+  const abbruch = (text: string) => neueEntscheidung({ frage: 'Abbrechen?', zweige: [neuerZweig('Nein', 0.8), neuerZweig('Ja', 0.2, { ende: `${text} ${++nr} abgebrochen` })] })
   const rollen = [neueRolle('A'), neueRolle('B'), neueRolle('C')]
   // ein externer Kunde; manche Aufgaben, Wartezeiten und Ereignisse tauschen Nachrichten mit ihm aus
   const kunde = neuerTeilnehmer('Kunde')
@@ -63,10 +68,11 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
       const anzahl = frei && zufall() < 0.1 ? 0 : schwankt ? wahl([1.5, 2.5, 4]) : wahl([0.5, 1, 2, 2.5, 3])
       const einzeln = zufall() < 0.35
       const schritte = einzeln ? [aufgabe()] : sequenz(tiefe + 1, inParallel || gleichzeitig, frei && zufall() < 0.1 ? 0 : 1)
-      // nacheinander darf ein Stück den Vorgang beenden: Fehler-Ende im Rahmen, gefangen am äußersten Rahmen
+      // Ein Stück darf den Vorgang beenden: Fehler-Ende im Rahmen, gefangen am äußersten Rahmen; laufen die Stücke gleichzeitig
+      // oder liegt der Rahmen neben gleichzeitig laufenden Schritten, bricht das alles ab (früheste Abbruch)
       if (!einzeln && !gleichzeitig && !inParallel && zufall() < 0.5) {
         schritte.push(neueEntscheidung({ frage: 'Stück in Ordnung?', zweige: [neuerZweig('Ja', 0.9), neuerZweig('Nein', 0.1, { ende: `Stück ${n} abgelehnt` })] }))
-      }
+      } else if (!einzeln && (gleichzeitig || inParallel) && abbruchZufall() < 0.4) schritte.push(abbruch('Stück'))
       return neuerMehrfach({
         name: `Für jedes Stück ${n}`,
         anzahl,
@@ -82,22 +88,25 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
       const zweige = Array.from({ length: n }, (_, i) =>
         neuerZweig(`Fall ${i + 1}`, 1 / n, {
           schritte: sequenz(tiefe + 1, inParallel),
-          ende: !inParallel && (frei || i > 0) && zufall() < 0.3 ? `Ende ${i}` : null,
+          // neben gleichzeitig laufenden Schritten aus einem eigenen Zufallsstrom: Das Ende bricht dann alles ab
+          ende: !inParallel ? ((frei || i > 0) && zufall() < 0.3 ? `Ende ${i}` : null) : i > 0 && abbruchZufall() < 0.25 ? `Abbruch ${i}` : null,
           ereignis: ereignisse ? (zufall() < 0.5 ? { art: 'nachricht', dauerMin: 60, von: nachricht() } : { art: 'zeit', dauerMin: 60 }) : null,
         }),
       )
       return neueEntscheidung({ frage: 'Welcher Fall?', art: ereignisse ? 'ereignis' : 'daten', zweige })
     }
     if (r < 0.84) {
-      // alle (60 %), weiter beim ersten (20 %, nebenläufig), in beliebiger Reihenfolge (20 %, nicht nebenläufig: Enden darin
-      // erlaubt). Ungültig: ein leerer Zweig, oder ein Ende in einem Zweig von „weiter beim ersten“ (bis zum Abbruch in Schritt 5).
+      // alle (60 %), weiter beim ersten (20 %, nebenläufig), in beliebiger Reihenfolge (20 %, nicht nebenläufig). Enden sind in
+      // allen Zweigen erlaubt; bei „alle“ und „erster“ brechen sie ab, was gleichzeitig läuft. Ungültig: ein leerer Zweig.
       const a = artZufall()
       const art: ParallelArt = a < 0.6 ? 'alle' : a < 0.8 ? 'erster' : 'nacheinander'
       const par = neueParallel(2 + Math.floor(zufall() * 2), art)
       const nebenher = art !== 'nacheinander' || inParallel
       par.zweige = par.zweige.map((z: Sequenz) => ({ ...z, schritte: frei && artZufall() < 0.05 ? [] : sequenz(tiefe + 1, nebenher, 1) }))
-      if (art === 'erster' && frei && artZufall() < 0.3) {
+      if (art === 'erster' && (frei ? artZufall() < 0.3 : abbruchZufall() < 0.35)) {
         par.zweige[0].schritte.push(neueEntscheidung({ frage: 'Abgelehnt?', zweige: [neuerZweig('Nein', 0.8), neuerZweig('Ja', 0.2, { ende: `Zweig ${++nr} abgelehnt` })] }))
+      } else if (art === 'alle' && par.zweige.every((z) => z.schritte.length > 0) && abbruchZufall() < 0.3) {
+        par.zweige[Math.floor(abbruchZufall() * par.zweige.length)].schritte.push(abbruch('Zweig'))
       }
       return par
     }
@@ -158,18 +167,18 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
     }
   }
   // Unterbrechungen aus einem eigenen Zufallsstrom: Der übrige Prozess bleibt für jeden Startwert, wie er war.
-  return mitUnterbrechungen(p, zufallMitStartwert(startwert * 7919 + 17), rollen, kunde, frei)
+  return mitUnterbrechungen(p, zufallMitStartwert(startwert * 7919 + 17), zufallMitStartwert(startwert * 6_700_417 + 5), rollen, kunde, frei)
 }
 
 /**
  * Hängt an einen Teil der Aufgaben, Abschnitte und „für jedes Stück“ in den
  * oberen Ebenen Unterbrechungen: Zeit oder Nachricht (auch vom Kunden),
- * unterbrechend mit „weiter“, Ende (nicht in nebenläufiger Umgebung) oder
- * Rücksprung, oder als Nebenweg. Ausnahmewege haben null bis zwei Schritte.
- * Mit `frei` entstehen auch ungültige: Anteile über 100 %, ein Ende im Nebenweg
- * oder neben gleichzeitig laufenden Schritten, ein Nebenweg ohne Schritte.
+ * unterbrechend mit „weiter“, Ende (auch neben gleichzeitig laufenden Schritten:
+ * dann ein Abbruch) oder Rücksprung (nicht in nebenläufiger Umgebung), oder als
+ * Nebenweg. Ausnahmewege haben null bis zwei Schritte. Mit `frei` entstehen
+ * auch ungültige: Anteile über 100 %, ein Ende im Nebenweg, ein Nebenweg ohne Schritte.
  */
-function mitUnterbrechungen(p: Prozess, zufall: () => number, rollen: Rolle[], kunde: Teilnehmer, frei: boolean): Prozess {
+function mitUnterbrechungen(p: Prozess, zufall: () => number, abbruchZufall: () => number, rollen: Rolle[], kunde: Teilnehmer, frei: boolean): Prozess {
   const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
   let nr = 0
   const aufgabe = () => neueAufgabe({ name: `Ausnahme ${++nr} erledigen`, rolleId: wahl(rollen).id, bearbeitungMin: wahl([5, 10, 20]), liegezeitMin: wahl([0, 15]) })
@@ -185,14 +194,14 @@ function mitUnterbrechungen(p: Prozess, zufall: () => number, rollen: Rolle[], k
       const art = zufall() < 0.5 ? 'nachricht' : 'zeit'
       const schritte = Array.from({ length: Math.floor(zufall() * (unterbrechend ? 3 : 2)) + (unterbrechend ? 0 : frei && zufall() < 0.2 ? 0 : 1) }, () => aufgabe() as Block)
       if (unterbrechend && schritte.length > 0 && zufall() < 0.2) {
-        // ein Ausnahmeweg mit Entscheidung; im ungültigen Fall auch neben gleichzeitig laufenden Schritten mit Ende
-        const endet = (!neben || frei) && zufall() < 0.5
+        // ein Ausnahmeweg mit Entscheidung, auch mit Ende; neben gleichzeitig laufenden Schritten aus einem eigenen Zufallsstrom
+        const endet = !neben || frei ? zufall() < 0.5 : abbruchZufall() < 0.5
         schritte.push(neueEntscheidung({ frage: 'Geklärt?', zweige: [neuerZweig('Ja', 0.8), neuerZweig('Nein', 0.2, endet ? { ende: `Ausnahme ${nr} offen` } : { schritte: [aufgabe()] })] }))
       }
       const anteil = unterbrechend ? (frei && zufall() < 0.15 ? 0.6 : wahl([0.05, 0.1, 0.2, 0.3])) : wahl([0.3, 0.5, 1, 1.5, 2.5])
       if (unterbrechend) summe += anteil
       const danach = zufall()
-      const ende = unterbrechend && (!neben || frei) && danach < 0.3 ? `Unterbrochen ${nr}` : !unterbrechend && frei && danach < 0.1 ? `Nebenweg ${nr} endet` : null
+      const ende = unterbrechend && danach < 0.3 ? `Unterbrochen ${nr}` : !unterbrechend && frei && danach < 0.1 ? `Nebenweg ${nr} endet` : null
       const u = neueUnterbrechung({
         bezeichnung: `Ereignis ${nr}.${i + 1}`,
         art,

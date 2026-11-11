@@ -166,7 +166,11 @@ export interface LayoutKnoten extends Rechteck {
   mehrfach?: MehrfachMarke
   /** dazu der Baustein „für jedes Stück“ im Modell */
   mehrfachBlock?: Id
-  /** Endereignis: Terminierung (ein Zweig von „weiter beim ersten“ ist fertig, die übrigen werden abgebrochen) */
+  /**
+   * Endereignis: Terminierung. In „weiter beim ersten“ ist ein Zweig fertig, und
+   * die übrigen werden abgebrochen; auf Prozessebene neben gleichzeitig
+   * laufenden Schritten endet der ganze Vorgang (mit Ergebnis als Name).
+   */
   terminierung?: boolean
   /** Terminierung eines Zweigs von „weiter beim ersten“: Wahrscheinlichkeit, dass er zuerst fertig ist (für das Tokenspiel) */
   zuerst?: number
@@ -361,6 +365,31 @@ interface Kontext {
   schub: Map<Id, number>
   /** Stunden je Arbeitstag (für Zeiten in der Dokumentation) */
   stunden: number
+  /** Liegt die Stelle neben gleichzeitig laufenden Schritten (Zweig von Gleichzeitig, ODER-Weg, Nebenweg)? Dann bricht ein Ende alles ab. */
+  nebenlaeufig: boolean
+}
+
+/**
+ * Ende je nach Ort: in einem Rahmen ein Fehler-Ende (der äußerste Rahmen fängt
+ * es), auf Prozessebene neben gleichzeitig laufenden Schritten eine
+ * Terminierung, sonst ein gewöhnliches Ende.
+ */
+function endeArt(ctx: Kontext, ergebnis: string): Pick<LayoutKnoten, 'fehler' | 'terminierung' | 'doku'> {
+  if (ctx.rahmen !== null) return { fehler: fehlerId(ctx, ergebnis) }
+  return ctx.nebenlaeufig ? { terminierung: true, doku: ABBRUCH_DOKU } : {}
+}
+
+const ABBRUCH_DOKU = 'Beendet den ganzen Vorgang mit diesem Ergebnis; was gleichzeitig läuft, wird abgebrochen'
+
+/** Legt `f` mit der angegebenen Nebenläufigkeit aus und stellt sie danach wieder her. */
+function nebenher<T>(ctx: Kontext, nebenlaeufig: boolean, f: () => T): T {
+  const vorher = ctx.nebenlaeufig
+  ctx.nebenlaeufig = vorher || nebenlaeufig
+  try {
+    return f()
+  } finally {
+    ctx.nebenlaeufig = vorher
+  }
 }
 
 function neuerTeil(bahn: string): Teil {
@@ -682,7 +711,8 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
     const ez = xor ? (z as EntscheidungsZweig) : null
     const oz = b.typ === 'oder' ? (z as OderZweig) : null
     const standard = b.typ === 'oder' && z.id === b.standard
-    let teil = layoutSequenz(z.schritte, bahn, ctx)
+    // Zweige von Gleichzeitig und ODER-Wege laufen neben anderen: Ein Ende darin bricht alles ab.
+    let teil = nebenher(ctx, !xor, () => layoutSequenz(z.schritte, bahn, ctx))
     if (ereignisse && ez) {
       // Jeder Ausgang einer Ereignis-Entscheidung beginnt mit seinem Ereignis, auf der Höhe der Hauptlinie.
       const ereignisId = xmlId(`${z.id}_ereignis`)
@@ -723,11 +753,12 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
     }
     if (leer && !zl.springt) belege(teil, bahn, 1) // Spur für die Linie des leeren Zweigs
     if (ez?.ende != null) {
-      // Im Rahmen wird das Ende zum Fehler-Ende; das Fehler-Randereignis am äußersten Rahmen fängt es.
+      // Im Rahmen wird das Ende zum Fehler-Ende (das Fehler-Randereignis am äußersten Rahmen fängt es), neben
+      // gleichzeitig laufenden Schritten zur Terminierung.
       const endeId = xmlId(`${z.id}_ende`)
       const endBahn = teil.austrittsBahn
       const spur = teil.anker.get(endBahn) ?? 0
-      teil.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: ez.ende, blockId: b.id, bahn: endBahn, spalte: teil.breite, spur, ...(ctx.rahmen !== null ? { fehler: fehlerId(ctx, ez.ende) } : {}) }))
+      teil.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: ez.ende, blockId: b.id, bahn: endBahn, spalte: teil.breite, spur, ...endeArt(ctx, ez.ende) }))
       belege(teil, endBahn, spur + 1)
       if (teil.austritt) teil.kanten.push(kanteAus(ctx, teil.austritt, endeId))
       if (leer) teil.eintritt = endeId
@@ -780,7 +811,22 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
   t.anker.set(bahn, anker)
 
   const fortsetzend = zweige.filter((z) => !z.endet && !z.springt && (z.leer || z.teil.austritt !== null))
-  if (b.typ === 'parallel' && b.art === 'erster') {
+  // Gleichzeitig mit einem Zweig, der den Vorgang immer beendet: Es geht nie weiter. Eine Zusammenführung bekäme nur die
+  // übrigen Zweige und ließe den Ablauf zu früh weiterlaufen; die übrigen Zweige enden deshalb für sich (Ende ohne Ergebnis).
+  const nieWeiter = (b.typ === 'parallel' && b.art === 'alle' && fortsetzend.length < zweige.length) || (b.typ === 'oder' && fortsetzend.length === 0)
+  if (nieWeiter) {
+    for (const z of fortsetzend) {
+      const endBahn = z.leer ? bahn : z.teil.austrittsBahn
+      const spur = z.leer ? (z.linie?.spur ?? 0) : (z.teil.anker.get(endBahn) ?? 0)
+      const endeId = xmlId(`${z.id}_ende`)
+      t.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: '', blockId: b.id, bahn: endBahn, spalte: 1 + maxBreite, spur, doku: 'Dieser Zweig ist fertig; der Vorgang endet in einem anderen Zweig' }))
+      if (z.leer) t.kanten.push(kante(ctx, aufId, endeId, { ueber: z.linie }))
+      else if (z.teil.austritt) t.kanten.push(kanteAus(ctx, z.teil.austritt, endeId))
+    }
+    t.austritt = null
+    t.austrittsBahn = bahn
+    t.breite = maxBreite + (fortsetzend.length > 0 ? 2 : 1)
+  } else if (b.typ === 'parallel' && b.art === 'erster') {
     // Weiter beim ersten: Jeder Zweig endet in einer Terminierung, alle in der Spalte hinter dem breitesten Zweig.
     // Am Ende steht, wie oft der Zweig zuerst fertig ist; damit würfelt das Tokenspiel.
     const gewinn = ersterAusgang(b, 'gesamt').je
@@ -1041,15 +1087,16 @@ function layoutRandwege(b: Block, schritt: Teil, fehler: string[], ctx: Kontext)
   const wege: Randweg[] = []
   // Unterbrechungen gibt es nur an Aufgabe, Abschnitt und „für jedes Stück“; Fehler-Randereignisse an jedem äußersten Rahmen
   for (const u of unterbrechungenVon(b)) {
-    const teil = layoutSequenz(u.schritte, bahn, ctx)
+    // Ein Nebenweg läuft neben dem Schritt her
+    const teil = nebenher(ctx, !u.unterbrechend, () => layoutSequenz(u.schritte, bahn, ctx))
     const leer = teil.eintritt === null
     const anteil = u.unterbrechend ? (anteile.je.get(u.id) ?? 0) : nebenwegAnzahl(u)
     const weg: Randweg = { randId: xmlId(`${u.id}_rand`), name: u.bezeichnung, doku: unterbrechungDoku(b as Unterbrechbar, u, anteil, ctx.stunden), ereignis: u.art, unterbrechend: u.unterbrechend, von: u.art === 'nachricht' ? u.von : null, anteil, teil, weiter: false, leer, inBahn: true }
-    const mitEnde = (name: string, fehlerId?: string) => {
+    const mitEnde = (name: string, art: Pick<LayoutKnoten, 'fehler' | 'terminierung' | 'doku'> = {}) => {
       const endeId = xmlId(`${u.id}_ende`)
       const endBahn = teil.austrittsBahn
       const spur = teil.anker.get(endBahn) ?? 0
-      teil.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name, blockId: b.id, bahn: endBahn, spalte: teil.breite, spur, ...(fehlerId ? { fehler: fehlerId } : {}) }))
+      teil.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name, blockId: b.id, bahn: endBahn, spalte: teil.breite, spur, ...art }))
       belege(teil, endBahn, spur + 1)
       if (teil.austritt) teil.kanten.push(kanteAus(ctx, teil.austritt, endeId))
       if (leer) teil.eintritt = endeId
@@ -1060,8 +1107,8 @@ function layoutRandwege(b: Block, schritt: Teil, fehler: string[], ctx: Kontext)
       // Nebenweg: eigenes Ende ohne Ergebnis, auch in einem Rahmen kein Fehler-Ende (der Rahmen wartet auf ihn)
       mitEnde('')
     } else if (u.ende !== null) {
-      // Ende je nach Ort: in einem Rahmen ein Fehler-Ende, das der äußerste Rahmen fängt
-      mitEnde(u.ende, ctx.rahmen !== null ? fehlerId(ctx, u.ende) : undefined)
+      // Ende je nach Ort: in einem Rahmen ein Fehler-Ende, das der äußerste Rahmen fängt; neben gleichzeitig laufenden Schritten eine Terminierung
+      mitEnde(u.ende, endeArt(ctx, u.ende))
     } else if (u.zurueckZu !== null) {
       // Die Kante zeichnet der Rücksprungbereich; ohne Schritte beginnt sie am Randereignis.
       if (leer) weg.sprung = u.zurueckZu
@@ -1077,7 +1124,8 @@ function layoutRandwege(b: Block, schritt: Teil, fehler: string[], ctx: Kontext)
   fehler.forEach((f, j) => {
     const teil = neuerTeil(bahn)
     const zielId = xmlId(`${b.id}_fehler_${j + 1}_ende`)
-    teil.knoten.push(knoten(ctx, { id: zielId, art: 'ende', name: ergebnis.get(f) ?? '', blockId: b.id, bahn, spalte: 0, spur: 0 }))
+    // Liegt der äußerste Rahmen neben gleichzeitig laufenden Schritten, beendet eine Terminierung den ganzen Vorgang.
+    teil.knoten.push(knoten(ctx, { id: zielId, art: 'ende', name: ergebnis.get(f) ?? '', blockId: b.id, bahn, spalte: 0, spur: 0, ...(ctx.nebenlaeufig ? { terminierung: true, doku: ABBRUCH_DOKU } : {}) }))
     belege(teil, bahn, 1)
     teil.breite = 1
     teil.eintritt = zielId
@@ -1328,7 +1376,7 @@ function hinterRahmen(l: Layout): [Id, number][] {
 }
 
 function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
-  const ctx: Kontext = { rollenIds: new Set(p.rollen.map((r) => r.id)), rollen: p.rollen, kantenNr: 0, bahnZwang: null, rahmen: null, fehler: new Map(), schub, stunden: p.arbeitsstundenProTag }
+  const ctx: Kontext = { rollenIds: new Set(p.rollen.map((r) => r.id)), rollen: p.rollen, kantenNr: 0, bahnZwang: null, rahmen: null, fehler: new Map(), schub, stunden: p.arbeitsstundenProTag, nebenlaeufig: false }
   const ersteBahn = ersteBahnVon(p, ctx)
 
   const haupt = layoutSequenz(p.ablauf.schritte, ersteBahn, ctx)

@@ -9,9 +9,14 @@
  * (Rücksprung zu Bereich b) und E_r (der Vorgang endet mit Ergebnis r). Damit
  * die Listen klein bleiben, werden sie zusammengefasst; das geschieht
  * mittelwerttreu, so dass Erwartungswerte von Summen exakt bleiben.
+ *
+ * Teile, die zugleich laufen (Zweige von Gleichzeitig, gewählte ODER-Wege,
+ * Stücke von „für jedes Stück“ zur selben Zeit), verknüpft die
+ * Abbruchkombination: Der früheste Abbruch beendet den Vorgang, sonst geht es
+ * weiter, wenn alle normal fertig sind.
  */
-import { anzahlVerteilung, erwartungMaximumOhneNull, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
-import { oderZiehung, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
+import { anzahlVerteilung, erwartungMaximumOhneNull, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
+import { alleMischung, oderMischung, unterbrechungsAnteile, unterbrechungsZeit, type Mischung } from '../modell/operationen'
 import { unerwartet, unterbrechungenVon, type Block, type Id, type Mehrfach, type Oder, type Parallel, type Unterbrechbar } from '../modell/typen'
 
 export interface Verteilung {
@@ -21,6 +26,8 @@ export interface Verteilung {
 
 const MAX_PUNKTE = 160
 const MIN_MASSE = 1e-9
+/** Kleinere Massen sind Rundungsrauschen; alles darüber bleibt erhalten, damit Masse und Mittel exakt bleiben. */
+const RAUSCHEN = 1e-14
 
 export function punkt(t: number, m = 1): Verteilung {
   return { wert: [t], masse: [m] }
@@ -50,7 +57,7 @@ export function verschiebe(v: Verteilung, t: number): Verteilung {
 
 /** Sortiert, fasst gleiche Werte zusammen und begrenzt die Zahl der Punkte. */
 function ordne(paare: [number, number][]): Verteilung {
-  const sortiert = paare.filter(([, m]) => m > MIN_MASSE).sort((a, b) => a[0] - b[0])
+  const sortiert = paare.filter(([, m]) => m > RAUSCHEN).sort((a, b) => a[0] - b[0])
   const wert: number[] = []
   const masseListe: number[] = []
   for (const [w, m] of sortiert) {
@@ -80,7 +87,7 @@ function kompakt(v: Verteilung): Verteilung {
   const wert: number[] = []
   const masseListe: number[] = []
   for (let k = 0; k < MAX_PUNKTE; k++) {
-    if (summeM[k] <= MIN_MASSE) continue
+    if (summeM[k] <= RAUSCHEN) continue
     wert.push(summeW[k] / summeM[k])
     masseListe.push(summeM[k])
   }
@@ -118,14 +125,27 @@ export function maximum(vs: Verteilung[]): Verteilung {
   return ordne(paare)
 }
 
-/** Summe Σ_{k≥0} wieder^{*k}: wie oft ein Abschnitt wiederholt wird, als Verteilung der Zusatzdauer. */
+/**
+ * Summe Σ_{k≥0} wieder^{*k}: wie oft ein Abschnitt wiederholt wird, als
+ * Verteilung der Zusatzdauer. Den Rest der Reihe nach dem letzten gefalteten
+ * Glied k nimmt ein Punkt mit genau seiner Masse q^{k+1} / (1 − q) und seinem
+ * Mittel μ · (k + 1 + q / (1 − q)) auf (q Masse, μ Mittel von `wieder`); so
+ * bleiben Masse und Erwartungswert exakt, auch wenn die Reihe langsam abklingt.
+ */
 function geometrisch(wieder: Verteilung): Verteilung {
+  const q = masse(wieder)
   let summe = punkt(0)
   let term = punkt(0)
-  for (let k = 0; k < 200; k++) {
-    term = falte(term, wieder)
-    if (masse(term) < 1e-7) break
+  let k = 0
+  for (; k < 200; k++) {
+    const naechster = falte(term, wieder)
+    if (masse(naechster) < 1e-7) break
+    term = naechster
     summe = addiere(summe, term)
+  }
+  if (q > 0 && q < 1) {
+    const rest = q ** (k + 1) / (1 - q)
+    if (rest > MIN_MASSE) summe = addiere(summe, punkt(erwartung(wieder) * (k + 1 + q / (1 - q)), rest))
   }
   return summe
 }
@@ -249,8 +269,8 @@ function verteilungOhneUnterbrechung(b: Block, art: Zeitart): Teilverteilungen {
       const parallelArt = b.art
       switch (parallelArt) {
         case 'alle':
-          // Enden in Zweigen meldet die Prüfung als Fehler (Verklemmung); die Abbruchkombination folgt mit Schritt 5 von Format 4.
-          return { weiter: maximum(b.zweige.map((z) => verteilungSequenz(z.schritte, art).weiter)), rueck: new Map(), ende: new Map() }
+          // alle Zweige zugleich: der früheste Abbruch, sonst das späteste normale Ende
+          return gleichlauf(b.zweige.map((z) => verteilungSequenz(z.schritte, art)), alleMischung)
         case 'erster':
           return ersterAusgang(b, art).teile
         case 'nacheinander':
@@ -261,7 +281,7 @@ function verteilungOhneUnterbrechung(b: Block, art: Zeitart): Teilverteilungen {
       }
     }
     case 'oder':
-      return { weiter: verteilungOder(b, art), rueck: new Map(), ende: new Map() }
+      return verteilungOder(b, art)
     case 'wiederholung': {
       const x = verteilungSequenz(b.koerper.schritte, art)
       const p = Math.min(Math.max(b.anteilWiederholung, 0), 0.999)
@@ -305,20 +325,134 @@ function potenzUndSumme(w: Verteilung, k: number): { potenz: Verteilung; summe: 
   return { potenz, summe }
 }
 
-/** Spätestes von N Stücken mit der Dauer d (Masse 1): Verteilungsfunktion E[F(t)^N] ohne den Teil N = 0. */
-function spaetestes(v: AnzahlVerteilung, d: Verteilung): Verteilung {
-  const m = masse(d)
-  if (m <= 0) return leer()
-  let kumuliert = 0
-  let vorher = 0
-  const paare: [number, number][] = []
-  d.wert.forEach((w, i) => {
-    kumuliert += d.masse[i] / m
-    const g = erwartungMaximumOhneNull(v, Math.min(1, kumuliert))
-    if (g - vorher > MIN_MASSE) paare.push([w, g - vorher])
-    vorher = g
+// ---------------------------------------------------------------------------
+// Abbruchkombination
+
+/** Gemeinsames Raster aller Werte (gleiche Werte bis 1e-9 zusammengefasst). */
+function raster(vs: Verteilung[]): number[] {
+  const alle = vs.flatMap((v) => v.wert).sort((a, b) => a - b)
+  const r: number[] = []
+  for (const w of alle) if (r.length === 0 || w - r[r.length - 1] > 1e-9) r.push(w)
+  return r
+}
+
+/** Masse einer Verteilung je Punkt des Rasters. */
+function aufRaster(v: Verteilung, r: number[]): number[] {
+  const m = new Array<number>(r.length).fill(0)
+  v.wert.forEach((w, i) => {
+    let unten = 0
+    let oben = r.length - 1
+    while (unten < oben) {
+      const mitte = (unten + oben) >> 1
+      if (r[mitte] < w - 1e-9) unten = mitte + 1
+      else oben = mitte
+    }
+    m[unten] += v.masse[i]
   })
-  return ordne(paare)
+  return m
+}
+
+function kumuliere(m: number[]): number[] {
+  let s = 0
+  return m.map((x) => (s += x))
+}
+
+/** Die Abbruch-Ausgänge eines Teils: Enden und (nur in ungültigen Modellen) Rücksprünge. */
+function abbrueche(t: Teilverteilungen): { ende?: string; rueck?: Id; v: Verteilung }[] {
+  return [...[...t.ende].map(([ende, v]) => ({ ende, v })), ...[...t.rueck].map(([rueck, v]) => ({ rueck, v }))]
+}
+
+/**
+ * Abbruchkombination für Teile, die zugleich laufen. Teil i hat den Abbruch
+ * Gᵢ (alle Enden und Rücksprünge) und das normale Ende Hᵢ; `mischung` verknüpft
+ * sie (Gleichzeitig: Produkt, ODER: über die Ziehung der Wege). Die Zeit ist der
+ * früheste Abbruch, sonst das späteste normale Ende:
+ *
+ * - Weiter-Teil W(t) = mischung(H(t)), ohne Normierung
+ * - Ergebnis r von Teil i bei t: e_{i,r}(t) · ∂mischung/∂aᵢ an der Stelle
+ *   aⱼ = 1 − Gⱼ(t) für j < i und aⱼ = 1 − Gⱼ(t⁻) für j > i: Bei Gleichstand
+ *   gewinnt der frühere Teil der Liste.
+ *
+ * Zusammen ergibt das den Abbruch-Teil 1 − mischung(1 − G(t)). Was die übrigen
+ * Teile bis dahin getan haben, zählt die Flussrechnung voll.
+ */
+export function gleichlauf(teile: Teilverteilungen[], mischung: Mischung): Teilverteilungen {
+  const rueck = new Map<Id, Verteilung>()
+  const ende = new Map<string, Verteilung>()
+  if (teile.length === 0) return { weiter: punkt(0), rueck, ende }
+  const aus = teile.map(abbrueche)
+  const r = raster(teile.flatMap((t, i) => [t.weiter, ...aus[i].map((a) => a.v)]))
+  const h = teile.map((t) => kumuliere(aufRaster(t.weiter, r)))
+  const e = aus.map((liste) => liste.map((a) => aufRaster(a.v, r)))
+  const g = e.map((liste) => kumuliere(r.map((_, k) => liste.reduce((s, m) => s + m[k], 0))))
+  const weiter: [number, number][] = []
+  const rueckPaare = new Map<Id, [number, number][]>()
+  const endePaare = new Map<string, [number, number][]>()
+  let vorher = 0
+  r.forEach((t, k) => {
+    const w = mischung(h.map((x) => Math.min(1, x[k])))
+    if (w - vorher > RAUSCHEN) {
+      weiter.push([t, w - vorher])
+      vorher = w
+    }
+    aus.forEach((liste, i) => {
+      if (liste.every((_, o) => e[i][o][k] <= 0)) return
+      const a = teile.map((_, j) => (j < i ? 1 - g[j][k] : j > i ? 1 - (k > 0 ? g[j][k - 1] : 0) : 0))
+      const ohne = mischung(a)
+      a[i] = 1
+      const anteil = mischung(a) - ohne
+      liste.forEach((x, o) => {
+        const m = e[i][o][k] * anteil
+        if (m <= RAUSCHEN) return
+        if (x.ende !== undefined) endePaare.set(x.ende, [...(endePaare.get(x.ende) ?? []), [t, m]])
+        else rueckPaare.set(x.rueck!, [...(rueckPaare.get(x.rueck!) ?? []), [t, m]])
+      })
+    })
+  })
+  for (const [id, paare] of rueckPaare) rueck.set(id, ordne(paare))
+  for (const [x, paare] of endePaare) ende.set(x, ordne(paare))
+  return { weiter: ordne(weiter), rueck, ende }
+}
+
+/**
+ * „Für jedes Stück“ gleichzeitig: N gleiche, unabhängige Stücke mit Abbruch G
+ * und normalem Ende H. Mit φ(a) = E[a^N; N ≥ 1]: Weiter-Teil φ(H(t)), Abbruch
+ * bei t mit φ(1 − G(t⁻)) − φ(1 − G(t)), aufgeteilt auf die Ergebnisse nach
+ * ihrem Anteil bei t; ohne Stück geht es sofort weiter (bei 0, ohne Liegezeit).
+ */
+function stueckeGleichzeitig(v: AnzahlVerteilung, x: Teilverteilungen, liegen: number): Teilverteilungen {
+  const ohne = wahrscheinlichkeit(v, 0)
+  const phi = (a: number) => erwartungMaximumOhneNull(v, Math.min(1, Math.max(0, a)))
+  const aus = abbrueche(x)
+  const r = raster([x.weiter, ...aus.map((a) => a.v)])
+  const h = kumuliere(aufRaster(x.weiter, r))
+  const e = aus.map((a) => aufRaster(a.v, r))
+  const gMasse = r.map((_, k) => e.reduce((s, m) => s + m[k], 0))
+  const g = kumuliere(gMasse)
+  const weiter: [number, number][] = ohne > 0 ? [[0, ohne]] : []
+  const rueckPaare = new Map<Id, [number, number][]>()
+  const endePaare = new Map<string, [number, number][]>()
+  let vorher = 0
+  r.forEach((t, k) => {
+    const w = phi(h[k])
+    if (w - vorher > RAUSCHEN) {
+      weiter.push([t + liegen, w - vorher])
+      vorher = w
+    }
+    if (gMasse[k] <= 0) return
+    const abbruch = phi(1 - (k > 0 ? g[k - 1] : 0)) - phi(1 - g[k])
+    aus.forEach((a, o) => {
+      const m = (abbruch * e[o][k]) / gMasse[k]
+      if (m <= RAUSCHEN) return
+      if (a.ende !== undefined) endePaare.set(a.ende, [...(endePaare.get(a.ende) ?? []), [t + liegen, m]])
+      else rueckPaare.set(a.rueck!, [...(rueckPaare.get(a.rueck!) ?? []), [t + liegen, m]])
+    })
+  })
+  const rueck = new Map<Id, Verteilung>()
+  const ende = new Map<string, Verteilung>()
+  for (const [id, paare] of rueckPaare) rueck.set(id, ordne(paare))
+  for (const [z, paare] of endePaare) ende.set(z, ordne(paare))
+  return { weiter: ordne(weiter), rueck, ende }
 }
 
 /**
@@ -326,7 +460,7 @@ function spaetestes(v: AnzahlVerteilung, d: Verteilung): Verteilung {
  * die Liegezeit, wenn N ≥ 1. Nacheinander ist es die Mischung über N der
  * N-fachen Faltung; ein Ende in einem Durchlauf beendet die Reihe (wie eine
  * Wiederholung mit höchstens N Durchläufen). Gleichzeitig zählt das späteste
- * Stück, F(t) = E[F_K(t)^N].
+ * Stück, F(t) = E[F_K(t)^N], oder der früheste Abbruch (`stueckeGleichzeitig`).
  */
 export function verteilungMehrfach(b: Mehrfach, art: Zeitart): Teilverteilungen {
   const v = anzahlVerteilung(b.anzahl, b.streuung)
@@ -359,89 +493,26 @@ export function verteilungMehrfach(b: Mehrfach, art: Zeitart): Teilverteilungen 
       nach(v.rest > 0 ? addiere(summe, skaliere(potenz, v.rest)) : summe)
       return { weiter, rueck, ende }
     }
-    case 'gleichzeitig': {
-      // Dauer eines Stücks, wie auch immer es endet (Enden meldet die Prüfung hier als Fehler; sie zählen anteilig)
-      const teile = [x.weiter, ...x.rueck.values(), ...x.ende.values()]
-      const stueck = teile.reduce((s, t) => addiere(s, t), leer())
-      const spaet = verschiebe(spaetestes(v, stueck), liegen)
-      const mitStueck = mindestens(v, 1)
-      if (mitStueck <= 0) return { weiter, rueck, ende }
-      const c = masse(x.weiter)
-      const normal = Math.max(0, erwartungMaximumOhneNull(v, c))
-      weiter = addiere(weiter, skaliere(spaet, normal / mitStueck))
-      const abbruch = Math.max(0, mitStueck - normal)
-      const summeEnden = [...x.ende.values()].reduce((s, d) => s + masse(d), 0)
-      if (abbruch > 1e-12 && summeEnden > 0) for (const [e, d] of x.ende) plus(ende, e, skaliere(spaet, (abbruch * masse(d)) / summeEnden / mitStueck))
-      return { weiter, rueck, ende }
-    }
+    case 'gleichzeitig':
+      // spätestes Stück, oder der früheste Abbruch eines Stücks beendet alle
+      return stueckeGleichzeitig(v, x, liegen)
     default:
       return unerwartet(ausfuehrung)
   }
 }
 
 /**
- * Dauer einer ODER-Verzweigung: Jeder Weg läuft unabhängig mit seiner
- * Wahrscheinlichkeit (sonst Dauer 0), weiter geht es nach dem längsten
- * gewählten. Läuft keiner, nimmt der Standardweg die Masse bei 0 ein.
+ * Dauer einer ODER-Verzweigung: Die Wege werden gezogen wie in `oderZiehung`
+ * (unabhängig, ohne Standardweg bedingt auf „mindestens einer“; der Standardweg
+ * läuft, wenn kein anderer gewählt ist). Weiter geht es nach dem längsten
+ * gewählten Weg; endet ein gewählter Weg den Vorgang, gilt der früheste Abbruch
+ * (Abbruchkombination mit `oderMischung`).
  */
-export function verteilungOder(b: Oder, art: Zeitart): Verteilung {
-  const zug = oderZiehung(b)
-  const iStandard = b.zweige.findIndex((z) => z.id === b.standard)
-  const vollstaendig = (i: number): Verteilung => {
-    const d = verteilungSequenz(b.zweige[i].schritte, art).weiter
-    const m = masse(d)
-    return m > 0 ? skaliere(d, 1 / m) : punkt(0)
-  }
-  if (zug.ausschliessend) {
-    // Grenzfall: genau ein Weg läuft
-    let ergebnis = leer()
-    b.zweige.forEach((_, i) => {
-      if (zug.r[i] > 0) ergebnis = addiere(ergebnis, skaliere(vollstaendig(i), zug.r[i]))
-    })
-    return ergebnis
-  }
-  const mischungen: Verteilung[] = []
-  b.zweige.forEach((_, i) => {
-    if (i === iStandard) return
-    // jeder Weg unabhängig: mit rᵢ seine Dauer, sonst 0
-    mischungen.push(addiere(skaliere(vollstaendig(i), zug.r[i]), punkt(0, 1 - zug.r[i])))
-  })
-  const roh = mischungen.length > 0 ? maximum(mischungen) : punkt(0)
-  // „Keiner läuft“ liegt bei 0 mit Masse 1 − Z
-  const ohneLeer = entferneNullmasse(roh, 1 - zug.z)
-  if (iStandard >= 0) return addiere(ohneLeer, skaliere(vollstaendig(iStandard), 1 - zug.z))
-  // ohne Standardweg: auf „mindestens einer“ bedingen
-  return zug.z > 0 ? skaliere(ohneLeer, 1 / zug.z) : ohneLeer
-}
-
-/**
- * Nimmt Masse q beim Wert 0 heraus. Hat das Zusammenfassen den Wert 0 mit
- * kleinen Werten verschmolzen, wird der Wert so verschoben, dass der
- * Erwartungswert exakt bleibt.
- */
-function entferneNullmasse(v: Verteilung, q: number): Verteilung {
-  if (q <= 0 || v.wert.length === 0) return v
-  const wert = [...v.wert]
-  const masseListe = [...v.masse]
-  const m0 = masseListe[0]
-  const rest = m0 - q
-  if (rest <= 1e-12) {
-    wert.shift()
-    masseListe.shift()
-  } else {
-    wert[0] = (wert[0] * m0) / rest
-    masseListe[0] = rest
-  }
-  return { wert, masse: masseListe }
-}
-
-export function erwartungOder(b: Oder, art: Zeitart): number {
-  return erwartung(verteilungOder(b, art))
-}
-
-/** Erwartungswert des Maximums der Zweige von „Gleichzeitig“. */
-export function erwartungMaximum(zweige: Block[][], art: Zeitart): number {
-  return erwartung(maximum(zweige.map((s) => verteilungSequenz(s, art).weiter)))
+export function verteilungOder(b: Oder, art: Zeitart): Teilverteilungen {
+  return gleichlauf(
+    b.zweige.map((z) => verteilungSequenz(z.schritte, art)),
+    oderMischung(b),
+  )
 }
 
 /** Wie oft ein Zweig von „weiter beim ersten“ gewinnt, aufgeteilt nach dem, womit er fertig wird. */

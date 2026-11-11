@@ -39,6 +39,8 @@ export interface FormularKontext {
   /** Block direkt danach, falls bekannt (z. B. die Entscheidung nach einer Freigabe) */
   nachfolger?: Block | null
   inParallele: boolean
+  /** In einem Nebenweg: Er endet für sich, „Prozess endet“ gibt es dort nicht. */
+  imNebenweg?: boolean
   neu: boolean
   /** Mögliche Ziele für „zurück zu …“ */
   ziele?: RuecksprungZiel[]
@@ -344,6 +346,14 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
   )
 }
 
+/**
+ * „Prozess endet“: An nebenläufigen Stellen (Zweig von Gleichzeitig, ODER-Weg,
+ * Stücke zur selben Zeit) bricht das Ende ab, was gleichzeitig läuft.
+ */
+function endeText(kontext: FormularKontext): string {
+  return kontext.inParallele ? 'Prozess endet sofort; was gleichzeitig läuft, wird abgebrochen' : 'Prozess endet'
+}
+
 function danachVon(z: EntscheidungsZweig): string {
   if (z.ende !== null) return 'ende'
   if (z.zurueckZu !== null) return `zurueck:${z.zurueckZu}`
@@ -468,7 +478,7 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
                   <span className="leise">Danach:</span>
                   <select aria-label={`Wie es nach „${name}“ weitergeht`} value={danachVon(z)} onChange={(ev) => danach(z, ev.target.value)}>
                     <option value="weiter">weiter im Ablauf</option>
-                    {!kontext.inParallele && <option value="ende">Prozess endet</option>}
+                    {!kontext.imNebenweg && <option value="ende">{endeText(kontext)}</option>}
                     {!kontext.inParallele &&
                       ziele.map((t) => (
                         <option key={t.id} value={`zurueck:${t.id}`}>
@@ -492,6 +502,7 @@ function EntscheidungFormular({ block: e, onAendern, kontext }: Props<Entscheidu
             </div>
           )
         })}
+        {kontext.inParallele && e.zweige.some((z) => z.ende !== null) && <Lernhinweis thema="abbruch" />}
         <div className={`summe${passt ? '' : ' summe-falsch'}`} aria-live="polite">
           Zusammen: {formatiereProzent(summe, 1)}
           {!passt && (
@@ -991,7 +1002,7 @@ function UnterbrechungZeile({ u, nr, schritt, kontext, onAendern, onEntfernen }:
                         zurück zu „{t.titel}“
                       </option>
                     ))}
-                  {!kontext.inParallele && <option value="ende">Prozess endet</option>}
+                  {!kontext.imNebenweg && <option value="ende">{endeText(kontext)}</option>}
                   {!zielBekannt && <option value={`zurueck:${u.zurueckZu}`}>zurück (Ziel nicht mehr gültig)</option>}
                 </select>
               </label>
@@ -999,6 +1010,7 @@ function UnterbrechungZeile({ u, nr, schritt, kontext, onAendern, onEntfernen }:
                 <input type="text" className="zweig-ende" aria-label={`Ergebnis, wenn „${name}“`} value={u.ende} placeholder="Mit welchem Ergebnis? z. B. Bestellung storniert" onChange={(e) => setze({ ende: e.target.value })} />
               )}
             </div>
+            {u.ende !== null && kontext.inParallele && <Lernhinweis thema="abbruch" />}
           </>
         ) : (
           <Feld label="Wie oft im Schnitt je Ausführung?" hilfe={`Auch mehr als einmal, z. B. 1,5. Der Nebenweg läuft neben „${titel}“ her, endet für sich und verlängert den Vorgang nicht.`}>

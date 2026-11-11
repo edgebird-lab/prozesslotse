@@ -23,6 +23,7 @@ import { findeSchwachstellen } from './hinweise'
 import { berechneKennzahlen } from './kennzahlen'
 import { simuliere, zufallMitStartwert } from './simulation'
 import { erwartung, erwartungGesamt, masse, verteilungSequenz, type Verteilung } from './verteilung'
+import { tokenZeiten } from '../testhilfen/tokenzeiten'
 
 const LAGER = neueRolle('Lager', { personen: 1 })
 const BUERO = neueRolle('Büro')
@@ -83,7 +84,7 @@ type MitSchleife = ModdleElement & { loopCharacteristics?: { $type: string; isSe
 function tokenAbweichungen(p: Prozess, laeufe: number, startwert: number): string[] {
   const { layout } = erzeugeBpmn(p)
   const k = berechneKennzahlen(p)
-  const gezaehlt = zaehleMitFehler(graphAusLayout(layout), anteile(layout), laeufe, zufallMitStartwert(startwert))
+  const gezaehlt = zaehleMitFehler(graphAusLayout(layout), anteile(layout), laeufe, zufallMitStartwert(startwert), tokenZeiten(p, layout))
   const abweichungen: string[] = []
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ !== 'aufgabe') continue
@@ -496,22 +497,24 @@ describe('Für jedes Stück: Prüfregeln und Schwachstellen', () => {
     expect(pruefeProzess(positionen().p).filter((b) => b.schwere !== 'hinweis')).toEqual([])
   })
 
-  it('meldet ein Ende im Körper, wenn die Stücke gleichzeitig laufen, und erlaubt es nacheinander', () => {
+  it('erlaubt ein Ende im Körper, nacheinander und gleichzeitig, auch in einem Zweig von Gleichzeitig', () => {
     const { p, m } = mitEnde()
     expect(pruefeProzess(p).filter((b) => b.schwere === 'fehler')).toEqual([])
     const gleichzeitig = prozess([{ ...m, ausfuehrung: 'gleichzeitig' }])
-    const f = pruefeProzess(gleichzeitig).find((b) => b.schluessel.startsWith('abbruch:'))
-    expect(f?.schwere).toBe('fehler')
-    expect(f?.text).toContain('der Reihe nach')
-    // keine Verklemmung: Das Fehler-Randereignis am Rahmen bricht alle Stücke ab
+    expect(pruefeProzess(gleichzeitig).filter((b) => b.schwere === 'fehler')).toEqual([])
+    // Das Fehler-Randereignis am Rahmen bricht alle Stücke ab
     expect(pruefeSoundness(graphAusLayout(erzeugeBpmn(gleichzeitig).layout)).fehler).toEqual([])
-    // in einem Zweig von Gleichzeitig dagegen schon
+    // in einem Zweig von Gleichzeitig: hinter dem Randereignis eine Terminierung, die auch den anderen Zweig abbricht
     const par = neueParallel(2)
     par.zweige[0].schritte = [m]
     par.zweige[1].schritte = [aufgabe('Rechnung schreiben', 5, BUERO)]
-    const verklemmt = prozess([par])
-    expect(schluessel(verklemmt)).toContain('fehler:verklemmung')
-    expect(pruefeSoundness(graphAusLayout(erzeugeBpmn(verklemmt).layout)).sound).toBe(false)
+    const zweig = prozess([par])
+    expect(pruefeProzess(zweig).filter((b) => b.schwere === 'fehler')).toEqual([])
+    const { layout } = erzeugeBpmn(zweig)
+    const hinterRand = layout.knoten.filter((k) => k.art === 'ende' && k.blockId === m.id && (k.rahmen ?? null) === null)
+    expect(hinterRand.length).toBeGreaterThan(0)
+    expect(hinterRand.every((k) => k.terminierung)).toBe(true)
+    expect(pruefeSoundness(graphAusLayout(layout)).fehler).toEqual([])
   })
 
   it('weist auf zu wenig Leute für gleichzeitige Stücke und auf eine lange Liegezeit hin', () => {

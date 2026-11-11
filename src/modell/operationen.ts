@@ -177,6 +177,12 @@ export function nebenlaeufig(kette: Glied[]): boolean {
   return kette.some(gliedNebenlaeufig)
 }
 
+/** Ist das Glied ein Nebenweg (nicht unterbrechender Ausnahmeweg)? Er endet für sich, ohne Ergebnis. */
+export function gliedNebenweg(g: Glied): boolean {
+  const u = unterbrechungVon(g.block, g.sequenz.id)
+  return u !== null && !u.unterbrechend
+}
+
 /** „Weiter beim ersten“ und „in beliebiger Reihenfolge“: Gleichzeitig-Arten, die als Rahmen gezeichnet werden. */
 export type ParallelRahmen = Parallel & { art: 'erster' | 'nacheinander' }
 
@@ -336,6 +342,40 @@ export function oderZiehung(b: Oder): OderZiehung {
   }
   const z = (unten + oben) / 2
   return { r: p.map((x) => x * z), z, ausschliessend: false }
+}
+
+/**
+ * Verknüpfung von Teilen, die zugleich laufen: Hat Teil i ein Ereignis mit der
+ * Wahrscheinlichkeit aᵢ (z. B. „bis t normal fertig“), unabhängig von den
+ * übrigen, dann haben alle laufenden Teile es mit `mischung(a)`. Teile, die
+ * nicht laufen, zählen dabei als erfüllt. Die Funktion ist in jedem aᵢ linear;
+ * deshalb ist mischung(a mit aᵢ = 1) − mischung(a mit aᵢ = 0) die
+ * Wahrscheinlichkeit, dass Teil i läuft und alle anderen laufenden das Ereignis haben.
+ */
+export type Mischung = (a: number[]) => number
+
+/** Gleichzeitig: Alle Zweige laufen, Π aᵢ. */
+export const alleMischung: Mischung = (a) => a.reduce((p, x) => p * x, 1)
+
+/**
+ * ODER mit der Ziehung aus `oderZiehung`: Mit Standardweg s und q = Π(1 − rᵢ)
+ * ist es Π(1 − rᵢ + rᵢaᵢ) − q + q·a_s (der Standardweg läuft genau dann, wenn
+ * kein anderer gewählt ist); ohne Standardweg, bedingt auf „mindestens einer“,
+ * [Π(1 − rᵢ + rᵢaᵢ) − (1 − Z)] / Z; schließen sich die Wege aus, Σ rᵢaᵢ.
+ */
+export function oderMischung(b: Oder): Mischung {
+  const zug = oderZiehung(b)
+  const iStandard = b.zweige.findIndex((z) => z.id === b.standard)
+  if (zug.ausschliessend) return (a) => a.reduce((s, x, i) => s + zug.r[i] * x, 0)
+  const keiner = zug.r.reduce((q, r, i) => (i === iStandard ? q : q * (1 - r)), 1)
+  return (a) => {
+    let produkt = 1
+    a.forEach((x, i) => {
+      if (i !== iStandard) produkt *= 1 - zug.r[i] + zug.r[i] * x
+    })
+    if (iStandard >= 0) return produkt - keiner + keiner * a[iStandard]
+    return zug.z > 0 ? (produkt - (1 - zug.z)) / zug.z : produkt
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -800,18 +840,24 @@ function ausgaengeOhneUnterbrechung(b: Block): Set<Ausgang> {
     }
     case 'parallel':
     case 'oder': {
-      // Weiter nur, wenn jeder Zweig weiterkommt: Bei ODER kann jeder Weg auch der einzige gewählte sein, bei
-      // „in beliebiger Reihenfolge“ kann jeder Zweig der letzte sein. Bei „weiter beim ersten“ reicht ein Zweig.
+      // Gleichzeitig und „in beliebiger Reihenfolge“: weiter nur, wenn jeder Zweig weiterkommt (bei „in beliebiger
+      // Reihenfolge“ kann jeder Zweig der letzte sein). „Weiter beim ersten“: ein Zweig reicht. ODER: weiter, wenn
+      // eine mögliche Auswahl nur aus Wegen besteht, die weiterkommen; jeder Weg kann der einzige gewählte sein,
+      // außer einer läuft immer mit.
       const aus = new Set<Ausgang>()
-      let alleWeiter = b.zweige.length > 0
-      let einerWeiter = false
-      for (const z of b.zweige) {
+      const weiter = b.zweige.map((z) => {
         const a = ausgaengeSequenz(z.schritte)
         vereinige(aus, a, 'weiter')
-        alleWeiter &&= a.has('weiter')
-        einerWeiter ||= a.has('weiter')
-      }
-      if (b.typ === 'parallel' && b.art === 'erster' ? einerWeiter : alleWeiter) aus.add('weiter')
+        return a.has('weiter')
+      })
+      const alleWeiter = weiter.length > 0 && weiter.every(Boolean)
+      const einerWeiter = weiter.some(Boolean)
+      let ja: boolean
+      if (b.typ === 'oder') {
+        const immer = oderWahrscheinlichkeiten(b).map((p, i) => b.zweige[i].id !== b.standard && p >= 1)
+        ja = immer.some(Boolean) ? weiter.every((w, i) => w || !immer[i]) : einerWeiter
+      } else ja = b.art === 'erster' ? einerWeiter : alleWeiter
+      if (ja) aus.add('weiter')
       return aus
     }
     case 'wiederholung': {

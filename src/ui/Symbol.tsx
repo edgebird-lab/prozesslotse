@@ -16,6 +16,7 @@ export type SymbolArt =
   | 'start-zeit'
   | 'start-bedingung'
   | 'ende'
+  | 'ende-terminierung'
   | 'bahn'
   | 'kennzahl'
   | 'verbessern'
@@ -151,6 +152,14 @@ function inhalt(art: SymbolArt) {
       )
     case 'ende':
       return <circle cx="16" cy="16" r="11" {...strich} strokeWidth={3.4} />
+    case 'ende-terminierung':
+      // Terminierung: dicker Kreis mit gefülltem Punkt
+      return (
+        <>
+          <circle cx="16" cy="16" r="11" {...strich} strokeWidth={3.4} />
+          <circle cx="16" cy="16" r="6" fill="currentColor" />
+        </>
+      )
     case 'ereignisgateway':
       return raute(
         <>

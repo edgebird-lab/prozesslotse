@@ -2,7 +2,9 @@
  * Monte-Carlo-Simulation der Durchlaufzeit. Jeder Lauf wählt an
  * Entscheidungen einen Ausgang nach den Anteilen, würfelt Wiederholungen aus
  * und nimmt bei „Gleichzeitig“ den längsten Zweig, bei „weiter beim ersten“ den
- * kürzesten; „in beliebiger Reihenfolge“ läuft in der Reihenfolge der Liste. Die Zeiten je Schritt sind
+ * kürzesten; „in beliebiger Reihenfolge“ läuft in der Reihenfolge der Liste.
+ * Beendet ein Zweig, ein ODER-Weg oder ein Stück zur selben Zeit den Vorgang,
+ * zählt der früheste Abbruch (bei Gleichstand der frühere). Die Zeiten je Schritt sind
  * die geschätzten Durchschnittswerte; die Streuung entsteht also nur aus dem
  * Ablauf selbst (Entscheidungen, Wiederholungen), nicht aus schwankenden
  * Bearbeitungszeiten. Das 90-%-Quantil ist deshalb eher zu niedrig. Mit
@@ -63,6 +65,23 @@ function laufeSequenz(schritte: Block[], zufall: () => number): Lauf {
     if (r.ende !== null || r.rueck) return { zeit, ende: r.ende, rueck: r.rueck }
   }
   return { zeit, ende: null, rueck: null }
+}
+
+/**
+ * Teile, die zugleich laufen (Zweige von Gleichzeitig, gewählte ODER-Wege,
+ * Stücke zur selben Zeit): Beendet einer den Vorgang, gilt der früheste Abbruch
+ * (bei Gleichstand der frühere Teil der Liste); sonst geht es nach dem
+ * spätesten weiter.
+ */
+function gemeinsam(laeufe: Lauf[]): Lauf {
+  let abbruch: Lauf | null = null
+  let spaetestens = 0
+  for (const r of laeufe) {
+    if (r.ende !== null || r.rueck) {
+      if (!abbruch || r.zeit < abbruch.zeit - 1e-9) abbruch = r
+    } else spaetestens = Math.max(spaetestens, r.zeit)
+  }
+  return abbruch ?? { zeit: spaetestens, ende: null, rueck: null }
 }
 
 function laufeBlock(b: Block, zufall: () => number): Lauf {
@@ -134,28 +153,13 @@ function laufeOhneUnterbrechung(b: Block, zufall: () => number): Lauf {
         }
         if (gewaehlt.length === 0 && b.standard !== null) gewaehlt = [b.zweige.findIndex((z) => z.id === b.standard)]
       }
-      let zeit = 0
-      let ende: string | null = null
-      for (const i of gewaehlt) {
-        const r = laufeSequenz(b.zweige[i].schritte, zufall)
-        zeit = Math.max(zeit, r.zeit)
-        ende ??= r.ende
-      }
-      return { zeit, ende, rueck: null }
+      return gemeinsam(gewaehlt.map((i) => laufeSequenz(b.zweige[i].schritte, zufall)))
     }
     case 'parallel': {
       const art = b.art
       switch (art) {
-        case 'alle': {
-          let zeit = 0
-          let ende: string | null = null
-          for (const z of b.zweige) {
-            const r = laufeSequenz(z.schritte, zufall)
-            zeit = Math.max(zeit, r.zeit)
-            ende ??= r.ende
-          }
-          return { zeit, ende, rueck: null }
-        }
+        case 'alle':
+          return gemeinsam(b.zweige.map((z) => laufeSequenz(z.schritte, zufall)))
         case 'erster': {
           // Der Zweig, der zuerst fertig ist, gewinnt (Gleichstand: der frühere); die übrigen werden abgebrochen.
           let gewinner: Lauf | null = null
@@ -201,15 +205,9 @@ function laufeOhneUnterbrechung(b: Block, zufall: () => number): Lauf {
           return { zeit, ende: null, rueck: null }
         }
         case 'gleichzeitig': {
-          // das späteste Stück zählt; Enden darin meldet die Prüfung als Fehler
-          let spaetestes = 0
-          let ende: string | null = null
-          for (let i = 0; i < n; i++) {
-            const r = laufeSequenz(b.koerper.schritte, zufall)
-            spaetestes = Math.max(spaetestes, r.zeit)
-            ende ??= r.ende
-          }
-          return { zeit: b.liegezeitMin + spaetestes, ende, rueck: null }
+          // das späteste Stück zählt, oder der früheste Abbruch eines Stücks
+          const r = gemeinsam(Array.from({ length: n }, () => laufeSequenz(b.koerper.schritte, zufall)))
+          return { ...r, zeit: b.liegezeitMin + r.zeit }
         }
         default:
           return unerwartet(ausfuehrung)

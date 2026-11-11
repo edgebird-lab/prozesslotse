@@ -22,6 +22,7 @@ import {
   kinderSequenzen,
   loeseAbschnittAuf,
   nebenlaeufig,
+  gliedNebenweg,
   normalisiere,
   parallelName,
   rahmenRolle,
@@ -104,14 +105,18 @@ function setzeUnterbrechungDanach(q: Prozess, schrittId: Id, unterbrechungId: Id
   return r
 }
 
-/** Kurzer Text einer Unterbrechung für die Gliederung: „Kunde storniert · 10 % · bricht ab · danach endet „storniert““. */
-function unterbrechungText(p: Prozess, u: Unterbrechung): string {
+/**
+ * Kurzer Text einer Unterbrechung für die Gliederung: „Kunde storniert · 10 % ·
+ * bricht ab · danach endet „storniert““; neben gleichzeitig laufenden Schritten
+ * „danach endet sofort“.
+ */
+function unterbrechungText(p: Prozess, u: Unterbrechung, sofort = false): string {
   const std = p.arbeitsstundenProTag
   const teile = [u.bezeichnung || 'Unterbrechung ohne Bezeichnung']
   if (u.art === 'zeit') teile.push(`Frist ${formatiereDauer(u.fristMin, std)}`)
   if (!u.unterbrechend) return [...teile, 'nebenher', `${formatiereZahl(u.anteil, 2)}-mal`].join(' · ')
   teile.push(formatiereProzent(u.anteil), 'bricht ab')
-  if (u.ende !== null) teile.push(`danach endet „${u.ende || 'Ende'}“`)
+  if (u.ende !== null) teile.push(`danach endet${sofort ? ' sofort' : ''} „${u.ende || 'Ende'}“`)
   else if (u.zurueckZu !== null) teile.push(`danach zurück zu „${zielTitel(p, u.zurueckZu)}“`)
   else teile.push('danach weiter')
   return teile.join(' · ')
@@ -314,6 +319,7 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
           vorgaenger: ort.vorgaenger,
           nachfolger: stelle?.sequenz.schritte[cursor.index] ?? null,
           inParallele: ort.inParallele,
+          imNebenweg: ort.imNebenweg,
           neu: true,
           ziele: zielVorher,
           rahmenBahn: istRahmen(entwurf) ? bahnDesAbschnitts(p, entwurf, stelle?.kette ?? []) : undefined,
@@ -386,6 +392,7 @@ function BlockBearbeiten() {
           vorgaenger,
           nachfolger: fund.sequenz.schritte[fund.index + 1] ?? null,
           inParallele: nebenlaeufig(fund.kette),
+          imNebenweg: fund.kette.some(gliedNebenweg),
           neu: false,
           ziele: b.typ === 'entscheidung' ? ruecksprungZiele(p, fund.sequenz.id, fund.index, true) : undefined,
           setzeDanach: (zweigId, danach) => aendere((q) => setzeDanach(q, b.id, zweigId, danach)),
@@ -625,6 +632,10 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
   }
   const unterbrechungen = unterbrechungenVon(b)
   if (unterbrechungen.length > 0) meta += ` · ${unterbrechungen.length === 1 ? '1 Unterbrechung' : `${unterbrechungen.length} Unterbrechungen`}`
+  // Ein Ende neben gleichzeitig laufenden Schritten bricht alles ab: in der Gliederung „endet sofort“
+  const mitEnde = (b.typ === 'entscheidung' && b.zweige.some((zw) => zw.ende !== null)) || unterbrechungen.some((u) => u.ende !== null)
+  const sofort = mitEnde && nebenlaeufig(findeBlock(p, b.id)?.kette ?? [])
+  const endeTitel = sofort ? 'Was gleichzeitig läuft, wird abgebrochen' : undefined
   const gewaehlt = z.auswahl === b.id
   return (
     <>
@@ -641,7 +652,12 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
             <div className="zweig-kopf">
               {zw.bezeichnung || 'Ausgang'} · {formatiereProzent(zw.anteil)}
               {b.art === 'ereignis' && zw.ereignis && <span> · nach Ø {formatiereDauer(zw.ereignis.dauerMin, std)}</span>}
-              {zw.ende !== null && <span className="zweig-ende-marke"> · endet: „{zw.ende || 'Ende'}“</span>}
+              {zw.ende !== null && (
+                <span className="zweig-ende-marke" title={endeTitel}>
+                  {' '}
+                  · endet{sofort ? ' sofort' : ''}: „{zw.ende || 'Ende'}“
+                </span>
+              )}
               {zw.zurueckZu !== null && <span className="zweig-ende-marke"> · ↩ zurück zu „{zielTitel(p, zw.zurueckZu)}“</span>}
             </div>
             <SequenzListe seq={zw} cursor={cursor} />
@@ -684,7 +700,7 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
       {unterbrechungen.map((u) => (
         <div key={u.id} className="zweig zweig-unterbrechung">
           <div className="zweig-kopf">
-            <Symbol art={u.unterbrechend ? 'unterbrechung' : 'unterbrechung-neben'} groesse={16} /> {unterbrechungText(p, u)}
+            <Symbol art={u.unterbrechend ? 'unterbrechung' : 'unterbrechung-neben'} groesse={16} /> {unterbrechungText(p, u, sofort)}
           </div>
           <SequenzListe seq={u} cursor={cursor} />
         </div>
