@@ -105,9 +105,13 @@ export function laengerAlsVorgeschrieben(d: DatenobjektAngaben): boolean {
 
 // ---------- Fristen der Dokumentation selbst (Spezifikation 6.2, Versionen) ----------
 
-/** Gültig bis: Tag vor dem Gültig-ab der nächsten Version; null bei der letzten („laufend“). */
-export function gueltigBisIn(versionen: Pick<VersionKopf, 'gueltigAb'>[], i: number): IsoDatum | null {
-  const naechste = versionen[i + 1]
+/**
+ * Gültig bis: Tag vor dem Gültig-ab der nächsten Version, deren Freigabe nicht zurückgezogen ist;
+ * null bei der letzten („laufend“) und bei einer zurückgezogenen Version, die nie galt.
+ */
+export function gueltigBisIn(versionen: Pick<VersionKopf, 'gueltigAb' | 'zurueckgezogen'>[], i: number): IsoDatum | null {
+  if (versionen[i]?.zurueckgezogen) return null
+  const naechste = versionen.slice(i + 1).find((v) => !v.zurueckgezogen)
   return naechste ? addiereTage(naechste.gueltigAb, -1) : null
 }
 

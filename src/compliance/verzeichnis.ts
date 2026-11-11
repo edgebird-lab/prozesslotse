@@ -9,7 +9,7 @@ import { formatiereDatum } from './datum'
 import { loeschText } from './fristen'
 import { BESONDERE_KATEGORIEN, BETROFFENE, DATENKATEGORIEN, GARANTIEN, RECHTSGRUNDLAGEN, RECHTSSTAND, STRAFRECHTLICH_TEXT, textVon, TOM_BEREICHE, type Eintrag } from './standard'
 import { hinweisVerzeichnis } from './textbausteine'
-import type { Abschnitt, ComplianceProjekt, Dokument, Kontakt } from './typen'
+import type { Abschnitt, ComplianceProjekt, Dokument, Kontakt, VersionKopf } from './typen'
 import { anschriftText, firmenName, prozessName, unterlagenNachEntstehung, versionsZeile, type DokuKontext } from './verfahrensdoku'
 
 function vereinigt<T extends string>(katalog: readonly Eintrag<T>[], werte: T[][]): Eintrag<T>[] {
@@ -182,8 +182,12 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
 
   // D
   h(1, 'D', 'Änderungen')
-  if (kx.historie.length > 0) tabelle(['Version', 'gültig ab', 'Änderung'], kx.historie.map((x) => [x.bezeichnung, formatiereDatum(x.gueltigAb), x.aenderung.trim() || '–']))
-  else absatz('Noch keine Version freigegeben.')
+  if (kx.historie.length > 0) {
+    // Eine zurückgezogene Freigabe galt nie; sie bleibt mit Datum und Grund sichtbar
+    const aenderung = (x: VersionKopf) =>
+      x.zurueckgezogen ? `${x.aenderung.trim() || '–'}; zurückgezogen am ${formatiereDatum(x.zurueckgezogen.am)}: ${x.zurueckgezogen.grund.trim()}` : x.aenderung.trim() || '–'
+    tabelle(['Version', 'gültig ab', 'Änderung'], kx.historie.map((x) => [x.bezeichnung, formatiereDatum(x.gueltigAb), aenderung(x)]))
+  } else absatz('Noch keine Version freigegeben.')
   tabelle(['Ort, Datum', 'Unterschrift des Verantwortlichen'], [['', '']])
 
   return {

@@ -277,8 +277,15 @@ export interface Dokument {
   abschnitte: Abschnitt[]
 }
 
+/** Rückzug einer Freigabe, bevor die Version in Kraft trat (5.4) */
+export interface Rueckzug {
+  /** Tag des Rückzugs; liegt vor `gueltigAb` der Version */
+  am: IsoDatum
+  grund: string
+}
+
 export interface DokuVersion {
-  /** 1, 2, 3 … fortlaufend */
+  /** 1, 2, 3 … fortlaufend; auch zurückgezogene Versionen behalten ihre Nummer */
   nummer: number
   /** z. B. „1.0“; eindeutig */
   bezeichnung: string
@@ -288,6 +295,8 @@ export interface DokuVersion {
   aenderung: string
   /** automatisch, z. B. ['VD 3.2', 'VD 4', 'VVT B'] */
   geaenderteKapitel: string[]
+  /** Gesetzt, wenn die Freigabe zurückgezogen wurde: Die Version bleibt sichtbar, zählt aber für Reihenfolge und Gültigkeit nicht mehr. */
+  zurueckgezogen?: Rueckzug
   /** Ist-Prozess bei der Freigabe, für Diagramm und Vergleich */
   prozess: Prozess
   verfahrensdoku: Dokument

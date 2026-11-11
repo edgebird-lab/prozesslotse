@@ -2105,6 +2105,10 @@ input[type='date'] {
 .pruefsumme-falsch {
   color: var(--schlecht-text);
 }
+/* Zurückgezogene Freigabe: bleibt sichtbar, galt aber nie */
+.version-zurueckgezogen > * {
+  color: var(--text-2);
+}
 .freigabe-dialog {
   max-width: min(560px, calc(100vw - 32px));
 }
