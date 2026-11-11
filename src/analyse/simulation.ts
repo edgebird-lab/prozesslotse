@@ -147,11 +147,13 @@ function laufeOhneUnterbrechung(b: Block, zufall: () => number): Lauf {
         const i = zug.r.findIndex((r) => (wurf -= r) < 0)
         gewaehlt = [i >= 0 ? i : zug.r.length - 1]
       } else {
+        // Fehlt der Standardweg (nur in von Hand geänderten Dateien; die Prüfung meldet es), gilt wie in der Rechnung „mindestens einer“.
+        const standard = b.zweige.findIndex((z) => z.id === b.standard)
         for (let versuch = 0; versuch < 10_000; versuch++) {
           gewaehlt = zug.r.map((r, i) => (zufall() < r ? i : -1)).filter((i) => i >= 0)
-          if (gewaehlt.length > 0 || b.standard !== null) break
+          if (gewaehlt.length > 0 || standard >= 0) break
         }
-        if (gewaehlt.length === 0 && b.standard !== null) gewaehlt = [b.zweige.findIndex((z) => z.id === b.standard)]
+        if (gewaehlt.length === 0 && standard >= 0) gewaehlt = [standard]
       }
       return gemeinsam(gewaehlt.map((i) => laufeSequenz(b.zweige[i].schritte, zufall)))
     }

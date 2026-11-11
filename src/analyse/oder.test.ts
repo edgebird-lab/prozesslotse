@@ -184,4 +184,15 @@ describe('ODER-Verzweigung', () => {
     expect(gezaehlt).toBeGreaterThanOrEqual(20)
     expect(abweichungen).toEqual([])
   }, 60_000)
+
+  it('stürzt bei einem fehlenden Standardweg (von Hand geänderte Datei) nicht ab und rechnet wie die Formeln', () => {
+    // Die Prüfung meldet den Fehler, die Seite „Prüfen“ simuliert trotzdem. Ohne gültigen Standardweg gilt „mindestens einer“.
+    const o = neueOder({ frage: 'Was fehlt?', standard: 'gibt_es_nicht', zweige: [neuerOderZweig('Ausweis', 0.5, { schritte: [aufgabe('Ausweis anfordern', 10)] }), neuerOderZweig('Nachweis', 0.5, { schritte: [aufgabe('Nachweis anfordern', 30)] })] })
+    const p = prozess([o])
+    expect(pruefeProzess(p).some((b) => b.schluessel === `standard:${o.id}`)).toBe(true)
+    // Würfe je Weg 0,5: nur A 0,25 (10), nur B 0,25 (30), beide 0,25 (30), keiner 0,25 (verworfen) → 17,5 / 0,75 = 23,33 Min.
+    expect(berechneKennzahlen(p).durchlaufzeitMin).toBeCloseTo(70 / 3, 9)
+    const sim = simuliere(p, 20_000, 3)
+    expect(Math.abs(sim.mittelMin - 70 / 3)).toBeLessThan(4 * standardfehler(sim.zeiten) + 0.1)
+  })
 })
