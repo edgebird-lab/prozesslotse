@@ -39,12 +39,13 @@ await dokumente()
 await browser.close()
 console.log('Bilder in', ziel)
 
-/** Compliance-Doku: Teilschritt „Dokumente“ mit Vorschau der Verfahrensdokumentation */
+/** Compliance-Doku: Teilschritt „Dokumente“ mit Vorschau der Verfahrensdokumentation (neue Seite mit leerem Speicher, sonst stellt die App den Stand von oben wieder her) */
 async function dokumente() {
-  await page.goto(process.env.ADRESSE ?? 'http://localhost:4173/')
-  await page.getByRole('button', { name: /Mit dem Beispiel/ }).click()
-  await schritt(/Dokumentieren/)
-  await page.getByRole('navigation', { name: 'Teilschritte' }).getByRole('button', { name: /^Dokumente/ }).click()
-  await page.waitForTimeout(800)
-  await page.screenshot({ path: `${ziel}/dokumente.png` })
+  const seite = await browser.newPage({ viewport: { width: 1440, height: 860 }, colorScheme: 'light' })
+  await seite.goto(process.env.ADRESSE ?? 'http://localhost:4173/')
+  await seite.getByRole('button', { name: /Mit dem Beispiel/ }).click()
+  await seite.getByRole('navigation', { name: 'Schritte' }).getByRole('button', { name: /Dokumentieren/ }).click()
+  await seite.getByRole('navigation', { name: 'Teilschritte' }).getByRole('button', { name: /^Dokumente/ }).click()
+  await seite.waitForTimeout(800)
+  await seite.screenshot({ path: `${ziel}/dokumente.png` })
 }
