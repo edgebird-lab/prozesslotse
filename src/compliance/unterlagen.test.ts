@@ -4,7 +4,7 @@ import { beispielLieferdienst } from '../modell/beispiel'
 import { complianceLieferdienst } from './beispiel'
 import { datenSicht } from './quelle'
 import { neueCompliance } from './standard'
-import { aendereAblageort, benenneUnterlageUm, legeAblageortAn, legeUnterlageAn, loescheAblageort, loescheUnterlage, loeseZugriff, setzeZugriff } from './unterlagen'
+import { aendereAblageort, benenneUnterlageUm, legeAblageortAn, legeUnterlageAn, loescheAblageort, loescheUnterlage, loeseZugriff, setzeZugriff, setzeZugriffe } from './unterlagen'
 
 describe('Unterlagen, Ablageorte und Zugriffe', () => {
   it('legt eine Unterlage mit Entstehung und Nutzung an', () => {
@@ -63,6 +63,15 @@ describe('Unterlagen, Ablageorte und Zugriffe', () => {
     expect(mitLesen.zugriffe).toHaveLength(17)
     expect(loeseZugriff(mitLesen, 'auf_rechnung', 'dob_rechnung', 'liest').zugriffe).toEqual(c.zugriffe)
     expect(loeseZugriff(c, 'auf_rechnung', 'dob_rechnung', 'liest')).toBe(c)
+  })
+
+  it('setzt die Zugriffe einer Richtung auf eine Auswahl von Aufgaben', () => {
+    const c = complianceLieferdienst()
+    const neu = setzeZugriffe(c, 'dob_rechnung', 'liest', ['auf_versenden', 'auf_abgeben'])
+    expect(neu.zugriffe.filter((z) => z.unterlageId === 'dob_rechnung' && z.richtung === 'liest').map((z) => z.aufgabeId)).toEqual(['auf_versenden', 'auf_abgeben'])
+    expect(neu.zugriffe.filter((z) => z.richtung === 'schreibt')).toEqual(c.zugriffe.filter((z) => z.richtung === 'schreibt'))
+    expect(setzeZugriffe(c, 'dob_rechnung', 'liest', ['auf_versenden', 'auf_freigeben'])).toBe(c)
+    expect(setzeZugriffe(c, 'dob_rechnung', 'schreibt', []).zugriffe.some((z) => z.unterlageId === 'dob_rechnung' && z.richtung === 'schreibt')).toBe(false)
   })
 })
 

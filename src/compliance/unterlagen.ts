@@ -75,3 +75,16 @@ export function loeseZugriff(c: ComplianceProjekt, aufgabeId: Id, unterlageId: I
   if (!c.zugriffe.some((z) => z.aufgabeId === aufgabeId && z.unterlageId === unterlageId && z.richtung === richtung)) return c
   return { ...c, zugriffe: c.zugriffe.filter((z) => !(z.aufgabeId === aufgabeId && z.unterlageId === unterlageId && z.richtung === richtung)) }
 }
+
+/**
+ * Setzt alle Zugriffe einer Richtung für eine Unterlage auf genau diese Aufgaben,
+ * z. B. „In welchen Schritten wird es genutzt?“. Die Reihenfolge bestehender Zugriffe bleibt.
+ */
+export function setzeZugriffe(c: ComplianceProjekt, unterlageId: Id, richtung: ZugriffsRichtung, aufgabeIds: Id[]): ComplianceProjekt {
+  const soll = new Set(aufgabeIds)
+  const bisher = c.zugriffe.filter((z) => z.unterlageId === unterlageId && z.richtung === richtung).map((z) => z.aufgabeId)
+  if (bisher.length === soll.size && bisher.every((a) => soll.has(a))) return c
+  const behalten = c.zugriffe.filter((z) => !(z.unterlageId === unterlageId && z.richtung === richtung && !soll.has(z.aufgabeId)))
+  const neu = aufgabeIds.filter((a) => !bisher.includes(a)).map((aufgabeId) => ({ aufgabeId, unterlageId, richtung }))
+  return { ...c, zugriffe: [...behalten, ...neu] }
+}

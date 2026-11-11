@@ -216,8 +216,13 @@ function warteDauer(p: Prozess, blockId: Id): number {
   return b?.typ === 'warten' ? b.dauerMin : 0
 }
 
-/** BPMN-Datei für den Export: Diagramm des gewählten Prozesses, ganzes Projekt eingebettet. */
-export function bpmnFuerExport(projekt: Projekt, ansicht: 'ist' | 'soll'): string {
+/**
+ * BPMN-Datei für den Export: Diagramm des gewählten Prozesses, ganzes Projekt eingebettet.
+ * `ohneCompliance`: ohne die Compliance-Angaben, z. B. zur Weitergabe an Dritte; das Projekt selbst bleibt unverändert.
+ */
+export function bpmnFuerExport(projekt: Projekt, ansicht: 'ist' | 'soll', optionen: { ohneCompliance?: boolean } = {}): string {
   const soll = ansicht === 'soll' && projekt.soll !== null
-  return erzeugeBpmn(soll && projekt.soll ? projekt.soll : projekt.ist, { projekt, ansicht: soll ? 'soll' : 'ist' }).xml
+  const { compliance, ...ohne } = projekt
+  const eingebettet = optionen.ohneCompliance || compliance === undefined ? ohne : projekt
+  return erzeugeBpmn(soll && projekt.soll ? projekt.soll : projekt.ist, { projekt: eingebettet, ansicht: soll ? 'soll' : 'ist' }).xml
 }

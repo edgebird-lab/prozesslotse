@@ -1,0 +1,170 @@
+import { ablageVon, datenImSystem, digital, hatPersonenbezug, mitDienstleister, objektName, systemAngaben, systemeImEinsatz } from '../../compliance/ableitung'
+import { AV_VERTRAEGE, BETRIEBE, GARANTIEN, SICHERUNGEN, STANDORTE, UNVERAENDERBARKEIT } from '../../compliance/standard'
+import type { SystemAngaben } from '../../compliance/typen'
+import { aendereAblageort, loescheAblageort } from '../../compliance/unterlagen'
+import { MEDIUM_ARTEN, type Medium } from '../../modell/typen'
+import { useBestaetigen } from '../frage'
+import { Kreuz } from '../Symbol'
+import { useCompliance } from './analyse'
+import { DatumFeld, JaNeinOffen, KatalogAuswahl, KatalogListe, TextFeld } from './Eingaben'
+
+export function SystemeTeil() {
+  const { c, k, ist, aendere } = useCompliance()
+  const bestaetige = useBestaetigen()
+  const systeme = systemeImEinsatz(k)
+  const ohneTechnik = ist.medien.filter((m) => !digital(m))
+  const genutzt = (ablageortId: string) => k.sicht.objekte.filter((o) => (c.datenobjekte[o.id]?.ablageSpeicherIds ?? []).includes(ablageortId)).length
+
+  return (
+    <div className="teil">
+      <section aria-labelledby="systeme-titel" className="felder">
+        <h3 id="systeme-titel">Systeme und Dienstleister</h3>
+        {systeme.length === 0 && (
+          <p className="leer-hinweis">Im Prozess wird kein digitales System genutzt. Systeme legst du im Schritt „Beteiligte“ an und ordnest sie im Schritt „Ablauf“ den Aufgaben zu.</p>
+        )}
+        {systeme.map((m) => (
+          <SystemKarte key={m.id} m={m} />
+        ))}
+      </section>
+
+      <section aria-labelledby="ablageorte-titel" className="felder">
+        <h3 id="ablageorte-titel">Ablageorte</h3>
+        <p className="leise">Wo Unterlagen aufbewahrt werden, z. B. ein Archiv im DMS oder ein Ordner im Büro. Angelegt werden sie bei den Belegen.</p>
+        {c.ablageorte.length === 0 ? (
+          <p className="leer-hinweis">Noch kein Ablageort.</p>
+        ) : (
+          <div className="tabelle-wrap">
+            <table className="eingabe-tabelle">
+              <thead>
+                <tr>
+                  <th scope="col">Ablageort</th>
+                  <th scope="col">System</th>
+                  <th scope="col">Unterlagen</th>
+                  <th scope="col">
+                    <span className="sr">Entfernen</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.ablageorte.map((a, i) => (
+                  <tr key={a.id}>
+                    <td>
+                      <input type="text" aria-label={`Name des Ablageorts ${i + 1}`} value={a.name} onChange={(e) => aendere((x) => aendereAblageort(x, a.id, { name: e.target.value }), `ablageort.${a.id}.name`)} />
+                    </td>
+                    <td>
+                      <select aria-label={`System von ${a.name || `Ablageort ${i + 1}`}`} value={a.mediumId ?? ''} onChange={(e) => aendere((x) => aendereAblageort(x, a.id, { mediumId: e.target.value || null }))}>
+                        <option value="">noch offen</option>
+                        {ist.medien.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name.trim() || 'Unbenanntes System'}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>{genutzt(a.id)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="knopf-icon"
+                        aria-label={`Ablageort ${a.name || i + 1} entfernen`}
+                        title="Entfernen"
+                        onClick={async () => {
+                          const n = genutzt(a.id)
+                          if (n > 0 && !(await bestaetige('Ablageort entfernen?', `In „${a.name}“ liegen ${n} Unterlagen. Sie verlieren diesen Ablageort.`, 'Entfernen'))) return
+                          aendere((x) => loescheAblageort(x, a.id))
+                        }}
+                      >
+                        <Kreuz />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {ohneTechnik.length > 0 && (
+        <section aria-labelledby="papier-titel" className="felder">
+          <h3 id="papier-titel">Papier und Telefon</h3>
+          <ul className="liste-schlicht">
+            {ohneTechnik.map((m) => {
+              const orte = c.ablageorte.filter((a) => a.mediumId === m.id).map((a) => a.name.trim() || 'Unbenannter Ablageort')
+              return (
+                <li key={m.id}>
+                  <strong>{m.name.trim() || 'Unbenannt'}</strong>: {orte.length > 0 ? `Ablage in ${orte.join(', ')}` : 'keine Ablage'}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function SystemKarte({ m }: { m: Medium }) {
+  const { c, k, aendere } = useCompliance()
+  const s = systemAngaben(c, m.id)
+  const name = m.name.trim() || 'Unbenanntes System'
+  const setze = (werte: Partial<SystemAngaben>, feld: string) => aendere((x) => ({ ...x, systeme: { ...x.systeme, [m.id]: { ...systemAngaben(x, m.id), ...werte } } }), `system.${m.id}.${feld}`)
+  const daten = datenImSystem(k, m.id).map((id) => objektName(k, id))
+  const ablage = ablageVon(k, m.id).map((id) => objektName(k, id))
+  const personen = hatPersonenbezug(k, m.id)
+  const titelId = `system-${m.id}-titel`
+
+  return (
+    <section className="karte felder" id={`ziel-system-${m.id}`} tabIndex={-1} aria-labelledby={titelId}>
+      <div className="teil-kopf">
+        <h4 id={titelId}>{name}</h4>
+        <span className="leise klein">{MEDIUM_ARTEN.find((a) => a.art === m.art)?.name}</span>
+      </div>
+      <p className="leise klein">
+        Verarbeitet: {daten.join(', ') || '–'} · Bewahrt auf: {ablage.join(', ') || '–'}
+      </p>
+      <div className="feldreihe">
+        <TextFeld label="Hersteller" wert={s.hersteller} onAendern={(hersteller) => setze({ hersteller }, 'hersteller')} />
+        <TextFeld label="Version" wert={s.version} onAendern={(version) => setze({ version }, 'version')} />
+      </div>
+      <DatumFeld label="Im Einsatz seit" wert={s.seit} onAendern={(seit) => setze({ seit }, 'seit')} />
+      <KatalogAuswahl label="Wo läuft das System?" katalog={BETRIEBE} wert={s.betrieb} spalten={3} onAendern={(betrieb) => setze({ betrieb }, 'betrieb')} />
+      {(s.betrieb === 'cloud' || s.betrieb === 'eigener_server') && (
+        <TextFeld label="Wer betreibt es?" platzhalter="Name des Dienstleisters" wert={s.dienstleister} onAendern={(dienstleister) => setze({ dienstleister }, 'dienstleister')} />
+      )}
+      {mitDienstleister(s) && (
+        <>
+          <KatalogListe label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={s.standort} onAendern={(standort) => standort && setze({ standort }, 'standort')} />
+          {s.standort === 'drittland' && (
+            <div className="feldreihe">
+              <TextFeld label="Land" wert={s.drittland} onAendern={(drittland) => setze({ drittland }, 'drittland')} />
+              <KatalogListe label="Garantie" katalog={GARANTIEN} wert={s.garantie} onAendern={(garantie) => setze({ garantie }, 'garantie')} />
+            </div>
+          )}
+          {personen && (
+            <>
+              <JaNeinOffen label="Verarbeitet der Anbieter personenbezogene Daten im Auftrag des Unternehmens?" wert={s.auftragsverarbeitung} onAendern={(auftragsverarbeitung) => setze({ auftragsverarbeitung }, 'av')} />
+              {s.auftragsverarbeitung !== false && (
+                <>
+                  <KatalogAuswahl label="Gibt es einen Vertrag zur Auftragsverarbeitung?" katalog={AV_VERTRAEGE} wert={s.avVertrag} spalten={3} onAendern={(avVertrag) => setze({ avVertrag }, 'avVertrag')} />
+                  {s.avVertrag === 'ja' && <DatumFeld label="Vertrag vom" wert={s.avVertragVom} onAendern={(avVertragVom) => setze({ avVertragVom }, 'avVom')} />}
+                </>
+              )}
+            </>
+          )}
+        </>
+      )}
+      {ablage.length > 0 && (
+        <KatalogAuswahl label="Wie sind aufbewahrte Unterlagen vor Änderung geschützt?" katalog={UNVERAENDERBARKEIT} wert={s.unveraenderbarkeit} spalten={2} onAendern={(unveraenderbarkeit) => setze({ unveraenderbarkeit }, 'unveraenderbar')} />
+      )}
+      <KatalogAuswahl label="Wie werden die Daten gesichert?" katalog={SICHERUNGEN} wert={s.sicherung} spalten={3} onAendern={(sicherung) => setze({ sicherung }, 'sicherung')} />
+      {(s.sicherung === 'manuell' || s.sicherung === 'automatisch' || s.sicherung === 'anbieter') && (
+        <div className="feldreihe">
+          <TextFeld label="Wie oft?" platzhalter="z. B. täglich" wert={s.sicherungIntervall} onAendern={(sicherungIntervall) => setze({ sicherungIntervall }, 'intervall')} />
+          <DatumFeld label="Rücksicherung zuletzt getestet am" wert={s.wiederherstellungGetestet} onAendern={(wiederherstellungGetestet) => setze({ wiederherstellungGetestet }, 'getestet')} />
+        </div>
+      )}
+      <TextFeld label="Zugriffsschutz" platzhalter="z. B. eigenes Konto je Person, Zwei-Faktor-Anmeldung" wert={s.zugriffsschutz} onAendern={(zugriffsschutz) => setze({ zugriffsschutz }, 'zugriff')} />
+    </section>
+  )
+}

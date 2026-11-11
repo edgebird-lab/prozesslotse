@@ -41,27 +41,27 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Phase 4 – Assistent, Teil 1
 
-- [ ] 4.1 Schritt „Dokumentieren“, Teilschritt-Leiste mit Status, Lernhinweise
-- [ ] 4.2 Teilschritt „Unternehmen“ mit Übernahme aus anderer Projektdatei
-- [ ] 4.3 „Belege und Daten“: Einordnung, Form, Ablage, Anlegen
-- [ ] 4.4 „Belege und Daten“: Personenbezug, Kategorien, Rechtsgrundlage, Empfänger, Zwecke
-- [ ] 4.5 „Systeme und Dienstleister“
+- [x] 4.1 Schritt „Dokumentieren“, Teilschritt-Leiste mit Status, Lernhinweise
+- [x] 4.2 Teilschritt „Unternehmen“ mit Übernahme aus anderer Projektdatei
+- [x] 4.3 „Belege und Daten“: Einordnung, Form, Ablage, Anlegen
+- [x] 4.4 „Belege und Daten“: Personenbezug, Kategorien, Rechtsgrundlage, Empfänger, Zwecke
+- [x] 4.5 „Systeme und Dienstleister“
 
 ## Phase 5 – Assistent, Teil 2
 
-- [ ] 5.1 „Aufbewahrung und Löschung“
-- [ ] 5.2 „Kontrollen“
-- [ ] 5.3 „Schutzmaßnahmen“
-- [ ] 5.4 „Lücken“ mit „Beheben“ und Markierungen; Browsertests 1 und 2
+- [x] 5.1 „Aufbewahrung und Löschung“
+- [x] 5.2 „Kontrollen“
+- [x] 5.3 „Schutzmaßnahmen“
+- [x] 5.4 „Lücken“ mit „Beheben“ und Markierungen; Browsertests 1 und 2
 
 ## Phase 6 – Ausgabe, Freigabe, Verzahnung
 
-- [ ] 6.1 `DokumentAnsicht` für beide Dokumente
-- [ ] 6.2 Druck und PDF
-- [ ] 6.3 DOCX-Export
-- [ ] 6.4 Freigabe-Dialog, Versionsliste, „Geprüft, keine Änderung“; Browsertest 3
-- [ ] 6.5 Hinweis in „Verbessern“ bei gestrichener Kontrolle; Browsertest 8
-- [ ] 6.6 BPMN-Export wahlweise ohne Compliance-Angaben
+- [x] 6.1 `DokumentAnsicht` für beide Dokumente
+- [x] 6.2 Druck und PDF: Fußzeile als CSS-Randfeld (`@page @bottom-center`) statt `position: fixed`; mit Edge als PDF geprüft: A4, Fußzeile mit „Seite X von Y“ auf jeder Seite, Kapitel der Ebene 1 auf neuer Seite, Diagramm in 9.1
+- [x] 6.3 DOCX-Export (`docx` 9.15.3 exakt gepinnt, eigener Teil von 224 KB, gzip 66 KB); Abnahme in Word durch Robin offen
+- [x] 6.4 Freigabe-Dialog, Versionsliste, „Geprüft, keine Änderung“; Browsertest 3
+- [x] 6.5 Hinweis in „Verbessern“ bei gestrichener Kontrolle; Browsertest 8
+- [x] 6.6 BPMN-Export wahlweise ohne Compliance-Angaben
 
 ## Phase 7 – Browsertests, Doku, Abnahme
 

@@ -17,6 +17,8 @@ import { AppKontext, useApp, type AppApi } from './ui/kontext'
 import { AblaufSchritt } from './ui/schritte/AblaufSchritt'
 import { BerichtSchritt } from './ui/schritte/BerichtSchritt'
 import { BeteiligteSchritt } from './ui/schritte/BeteiligteSchritt'
+import { DokumentierenSchritt } from './ui/schritte/DokumentierenSchritt'
+import { useComplianceMarkierungen } from './ui/compliance/analyse'
 import { PruefenSchritt } from './ui/schritte/PruefenSchritt'
 import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
 import { VerbessernSchritt } from './ui/schritte/VerbessernSchritt'
@@ -242,15 +244,17 @@ function Hauptfenster() {
                 <BerichtSchritt />
               </main>
             ) : (
-              <main id="inhalt" className="arbeitsflaeche">
+              // Im Teilschritt „Dokumente“ nutzt der Inhalt die volle Breite; das Panel bleibt dasselbe, damit der Fokus erhalten bleibt
+              <main id="inhalt" className={`arbeitsflaeche${z.schritt === 'dokumentieren' && z.teilschritt === 'dokumente' ? ' arbeitsflaeche-voll' : ''}`}>
                 <section className="panel" aria-label="Assistent">
                   {z.schritt === 'rahmen' && <RahmenSchritt />}
                   {z.schritt === 'beteiligte' && <BeteiligteSchritt />}
                   {z.schritt === 'ablauf' && <AblaufSchritt />}
                   {z.schritt === 'pruefen' && <PruefenSchritt />}
                   {z.schritt === 'verbessern' && <VerbessernSchritt />}
+                  {z.schritt === 'dokumentieren' && <DokumentierenSchritt />}
                 </section>
-                <Buehne p={p} hervorhebung={hervorhebung} />
+                {!(z.schritt === 'dokumentieren' && z.teilschritt === 'dokumente') && <Buehne p={p} hervorhebung={hervorhebung} />}
               </main>
             )}
           </>
@@ -334,6 +338,11 @@ function Kopfzeile({ meldung, onOeffnen, befehl, onBrowserDatenLoeschen }: { mel
             <MenuePunkt onClick={() => befehl('bpmn')} schliesse={schliesse}>
               Als BPMN exportieren
             </MenuePunkt>
+            {z.projekt.compliance && (
+              <MenuePunkt onClick={() => void datei.exportiereBpmn(undefined, { ohneCompliance: true })} schliesse={schliesse}>
+                Als BPMN ohne Compliance-Angaben exportieren
+              </MenuePunkt>
+            )}
             <MenuePunkt onClick={() => befehl('beispielLieferdienst')} schliesse={schliesse}>
               Beispiel „Lieferdienst“ laden
             </MenuePunkt>
@@ -412,7 +421,9 @@ function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
   const bpmn = useBpmn(pDiagramm)
   const analyse = useAnalyse(pDiagramm)
   const zeigeBefunde = z.schritt === 'pruefen' || z.schritt === 'verbessern'
-  const marken = useMemo(() => (zeigeBefunde ? markierungen(analyse.befunde, bpmn) : undefined), [zeigeBefunde, analyse, bpmn])
+  const dokumentieren = z.schritt === 'dokumentieren'
+  const complianceMarken = useComplianceMarkierungen(dokumentieren, z.projekt, bpmn)
+  const marken = useMemo(() => (zeigeBefunde ? markierungen(analyse.befunde, bpmn) : complianceMarken), [zeigeBefunde, analyse, bpmn, complianceMarken])
   const ausgewaehlt = useMemo(
     () => [z.auswahl, ...hervorhebung].filter((id): id is Id => !!id).map((id) => hauptElement(bpmn, id)).filter((e): e is string => !!e),
     [z.auswahl, hervorhebung, bpmn],
@@ -423,7 +434,8 @@ function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
       const blockId = bpmn.elementZuBlock.get(elementId)
       if (!blockId || schritt === 'verbessern') return
       dispatch({ typ: 'auswahl', auswahl: blockId })
-      if (schritt !== 'ablauf') dispatch({ typ: 'schritt', schritt: 'ablauf' })
+      // Im Schritt „Dokumentieren“ filtert ein Klick die Angaben auf diese Aufgabe
+      if (schritt !== 'ablauf' && schritt !== 'dokumentieren') dispatch({ typ: 'schritt', schritt: 'ablauf' })
     },
     [bpmn, schritt, dispatch],
   )
@@ -431,7 +443,7 @@ function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
   return (
     <section className="buehne" aria-label="Diagramm">
       <div className="buehne-kopf">
-        {z.projekt.soll ? (
+        {z.projekt.soll && !dokumentieren ? (
           <div className="umschalter" role="group" aria-label="Ansicht">
             <button type="button" aria-pressed={z.ansicht === 'ist'} onClick={() => dispatch({ typ: 'ansicht', ansicht: 'ist' })}>
               Ist
@@ -445,9 +457,12 @@ function Buehne({ p, hervorhebung }: { p: Prozess; hervorhebung: Id[] }) {
         )}
         <span className="buehne-name">{p.name || 'Unbenannter Prozess'}</span>
         {zeigeBefunde && marken && marken.size > 0 && <span className="leise klein">Markiert: Schwachstellen und Fehler</span>}
+        {dokumentieren && marken && marken.size > 0 && <span className="leise klein">Markiert: Lücken an Schritten</span>}
       </div>
       <Diagramm xml={bpmn.xml} markierungen={marken} ausgewaehlt={ausgewaehlt} onKlick={klick} beschriftung={`BPMN-Diagramm: ${p.name || 'Unbenannter Prozess'}`} />
-      <p className="buehne-fuss leise klein">Ziehen zum Verschieben, Strg + Mausrad zum Zoomen. Ein Klick auf einen Schritt öffnet ihn zum Bearbeiten.</p>
+      <p className="buehne-fuss leise klein">
+        Ziehen zum Verschieben, Strg + Mausrad zum Zoomen. {dokumentieren ? 'Ein Klick auf einen Schritt zeigt nur seine Angaben.' : 'Ein Klick auf einen Schritt öffnet ihn zum Bearbeiten.'}
+      </p>
     </section>
   )
 }

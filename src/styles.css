@@ -1748,3 +1748,406 @@ fieldset {
   flex: 1;
   max-width: 320px;
 }
+
+/* Compliance-Doku: Schritt „Dokumentieren“ ---------------------------------- */
+
+.arbeitsflaeche-voll {
+  grid-template-columns: minmax(0, 1fr);
+}
+.arbeitsflaeche-voll .panel {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+}
+.felder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.teil {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 12px;
+}
+.teil h3 {
+  margin: 0.4rem 0 0;
+}
+.teil-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.teil-kopf h3,
+.teil-kopf h4 {
+  margin: 0;
+}
+.karte:focus,
+.teil [tabindex='-1']:focus {
+  outline: 2px solid var(--fokus);
+  outline-offset: 2px;
+}
+.karte > .felder,
+.karte.felder > * + * {
+  margin-top: 0;
+}
+
+/* Teilschritt-Leiste */
+.teilschritte ol {
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+}
+.teilschritte button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  background: var(--karte);
+  color: var(--text-2);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.88rem;
+}
+.teilschritte button:hover {
+  border-color: var(--linie-stark);
+  color: var(--text);
+}
+.teilschritte button[aria-current='step'] {
+  border-color: var(--akzent);
+  background: var(--akzent-hauch);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+.teilschritte .nummer {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--linie-stark);
+  font-size: 0.75rem;
+}
+.teilschritt-name {
+  flex: 1;
+  min-width: 0;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+.arbeitsflaeche-voll .teilschritte ol {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.teilschritt-zahl {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--status-warnung);
+  color: #0b0b0b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Hinweise und Zeilen */
+.hinweis-band {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--akzent-rand);
+  background: var(--akzent-hauch);
+  font-size: 0.9rem;
+}
+.status-zeile {
+  margin: 0;
+  font-weight: 600;
+}
+.filter-hinweis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--karte-2);
+}
+.zaehler {
+  margin: 0;
+  color: var(--text-2);
+}
+.feld-titel {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.93rem;
+}
+.lernhinweis-ohne-symbol {
+  margin-top: 0.6rem;
+}
+.aufklapp summary {
+  cursor: pointer;
+  color: var(--akzent-text);
+  font-size: 0.92rem;
+}
+.aufklapp[open] > summary {
+  margin-bottom: 8px;
+}
+.aufklapp > * + * {
+  margin-top: 10px;
+}
+.liste-schlicht {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.knopf-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--akzent-text);
+  text-decoration: underline;
+  cursor: pointer;
+  font-style: normal;
+}
+.kontrollkaestchen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+input[type='date'] {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--linie-stark);
+  border-radius: 7px;
+  background: var(--karte);
+  max-width: 220px;
+}
+.empfaenger > legend {
+  font-weight: 600;
+}
+.empfaenger {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fristen-tabelle th[scope='row'] {
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--text);
+}
+.versionsliste td {
+  text-align: left;
+  vertical-align: top;
+}
+.karte-umschalter {
+  align-self: flex-start;
+}
+
+/* Chips: Mehrfachauswahl */
+.chips-auswahl > legend {
+  margin-bottom: 6px;
+}
+.chips-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--linie-stark);
+  border-radius: 999px;
+  background: var(--karte);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+.chip-option.an {
+  border-color: var(--akzent);
+  background: var(--akzent-hauch);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+.chip-option input {
+  margin: 0;
+  accent-color: var(--knopf-haupt);
+}
+.chip-option:has(input:focus-visible) {
+  outline: 2px solid var(--fokus);
+  outline-offset: 2px;
+}
+
+/* Dokumente */
+.reiter {
+  display: inline-flex;
+  border: 1px solid var(--linie-stark);
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.reiter [role='tab'] {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.reiter [role='tab'][aria-selected='true'] {
+  background: var(--knopf-haupt);
+  color: #fff;
+  font-weight: 600;
+}
+.version-banner {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.version-banner p {
+  margin: 0;
+}
+.dokument {
+  background: var(--papier);
+  color: #0b0b0b;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  line-height: 1.55;
+}
+.dokument p,
+.dokument li {
+  max-width: 78ch;
+}
+.dokument-titel {
+  font-size: 1.6rem;
+  margin: 0;
+}
+.dokument-untertitel {
+  font-size: 1.05rem;
+  color: #52514e;
+}
+.dokument-hinweis {
+  background: #edede9;
+  border-left: 3px solid #6b6a65;
+  padding: 8px 12px;
+}
+.dokument-gliederung {
+  margin: 1.2rem 0;
+  padding: 10px 14px;
+  border: 1px solid #e1e0d9;
+  border-radius: 8px;
+}
+.gliederung-titel {
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.dokument-gliederung ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2;
+  font-size: 0.9rem;
+}
+.dokument-gliederung .gliederung-2 {
+  padding-left: 1.2rem;
+}
+.dokument-h1 {
+  font-size: 1.3rem;
+  margin: 1.8rem 0 0.6rem;
+  border-bottom: 1px solid #c3c2b7;
+  padding-bottom: 4px;
+}
+.dokument-h2 {
+  font-size: 1.08rem;
+  margin: 1.2rem 0 0.4rem;
+}
+.dokument-h3 {
+  font-size: 1rem;
+  margin: 1rem 0 0.3rem;
+}
+.dokument-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 0.6rem 0;
+}
+.dokument-tabelle th,
+.dokument-tabelle td {
+  border: 1px solid #c3c2b7;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.dokument-tabelle thead th {
+  background: #f1f0ec;
+}
+.dokument-tabelle .leerzeile td {
+  height: 2.2em;
+}
+.dokument-diagramm {
+  margin: 0.6rem 0;
+}
+.versionsliste code {
+  font-size: 0.85rem;
+}
+.freigabe-dialog {
+  max-width: min(560px, calc(100vw - 32px));
+}
+.freigabe-dialog .banner {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.freigabe-dialog p {
+  margin: 0;
+}
+
+@media print {
+  /* Compliance-Dokumente: nur das Dokument drucken */
+  .dokumentieren > :not(.teil),
+  .dokumente > :not(.dokument-bereich),
+  .teilschritte,
+  .buehne {
+    display: none !important;
+  }
+  .arbeitsflaeche {
+    display: block;
+    padding: 0;
+  }
+  .dokument {
+    border: 0;
+    padding: 0;
+    background: #fff;
+  }
+  .dokument-h1 {
+    break-before: page;
+  }
+  .dokument-deckblatt {
+    break-after: page;
+  }
+  .dokument-gliederung {
+    border: 0;
+    padding: 0;
+  }
+  .dokument-gliederung ol {
+    columns: 1;
+  }
+  .dokument-tabelle tr {
+    break-inside: avoid;
+  }
+  .dokument-tabelle thead {
+    display: table-header-group;
+  }
+  .dokument-h1,
+  .dokument-h2,
+  .dokument-h3 {
+    break-after: avoid;
+  }
+}

@@ -30,7 +30,8 @@ export interface DateiBefehle {
   oeffneZuletzt: (pfad: string) => Promise<void>
   speichern: () => Promise<boolean>
   speichernUnter: () => Promise<boolean>
-  exportiereBpmn: (ansicht?: 'ist' | 'soll') => Promise<void>
+  /** `ohneCompliance`: Datei ohne die Compliance-Angaben, z. B. für Dritte */
+  exportiereBpmn: (ansicht?: 'ist' | 'soll', optionen?: { ohneCompliance?: boolean }) => Promise<void>
   exportiere: (name: string, inhalt: string, art: DateiArt) => Promise<void>
   /** Vor dem Schließen des Programms. */
   darfSchliessen: () => Promise<boolean>
@@ -183,15 +184,17 @@ export function useDateiBefehle({ z, dispatch, melde, zeigeFremd }: Optionen): D
   )
 
   const exportiereBpmn = useCallback(
-    async (ansicht?: 'ist' | 'soll') => {
+    async (ansicht?: 'ist' | 'soll', optionen: { ohneCompliance?: boolean } = {}) => {
       const zz = aktuell.current
       const welche = ansicht ?? zz.ansicht
       const soll = welche === 'soll' && zz.projekt.soll !== null
       // Gibt es Ist und Soll, sagt der Dateiname, welcher Prozess drin ist
       const endung = soll ? '-soll.bpmn' : zz.projekt.soll ? '-ist.bpmn' : '.bpmn'
-      await exportiere(dateiname(zz.projekt.ist.name, endung), bpmnFuerExport(zz.projekt, soll ? 'soll' : 'ist'), 'bpmn')
+      await exportiere(dateiname(zz.projekt.ist.name, endung), bpmnFuerExport(zz.projekt, soll ? 'soll' : 'ist', optionen), 'bpmn')
+      // Compliance-Angaben nennen Schutzmaßnahmen und Lücken; vor der Weitergabe darauf hinweisen
+      if (zz.projekt.compliance && !optionen.ohneCompliance) melde('Die BPMN-Datei enthält auch die Compliance-Angaben. Zur Weitergabe an Dritte im Menü „ohne Compliance-Angaben“ exportieren.')
     },
-    [exportiere],
+    [exportiere, melde],
   )
 
   const darfSchliessen = useCallback(async () => {
