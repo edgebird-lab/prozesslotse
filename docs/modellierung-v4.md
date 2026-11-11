@@ -278,7 +278,7 @@ export interface Unterbrechung extends Sequenz {
 **Prüfregeln.**
 
 - Fehler: Summe der unterbrechenden Anteile über 100 %; Anteil unter 0 oder (unterbrechend) über 100 %; Frist ≤ 0; mehr als drei Unterbrechungen an einer Aufgabe; Ende oder Rücksprung in einem Nebenweg, auch tiefer darin; `ende` und `zurueckZu` zugleich; Rücksprung ins Leere; bis Schritt 5 ein Ende im Ausnahmeweg eines Schritts in nebenläufiger Umgebung.
-- Warnung: keine Bezeichnung; Frist an einer Aufgabe kürzer als L + B („würde in jedem Fall überschritten“); Nebenweg ohne Schritte.
+- Warnung: keine Bezeichnung; Frist an einer Aufgabe kürzer als L + B („würde in jedem Fall überschritten“); Frist an einem Rahmen, wenn laut den Zeiten im Rahmen P(D > Frist) größer ist als der angegebene Anteil („Laut den Zeiten im Abschnitt dauern 30 % der Fälle länger als die Frist, angegeben sind 10 %.“); Nebenweg ohne Schritte.
 - Hinweis: Der Schritt läuft öfter als einmal je Vorgang (der Anteil gilt je Ausführung); unterbrechender Anteil 0 % („kommt nie vor“); Anteile zusammen 100 % („der Schritt endet nie normal“).
 
 **Schwachstellen-Hinweise.** Häufig abgebrochen (zusammen ≥ 20 % der Ausführungen): „Viel abgebrochene Arbeit …“. Frist in ≥ 20 % überschritten: „Frist wird oft überschritten …“. Nebenweg dauert im Schnitt länger als sein Schritt: Die Annahme „verlängert nichts“ ist dann fraglich.
@@ -404,7 +404,7 @@ Zufallsgenerator: Jeder Schritt fügt seine Form in `zufallsprozess.ts` ein, auc
 | ODER „mindestens einer“ (Rechnung, hoch) | in Format 3 gelöst |
 | Abbruch in gleichzeitigen Zweigen: Formeln (Rechnung, hoch) | Abbruchkombination (gemeinsame Regeln, 5) |
 | „Beendet alles“ im Rahmen (Rechnung, hoch) | Ende je nach Ort |
-| Unterbrechung: Anteil und Zeitpunkt (Rechnung, hoch) | feste Anteile, t je Art, Frist ohne Kürzung (3) |
+| Unterbrechung: Anteil und Zeitpunkt (Rechnung, hoch) | feste Anteile, t je Art, Frist ohne Kürzung (3). Abweichung vom Vorschlag: Auch am Rahmen gilt der angegebene Anteil statt P(D > t), weil sonst die Häufigkeiten von Zeiten abhingen und ein Rahmen ohne Verzweigung nie oder immer überschritte; eine Warnung zeigt, wenn die Zeiten im Rahmen etwas anderes sagen |
 | Nicht unterbrechender Ausnahmeweg (Rechnung, hoch) | Nebenweg, Annahme in den Grenzen (3) |
 | Weiter beim ersten hält Rahmen und Schleifen offen (Rechnung, hoch) | abbrechende Variante (4) |
 | Mehrfach: Liegezeit je Stück, kleinste Streuung (Rechnung, mittel) | `liegezeitMin` einmal, `streuung` fest oder schwankt (2) |
