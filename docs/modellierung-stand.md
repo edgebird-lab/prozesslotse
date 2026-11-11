@@ -51,7 +51,7 @@ Hinweise für Schritt 2 und später:
 
 ## Schritt 2 – Für jede Position
 
-Fertig am 2026-11-11, Commit „Für jedes Stück einer Liste (Mehrfachinstanz) mit Umwandlungshinweisen“ auf `modellierung` (Hash siehe `git log`). Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 2)“.
+Fertig am 2026-11-11, Commit 1d799c0 „Für jedes Stück einer Liste (Mehrfachinstanz) mit Umwandlungshinweisen“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 2)“.
 
 - [x] Typ `Mehrfach`, `neuerMehrfach`, `pruefeBlock`; Ziehung von N (fest, schwankt) an einer Stelle für alle Nutzer (`src/modell/anzahl.ts`)
 - [x] Operationen, Rücksprungziele (nicht aus dem Körper heraus), Führung („je Stück in …“); `istRahmen` gilt für Mehrfach, `alsMarkierteAufgabe` entscheidet Aufgabe oder Rahmen
@@ -115,4 +115,4 @@ Hinweise für Schritt 3 und später:
 | --- | --- | --- |
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
 | Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
-| Schritt 2, für jedes Stück | 178 in 19 Dateien | 21 |
+| Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
