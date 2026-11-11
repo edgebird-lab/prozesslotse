@@ -210,3 +210,22 @@ test('abnahme-5: Befunde zu Unterlagen stehen als Hinweis an der Aufgabe, in der
   await teil(page, 'Lücken').click()
   await expect(page.getByText('keine Fehler · 4 Warnungen · 3 Hinweise')).toBeVisible()
 })
+
+test('logik-9: Datum in der Zukunft meldet „Lücken“ als Hinweis (S9); „Beheben“ springt auf das Feld', async ({ page }) => {
+  await start(page)
+  await schritt(page, 'Dokumentieren').click()
+  await page.getByLabel('Eingeführt am').fill('2027-01-01')
+  await teil(page, 'Systeme und Dienstleister').click()
+  const excel = page.locator('#ziel-system-med_excel')
+  await excel.getByLabel('Im Einsatz seit').fill('2062-06-30')
+  await teil(page, 'Lücken').click()
+  // 7 Befunde des Beispiels und zwei Hinweise
+  await expect(page.getByText('keine Fehler · 4 Warnungen · 5 Hinweise')).toBeVisible()
+  const system = page.locator('.befunde li').filter({ hasText: 'Für „Excel-Tourenliste“ liegt „Im Einsatz seit“ in der Zukunft (30.06.2062). Datum prüfen.' })
+  await system.getByRole('button', { name: 'Beheben: Datum in der Zukunft – Excel-Tourenliste' }).click()
+  await expect(excel.getByLabel('Im Einsatz seit')).toBeFocused()
+  await teil(page, 'Lücken').click()
+  const verarbeitung = page.locator('.befunde li').filter({ hasText: '„Eingeführt am“ der Verarbeitungstätigkeit liegt in der Zukunft (01.01.2027). Datum prüfen.' })
+  await verarbeitung.getByRole('button', { name: /^Beheben/ }).click()
+  await expect(page.getByLabel('Eingeführt am')).toBeFocused()
+})

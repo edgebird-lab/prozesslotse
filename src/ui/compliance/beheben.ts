@@ -110,6 +110,10 @@ export function feldZiel(b: ComplianceBefund, c: ComplianceProjekt): string | nu
       return id && systemAngaben(c, id).standort === 'drittland' ? `${ziel}-bewilligung` : `${ziel}-standort`
     case 'S8':
       return id && !systemAngaben(c, id).wiederfinden?.trim() ? `${ziel}-wiederfinden` : `${ziel}-datenzugriff`
+    case 'S9':
+      // „Eingeführt am“: das Ziel ist schon das Feld; sonst das erste Datum in der Zukunft, das der Befund nennt
+      if (b.ziel?.art !== 'system') return null
+      return b.text.includes('„Im Einsatz seit“') ? `${ziel}-seit` : b.text.includes('„Vertrag vom“') ? `${ziel}-avvom` : `${ziel}-bewilligung`
     case 'K2':
       return `${ziel}-nachweis`
     case 'K3':

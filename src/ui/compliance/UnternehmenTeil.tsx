@@ -216,7 +216,7 @@ export function UnternehmenTeil() {
         <TextFeld label="Benennung" wert={v.benennung} platzhalter={ist.name || 'Name des Prozesses'} hilfe="Bleibt das Feld leer, steht hier der Name des Prozesses." onAendern={(benennung) => setzeV({ benennung }, 'benennung')} />
         <div className="feldreihe">
           <TextFeld label="Laufende Nummer" wert={v.laufendeNummer} onAendern={(laufendeNummer) => setzeV({ laufendeNummer }, 'nummer')} />
-          <DatumFeld label="Eingeführt am" wert={v.eingefuehrtAm} onAendern={(eingefuehrtAm) => setzeV({ eingefuehrtAm }, 'eingefuehrt')} />
+          <DatumFeld id="ziel-unternehmen-eingefuehrt" label="Eingeführt am" wert={v.eingefuehrtAm} onAendern={(eingefuehrtAm) => setzeV({ eingefuehrtAm }, 'eingefuehrt')} />
         </div>
         <div className="feldreihe">
           <TextFeld label="Fachabteilung" wert={v.fachabteilung} onAendern={(fachabteilung) => setzeV({ fachabteilung }, 'abteilung')} />

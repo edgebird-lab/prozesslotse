@@ -79,7 +79,7 @@ Der Schritt „Dokumentieren“ erzeugt aus dem Ist-Prozess zwei Dokumente, die 
 | Aufbewahrung und Löschung | gesetzliche und gewählte Frist, frühestes Löschdatum, Löschfristen, wer löscht |
 | Kontrollen | Prüfungen und Freigaben mit Vier-Augen-Status, weitere Kontrollen, Einweisung |
 | Schutzmaßnahmen | sechs Bereiche nach Art. 32 Abs. 1 DSGVO mit Vorschlägen |
-| Lücken | 43 Regeln mit Quelle und „Beheben“ (springt auf die offene Frage), z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Vertrag zur Auftragsverarbeitung fehlt, Aufbewahrung im Drittland ohne Bewilligung |
+| Lücken | 44 Regeln mit Quelle und „Beheben“ (springt auf die offene Frage), z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Vertrag zur Auftragsverarbeitung fehlt, Aufbewahrung im Drittland ohne Bewilligung |
 | Dokumente | Vorschau, Druck als PDF (im Programm auch ohne Druckdialog), Word-Datei, Freigabe, Versionsliste mit nachgerechneter Prüfsumme, Zurückziehen einer Freigabe, die noch nicht gilt, mitgeltende Unterlagen |
 
 - **Fristen** nach § 147 AO: Bücher und Organisationsunterlagen 10 Jahre, Buchungsbelege 8, Geschäftsbriefe und sonstige Unterlagen 6, jeweils ab Ende des Kalenderjahres; Lieferscheine ohne Buchungsfunktion bis zur Rechnung, bei Kaufleuten mit dem Hinweis auf 6 Jahre als möglicher Handelsbrief (§ 257 HGB).
@@ -117,7 +117,7 @@ Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur 
 - Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
-- Compliance-Doku: 43 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft; Speichern mit vollem oder beschädigtem Browser-Speicher, zwei Tabs und Prüfsummen. 66 Browsertests decken Lücken und „Beheben“, Freigabe und Rückzug, Word-Datei, Druck (alle Tabellen passen auf A4, Anlage 9.1 in lesbaren Ausschnitten), Fokus und Sprünge, schmale Fenster, Tastatur und axe hell und dunkel ab. Die 82 Funde einer unabhängigen Durchsicht sind behoben, jeder mit einem Test ([Stand](docs/compliance-stand.md#durchsicht-vom-11112026)).
+- Compliance-Doku: 44 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft; Speichern mit vollem oder beschädigtem Browser-Speicher, zwei Tabs und Prüfsummen. 66 Browsertests decken Lücken und „Beheben“, Freigabe und Rückzug, Word-Datei, Druck (alle Tabellen passen auf A4, Anlage 9.1 in lesbaren Ausschnitten), Fokus und Sprünge, schmale Fenster, Tastatur und axe hell und dunkel ab. Die 82 Funde einer unabhängigen Durchsicht sind behoben, jeder mit einem Test ([Stand](docs/compliance-stand.md#durchsicht-vom-11112026)).
 
 ## Entwickeln
 

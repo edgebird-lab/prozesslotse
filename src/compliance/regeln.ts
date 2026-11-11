@@ -1,5 +1,5 @@
 /**
- * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 43 Regeln. V4 (Prüfsumme)
+ * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 44 Regeln. V4 (Prüfsumme)
  * liefert `pruefsummenBefunde`, weil die Prüfsummen erst nach dem Laden asynchron nachgerechnet werden.
  * Die App prüft nicht, ob die Angaben stimmen, sondern ob sie vollständig und
  * widerspruchsfrei sind. Befunde sind Hinweise zum Prüfen und Klären, keine
@@ -666,6 +666,48 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
       ziel: { art: 'system', id: m.id },
     })
   }
+  // S9: Ein Datum nach heute ist meist ein Tippfehler (logik-9); geprüft wird nur, was die Oberfläche gerade fragt
+  for (const { m, s, name } of systeme) {
+    const zukunft = nachHeute(heute, [
+      ['Im Einsatz seit', s.seit],
+      ['Vertrag vom', mitDienstleister(s) && hatPersonenbezug(k, m.id) && s.auftragsverarbeitung !== false && s.avVertrag === 'ja' ? s.avVertragVom : null],
+      ['Bewilligung des Finanzamts vom', mitDienstleister(s) && s.standort === 'drittland' && ablageVon(k, m.id).length > 0 ? (s.bewilligungVom ?? null) : null],
+    ])
+    if (zukunft.length === 0) continue
+    add({
+      regel: 'S9',
+      id: m.id,
+      teilschritt: 'systeme',
+      schwere: 'hinweis',
+      titel: 'Datum in der Zukunft',
+      text:
+        zukunft.length === 1
+          ? `Für „${name}“ liegt „${zukunft[0].feld}“ in der Zukunft (${formatiereDatum(zukunft[0].datum)}). Datum prüfen.`
+          : `Für „${name}“ liegen ${liste(zukunft.map((z) => `„${z.feld}“ (${formatiereDatum(z.datum)})`))} in der Zukunft. Daten prüfen.`,
+      quelle: QUELLE_DATUM,
+      ziel: { art: 'system', id: m.id },
+    })
+  }
+  const eingefuehrt = k.c.verarbeitung.eingefuehrtAm
+  if (eingefuehrt !== null && eingefuehrt > heute) {
+    add({
+      regel: 'S9',
+      teilschritt: 'unternehmen',
+      schwere: 'hinweis',
+      titel: 'Datum in der Zukunft',
+      text: `„Eingeführt am“ der Verarbeitungstätigkeit liegt in der Zukunft (${formatiereDatum(eingefuehrt)}). Datum prüfen.`,
+      quelle: QUELLE_DATUM,
+      ziel: { art: 'unternehmen', id: 'eingefuehrt' },
+    })
+  }
+}
+
+/** S9 prüft Plausibilität, keine Vorschrift. */
+const QUELLE_DATUM = 'Plausibilitätsprüfung der App'
+
+/** Angaben, deren Datum nach heute liegt, in der gegebenen Reihenfolge. */
+function nachHeute(heute: IsoDatum, angaben: [string, IsoDatum | null][]): { feld: string; datum: IsoDatum }[] {
+  return angaben.flatMap(([feld, datum]) => (datum !== null && datum > heute ? [{ feld, datum }] : []))
 }
 
 /** Vier-Augen-Prüfung (6.4): höchstens ein Befund je Freigabe, der schwerste. */

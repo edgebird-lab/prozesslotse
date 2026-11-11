@@ -163,7 +163,7 @@ function SystemKarte({ m }: { m: Medium }) {
               {s.auftragsverarbeitung !== false && (
                 <>
                   <KatalogAuswahl id={`${ziel}-avvertrag`} label="Gibt es einen Vertrag zur Auftragsverarbeitung?" katalog={AV_VERTRAEGE} wert={s.avVertrag} spalten={3} onAendern={(avVertrag) => setze({ avVertrag }, 'avVertrag')} />
-                  {s.avVertrag === 'ja' && <DatumFeld label="Vertrag vom" wert={s.avVertragVom} onAendern={(avVertragVom) => setze({ avVertragVom }, 'avVom')} />}
+                  {s.avVertrag === 'ja' && <DatumFeld id={`${ziel}-avvom`} label="Vertrag vom" wert={s.avVertragVom} onAendern={(avVertragVom) => setze({ avVertragVom }, 'avVom')} />}
                 </>
               )}
             </>

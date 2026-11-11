@@ -10,7 +10,7 @@ Die Erweiterung erzeugt aus dem modellierten Ablauf die **GoBD-Verfahrensdokumen
 | --- | --- | --- |
 | Gliederung „des Musters von BStBK und DStV“ | Das gemeinsame Muster gilt nur für das **ersetzende Scannen** (Version 2.1, Stand 27.02.2026). Das Muster zur Belegablage stammt von der AWV (Muster, Ziff. 0.3). | Die Gliederung der Kapitel 1–3 und 6–9 ist allgemein und wird übernommen, die Texte nicht (3.4). Kapitel 4 beschreibt den modellierten Ablauf statt des Scannens. Das Muster sieht solche Ergänzungen vor (Ziff. 0.1 [9]). |
 | Aufbewahrung „nach BEG IV 8 Jahre“ (steht bei Idee 1, gilt hier ebenso) | Gilt für Buchungsbelege. Bücher und Organisationsunterlagen: 10 Jahre, Geschäftsbriefe und sonstige Unterlagen: 6 Jahre (§ 147 Abs. 3 AO). Das Muster empfiehlt einheitlich mindestens 10 Jahre (Ziff. 2.3 [2]). | Frist je Unterlagenart. Längere Aufbewahrung personenbezogener Daten braucht eine Begründung (Regel D7). |
-| Aufwand „S“ | Zwei Dokumente, Versionen, 43 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
+| Aufwand „S“ | Zwei Dokumente, Versionen, 44 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
 | (nicht in der Idee) Das Prozessmodell wächst parallel auf Dateiformat 3 (`docs/modellierung-v3.md`). ODER und externe Teilnehmer sind umgesetzt (Commits `4f8ee69`, `915e957`); Teilprozess, für jede Position, Unterbrechung und Abbruch folgen. | Kapitel 4 muss alle Bausteine beschreiben können. Datenobjekte gehören nicht zu Format 3 und sind auch sonst nirgends spezifiziert oder geplant. | Satzbausteine für alle Bausteine aus Format 3 (6.6.1); externe Teilnehmer erscheinen in Kapitel 2.6 und als Vorschläge für Empfänger. Unterlagen und Ablageorte führt die Erweiterung selbst (4.1). |
 | Angaben „über BPMN-`extensionElements`“ | Das ganze Projekt reist schon heute im BPMN-Export mit (`src/bpmn/einbettung.ts`). Damit stecken auch Compliance-Angaben und Versionen in jeder BPMN-Datei. | keine eigenen BPMN-Erweiterungen; BPMN-Export wahlweise ohne Compliance-Angaben (Abschnitt 8) |
 | Lokales LLM zum Formulieren | Widerspricht „ohne KI“ und macht Ausgaben schwer testbar | feste Satzbausteine, kein LLM |
@@ -30,7 +30,7 @@ In vielen Kleinbetrieben fehlen zwei Pflichtdokumente: die Verfahrensdokumentati
 3. **Unterlagen und Ablageorte** (fachlich Datenobjekte und Datenspeicher) mit „entsteht in“ und „genutzt in“ als eigene Tabellen in den Compliance-Angaben. Das BPMN-Diagramm zeigt sie im MVP nicht (4.1).
 4. **Verfahrensdokumentation** in der Gliederung des Musters von BStBK und DStV (Version 2.1); Kapitel 4 entsteht aus dem Ablauf.
 5. **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 lit. a–g im Aufbau des DSK-Musters, mit TOM-Übersicht in den sechs Bereichen nach Art. 32 Abs. 1 DSGVO.
-6. **Lückenprüfung** mit 43 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
+6. **Lückenprüfung** mit 44 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
 7. **Fristberechnung:** gesetzliche Mindestfrist je Unterlagenart, Fristende, frühestes Vernichtungs- bzw. Löschdatum.
 8. **Versionen:** Eine Freigabe friert beide Dokumente ein (gültig ab, freigegeben am und von, Änderung, geänderte Kapitel, SHA-256-Prüfsumme). Befunde, wenn sich seit der Freigabe etwas geändert hat oder sie älter als 365 Tage ist.
 9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Jede Ausgabe trägt den Hinweis „Vorlage zur Prüfung …“, nicht freigegebene Stände zusätzlich „Entwurf“.
@@ -879,6 +879,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | S6 | Rücksicherung nicht getestet | Hinweis | Sicherung `manuell` oder `automatisch` und (`wiederherstellungGetestet = null` oder `getestet > heute` oder `tageZwischen(getestet, heute) > 365`) | „Für „{s}“ wurde {noch nie / seit {Datum} nicht} geprüft, ob sich die Sicherung zurückspielen lässt.“ Datum nach heute: „Für „{s}“ liegt der letzte Test der Rücksicherung in der Zukunft ({Datum}). Datum prüfen.“ | Art. 32 Abs. 1 lit. c, d DSGVO | systeme |
 | S7 | Aufbewahrung im Drittland ohne Bewilligung; Hinweis „Ort der Aufbewahrung unklar“ | Warnung; Hinweis bei Standort `unbekannt` | `mitDienstleister`, `ablageVon` nicht leer (unabhängig vom Personenbezug) und Standort `drittland` ohne `bewilligungVom`; Hinweis: Standort `unbekannt` | „„{s}“ bewahrt {Liste} im Drittland ({Land}) auf. Elektronische Bücher, Aufzeichnungen und Rechnungen dürfen außerhalb der EU nur mit Bewilligung des Finanzamts aufbewahrt werden. Mit der Steuerberatung klären und das Datum der Bewilligung eintragen.“ Hinweis: „„{s}“ bewahrt {Liste} auf, aber der Ort der Verarbeitung ist nicht bekannt. Liegen die Daten außerhalb der EU, braucht es eine Bewilligung des Finanzamts.“ | § 146 Abs. 2, 2b AO; § 14b Abs. 5 UStG | systeme |
 | S8 | Wiederfinden und Datenzugriff offen | Hinweis | digital, im Einsatz, `ablageVon` nicht leer, `wiederfinden` oder `datenzugriff` leer | „Für „{s}“ ist offen, {wie eine Unterlage wiedergefunden wird / wie die Finanzverwaltung bei einer Außenprüfung auf die Daten zugreift, auch nach Vertragsende oder Systemwechsel}.“ | GoBD Rz. 152, 156–159; § 147 Abs. 2, 5 und 6 AO | systeme |
+| S9 | Datum in der Zukunft | Hinweis | „Im Einsatz seit“ eines Systems im Einsatz, „Vertrag vom“ (nur bei `avVertrag = 'ja'` mit Dienstleister, Personenbezug und Auftragsverarbeitung nicht `false`, wie bei der Frage) oder „Bewilligung des Finanzamts vom“ (nur mit Dienstleister im Drittland und Ablage, wie bei der Frage) nach heute; ebenso `verarbeitung.eingefuehrtAm` nach heute (dann Teilschritt unternehmen, Sprung auf „Eingeführt am“). Ein Befund je System, der alle betroffenen Angaben nennt | „Für „{s}“ liegt „{Feld}“ in der Zukunft ({Datum}). Datum prüfen.“; mehrere: „Für „{s}“ liegen „{Feld}“ ({Datum}) und … in der Zukunft. Daten prüfen.“ · „„Eingeführt am“ der Verarbeitungstätigkeit liegt in der Zukunft ({Datum}). Datum prüfen.“ | Plausibilitätsprüfung der App | systeme; unternehmen |
 | K1 | Freigabe ohne Vier-Augen-Prinzip | Warnung oder Hinweis | Abschnitt 6.4 | Abschnitt 6.4 | GoBD Rz. 100; Muster 3.2 | kontrollen |
 | K2 | Kontrolle ohne Nachweis | Hinweis | Nachweis `keiner` oder `unklar` (Aufgabe oder weitere Kontrolle) | „„{k}“ wird nicht nachgewiesen. Kontrollen sind einzurichten, auszuüben und zu protokollieren, z. B. mit Kürzel und Datum.“ | GoBD Rz. 100 | kontrollen |
 | K3 | Kontrolle ohne Angaben | Hinweis | Aufgabe der Art Prüfung oder Freigabe ohne Eintrag in `kontrollen` | „Was prüft „{A}“, und wie wird es nachgewiesen?“ | GoBD Rz. 102 | kontrollen |
@@ -891,7 +892,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | V3 | Überprüfung fällig | Hinweis | Versionen vorhanden, V2 trifft nicht zu, `tageZwischen(max(letzte freigegebenAm, zuletztGeprueft), heute) > 365` | „Die letzte Prüfung ist {n} Tage her. Einmal im Jahr prüfen, ob alles noch stimmt.“ | Art. 32 Abs. 1 lit. d DSGVO; 365 Tage als Annahme | dokumente |
 | V4 | Prüfsumme stimmt nicht | Warnung | je Version (auch zurückgezogen), deren nachgerechnete Prüfsumme nicht stimmt (6.8). Das Nachrechnen läuft nach dem Laden asynchron; deshalb liefert die Regel die eigene Funktion `pruefsummenBefunde`, und die Oberfläche fügt ihre Befunde zu denen aus `pruefeCompliance` | „Version {x} passt nicht mehr zu ihrer Prüfsumme: Sie wurde außerhalb der App verändert oder ist beschädigt. Öffne eine unveränderte Projektdatei, etwa aus einer Sicherung.“ | GoBD Rz. 154 | dokumente |
 
-Zusammen 43 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
+Zusammen 44 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
 
 ### 6.6 Verfahrensdokumentation erzeugen
 
@@ -1047,7 +1048,7 @@ src/compliance/            Fachlogik ohne React, vollständig getestet
   fristen.ts               Mindestfrist, Fristende, Texte, Kaufmannseigenschaft (§ 257 HGB)
   mitgeltend.ts            mitgeltende Unterlagen (Kapitel 6), auch ältere Einträge ohne Ablageort
   ableitung.ts             Ersteller, Nutzer, Systeme mit Daten, vorigeAufgabe
-  regeln.ts                pruefeCompliance: Lückenprüfung (43 Regeln; V4 in pruefsummenBefunde)
+  regeln.ts                pruefeCompliance: Lückenprüfung (44 Regeln; V4 in pruefsummenBefunde)
   fortschritt.ts           hatAngaben: Stand der Teilschritte (6.10)
   dokument.ts              Kapitelschlüssel, Vergleich
   ablauftext.ts            Kapitel 4 aus dem Baum
@@ -1260,6 +1261,7 @@ Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentit
 | Rücksicherung vor genau 365 / 366 Tagen getestet | kein S6 / S6 |
 | letzte Prüfung vor 365 / 366 Tagen | kein V3 / V3 |
 | Version mit falscher Prüfsumme (`pruefsummenBefunde`) | V4 als Warnung im Teilschritt „Dokumente“, zählt als offener Punkt |
+| „Im Einsatz seit“ von `med_excel` am 30.06.2062; „Vertrag vom“ und „Bewilligung des Finanzamts vom“ von `med_erp` nach heute; „Eingeführt am“ 01.01.2027; dieselben Angaben heute oder ausgeblendet | S9 je System ein Hinweis mit allen Angaben, für „Eingeführt am“ im Teilschritt „Unternehmen“ / kein S9; das Beispiel bleibt bei 7 Befunden |
 | TOM Pseudonymisierung leer / Verschlüsselung leer | T1 Hinweis / T1 Warnung |
 | `personenMitDaten` 19 / 20 ohne Datenschutzbeauftragten | kein U3 / U3 |
 | Datenschutzbeauftragter benannt, ohne Namen und Kontakt | U1 „Name und Kontaktdaten des Datenschutzbeauftragten“, kein U3 |
