@@ -16,6 +16,7 @@ import {
   type Id,
   type Mehrfach,
   type Oder,
+  type Parallel,
   type Prozess,
   type Sequenz,
   type Teilprozess,
@@ -135,10 +136,14 @@ export function gliedNebenlaeufig(g: Glied): boolean {
   const b = g.block
   switch (b.typ) {
     case 'parallel': {
+      // „In beliebiger Reihenfolge“ ist nicht nebenläufig: Dort läuft immer nur ein Zweig.
       const art = b.art
       switch (art) {
         case 'alle':
+        case 'erster':
           return true
+        case 'nacheinander':
+          return false
         default:
           return unerwartet(art)
       }
@@ -172,14 +177,66 @@ export function nebenlaeufig(kette: Glied[]): boolean {
   return kette.some(gliedNebenlaeufig)
 }
 
+/** „Weiter beim ersten“ und „in beliebiger Reihenfolge“: Gleichzeitig-Arten, die als Rahmen gezeichnet werden. */
+export type ParallelRahmen = Parallel & { art: 'erster' | 'nacheinander' }
+
+/** Bausteine, die als Rahmen (aufgeklappter Teilprozess) gelten. */
+export type Rahmenbaustein = Teilprozess | Mehrfach | ParallelRahmen
+
 /**
- * Ist der Block ein Rahmen (Abschnitt oder „für jedes Stück“)? Kein Sequenzfluss
- * und kein Rücksprung quert seine Grenze. Besteht der Körper von „für jedes Stück“
- * aus einer einzelnen Aufgabe, zeichnet das Diagramm statt des Rahmens die
- * Markierung an der Aufgabe; die Grenze gilt trotzdem.
+ * Ist der Block ein Rahmen (Abschnitt, „für jedes Stück“, „weiter beim ersten“
+ * oder „in beliebiger Reihenfolge“)? Kein Sequenzfluss und kein Rücksprung quert
+ * seine Grenze. Besteht der Körper von „für jedes Stück“ aus einer einzelnen
+ * Aufgabe, zeichnet das Diagramm statt des Rahmens die Markierung an der
+ * Aufgabe; die Grenze gilt trotzdem.
  */
-export function istRahmen(b: Block): b is Teilprozess | Mehrfach {
-  return b.typ === 'teilprozess' || b.typ === 'mehrfach'
+export function istRahmen(b: Block): b is Rahmenbaustein {
+  if (b.typ === 'teilprozess' || b.typ === 'mehrfach') return true
+  if (b.typ !== 'parallel') return false
+  const art = b.art
+  switch (art) {
+    case 'alle':
+      return false
+    case 'erster':
+    case 'nacheinander':
+      return true
+    default:
+      return unerwartet(art)
+  }
+}
+
+/** Was im Rahmen liegt: der Körper bzw. die Zweige (ohne die Ausnahmewege, die beginnen am Rand). */
+export function rahmenInhalt(b: Rahmenbaustein): Sequenz[] {
+  return b.typ === 'parallel' ? b.zweige : [b.koerper]
+}
+
+/** Name einer Art von „Gleichzeitig“ für Titel und Sätze. */
+export function parallelName(b: Parallel): string {
+  const art = b.art
+  switch (art) {
+    case 'alle':
+      return 'Gleichzeitig'
+    case 'erster':
+      return 'Weiter beim ersten'
+    case 'nacheinander':
+      return 'In beliebiger Reihenfolge'
+    default:
+      return unerwartet(art)
+  }
+}
+
+/**
+ * „In beliebiger Reihenfolge“ (Ad-hoc-Teilprozess): Im BPMN ist jeder Zweig
+ * genau eine Aktivität ohne Sequenzfluss. Ein Zweig aus genau einer Aufgabe,
+ * einem Abschnitt oder „für jedes Stück“ ohne Unterbrechungen bleibt, wie er
+ * ist (dann dieser Baustein); alles andere wird ein eingebetteter Teilprozess
+ * „Zweig n“ mit eigenem Start und Ende (dann null).
+ */
+export function einzelneAktivitaet(zweig: Sequenz): Aufgabe | Teilprozess | Mehrfach | null {
+  if (zweig.schritte.length !== 1) return null
+  const b = zweig.schritte[0]
+  if (b.typ !== 'aufgabe' && b.typ !== 'teilprozess' && b.typ !== 'mehrfach') return null
+  return unterbrechungenVon(b).length === 0 ? b : null
 }
 
 /**
@@ -195,11 +252,12 @@ export function alsMarkierteAufgabe(b: Mehrfach): Aufgabe | null {
 
 /**
  * Liegt die Kindsequenz des Glieds im Rahmen seines Blocks? Das gilt für den
- * Körper von Abschnitt und „für jedes Stück“; der Ausnahmeweg einer
- * Unterbrechung liegt außerhalb des Rahmens (er beginnt am Randereignis).
+ * Körper von Abschnitt und „für jedes Stück“ und für die Zweige von „weiter beim
+ * ersten“ und „in beliebiger Reihenfolge“; der Ausnahmeweg einer Unterbrechung
+ * liegt außerhalb des Rahmens (er beginnt am Randereignis).
  */
 export function gliedRahmen(g: Glied): boolean {
-  return istRahmen(g.block) && g.sequenz.id === g.block.koerper.id
+  return istRahmen(g.block) && rahmenInhalt(g.block).some((s) => s.id === g.sequenz.id)
 }
 
 /** Alle Rahmen über der Stelle am Ende der Kette, von außen nach innen. */
@@ -213,14 +271,16 @@ export function rahmenUeber(kette: Glied[]): Block[] {
  * ersten Aufgabe. `undefined`, wenn der Rahmen keine Aufgabe enthält (dann gilt
  * die Bahn, in der der Ablauf gerade ist); `null` steht für Aufgaben ohne Rolle.
  */
-export function rahmenRolle(b: Teilprozess | Mehrfach, gueltig: (rolleId: Id | null) => Id | null = (r) => r): Id | null | undefined {
+export function rahmenRolle(b: Rahmenbaustein, gueltig: (rolleId: Id | null) => Id | null = (r) => r): Id | null | undefined {
   const anzahl = new Map<Id | null, number>()
   let erste: Id | null | undefined
-  for (const { block } of durchlaufe(b.koerper)) {
-    if (block.typ !== 'aufgabe') continue
-    const r = gueltig(block.rolleId)
-    if (erste === undefined) erste = r
-    anzahl.set(r, (anzahl.get(r) ?? 0) + 1)
+  for (const s of rahmenInhalt(b)) {
+    for (const { block } of durchlaufe(s)) {
+      if (block.typ !== 'aufgabe') continue
+      const r = gueltig(block.rolleId)
+      if (erste === undefined) erste = r
+      anzahl.set(r, (anzahl.get(r) ?? 0) + 1)
+    }
   }
   if (erste === undefined) return undefined
   let beste: Id | null = erste
@@ -462,7 +522,7 @@ export function blockTitel(b: Block): string {
     case 'entscheidung':
       return b.frage || 'Entscheidung ohne Frage'
     case 'parallel':
-      return `Gleichzeitig (${b.zweige.length} Zweige)`
+      return `${parallelName(b)} (${b.zweige.length} Zweige)`
     case 'oder':
       return b.frage || 'Mehrere Wege möglich'
     case 'wiederholung':
@@ -740,15 +800,18 @@ function ausgaengeOhneUnterbrechung(b: Block): Set<Ausgang> {
     }
     case 'parallel':
     case 'oder': {
-      // Weiter nur, wenn jeder Zweig weiterkommt: Bei ODER kann jeder Weg auch der einzige gewählte sein.
+      // Weiter nur, wenn jeder Zweig weiterkommt: Bei ODER kann jeder Weg auch der einzige gewählte sein, bei
+      // „in beliebiger Reihenfolge“ kann jeder Zweig der letzte sein. Bei „weiter beim ersten“ reicht ein Zweig.
       const aus = new Set<Ausgang>()
       let alleWeiter = b.zweige.length > 0
+      let einerWeiter = false
       for (const z of b.zweige) {
         const a = ausgaengeSequenz(z.schritte)
         vereinige(aus, a, 'weiter')
         alleWeiter &&= a.has('weiter')
+        einerWeiter ||= a.has('weiter')
       }
-      if (alleWeiter) aus.add('weiter')
+      if (b.typ === 'parallel' && b.art === 'erster' ? einerWeiter : alleWeiter) aus.add('weiter')
       return aus
     }
     case 'wiederholung': {

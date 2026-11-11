@@ -16,20 +16,24 @@ import {
   gliedRahmen,
   heisstBeides,
   istMengenschleife,
+  istRahmen,
   kannWeiterlaufen,
   mengenschleifeAlsMehrfach,
   nachrichtenVerweise,
   oderWahrscheinlichkeiten,
+  parallelName,
+  rahmenInhalt,
   rahmenRolle,
   rahmenUeber,
   unterbrechungVon,
   wirktExtern,
   type Glied,
+  type Rahmenbaustein,
 } from './operationen'
 import { MAX_ANZAHL } from './anzahl'
-import { unerwartet, type Block, type Id, type Mehrfach, type Prozess, type Teilprozess, type Unterbrechbar, type Unterbrechung } from './typen'
+import { unerwartet, type Block, type Id, type Parallel, type Prozess, type Unterbrechbar, type Unterbrechung } from './typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from './zeit'
-import { verteilungBlock, type Verteilung } from '../analyse/verteilung'
+import { ersterAusgang, erwartungGesamt, verteilungBlock, verteilungSequenz, type Verteilung } from '../analyse/verteilung'
 
 export type Schwere = 'fehler' | 'warnung' | 'hinweis'
 
@@ -79,6 +83,7 @@ function nebenlaeufigText(kette: Glied[]): string {
   const g = kette.filter(gliedNebenlaeufig).pop()
   if (g?.block.typ === 'oder') return 'in einem Weg einer ODER-Verzweigung'
   if (g?.block.typ === 'mehrfach' && gliedRahmen(g)) return `in „${blockTitel(g.block)}“, wo die Stücke zur selben Zeit laufen`
+  if (g?.block.typ === 'parallel') return `in einem Zweig von „${parallelName(g.block)}“`
   return 'in einem Zweig von „Gleichzeitig“'
 }
 
@@ -217,7 +222,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
               schluessel: `abbruch:${z.id}`,
               schwere: 'fehler',
               titel: 'Ende neben gleichzeitig laufenden Schritten',
-              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess ${wo}. Was daneben noch läuft, müsste dann abgebrochen werden; das rechnet der Prozesslotse noch nicht.${kette.some((g) => gliedNebenlaeufig(g) && g.block.typ === 'mehrfach') ? ' Werden die Stücke der Reihe nach erledigt, darf ein Ausgang den Prozess beenden.' : ' Lass den Ausgang weiterlaufen.'}`,
+              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess ${wo}. Was daneben noch läuft, müsste dann abgebrochen werden; das rechnet der Prozesslotse noch nicht.${kette.some((g) => gliedNebenlaeufig(g) && g.block.typ === 'mehrfach') ? ' Werden die Stücke der Reihe nach erledigt, darf ein Ausgang den Prozess beenden.' : kette.some((g) => gliedNebenlaeufig(g) && g.block.typ === 'parallel') ? ' Lass den Ausgang weiterlaufen, oder lass eine Person die Zweige nacheinander erledigen (in beliebiger Reihenfolge); dort darf ein Zweig den Prozess beenden.' : ' Lass den Ausgang weiterlaufen.'}`,
               blockId: b.id,
             })
           }
@@ -317,7 +322,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
           })
         }
         if (andere.length >= 2 && andere.every((z) => z.anteil >= 1 - TOLERANZ)) {
-          add({ schluessel: `immer-alle:${b.id}`, schwere: 'hinweis', titel: 'Alle Wege laufen immer', text: `Bei „${titel}“ laufen alle Wege in jedem Fall. Das ist „Mehreres gleichzeitig“.`, blockId: b.id })
+          add({ schluessel: `immer-alle:${b.id}`, schwere: 'hinweis', titel: 'Alle Wege laufen immer', text: `Bei „${titel}“ laufen alle Wege in jedem Fall. Das ist „Gleichzeitig“ (Knopf „Mehrere Dinge unabhängig voneinander“).`, blockId: b.id })
         } else if (b.standard === null && andere.length >= 2 && Math.abs(andere.reduce((s, z) => s + z.anteil, 0) - 1) < TOLERANZ) {
           // Typischer Bedienfehler: Anteile wie bei einer Entscheidung auf 100 % verteilt
           add({
@@ -335,14 +340,30 @@ export function pruefeProzess(p: Prozess): Befund[] {
         break
       }
       case 'parallel': {
+        const name = parallelName(b)
         if (b.zweige.length < 2) {
-          add({ schluessel: `zweige:${b.id}`, schwere: 'fehler', titel: 'Zu wenige Zweige', text: '„Gleichzeitig“ braucht mindestens zwei Zweige.', blockId: b.id })
+          add({ schluessel: `zweige:${b.id}`, schwere: 'fehler', titel: 'Zu wenige Zweige', text: `„${name}“ braucht mindestens zwei Zweige.`, blockId: b.id })
         }
         b.zweige.forEach((z, i) => {
           if (z.schritte.length === 0) {
-            add({ schluessel: `leer:${z.id}`, schwere: 'fehler', titel: 'Leerer Zweig', text: `Zweig ${i + 1} von „Gleichzeitig“ hat keine Schritte.`, blockId: b.id })
+            add({ schluessel: `leer:${z.id}`, schwere: 'fehler', titel: 'Leerer Zweig', text: `Zweig ${i + 1} von „${name}“ hat keine Schritte.`, blockId: b.id })
           }
         })
+        const art = b.art
+        switch (art) {
+          case 'alle':
+            break
+          case 'erster':
+            pruefeErster(b)
+            break
+          case 'nacheinander':
+            pruefeNacheinander(b)
+            break
+          default:
+            unerwartet(art)
+        }
+        // Rahmen: alle Schritte in einer Bahn, der äußerste Rahmen bestimmt sie
+        if (istRahmen(b) && rahmenUeber(kette).length === 0) rahmenBahn(b)
         pruefeSequenzen(b.zweige.map((z) => z.schritte))
         break
       }
@@ -475,11 +496,13 @@ export function pruefeProzess(p: Prozess): Befund[] {
       add({
         schluessel: `rahmenrueck:${ausgangId}`,
         schwere: 'fehler',
-        titel: rahmen.typ === 'mehrfach' ? `Rücksprung aus „${blockTitel(rahmen)}“` : 'Rücksprung aus einem Abschnitt',
+        titel: rahmen.typ === 'teilprozess' ? 'Rücksprung aus einem Abschnitt' : rahmen.typ === 'parallel' ? `Rücksprung aus „${parallelName(rahmen)}“` : `Rücksprung aus „${blockTitel(rahmen)}“`,
         text:
           rahmen.typ === 'mehrfach'
             ? `${wer} springt aus „${blockTitel(rahmen)}“ hinaus zurück. Was je Stück läuft, hat einen eigenen Anfang und ein eigenes Ende; zurück geht es nur zu Schritten, die ebenfalls je Stück laufen.`
-            : `${wer} springt aus dem Abschnitt „${blockTitel(rahmen)}“ hinaus zurück. Ein Abschnitt hat einen eigenen Start und ein eigenes Ende; zurück geht es nur zu Schritten im selben Abschnitt.`,
+            : rahmen.typ === 'parallel'
+              ? `${wer} springt aus einem Zweig von „${parallelName(rahmen)}“ hinaus zurück. Im Diagramm ist das ein Rahmen, in dem jeder Zweig für sich läuft; zurück geht es nur zu Schritten im selben Zweig.`
+              : `${wer} springt aus dem Abschnitt „${blockTitel(rahmen)}“ hinaus zurück. Ein Abschnitt hat einen eigenen Start und ein eigenes Ende; zurück geht es nur zu Schritten im selben Abschnitt.`,
         blockId,
       })
     } else if (kette.slice(t + 1).some(gliedNebenweg)) {
@@ -611,20 +634,69 @@ export function pruefeProzess(p: Prozess): Befund[] {
   }
 
   /** Alle Schritte eines Rahmens stehen in einer Bahn; der äußerste Rahmen bestimmt sie. Arbeiten darin mehrere Rollen, ein Hinweis. */
-  function rahmenBahn(b: Teilprozess | Mehrfach) {
+  function rahmenBahn(b: Rahmenbaustein) {
     const gueltig = (r: Id | null) => (r !== null && rollenIds.has(r) ? r : null)
     const rollen = new Set<Id | null>()
-    for (const { block: x } of durchlaufe(b.koerper)) if (x.typ === 'aufgabe') rollen.add(gueltig(x.rolleId))
+    for (const s of rahmenInhalt(b)) for (const { block: x } of durchlaufe(s)) if (x.typ === 'aufgabe') rollen.add(gueltig(x.rolleId))
     if (rollen.size < 2) return
     const bahn = rahmenRolle(b, gueltig)
     const bahnName = bahn ? p.rollen.find((r) => r.id === bahn)?.name || 'Unbenannte Rolle' : 'Ohne Rolle'
     add({
       schluessel: `rahmenbahn:${b.id}`,
       schwere: 'hinweis',
-      titel: b.typ === 'mehrfach' ? 'Mehrere Rollen je Stück' : 'Mehrere Rollen in einem Abschnitt',
-      text: `Im Diagramm stehen alle Schritte von „${blockTitel(b)}“ in ${b.typ === 'mehrfach' ? 'einem Rahmen in ' : ''}der Bahn „${bahnName}“; Schritte anderer Rollen tragen die Rolle in Klammern.`,
+      titel: b.typ === 'mehrfach' ? 'Mehrere Rollen je Stück' : b.typ === 'parallel' ? `Mehrere Rollen in „${parallelName(b)}“` : 'Mehrere Rollen in einem Abschnitt',
+      text: `Im Diagramm stehen alle Schritte von „${blockTitel(b)}“ in ${b.typ === 'teilprozess' ? '' : 'einem Rahmen in '}der Bahn „${bahnName}“; Schritte anderer Rollen tragen die Rolle in Klammern.`,
       blockId: b.id,
     })
+  }
+
+  /**
+   * „Weiter beim ersten“: Mit festen Zeiten je Schritt gewinnt meist derselbe
+   * Zweig. Dauert der Block laut Rechnung so lange wie der im Schnitt schnellste
+   * Zweig, zeigt sie keinen Zeitgewinn; der liegt in den Fällen, die länger dauern als sonst.
+   */
+  function pruefeErster(b: Parallel) {
+    if (b.zweige.length < 2 || b.zweige.some((z) => z.schritte.length === 0)) return
+    const block = erwartungGesamt(ersterAusgang(b, 'gesamt').teile)
+    const schnellster = Math.min(...b.zweige.map((z) => erwartungGesamt(verteilungSequenz(z.schritte, 'gesamt'))))
+    if (block < schnellster - 1e-6) return
+    add({
+      schluessel: `erstergleich:${b.id}`,
+      schwere: 'hinweis',
+      titel: 'Kein Zeitgewinn in der Rechnung',
+      text: `„${blockTitel(b)}“ dauert laut Rechnung so lange wie der im Schnitt schnellste Zweig (${formatiereDauer(block, p.arbeitsstundenProTag)}). Die Rechnung kennt nur Durchschnittszeiten und zeigt hier keinen Zeitgewinn. Der Gewinn liegt in den Fällen, in denen ein Zweig länger dauert als sonst.`,
+      blockId: b.id,
+    })
+  }
+
+  /**
+   * „In beliebiger Reihenfolge“ rechnet in der Reihenfolge der Liste. Kann ein
+   * Zweig den Vorgang beenden, laufen die Zweige dahinter laut Rechnung seltener
+   * (Hinweis); beendet er ihn immer, laufen sie laut Rechnung nie (Warnung).
+   */
+  function pruefeNacheinander(b: Parallel) {
+    const vorn = b.zweige.slice(0, -1)
+    const nie = vorn.findIndex((z) => z.schritte.length > 0 && !ausgaengeSequenz(z.schritte).has('weiter'))
+    if (nie >= 0) {
+      add({
+        schluessel: `adhocende:${b.zweige[nie].id}`,
+        schwere: 'warnung',
+        titel: 'Zweige danach laufen laut Rechnung nie',
+        text: `Zweig ${nie + 1} von „${parallelName(b)}“ beendet den Vorgang immer. Gerechnet wird in der Reihenfolge der Liste, die Zweige dahinter laufen laut Rechnung also nie. Stell diesen Zweig ans Ende.`,
+        blockId: b.id,
+      })
+      return
+    }
+    const verlaesst = vorn.findIndex((z) => [...ausgaengeSequenz(z.schritte)].some((a) => a !== 'weiter'))
+    if (verlaesst >= 0) {
+      add({
+        schluessel: `adhocreihe:${b.id}`,
+        schwere: 'hinweis',
+        titel: 'Reihenfolge zählt für die Rechnung',
+        text: `Zweig ${verlaesst + 1} von „${parallelName(b)}“ kann den Vorgang beenden. Die Zweige laufen in beliebiger Reihenfolge, gerechnet wird aber in der Reihenfolge der Liste: Die Zweige dahinter laufen laut Rechnung seltener. Ordne die Zweige so, wie sie meist erledigt werden.`,
+        blockId: b.id,
+      })
+    }
   }
 
   for (const r of p.rollen) {

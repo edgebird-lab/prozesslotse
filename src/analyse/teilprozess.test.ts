@@ -518,7 +518,7 @@ describe('Dateiformat 4', () => {
     delete kaputt.ist.ablauf.schritte[0].name
     expect(() => leseProjekt(kaputt)).toThrow('Abschnitt ohne Namensfeld')
     const fremdeArt = JSON.parse(alsJson({ ...projekt, ist: prozess([neueParallel(2)]) }))
-    fremdeArt.ist.ablauf.schritte[0].art = 'erster'
+    fremdeArt.ist.ablauf.schritte[0].art = 'irgendwann'
     expect(() => leseProjekt(fremdeArt)).toThrow('unbekannte Art von „Gleichzeitig“')
   })
 })

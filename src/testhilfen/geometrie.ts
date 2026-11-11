@@ -1,4 +1,4 @@
-import { RAHMEN, type Layout, type LayoutKnoten, type LayoutRahmen, type Punkt, type Rechteck } from '../bpmn/layout'
+import { hatMarke, MASSE, RAHMEN, type Layout, type LayoutKnoten, type LayoutRahmen, type Punkt, type Rechteck } from '../bpmn/layout'
 
 function ueberlappen(a: Rechteck, b: Rechteck): boolean {
   return a.x < b.x + b.breite - 1 && b.x < a.x + a.breite - 1 && a.y < b.y + b.hoehe - 1 && b.y < a.y + a.hoehe - 1
@@ -51,7 +51,7 @@ export function gemeinsameStrecke(p1: Punkt, q1: Punkt, p2: Punkt, q2: Punkt): n
 export function aufRand(p: Punkt, k: LayoutKnoten | LayoutRahmen): boolean {
   const cx = k.x + k.breite / 2
   const cy = k.y + k.hoehe / 2
-  if (!('art' in k) || k.art === 'aufgabe' || k.art === 'teilprozess' || k.art === 'mehrfach') {
+  if ('spalteVon' in k || k.art === 'aufgabe') {
     const innenX = p.x > k.x - 0.5 && p.x < k.x + k.breite + 0.5
     const innenY = p.y > k.y - 0.5 && p.y < k.y + k.hoehe + 0.5
     return (innenY && (Math.abs(p.x - k.x) < 0.5 || Math.abs(p.x - k.x - k.breite) < 0.5)) || (innenX && (Math.abs(p.y - k.y) < 0.5 || Math.abs(p.y - k.y - k.hoehe) < 0.5))
@@ -122,8 +122,9 @@ export function geometrieFehler(l: Layout): string[] {
       continue
     }
     if (Math.abs(cy - (w.y + w.hoehe)) > 0.5 || k.x < w.x - 0.5 || k.x + k.breite > w.x + w.breite + 0.5) fehler.push(`Randereignis ${k.id} sitzt nicht auf der Unterkante von ${w.id}`)
-    // Die Mitte der Unterkante eines Mehrfach-Rahmens gehört der Markierung
-    else if (w.mehrfach && k.x < w.x + w.breite / 2 + RAHMEN.markeHalb - 0.5 && k.x + k.breite > w.x + w.breite / 2 - RAHMEN.markeHalb + 0.5) fehler.push(`Randereignis ${k.id} verdeckt die Mehrfach-Markierung von ${w.id}`)
+    // Die Mitte der Unterkante eines Mehrfach- oder Ad-hoc-Rahmens gehört der Markierung
+    else if ('spalteVon' in w && hatMarke(w) && k.x < w.x + w.breite / 2 + RAHMEN.markeHalb - 0.5 && k.x + k.breite > w.x + w.breite / 2 - RAHMEN.markeHalb + 0.5) fehler.push(`Randereignis ${k.id} verdeckt die Markierung von ${w.id}`)
+    else if (!('spalteVon' in w) && w.mehrfach && k.x < w.x + w.breite / 2 + RAHMEN.markeHalb - 0.5 && k.x + k.breite > w.x + w.breite / 2 - RAHMEN.markeHalb + 0.5) fehler.push(`Randereignis ${k.id} verdeckt die Mehrfach-Markierung von ${w.id}`)
     for (const e of l.kanten) {
       if (e.von !== k.id || e.punkte.length < 2) continue
       const [p0, p1] = e.punkte
@@ -157,6 +158,20 @@ export function geometrieFehler(l: Layout): string[] {
       if (ebene.includes(r.id)) {
         if (e.punkte.some((p) => p.x < r.x + 0.5 || p.x > r.x + r.breite - 0.5 || p.y < r.y + 0.5 || p.y > r.y + r.hoehe - 0.5)) fehler.push(`${e.id} verlässt seinen Rahmen ${r.id}`)
       } else if (e.punkte.some((p, i) => i > 0 && segmentSchneidet(e.punkte[i - 1], p, r))) fehler.push(`${e.id} (${e.von}→${e.nach}) quert die Grenze von ${r.id}`)
+    }
+  }
+  // Ad-hoc-Rahmen („in beliebiger Reihenfolge“): Darin läuft kein Sequenzfluss, seine Aktivitäten stehen untereinander ab
+  // seiner ersten Spalte, und Ein- und Austritt liegen auf der Höhe der ersten.
+  for (const r of l.rahmen) {
+    if (r.art === 'adhoc') {
+      for (const e of l.kanten) if (ebeneVon(e.von) === r.id) fehler.push(`${e.id} ist ein Sequenzfluss im Ad-hoc-Rahmen ${r.id}`)
+      const aktivitaeten = (r.aktivitaeten ?? []).map((id) => form(id))
+      if (aktivitaeten.some((a) => !a)) fehler.push(`Ad-hoc-Rahmen ${r.id} nennt eine unbekannte Aktivität`)
+      const formen = aktivitaeten.filter((a): a is LayoutKnoten | LayoutRahmen => !!a)
+      for (let i = 1; i < formen.length; i++) if (formen[i].y < formen[i - 1].y + formen[i - 1].hoehe) fehler.push(`Aktivitäten im Ad-hoc-Rahmen ${r.id} stehen nicht untereinander`)
+      if (formen.some((a) => a.x > r.x + MASSE.spalte / 2)) fehler.push(`Aktivitäten im Ad-hoc-Rahmen ${r.id} beginnen nicht in seiner ersten Spalte`)
+      const erste = formen[0]
+      if (erste && (r.anschlussY < erste.y - 0.5 || r.anschlussY > erste.y + erste.hoehe + 0.5)) fehler.push(`Ein- und Austritt von ${r.id} liegen nicht auf der Höhe der ersten Aktivität`)
     }
   }
   // Nachrichtenflüsse: rechtwinklig, durch keinen fremden Knoten, Ende auf dem Rand des Pools

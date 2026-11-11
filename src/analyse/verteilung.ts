@@ -12,7 +12,7 @@
  */
 import { anzahlVerteilung, erwartungMaximumOhneNull, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
 import { oderZiehung, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
-import { unerwartet, unterbrechungenVon, type Block, type Id, type Mehrfach, type Oder, type Unterbrechbar } from '../modell/typen'
+import { unerwartet, unterbrechungenVon, type Block, type Id, type Mehrfach, type Oder, type Parallel, type Unterbrechbar } from '../modell/typen'
 
 export interface Verteilung {
   wert: number[]
@@ -251,6 +251,11 @@ function verteilungOhneUnterbrechung(b: Block, art: Zeitart): Teilverteilungen {
         case 'alle':
           // Enden in Zweigen meldet die Prüfung als Fehler (Verklemmung); die Abbruchkombination folgt mit Schritt 5 von Format 4.
           return { weiter: maximum(b.zweige.map((z) => verteilungSequenz(z.schritte, art).weiter)), rueck: new Map(), ende: new Map() }
+        case 'erster':
+          return ersterAusgang(b, art).teile
+        case 'nacheinander':
+          // eine Person, Reihenfolge egal: gerechnet in der Reihenfolge der Liste, wie eine Folge
+          return verteilungSequenz(b.zweige.flatMap((z) => z.schritte), art)
         default:
           return unerwartet(parallelArt)
       }
@@ -437,4 +442,87 @@ export function erwartungOder(b: Oder, art: Zeitart): number {
 /** Erwartungswert des Maximums der Zweige von „Gleichzeitig“. */
 export function erwartungMaximum(zweige: Block[][], art: Zeitart): number {
   return erwartung(maximum(zweige.map((s) => verteilungSequenz(s, art).weiter)))
+}
+
+/** Wie oft ein Zweig von „weiter beim ersten“ gewinnt, aufgeteilt nach dem, womit er fertig wird. */
+export interface Gewinn {
+  /** normal fertig: weiter hinter dem Block */
+  weiter: number
+  /** der Vorgang endet mit diesem Ergebnis (ab Schritt 5 erlaubt) */
+  ende: Map<string, number>
+  /** Rücksprung aus dem Zweig hinaus (nur in ungültigen Modellen) */
+  rueck: Map<Id, number>
+}
+
+export interface ErsterAusgang {
+  /** Teilverteilungen des Blocks: die Zeit des ersten Zweigs, der fertig wird, und womit er fertig wird */
+  teile: Teilverteilungen
+  /** je Zweig: Wahrscheinlichkeit, dass er zuerst fertig ist, nach Ausgang */
+  je: Gewinn[]
+}
+
+/**
+ * „Weiter beim ersten“: Es gewinnt der Zweig, der zuerst fertig ist (normal oder,
+ * ab Schritt 5, mit einem Ende); die übrigen werden abgebrochen. Bei Gleichstand
+ * gewinnt der frühere Zweig der Liste. Zweig i gewinnt mit Ausgang o bei t mit
+ * d_{i,o}(t) · Π_{j<i} P(D_j > t) · Π_{j>i} P(D_j ≥ t), wobei D_j die ganze
+ * Dauer von Zweig j ist (wie auch immer er endet). Ohne Enden ist das das
+ * Minimum: F(t) = 1 − Π (1 − F_i(t)).
+ */
+export function ersterAusgang(b: Parallel, art: Zeitart): ErsterAusgang {
+  const zweige = b.zweige.map((z) => verteilungSequenz(z.schritte, art))
+  const ganz = zweige.map((x) => {
+    const v = alleTeile(x)
+    return { v, m: masse(v) }
+  })
+  /** P(D_j < t) bzw. P(D_j ≤ t) relativ zur Masse des Zweigs */
+  const bis = (j: number, t: number, mitGleich: boolean): number => {
+    const { v, m } = ganz[j]
+    if (m <= 0) return 1
+    let s = 0
+    for (let k = 0; k < v.wert.length; k++) {
+      const w = v.wert[k]
+      if (w < t - 1e-9 || (mitGleich && w <= t + 1e-9)) s += v.masse[k]
+      else break
+    }
+    return Math.min(1, s / m)
+  }
+  const ueberlebt = (i: number, t: number): number => {
+    let p = 1
+    for (let j = 0; j < zweige.length; j++) {
+      if (j === i) continue
+      // Gleichstand: Ein früherer Zweig gewinnt, also muss er echt später fertig werden; ein späterer darf gleichzeitig fertig werden.
+      p *= 1 - bis(j, t, j < i)
+      if (p <= 0) return 0
+    }
+    return p
+  }
+  const gewichte = (i: number, v: Verteilung): Verteilung => ordne(v.wert.map((t, k) => [t, v.masse[k] * ueberlebt(i, t)] as [number, number]))
+  let weiter = leer()
+  const rueck = new Map<Id, Verteilung>()
+  const ende = new Map<string, Verteilung>()
+  const je: Gewinn[] = zweige.map((x, i) => {
+    const g: Gewinn = { weiter: 0, ende: new Map(), rueck: new Map() }
+    const w = gewichte(i, x.weiter)
+    g.weiter = masse(w)
+    weiter = addiere(weiter, w)
+    for (const [e, v] of x.ende) {
+      const ge = gewichte(i, v)
+      g.ende.set(e, masse(ge))
+      plus(ende, e, ge)
+    }
+    for (const [id, v] of x.rueck) {
+      const gr = gewichte(i, v)
+      g.rueck.set(id, masse(gr))
+      plus(rueck, id, gr)
+    }
+    return g
+  })
+  if (zweige.length === 0) weiter = punkt(0)
+  return { teile: { weiter, rueck, ende }, je }
+}
+
+/** Wahrscheinlichkeit je Zweig von „weiter beim ersten“, dass er zuerst fertig ist (wie auch immer). */
+export function zuerstFertig(b: Parallel): number[] {
+  return ersterAusgang(b, 'gesamt').je.map((g) => g.weiter + [...g.ende.values(), ...g.rueck.values()].reduce((s, x) => s + x, 0))
 }

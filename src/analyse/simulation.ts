@@ -1,7 +1,8 @@
 /**
  * Monte-Carlo-Simulation der Durchlaufzeit. Jeder Lauf wählt an
  * Entscheidungen einen Ausgang nach den Anteilen, würfelt Wiederholungen aus
- * und nimmt bei „Gleichzeitig“ den längsten Zweig. Die Zeiten je Schritt sind
+ * und nimmt bei „Gleichzeitig“ den längsten Zweig, bei „weiter beim ersten“ den
+ * kürzesten; „in beliebiger Reihenfolge“ läuft in der Reihenfolge der Liste. Die Zeiten je Schritt sind
  * die geschätzten Durchschnittswerte; die Streuung entsteht also nur aus dem
  * Ablauf selbst (Entscheidungen, Wiederholungen), nicht aus schwankenden
  * Bearbeitungszeiten. Das 90-%-Quantil ist deshalb eher zu niedrig. Mit
@@ -144,15 +145,32 @@ function laufeOhneUnterbrechung(b: Block, zufall: () => number): Lauf {
     }
     case 'parallel': {
       const art = b.art
-      if (art !== 'alle') return unerwartet(art)
-      let zeit = 0
-      let ende: string | null = null
-      for (const z of b.zweige) {
-        const r = laufeSequenz(z.schritte, zufall)
-        zeit = Math.max(zeit, r.zeit)
-        ende ??= r.ende
+      switch (art) {
+        case 'alle': {
+          let zeit = 0
+          let ende: string | null = null
+          for (const z of b.zweige) {
+            const r = laufeSequenz(z.schritte, zufall)
+            zeit = Math.max(zeit, r.zeit)
+            ende ??= r.ende
+          }
+          return { zeit, ende, rueck: null }
+        }
+        case 'erster': {
+          // Der Zweig, der zuerst fertig ist, gewinnt (Gleichstand: der frühere); die übrigen werden abgebrochen.
+          let gewinner: Lauf | null = null
+          for (const z of b.zweige) {
+            const r = laufeSequenz(z.schritte, zufall)
+            if (!gewinner || r.zeit < gewinner.zeit - 1e-9) gewinner = r
+          }
+          return gewinner ?? { zeit: 0, ende: null, rueck: null }
+        }
+        case 'nacheinander':
+          // in der Reihenfolge der Liste, wie eine Folge
+          return laufeSequenz(b.zweige.flatMap((z) => z.schritte), zufall)
+        default:
+          return unerwartet(art)
       }
-      return { zeit, ende, rueck: null }
     }
     case 'wiederholung': {
       let zeit = 0

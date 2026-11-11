@@ -38,6 +38,17 @@
  * ⌊c⌋- oder ⌈c⌉-mal mit Mittel c. Nebenwege berühren den übrigen Ablauf nicht;
  * die vollständige Suche schaltet sie deshalb vorrangig (eine zulässige
  * Verkürzung, die keine Verklemmung übersieht).
+ *
+ * „Weiter beim ersten“ ist ein Rahmen, in dem jeder Zweig mit einer
+ * Terminierung endet; sie leert die Instanz. Nach „Abbruch zuletzt“ laufen die
+ * übrigen Zweige vorher zu Ende (abgebrochene Arbeit zählt voll). Die Suche
+ * probiert jede Terminierung als erste, die Zählung würfelt nach dem Gewicht am
+ * Endereignis (wie oft der Zweig zuerst fertig ist). Ein Ad-hoc-Rahmen („in
+ * beliebiger Reihenfolge“) legt beim Start je Aktivität eine offene Marke
+ * `Pfad|?Aktivität` an; ist in der Instanz nichts mehr in Arbeit, wird eine
+ * offene Aktivität begonnen (Marke auf dem gedachten Fluss `~Aktivität`). Die
+ * Suche nimmt jede Reihenfolge, die Zählung die Reihenfolge der Liste. Die
+ * Instanz ist fertig, wenn alle erledigt sind.
  */
 
 import { anzahlVerteilung, kannNull, kannStueck, zieheAnzahl } from '../modell/anzahl'
@@ -67,6 +78,10 @@ export interface TokenKnoten {
   unterbrechend?: boolean
   /** Mehrfachinstanz an einer Aktivität oder einem Rahmen; Anzahl und Streuung, soweit bekannt (aus dem XML nur eine feste ganze Anzahl) */
   mehrfach?: { nacheinander: boolean; anzahl?: number; streuung?: MehrfachStreuung }
+  /** Ad-hoc-Rahmen (eine Aktivität nach der anderen, Reihenfolge egal): seine Aktivitäten, für die Zählung in der Reihenfolge der Liste */
+  adhoc?: string[]
+  /** Terminierung eines Zweigs von „weiter beim ersten“: Gewicht beim Würfeln, wer zuerst fertig ist */
+  gewicht?: number
 }
 
 export interface TokenGraph {
@@ -90,14 +105,15 @@ const TYP_AUS_LAYOUT: Record<KnotenArt, KnotenTyp> = {
 /** Graph direkt aus dem Layout, aus dem auch das BPMN-XML entsteht. */
 export function graphAusLayout(l: Layout): TokenGraph {
   const knoten = new Map<string, TokenKnoten>()
-  for (const r of l.rahmen) knoten.set(r.id, { id: r.id, typ: 'rahmen', rein: [], raus: [], rahmen: r.eltern, ...(r.mehrfach ? { mehrfach: { ...r.mehrfach } } : {}) })
+  for (const r of l.rahmen) knoten.set(r.id, { id: r.id, typ: 'rahmen', rein: [], raus: [], rahmen: r.eltern, ...(r.mehrfach ? { mehrfach: { ...r.mehrfach } } : {}), ...(r.art === 'adhoc' ? { adhoc: [...(r.aktivitaeten ?? [])] } : {}) })
   for (const k of l.knoten) {
     const t: TokenKnoten = { id: k.id, typ: TYP_AUS_LAYOUT[k.art], rein: [], raus: [], rahmen: k.rahmen ?? null }
     if (k.mindestensEiner) t.mindestensEiner = true
     if (k.mehrfach) t.mehrfach = { ...k.mehrfach }
     if (k.art === 'ende') {
-      t.endeArt = k.fehler ? 'fehler' : 'normal'
+      t.endeArt = k.fehler ? 'fehler' : k.terminierung ? 'terminierung' : 'normal'
       if (k.fehler) t.fehler = k.fehler
+      if (k.zuerst !== undefined) t.gewicht = k.zuerst
     }
     if (k.art === 'rand') {
       Object.assign(t, { wirt: k.wirt, randArt: k.fehler ? 'fehler' : k.ereignis === 'zeit' ? 'zeit' : 'nachricht', unterbrechend: k.unterbrechend !== false })
@@ -125,6 +141,8 @@ interface Reichweite {
 
 interface Netz {
   g: TokenGraph
+  /** Fluss → Zielknoten, dazu die gedachten Flüsse `~Aktivität` in Ad-hoc-Rahmen */
+  ziel: Map<string, string>
   nach: Map<string, TokenKnoten>
   /** Fluss → Quellknoten */
   quelle: Map<string, TokenKnoten>
@@ -197,7 +215,10 @@ function baueNetz(g: TokenGraph): Netz {
     }
     oderReichweite.set(j.id, karte)
   }
-  return { g, nach, quelle, innerStart, rand, unterbrechend, neben, nebenIds, oderReichweite }
+  // Ad-hoc-Rahmen: Eine Aktivität beginnt über einen gedachten Fluss, den es im Diagramm nicht gibt.
+  const ziel = new Map(g.ziel)
+  for (const k of g.knoten) for (const a of k.adhoc ?? []) ziel.set(`~${a}`, a)
+  return { g, ziel, nach, quelle, innerStart, rand, unterbrechend, neben, nebenIds, oderReichweite }
 }
 
 // ---------------------------------------------------------------------------
@@ -485,7 +506,13 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
       } else liste.push({ art: 'fest', ausloeser: s, knoten: r.id, weg: [s], hin: r.raus.map((o) => schl(aussen, o)) })
       continue
     }
-    const k = n.nach.get(n.g.ziel.get(f)!)
+    if (f.startsWith('?')) {
+      // Ad-hoc: Die nächste offene Aktivität beginnt, wenn in der Instanz nichts mehr in Arbeit ist.
+      const inArbeit = [...m.keys()].some((x) => imBereich(x, pfad) && x !== `${pfad}|*` && !(zerlege(x)[0] === pfad && zerlege(x)[1].startsWith('?')))
+      if (!inArbeit) liste.push({ art: 'fest', ausloeser: s, knoten: rahmenVonPfad(pfad), weg: [s], hin: [schl(pfad, `~${f.slice(1)}`)] })
+      continue
+    }
+    const k = n.nach.get(n.ziel.get(f)!)
     if (!k) continue
     switch (k.typ) {
       case 'start':
@@ -511,7 +538,8 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
         while (m.has(`${kindPfad(pfad, k.id, nr)}|*`)) nr++
         const c = kindPfad(pfad, k.id, nr)
         const start = n.innerStart.get(k.id)
-        const hin = [`${c}|*`, ...(start?.raus ?? []).map((o) => schl(c, o))]
+        // Ad-hoc: alle Aktivitäten offen, in der Reihenfolge der Liste; sonst eine Marke hinter dem inneren Start
+        const hin = [`${c}|*`, ...(k.adhoc ? k.adhoc.map((a) => schl(c, `?${a}`)) : (start?.raus ?? []).map((o) => schl(c, o)))]
         // Nebenwege des Rahmens starten mit ihm, auf seiner Ebene
         if (n.neben.has(k.id)) liste.push({ art: 'schritt', ausloeser: s, knoten: k, weg: [s], basis: hin, ausgaenge: null, neben: nebenStarts(n, k, pfad), zaehlt: false })
         else liste.push({ art: 'fest', ausloeser: s, knoten: k.id, weg: [s], hin })
@@ -535,8 +563,10 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
         break
     }
   }
-  // Abbruch zuletzt: nur, wenn in dem Bereich, den er beendet, sonst nichts mehr schalten kann
-  for (const a of abbrueche) if (a.art === 'abbruch' && !liste.some((x) => a.bereich(x.ausloeser))) liste.push(a)
+  // Abbruch zuletzt: nur, wenn in dem Bereich, den er beendet, sonst nichts mehr schalten kann. Stehen mehrere Abbrüche
+  // zugleich an (die Terminierungen von „weiter beim ersten“), kann jeder der erste sein.
+  const normal = [...liste]
+  for (const a of abbrueche) if (a.art === 'abbruch' && !normal.some((x) => a.bereich(x.ausloeser))) liste.push(a)
   return liste
 }
 
@@ -595,7 +625,8 @@ function ausfuehrungen(n: Netz, mo: Moeglichkeit, m: Markierung): Schritt[] {
 
 /**
  * Schaltmöglichkeiten in einer Markierung. `reduziert`: nur die Stelle mit dem
- * kleinsten Schlüssel, Abbrüche zuletzt. Zulässig, weil jeder Fluss genau ein
+ * kleinsten Schlüssel, Abbrüche zuletzt (dann alle derselben Instanz: jeder kann
+ * der erste sein). Zulässig, weil jeder Fluss genau ein
  * Ziel hat: Bis zu einem Abbruch nimmt keine Marke einer anderen etwas weg, also
  * ändert die Reihenfolge unabhängiger Schritte nichts an Verklemmung und
  * Abschluss. Verzweigt wird nur an echten Wahlstellen (Entweder-oder, ODER).
@@ -606,7 +637,9 @@ function schritte(n: Netz, m: Markierung, reduziert = false): Schritt[] {
     const normal = liste.filter((x) => x.art !== 'abbruch')
     const auswahl = normal.length > 0 ? normal : liste
     const erster = auswahl.map((x) => x.ausloeser).sort()[0]
-    liste = auswahl.filter((x) => x.ausloeser === erster)
+    // Abbrüche derselben Instanz (die Terminierungen von „weiter beim ersten“) sind eine echte Wahl: Jeder kann der erste sein.
+    const pfad = zerlege(erster)[0]
+    liste = normal.length > 0 ? auswahl.filter((x) => x.ausloeser === erster) : auswahl.filter((x) => zerlege(x.ausloeser)[0] === pfad)
   } else if (liste.length > 0) {
     // Nebenwege zuerst: Ihre Marken teilen keinen Fluss mit dem übrigen Ablauf, kein anderer Schritt nimmt ihnen etwas weg,
     // und ein Abbruch wartet ohnehin auf sie. Diese Reihenfolge übersieht also keine Verklemmung und keinen Abschluss.
@@ -648,7 +681,7 @@ function durchsuche(n: Netz, maxZustaende: number, reduziert: boolean): Soundnes
   const fehler: string[] = []
   const starts = n.g.knoten.filter((k) => k.typ === 'start' && !k.rahmen)
   if (starts.length !== 1) fehler.push(`erwartet genau ein Startereignis, gefunden ${starts.length}`)
-  for (const k of n.g.knoten) if (k.typ === 'rahmen' && !n.innerStart.has(k.id)) fehler.push(`Rahmen ${k.id} hat kein inneres Startereignis`)
+  for (const k of n.g.knoten) if (k.typ === 'rahmen' && !k.adhoc && !n.innerStart.has(k.id)) fehler.push(`Rahmen ${k.id} hat kein inneres Startereignis`)
 
   const index = new Map<string, number>()
   const nachfolger: number[][] = []
@@ -737,7 +770,10 @@ function wuerfle(n: Netz, mo: Moeglichkeit, m: Markierung, anteil: Map<string, n
     // Ein Rahmen auf dem Weg wird mit dem Anteil seines Randereignisses unterbrochen, sonst läuft der Abbruch durch.
     const rest = (id: string) => 1 - Math.min(1, (n.unterbrechend.get(id) ?? []).reduce((s, r) => s + randAnteil(r, anteil), 0))
     const gewichte = mo.folgen.map((f) => (f.rand ? randAnteil(f.rand, anteil) : 1) * f.davor.reduce((p, id) => p * rest(id), 1))
-    return waehleNachGewicht(mo.folgen, gewichte, zufall).danach
+    const f = waehleNachGewicht(mo.folgen, gewichte, zufall)
+    // Endereignisse zählen mit (für den Vergleich, wie oft ein Zweig von „weiter beim ersten“ zuerst fertig ist)
+    if (n.nach.get(f.knoten)?.typ === 'ende') zaehle(f.knoten, 1)
+    return f.danach
   }
   if (mo.art === 'schritt') {
     if (mo.zaehlt) zaehle(mo.knoten.id, 1)
@@ -795,6 +831,23 @@ function wuerfle(n: Netz, mo: Moeglichkeit, m: Markierung, anteil: Map<string, n
   return mit(m, [mo.ausloeser], [schl(mo.pfad, wahl)])
 }
 
+/**
+ * Stehen in einer Instanz mehrere Abbrüche zugleich an (die Terminierungen der
+ * Zweige von „weiter beim ersten“, nachdem alle Zweige zu Ende gelaufen sind),
+ * schaltet der erste nach dem Gewicht am Endereignis: wie oft sein Zweig zuerst
+ * fertig ist. Ohne Gewicht zählt jeder gleich.
+ */
+function ersterAbbruch(n: Netz, moeglich: Moeglichkeit[], erster: Moeglichkeit, zufall: () => number): Moeglichkeit {
+  const pfad = zerlege(erster.ausloeser)[0]
+  const kandidaten = moeglich.filter((x) => x.art === 'abbruch' && zerlege(x.ausloeser)[0] === pfad)
+  if (kandidaten.length <= 1) return erster
+  const gewicht = (x: Moeglichkeit) => {
+    const k = x.art === 'abbruch' ? n.nach.get(x.knoten) : undefined
+    return k?.endeArt === 'terminierung' && k.gewicht !== undefined ? Math.max(0, k.gewicht) : 1
+  }
+  return waehleNachGewicht(kandidaten, kandidaten.map(gewicht), zufall)
+}
+
 /** Anteil (unterbrechend) bzw. mittlere Anzahl je Ausführung (Nebenweg), wie er am Ausgang des Randereignisses steht. */
 function randAnteil(r: TokenKnoten, anteil: Map<string, number>): number {
   const x = r.raus.length > 0 ? anteil.get(r.raus[0]) : undefined
@@ -835,8 +888,9 @@ export function zaehleMitFehler(g: TokenGraph, anteil: Map<string, number>, laeu
     for (let schritt = 0; m.size > 0 && schritt < 100_000; schritt++) {
       // die erste bereite Stelle schalten, Abbrüche zuletzt (dafür sorgt `moeglichkeiten`)
       const moeglich = moeglichkeiten(n, m)
-      const mo = moeglich.find((x) => x.art !== 'abbruch') ?? moeglich[0]
+      let mo = moeglich.find((x) => x.art !== 'abbruch') ?? moeglich[0]
       if (!mo) break // Verklemmung; zeigt die Soundness-Prüfung
+      if (mo.art === 'abbruch') mo = ersterAbbruch(n, moeglich, mo, zufall)
       m = wuerfle(n, mo, m, anteil, zufall, (id, mal) => lauf.set(id, (lauf.get(id) ?? 0) + mal))
     }
     for (const [id, x] of lauf) {

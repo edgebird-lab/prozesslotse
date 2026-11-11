@@ -26,6 +26,8 @@ export type SymbolArt =
   | 'mehrfach-gleichzeitig'
   | 'unterbrechung'
   | 'unterbrechung-neben'
+  | 'erster'
+  | 'adhoc'
 
 export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
   return (
@@ -196,6 +198,29 @@ function inhalt(art: SymbolArt) {
         </>
       )
     }
+    case 'erster':
+      // Rahmen: Raute mit Plus, zwei Zweige, jeder endet in einer Terminierung (dicker Kreis mit Punkt)
+      return (
+        <>
+          <rect x="2.5" y="4.5" width="27" height="23" rx="3.5" {...strich} />
+          <path d="M8.5 12 12.5 16 8.5 20 4.5 16Z" {...strich} strokeWidth={1.3} />
+          <path d="M10.5 14 13.5 10.5H20M10.5 18 13.5 21.5H20" {...strich} strokeWidth={1.2} />
+          <circle cx="23" cy="10.5" r="2.6" {...strich} strokeWidth={1.8} />
+          <circle cx="23" cy="10.5" r="1" fill="currentColor" />
+          <circle cx="23" cy="21.5" r="2.6" {...strich} strokeWidth={1.8} />
+          <circle cx="23" cy="21.5" r="1" fill="currentColor" />
+        </>
+      )
+    case 'adhoc':
+      // Rahmen mit Tilde unten in der Mitte, darin Aufgaben ohne Pfeile
+      return (
+        <>
+          <rect x="2.5" y="4.5" width="27" height="23" rx="3.5" {...strich} />
+          <rect x="6.5" y="8" width="11" height="5" rx="1.2" {...strich} strokeWidth={1.2} />
+          <rect x="11.5" y="14.5" width="13" height="5" rx="1.2" {...strich} strokeWidth={1.2} />
+          <path d="M12.5 24c1.2-1.6 2.4-1.6 3.5 0s2.3 1.6 3.5 0" {...strich} strokeWidth={1.4} />
+        </>
+      )
     case 'ruecksprung':
       return (
         <>

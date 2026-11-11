@@ -25,10 +25,11 @@ import {
   type Wiederholung,
 } from '../../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../../modell/zeit'
+import { zuerstFertig } from '../../analyse/verteilung'
 import { Auswahl, Feld, ProzentEingabe, ZahlEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
 import { Lernhinweis } from '../Lernhinweis'
-import { Kreuz, Symbol } from '../Symbol'
+import { Kreuz, Symbol, type SymbolArt } from '../Symbol'
 
 /** Wie es nach einem Ausgang weitergeht. */
 export type Danach = { art: 'weiter' } | { art: 'ende' } | { art: 'zurueck'; zielId: Id }
@@ -590,16 +591,70 @@ function OderFormular({ block: o, onAendern, kontext }: Props<Oder>) {
   )
 }
 
-function ParallelFormular({ block: b, onAendern }: Props<Parallel>) {
+/**
+ * Mehrere Dinge unabhängig voneinander: „Wann geht es weiter?“ (alle fertig
+ * oder beim ersten) und nur bei „alle“ „Wer erledigt die Zweige?“ (zur selben
+ * Zeit oder eine Person nacheinander). Daraus folgt die Art.
+ */
+function ParallelFormular({ block: b, onAendern, kontext }: Props<Parallel>) {
   const bestaetige = useBestaetigen()
+  const weiter = b.art === 'erster' ? 'erster' : 'alle'
+  const wer = b.art === 'nacheinander' ? 'nacheinander' : 'gleichzeitig'
+  const bahn = kontext.rahmenBahn
+  // Wie oft jeder Zweig zuerst fertig ist, sobald alle Zweige Schritte haben
+  const zuerst = b.art === 'erster' && b.zweige.length >= 2 && b.zweige.every((z) => z.schritte.length > 0) ? zuerstFertig(b) : null
+  const legende = b.art === 'alle' ? 'Zweige, die gleichzeitig laufen' : b.art === 'erster' ? 'Zweige, die gleichzeitig laufen, bis einer fertig ist' : 'Zweige, die eine Person nacheinander erledigt'
+  const symbol: SymbolArt = b.art === 'alle' ? 'und' : b.art === 'erster' ? 'erster' : 'adhoc'
+  return (
+    <>
+      <Auswahl
+        label="Wann geht es weiter?"
+        wert={weiter}
+        spalten={2}
+        optionen={[
+          { wert: 'alle', text: 'Wenn alle fertig sind' },
+          { wert: 'erster', text: 'Sobald eins fertig ist', beschreibung: 'die anderen werden abgebrochen' },
+        ]}
+        onAendern={(w) => onAendern({ ...b, art: w === 'erster' ? 'erster' : wer === 'nacheinander' ? 'nacheinander' : 'alle' })}
+      />
+      {weiter === 'alle' && (
+        <Auswahl
+          label="Wer erledigt die Zweige?"
+          wert={wer}
+          spalten={2}
+          optionen={[
+            { wert: 'gleichzeitig', text: 'Zur selben Zeit', beschreibung: 'mehrere Leute oder Stellen arbeiten daran', symbol: <Symbol art="und" groesse={24} /> },
+            { wert: 'nacheinander', text: 'Eine Person nacheinander, Reihenfolge egal', symbol: <Symbol art="adhoc" groesse={24} /> },
+          ]}
+          onAendern={(w) => onAendern({ ...b, art: w === 'nacheinander' ? 'nacheinander' : 'alle' })}
+        />
+      )}
+      <p className="feld-hilfe">Hängt es davon ab, was von außen zuerst passiert (Antwort, Frist)? Dann ist es eine Entscheidung „was zuerst passiert“.</p>
+      {b.art !== 'alle' && (
+        <p className="feld-hilfe">
+          {bahn
+            ? `Im Diagramm stehen alle Zweige in einem Rahmen in der Bahn „${bahn}“; Schritte anderer Rollen tragen die Rolle in Klammern.`
+            : 'Im Diagramm stehen alle Zweige in einem Rahmen in einer Bahn, der Rolle mit den meisten Schritten darin; Schritte anderer Rollen tragen die Rolle in Klammern.'}
+          {b.art === 'nacheinander' && ' Gerechnet wird in der Reihenfolge der Liste.'}
+        </p>
+      )}
+      <ParallelZweige b={b} onAendern={onAendern} legende={legende} symbol={symbol} zuerst={zuerst} bestaetige={bestaetige} />
+    </>
+  )
+}
+
+function ParallelZweige({ b, onAendern, legende, symbol, zuerst, bestaetige }: { b: Parallel; onAendern: (b: Parallel) => void; legende: string; symbol: SymbolArt; zuerst: number[] | null; bestaetige: ReturnType<typeof useBestaetigen> }) {
   return (
     <fieldset className="zweige">
-      <legend>Zweige, die gleichzeitig laufen</legend>
+      <legend>{legende}</legend>
       {b.zweige.map((z, i) => (
         <div key={z.id} className="zweig-zeile">
-          <Symbol art="und" groesse={20} />
+          <Symbol art={symbol} groesse={20} />
           <span>Zweig {i + 1}</span>
-          <span className="leise">{z.schritte.length === 1 ? '1 Schritt' : `${z.schritte.length} Schritte`}</span>
+          <span className="leise">
+            {z.schritte.length === 1 ? '1 Schritt' : `${z.schritte.length} Schritte`}
+            {zuerst && ` · zuerst fertig in ${formatiereProzent(zuerst[i])} der Fälle`}
+          </span>
           {b.zweige.length > 2 && (
             <button
               type="button"

@@ -23,6 +23,7 @@ import {
   loeseAbschnittAuf,
   nebenlaeufig,
   normalisiere,
+  parallelName,
   rahmenRolle,
   rahmenUeber,
   rolleName,
@@ -33,9 +34,10 @@ import {
   verschiebeBlock,
   verschiebeUnterbrechung,
   type Glied,
+  type Rahmenbaustein,
   type SequenzFundstelle,
 } from '../../modell/operationen'
-import { istUnterbrechbar, unerwartet, unterbrechungenVon, type Block, type BlockTyp, type Cursor, type Id, type Mehrfach, type Prozess, type Sequenz, type Teilprozess, type Unterbrechung } from '../../modell/typen'
+import { istUnterbrechbar, unerwartet, unterbrechungenVon, type Block, type BlockTyp, type Cursor, type Id, type Mehrfach, type Parallel, type Prozess, type Sequenz, type Unterbrechung } from '../../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../../modell/zeit'
 import { wirksamerCursor } from '../../zustand'
 import { useApp } from '../kontext'
@@ -51,7 +53,7 @@ const WAHL: { typ: BlockTyp; text: string; beschreibung: string; symbol: SymbolA
   { typ: 'aufgabe', text: 'Eine Aufgabe', beschreibung: 'Jemand erledigt etwas', symbol: 'aufgabe' },
   { typ: 'entscheidung', text: 'Eine Entscheidung', beschreibung: 'Je nach Fall geht es anders weiter', symbol: 'xor' },
   { typ: 'oder', text: 'Mehrere Wege möglich', beschreibung: 'einer, mehrere oder alle, je nach Fall', symbol: 'oder' },
-  { typ: 'parallel', text: 'Mehreres gleichzeitig', beschreibung: 'Zweige laufen parallel', symbol: 'und' },
+  { typ: 'parallel', text: 'Mehrere Dinge unabhängig voneinander', beschreibung: 'gleichzeitig, in beliebiger Reihenfolge oder bis eins fertig ist', symbol: 'und' },
   { typ: 'wiederholung', text: 'Etwas wird wiederholt', beschreibung: 'z. B. Nacharbeit nach einer Prüfung', symbol: 'wiederholung' },
   { typ: 'warten', text: 'Warten', beschreibung: 'auf einen Termin oder eine Nachricht', symbol: 'warten-zeit' },
   { typ: 'mehrfach', text: 'Etwas für jedes Stück einer Liste', beschreibung: 'jede Position, jeden Lieferanten, jeden Beleg', symbol: 'mehrfach' },
@@ -118,13 +120,30 @@ function unterbrechungText(p: Prozess, u: Unterbrechung): string {
 function lernthema(b: Block): LernThema {
   if (b.typ === 'entscheidung') return b.art === 'ereignis' ? 'ereignis' : 'entscheidung'
   if (b.typ === 'wiederholung') return b.modus === 'ruecksprung' ? 'ruecksprung' : 'wiederholung'
+  if (b.typ === 'parallel') return b.art === 'alle' ? 'parallel' : b.art
   return b.typ
 }
 
 function typname(b: Block): string {
   if (b.typ === 'entscheidung' && b.art === 'ereignis') return 'Ereignis-Entscheidung'
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return 'Bereich mit Rücksprung'
+  if (b.typ === 'parallel') return parallelName(b)
   return TYPNAME[b.typ]
+}
+
+/** Kurzbeschreibung einer Art von „Gleichzeitig“ für die Gliederung */
+function parallelMeta(b: Parallel): string {
+  const art = b.art
+  switch (art) {
+    case 'alle':
+      return 'weiter, wenn alle fertig sind'
+    case 'erster':
+      return 'die übrigen werden abgebrochen'
+    case 'nacheinander':
+      return 'eine Person, Reihenfolge egal'
+    default:
+      return unerwartet(art)
+  }
 }
 
 /** Ändert, wie es nach einem Ausgang einer bestehenden Entscheidung weitergeht; Rücksprünge verändern die Struktur. */
@@ -172,7 +191,7 @@ function neuerEntwurf(typ: BlockTyp, p: Prozess, vorgaenger: Block | null): Bloc
  * äußerste Rahmen über ihm (oder er selbst) bestimmt sie, als Rolle mit den
  * meisten Aufgaben darin. null, solange darin keine Aufgabe steht.
  */
-function bahnDesAbschnitts(p: Prozess, abschnitt: Teilprozess | Mehrfach, kette: Glied[]): string | null {
+function bahnDesAbschnitts(p: Prozess, abschnitt: Rahmenbaustein, kette: Glied[]): string | null {
   const aeusserster = rahmenUeber(kette)[0] ?? abschnitt
   if (!istRahmen(aeusserster)) return null
   const gueltig = (r: Id | null) => (r !== null && p.rollen.some((x) => x.id === r) ? r : null)
@@ -597,6 +616,7 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
   else if (b.typ === 'wiederholung' && b.modus === 'anteil') meta = `wiederholt in ${formatiereProzent(b.anteilWiederholung)}`
   else if (b.typ === 'entscheidung' && b.art === 'ereignis') meta = 'je nachdem, was zuerst passiert'
   else if (b.typ === 'oder') meta = 'einer, mehrere oder alle Wege'
+  else if (b.typ === 'parallel') meta = parallelMeta(b)
   else if (b.typ === 'teilprozess') meta = 'Abschnitt'
   else if (b.typ === 'mehrfach') {
     meta = `Ø ${formatiereZahl(b.anzahl, 1)} · ${b.ausfuehrung === 'nacheinander' ? 'nacheinander' : 'gleichzeitig'}`

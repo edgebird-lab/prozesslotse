@@ -2,7 +2,7 @@
  * Schwachstellen, die sich aus den Kennzahlen ergeben. Anders als die
  * Prüfregeln des Modells sind das keine Fehler, sondern begründete Hinweise.
  */
-import { bereichTitel, blockTitel, durchlaufe, folgtEntscheidung, freigabeQuote, mediumName, rolleName, unterbrechungsAnteile } from '../modell/operationen'
+import { bereichTitel, blockTitel, durchlaufe, folgtEntscheidung, freigabeQuote, mediumName, parallelName, rolleName, unterbrechungsAnteile } from '../modell/operationen'
 import { sortiereBefunde, type Befund } from '../modell/pruefung'
 import { istUnterbrechbar, type Aufgabe, type Id, type Prozess, type Unterbrechbar } from '../modell/typen'
 import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
@@ -234,8 +234,9 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           })
         }
       }
-    } else if (block.typ === 'parallel' || block.typ === 'oder') {
+    } else if ((block.typ === 'parallel' && block.art !== 'nacheinander') || block.typ === 'oder') {
       // Dieselbe Rolle in mehr Zweigen, als sie Personen hat: Sie kann nicht an zwei Stellen zugleich arbeiten.
+      // Bei „in beliebiger Reihenfolge“ arbeitet ohnehin eine Person die Zweige nacheinander ab.
       const zweigeJeRolle = new Map<Id, number>()
       for (const z of block.zweige) {
         const rollen = new Set<Id>()
@@ -249,7 +250,7 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           schluessel: `parallelrolle:${block.id}:${id}`,
           schwere: 'hinweis',
           titel: 'Gleichzeitig, aber dieselben Leute',
-          text: `In ${anzahl} Zweigen von „${block.typ === 'oder' ? blockTitel(block) : 'Gleichzeitig'}“ arbeitet ${rolle.name || 'dieselbe Rolle'}, die Rolle hat aber nur ${personenText(bedienende(rolle.personen))}. Wer an zwei Stellen zugleich arbeiten müsste, arbeitet tatsächlich nacheinander; die berechnete Durchlaufzeit ist dann zu niedrig.`,
+          text: `In ${anzahl} Zweigen von „${block.typ === 'oder' ? blockTitel(block) : parallelName(block)}“ arbeitet ${rolle.name || 'dieselbe Rolle'}, die Rolle hat aber nur ${personenText(bedienende(rolle.personen))}. Wer an zwei Stellen zugleich arbeiten müsste, arbeitet tatsächlich nacheinander; die berechnete Durchlaufzeit ist dann zu niedrig.`,
           blockId: block.id,
           rolleId: id,
         })

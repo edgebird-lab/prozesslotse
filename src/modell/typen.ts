@@ -171,13 +171,21 @@ export interface Entscheidung {
 }
 
 /**
- * Wann es nach „Gleichzeitig“ weitergeht. Bisher gibt es nur „alle“: weiter,
- * wenn alle Zweige fertig sind. Weitere Arten folgen (siehe modellierung-v4.md);
- * jede Funktion über Gleichzeitig unterscheidet die Art erschöpfend.
+ * Wie mehrere unabhängige Dinge erledigt werden; jede Funktion über
+ * „Gleichzeitig“ unterscheidet die Art erschöpfend.
+ *
+ * - **alle**: Die Zweige laufen gleichzeitig, weiter geht es, wenn alle fertig
+ *   sind (paralleles Gateway).
+ * - **erster**: Die Zweige laufen gleichzeitig, weiter geht es, sobald einer
+ *   fertig ist; die übrigen werden abgebrochen (Teilprozess, in dem jeder Zweig
+ *   mit einer Terminierung endet).
+ * - **nacheinander**: Eine Person erledigt die Zweige nacheinander, die
+ *   Reihenfolge ist egal (Ad-hoc-Teilprozess); gerechnet wird in der
+ *   Reihenfolge der Liste.
  */
-export type ParallelArt = 'alle'
+export type ParallelArt = 'alle' | 'erster' | 'nacheinander'
 
-/** Gleichzeitig: alle Zweige laufen, weiter geht es, wenn alle fertig sind (paralleles Gateway). */
+/** Mehrere Dinge unabhängig voneinander: gleichzeitig, bis eins fertig ist, oder in beliebiger Reihenfolge (siehe `ParallelArt`). */
 export interface Parallel {
   typ: 'parallel'
   id: Id

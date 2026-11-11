@@ -21,6 +21,13 @@
  * ist false für Nebenwege. Anteil, Frist und Zeitpunkt stehen in der
  * Dokumentation, eine Nachricht von außen kommt als Nachrichtenfluss vom Pool.
  * Ein Nebenweg endet in einem eigenen Endereignis ohne Namen.
+ *
+ * „Weiter beim ersten“ wird ein aufgeklappter Teilprozess, in dem jeder Zweig
+ * mit einer Terminierung (`terminateEventDefinition`) endet: Die erste beendet
+ * den Teilprozess und bricht die übrigen Zweige ab. „In beliebiger Reihenfolge“
+ * wird ein Ad-hoc-Teilprozess mit `ordering="Sequential"` und einer
+ * `completionCondition` „alle Zweige erledigt“; darin steht je Zweig genau eine
+ * Aktivität ohne Sequenzfluss.
  */
 import { anzahlVerteilung } from '../modell/anzahl'
 import { findeBlock, mediumName, rolleName } from '../modell/operationen'
@@ -110,6 +117,8 @@ const EREIGNIS_DEFINITION: Record<string, string> = {
 function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], blockDoku: Map<string, string>, standardFluss: Map<string, string>, e: string): string {
   const flussRefs = rein.map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + raus.map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
   const fehlerDefinition = k.fehler ? `${e}  <bpmn:errorEventDefinition id="${k.id}_def" errorRef="${k.fehler}" />\n` : ''
+  // Terminierung: beendet den Teilprozess „weiter beim ersten“ und bricht die übrigen Zweige ab
+  const endDefinition = k.terminierung ? `${e}  <bpmn:terminateEventDefinition id="${k.id}_def" />\n` : fehlerDefinition
   const definition = (art: string | null | undefined) => {
     if (!art || !EREIGNIS_DEFINITION[art]) return ''
     const tag = EREIGNIS_DEFINITION[art]
@@ -123,7 +132,7 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
       return `${e}<bpmn:startEvent id="${k.id}"${attrName(k.name)}>\n${flussRefs}${definition(k.ereignis)}${e}</bpmn:startEvent>\n`
     case 'ende':
       // Im Abschnitt ein Fehler-Ende: Es steigt zum Randereignis des äußersten Abschnitts auf.
-      return `${e}<bpmn:endEvent id="${k.id}"${attrName(k.name)}>\n${flussRefs}${fehlerDefinition}${e}</bpmn:endEvent>\n`
+      return `${e}<bpmn:endEvent id="${k.id}"${attrName(k.name)}>\n${doku(k.doku ?? '', `${e}  `)}${flussRefs}${endDefinition}${e}</bpmn:endEvent>\n`
     case 'rand':
       // Randereignis: Fehler (Ausstieg aus dem Abschnitt), Frist oder Nachricht; unterbrechend oder nebenher (cancelActivity="false")
       return `${e}<bpmn:boundaryEvent id="${k.id}"${attrName(k.name)} attachedToRef="${k.wirt}" cancelActivity="${k.unterbrechend !== false}">\n${doku(k.doku ?? '', `${e}  `)}${flussRefs}${k.fehler ? fehlerDefinition : definition(k.ereignis)}${e}</bpmn:boundaryEvent>\n`
@@ -226,7 +235,12 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   const rahmenXml = (r: LayoutRahmen, e: string): string => {
     const flussRefs = (rein.get(r.id) ?? []).map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + (raus.get(r.id) ?? []).map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
     const mf = r.mehrfach ? findeBlock(p, r.blockId)?.block : undefined
-    const text = mf?.typ === 'mehrfach' ? doku(mehrfachDoku(p, mf), `${e}  `) : ''
+    const text = mf?.typ === 'mehrfach' ? doku(mehrfachDoku(p, mf), `${e}  `) : doku(r.doku ?? '', `${e}  `)
+    if (r.art === 'adhoc') {
+      // Ad-hoc: eine Person, ein Zweig nach dem anderen, fertig, wenn jeder Zweig erledigt ist
+      const bedingung = `${e}  <bpmn:completionCondition xsi:type="bpmn:tFormalExpression">alle Zweige erledigt</bpmn:completionCondition>\n`
+      return `${e}<bpmn:adHocSubProcess id="${r.id}"${attrName(r.name)} ordering="Sequential">\n${text}${flussRefs}${ebene(r.id, `${e}  `)}${bedingung}${e}</bpmn:adHocSubProcess>\n`
+    }
     return `${e}<bpmn:subProcess id="${r.id}"${attrName(r.name)}>\n${text}${flussRefs}${mehrfachXml(r.mehrfach, `${e}  `)}${ebene(r.id, `${e}  `)}${e}</bpmn:subProcess>\n`
   }
   x += ebene(null, '    ')

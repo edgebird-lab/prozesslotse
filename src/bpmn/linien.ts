@@ -28,9 +28,10 @@ export const LINIE = { abstand: 10, rand: 6, stummel: 8, anschluss: 10 }
 /**
  * Seitenkanten der Rahmen: `innen` Abstand vom belegten Bereich der ersten bzw.
  * letzten inneren Spalte, `aussen` zusätzlicher Abstand zu den Kanalspuren
- * (zu `LINIE.rand` dazu).
+ * (zu `LINIE.rand` dazu), `ebene` Versatz je Rahmen darin, der in derselben
+ * Spalte beginnt bzw. endet (Ad-hoc-Rahmen mit eingebettetem Zweig).
  */
-export const RAHMEN_RAND = { innen: 12, aussen: 2 }
+export const RAHMEN_RAND = { innen: 12, aussen: 2, ebene: 8 }
 
 interface Arm {
   y: number
@@ -420,10 +421,15 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
   const quelle = (id: string) => rahmenAus.get(id) ?? randAus.get(id)?.knoten ?? nach.get(id)!
   const ziel = (id: string) => rahmenEin.get(id) ?? nach.get(id)!
   const { aus, ein } = bestimmeAnschluesse(kanten, quelle, ziel, spurMitte, auftrag.spalteFrei)
-  // Neben Rahmenkanten bleibt in der Lücke Platz: Kanalspuren liegen außerhalb des Rahmens.
-  const kanteLinks = new Set([...rahmenEin.values()].map((k) => k.spalte))
-  const kanteRechts = new Set([...rahmenAus.values()].map((k) => k.spalte))
-  const randRahmen = RAHMEN_RAND.innen + RAHMEN_RAND.aussen
+  // Neben Rahmenkanten bleibt in der Lücke Platz: Kanalspuren liegen außerhalb des äußersten Rahmens.
+  // Der Ersatzknoten reicht bis zur Kante; je Spalte zählt der Rahmen, dessen Kante am weitesten außen liegt.
+  const kanteAbstand = (liste: Iterable<LayoutKnoten>): Map<number, number> => {
+    const m = new Map<number, number>()
+    for (const k of liste) m.set(k.spalte, Math.max(m.get(k.spalte) ?? 0, k.breite / 2 - (auftrag.belegt.get(k.spalte) ?? 0) + RAHMEN_RAND.aussen))
+    return m
+  }
+  const kanteLinks = kanteAbstand(rahmenEin.values())
+  const kanteRechts = kanteAbstand(rahmenAus.values())
 
   const kanaele = new Map<number, Kanalstueck[]>()
   const kanal = (luecke: number, ya: number, yb: number, arme: Arm[]): Kanalstueck => {
@@ -536,8 +542,8 @@ export function fuehreLinien(auftrag: LinienAuftrag): Linien {
   const anzahl = new Map<number, number>()
   for (const [luecke, liste] of kanaele) anzahl.set(luecke, ordneKanal(liste))
   const freiraum = (g: number, mitte: (c: number) => number): [number, number] => {
-    const links = g < 0 ? auftrag.linkerRand : mitte(g) + (auftrag.belegt.get(g) ?? 0) + (kanteRechts.has(g) ? randRahmen : 0)
-    const rechts = g >= auftrag.maxSpalte ? mitte(auftrag.maxSpalte) + auftrag.rechterRand : mitte(g + 1) - (auftrag.belegt.get(g + 1) ?? 0) - (kanteLinks.has(g + 1) ? randRahmen : 0)
+    const links = g < 0 ? auftrag.linkerRand : mitte(g) + (auftrag.belegt.get(g) ?? 0) + (kanteRechts.get(g) ?? 0)
+    const rechts = g >= auftrag.maxSpalte ? mitte(auftrag.maxSpalte) + auftrag.rechterRand : mitte(g + 1) - (auftrag.belegt.get(g + 1) ?? 0) - (kanteLinks.get(g + 1) ?? 0)
     return [links + LINIE.rand, rechts - LINIE.rand]
   }
   const extra = new Map<number, number>()

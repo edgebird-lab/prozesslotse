@@ -75,7 +75,7 @@ Hinweise für Schritt 3 und später:
 
 ## Schritt 3 – Unterbrechung
 
-Fertig am 2026-11-11, Commits 5d73e28 „Unterbrechungen (Randereignisse): Modell, Rechnung, BPMN und Tokenspiel“ und „Unterbrechungen: Oberfläche, Browsertests und Doku“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 3)“.
+Fertig am 2026-11-11, Commits 5d73e28 „Unterbrechungen (Randereignisse): Modell, Rechnung, BPMN und Tokenspiel“ und addb89b „Unterbrechungen: Oberfläche, Browsertests und Doku“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 3)“.
 
 - [x] Typ `Unterbrechung extends Sequenz`, optionale `unterbrechungen` an Aufgabe, Teilprozess, Mehrfach; `pruefeBlock`, `entferneFremdeAbsender`
 - [x] Operationen: Kindsequenzen, Ketten-Prädikate je Glied (`gliedRahmen`, `gliedNebenlaeufig`), Rücksprung aus dem Ausnahmeweg (`zurueckZu`, auch „noch einmal von vorn“), `normalisiere`, `ausgaengeBlock`, `verlaesstBlock`, `verschiebeUnterbrechung`, `unterbrechungFuerAbschnitt`, Führung („im Ausnahmeweg … von …“, „im Nebenweg …“)
@@ -97,12 +97,22 @@ Hinweise für Schritt 4 und später:
 
 ## Schritt 4 – Gleichzeitig: erster und nacheinander
 
-- [ ] `ParallelArt` um `'erster' | 'nacheinander'` erweitern; erschöpfende Unterscheidung überall
-- [ ] erster: Rahmen mit Terminierung je Zweig, Minimum, P(i zuerst) am Element, Übergaben vom Gewinner, Hinweis bei gleich langen Zweigen
-- [ ] nacheinander: Ad-hoc-Rahmen mit `ordering` und `completionCondition`, „Zweig n“-Teilprozesse, Rechnung als Folge in Listenreihenfolge, Ende im Zweig erlaubt
-- [ ] Tokenspiel: Terminierung im Rahmen, Ad-hoc-Knoten
-- [ ] Oberfläche: Knopf „Mehrere Dinge unabhängig voneinander“, zwei Fragen, Titel nach Art, Lernhinweise; Zufallsgenerator, Tests von Hand, Browsertest, Diagramm angesehen, Doku
-- [ ] Commit und Push
+Fertig am 2026-11-11, Commit „Gleichzeitig: weiter beim ersten und in beliebiger Reihenfolge“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 4)“.
+
+- [x] `ParallelArt = 'alle' | 'erster' | 'nacheinander'`, `neueParallel(n, art)`, `pruefeBlock`; erschöpfende Unterscheidung in Operationen, Kennzahlen (Fluss und Dauer), Verteilung, Simulation, Layout, Prüfung; `istRahmen`/`rahmenInhalt`/`ParallelRahmen`, `parallelName`, `einzelneAktivitaet`
+- [x] erster: Rahmen mit Raute und Terminierung je Zweig, Minimum mit Gleichstandsregel (`ersterAusgang`, schon allgemein mit Enden), P(i zuerst) am Endereignis und in `Kennzahlen.zuerstFertig`, Übergaben vom Gewinner, TCT als Minimum der Bearbeitungszeiten, Hinweis `erstergleich`
+- [x] nacheinander: Ad-hoc-Rahmen mit `ordering="Sequential"` und `completionCondition`, „Zweig n“-Teilprozesse, Rechnung als Folge in Listenreihenfolge, Ende im Zweig erlaubt (Fehler-Ende, gefangen am äußersten Rahmen), Hinweis `adhocreihe`, Warnung `adhocende`; Kantenversatz 8 px je Ebene für Rahmen in derselben Spalte
+- [x] Tokenspiel: Terminierung im Rahmen (jede kann die erste sein, auch in der verkürzten Suche; Zählung nach Gewicht), Ad-hoc-Knoten mit offenen Marken; `graphAusXml` liest `adHocSubProcess`; behoben: von mehreren gleichzeitigen Abbrüchen wurde nur der erste angeboten
+- [x] `geometrieFehler`: im Ad-hoc-Rahmen kein Sequenzfluss, Aktivitäten untereinander ab der ersten Spalte, Ein- und Austritt auf der Höhe der ersten; Tilde wie die Mehrfach-Markierung frei
+- [x] Oberfläche: Knopf „Mehrere Dinge unabhängig voneinander“, zwei Fragen, Abgrenzung zur Ereignis-Entscheidung, Satz zur Bahn, „zuerst fertig in x %“ je Zweig, Titel und Gliederung nach Art, Symbole und Lernhinweise „Weiter beim ersten“ und „In beliebiger Reihenfolge“
+- [x] Zufallsgenerator (eigener Zufallsstrom, auch ungültige Varianten), Tests von Hand (`src/analyse/gleichzeitig.test.ts`), Browsertests (`e2e/gleichzeitig.spec.ts`), Diagramme mit `render.mjs` angesehen („erster“ mit drei Zweigen und Nachricht, Ad-hoc mit Ende und „Zweig 1“, Ad-hoc mit Abschnitt und zweimal „für jedes Stück“, verschachtelt in Gleichzeitig und Abschnitt, drei Zufallsprozesse mit Ausschnitten), Doku (`datenmodell.md`, `fragenkatalog.md`, README)
+- [x] Commit und Push
+
+Hinweise für Schritt 5:
+
+- „erster“ rechnet Enden in Zweigen schon richtig (`ersterAusgang`, `flussErster`, `dauerErster`, Simulation: wer zuerst fertig ist oder abbricht). Es fehlen: den Prüffehler `abbruch` für Zweige von „erster“ aufheben und im Tokenspiel beim Zählen auch Fehler-Enden gewichten. Heute würfelt `ersterAbbruch` nur Terminierungen nach `gewicht`, andere Abbrüche zählen 1; ein Fehler-Ende in Zweig i braucht P(i gewinnt mit Ergebnis r), aufgeteilt auf die Fehler-Enden dieses Zweigs.
+- Mehrere Abbrüche einer Instanz sind jetzt eine echte Wahl (jeder kann der erste sein); das braucht auch die Abbruchkombination für „alle“, ODER und Mehrfach gleichzeitig.
+- Ein Ende in einem Zweig von „nacheinander“ ist kein Abbruch neben Nebenläufigem; es braucht in Schritt 5 nichts.
 
 ## Schritt 5 – Abbruch in nebenläufiger Umgebung
 
@@ -117,7 +127,8 @@ Hinweise für Schritt 4 und später:
 
 - Bedienprobe: Eine Person ohne BPMN-Kenntnis bildet drei Fälle ab (Kunde schickt Unterlagen; Ausweis und/oder Nachweis fehlt; je Position kommissionieren); danach die Texte anpassen.
 - Bewusst nicht übernommen: ODER als Kombinationen abfragen (Format 3 fragt Häufigkeiten je Weg), „übrige Zweige laufen zu Ende“ bei „weiter beim ersten“, zugeklappte Teilprozesse.
-- Annahmen, die in die README-Grenzen kommen: abgebrochene Arbeit zählt voll; „in beliebiger Reihenfolge“ in Listenreihenfolge. (Nebenwege verlängern nichts und Unterbrechungen mit festen Anteilen stehen seit Schritt 3 in den Grenzen.)
+- Annahmen in den README-Grenzen: abgebrochene Arbeit zählt voll, „weiter beim ersten“ bricht ab, „in beliebiger Reihenfolge“ in Listenreihenfolge (seit Schritt 4), Nebenwege verlängern nichts und Unterbrechungen mit festen Anteilen (seit Schritt 3).
+- Abweichungen aus Schritt 4 abnehmen (Details in modellierung-v4.md, „Umsetzung (Schritt 4)“): neuer Hinweis und neue Warnung zur Listenreihenfolge bei „in beliebiger Reihenfolge“; „kein Zeitgewinn“ auch dann, wenn ein Zweig sicher gewinnt; Ein- und Austritt des Ad-hoc-Rahmens liegen auf der Höhe der ersten Aktivität, der Pfeil endet also kurz vor deren Rahmen.
 - Abweichungen aus Schritt 3 abnehmen (Details in modellierung-v4.md, „Umsetzung (Schritt 3)“): „Verklemmung“ nur noch bei „Gleichzeitig“, ein Ende in einem ODER-Weg ist der Fehler „Ende neben gleichzeitig laufenden Schritten“; Gliederung mit Symbol statt „⚡“; über die Abgangsspur steht das höchste Ziel ganz rechts; Nebenwege beginnen bei Übergaben an der letzten Aufgabe eines Rahmens; der Anteil einer Unterbrechung an „für jedes Stück“ gilt auch für Vorgänge ohne Stück.
 
 ## Testzahlen
@@ -127,4 +138,5 @@ Hinweise für Schritt 4 und später:
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
 | Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
 | Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
-| Schritt 3, Unterbrechung (Commits 5d73e28 und Oberfläche) | 210 in 20 Dateien | 23 |
+| Schritt 3, Unterbrechung (Commits 5d73e28 und addb89b) | 210 in 20 Dateien | 23 |
+| Schritt 4, Gleichzeitig-Arten | 231 in 21 Dateien | 25 |

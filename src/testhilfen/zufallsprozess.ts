@@ -17,7 +17,7 @@ import {
   neueUnterbrechung,
 } from '../modell/bausteine'
 import { aendereUnterbrechungen, durchlaufe, findeBlock, nebenlaeufig, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
-import { istUnterbrechbar, type Block, type NachrichtZeitpunkt, type Prozess, type Rolle, type Sequenz, type Teilnehmer, type Unterbrechung } from '../modell/typen'
+import { istUnterbrechbar, type Block, type NachrichtZeitpunkt, type ParallelArt, type Prozess, type Rolle, type Sequenz, type Teilnehmer, type Unterbrechung } from '../modell/typen'
 
 /**
  * Zufällige, gültige Prozesse für Belastungstests: verschachtelte
@@ -26,14 +26,17 @@ import { istUnterbrechbar, type Block, type NachrichtZeitpunkt, type Prozess, ty
  * Stück“ (fest und schwankend, nacheinander mit Enden darin und gleichzeitig,
  * als Aufgabe mit Markierung und als Rahmen), Unterbrechungen an Aufgaben und
  * Rahmen (Zeit oder Nachricht, unterbrechend mit „weiter“, Ende oder
- * Rücksprung, oder als Nebenweg), vorzeitige Enden und Rücksprünge, die über
- * `setzeRuecksprung` entstehen wie in der Oberfläche.
+ * Rücksprung, oder als Nebenweg), „weiter beim ersten“ und „in beliebiger
+ * Reihenfolge“ (mit Enden und Rücksprüngen in den Zweigen), vorzeitige Enden und
+ * Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche.
  */
 export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: boolean } = {}): Prozess {
   // auchUngueltig: jeder Ausgang darf enden oder zurückspringen, also auch alle; dann entstehen unerreichbare Schritte und Endlosschleifen
   const frei = optionen.auchUngueltig ?? false
   const zufall = zufallMitStartwert(startwert)
   const wahl = <T,>(liste: T[]): T => liste[Math.floor(zufall() * liste.length)]
+  // Die Art von „Gleichzeitig“ kommt aus einem eigenen Zufallsstrom; Prozesse ohne die neuen Arten bleiben, wie sie waren.
+  const artZufall = zufallMitStartwert(startwert * 104_729 + 31)
   const rollen = [neueRolle('A'), neueRolle('B'), neueRolle('C')]
   // ein externer Kunde; manche Aufgaben, Wartezeiten und Ereignisse tauschen Nachrichten mit ihm aus
   const kunde = neuerTeilnehmer('Kunde')
@@ -86,8 +89,16 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
       return neueEntscheidung({ frage: 'Welcher Fall?', art: ereignisse ? 'ereignis' : 'daten', zweige })
     }
     if (r < 0.84) {
-      const par = neueParallel(2 + Math.floor(zufall() * 2))
-      par.zweige = par.zweige.map((z: Sequenz) => ({ ...z, schritte: sequenz(tiefe + 1, true, 1) }))
+      // alle (60 %), weiter beim ersten (20 %, nebenläufig), in beliebiger Reihenfolge (20 %, nicht nebenläufig: Enden darin
+      // erlaubt). Ungültig: ein leerer Zweig, oder ein Ende in einem Zweig von „weiter beim ersten“ (bis zum Abbruch in Schritt 5).
+      const a = artZufall()
+      const art: ParallelArt = a < 0.6 ? 'alle' : a < 0.8 ? 'erster' : 'nacheinander'
+      const par = neueParallel(2 + Math.floor(zufall() * 2), art)
+      const nebenher = art !== 'nacheinander' || inParallel
+      par.zweige = par.zweige.map((z: Sequenz) => ({ ...z, schritte: frei && artZufall() < 0.05 ? [] : sequenz(tiefe + 1, nebenher, 1) }))
+      if (art === 'erster' && frei && artZufall() < 0.3) {
+        par.zweige[0].schritte.push(neueEntscheidung({ frage: 'Abgelehnt?', zweige: [neuerZweig('Nein', 0.8), neuerZweig('Ja', 0.2, { ende: `Zweig ${++nr} abgelehnt` })] }))
+      }
       return par
     }
     if (r < 0.92 && tiefe <= 1) {

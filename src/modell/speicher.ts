@@ -76,7 +76,7 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       return
     case 'parallel':
       fordere(Array.isArray(x.zweige), `${wo}: Zweige fehlen.`)
-      fordere(x.art === 'alle', `${wo}: unbekannte Art von „Gleichzeitig“.`)
+      fordere(x.art === 'alle' || x.art === 'erster' || x.art === 'nacheinander', `${wo}: unbekannte Art von „Gleichzeitig“.`)
       x.zweige.forEach((z, i) => pruefeSequenz(z, `${wo}, Zweig ${i + 1}`))
       return
     case 'teilprozess':

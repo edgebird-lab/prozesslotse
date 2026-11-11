@@ -9,8 +9,9 @@
  * - **Spuren**: Innerhalb einer Bahn werden Zweige übereinander gestapelt.
  *   Jeder Zweig bekommt in jeder Bahn ein eigenes Band, das über die ganze
  *   Breite seines Blocks reserviert ist.
- * - **Rahmen** (Abschnitte und „für jedes Stück“, im BPMN aufgeklappte
- *   Teilprozesse) liegen mit allem darin in einer Bahn. Ist der Körper von
+ * - **Rahmen** (Abschnitte, „für jedes Stück“, „weiter beim ersten“ und „in
+ *   beliebiger Reihenfolge“, im BPMN aufgeklappte bzw. Ad-hoc-Teilprozesse)
+ *   liegen mit allem darin in einer Bahn. Ist der Körper von
  *   „für jedes Stück“ eine einzelne Aufgabe, trägt sie die Markierung der
  *   Mehrfachinstanz, und es gibt keinen Rahmen. Über dem Inhalt liegt eine dünne Kopfspur für
  *   den Namen, darunter eine dünne Fußspur. Die Hauptlinie eines Teils liegt in
@@ -26,11 +27,25 @@
  * eines fremden Flusses in einem Rahmen, rückt der betroffene Baustein hinter
  * den Rahmen (Bahnwechsel neben Rahmen).
  */
+import { ersterAusgang } from '../analyse/verteilung'
 import { anzahlVerteilung, kannNull } from '../modell/anzahl'
-import { alsMarkierteAufgabe, durchlaufe, nebenwegAnzahl, oderWahrscheinlichkeiten, oderZiehung, rahmenRolle, unterbrechungsAnteile } from '../modell/operationen'
+import {
+  alsMarkierteAufgabe,
+  durchlaufe,
+  einzelneAktivitaet,
+  istRahmen,
+  nebenwegAnzahl,
+  oderWahrscheinlichkeiten,
+  oderZiehung,
+  parallelName,
+  rahmenRolle,
+  unterbrechungsAnteile,
+  type Rahmenbaustein,
+} from '../modell/operationen'
 import { fuehreLinien, RAHMEN_RAND, type NachrichtAuftrag, type RandAbgang } from './linien'
 import {
   unerwartet,
+  unterbrechungenVon,
   type Aufgabe,
   type Block,
   type EntscheidungsZweig,
@@ -38,6 +53,7 @@ import {
   type Mehrfach,
   type MehrfachStreuung,
   type OderZweig,
+  type Parallel,
   type Prozess,
   type Rolle,
   type Sequenz,
@@ -150,6 +166,10 @@ export interface LayoutKnoten extends Rechteck {
   mehrfach?: MehrfachMarke
   /** dazu der Baustein „für jedes Stück“ im Modell */
   mehrfachBlock?: Id
+  /** Endereignis: Terminierung (ein Zweig von „weiter beim ersten“ ist fertig, die übrigen werden abgebrochen) */
+  terminierung?: boolean
+  /** Terminierung eines Zweigs von „weiter beim ersten“: Wahrscheinlichkeit, dass er zuerst fertig ist (für das Tokenspiel) */
+  zuerst?: number
 }
 
 export interface Spur {
@@ -206,7 +226,13 @@ export interface LayoutNachricht {
   punkte: Punkt[]
 }
 
-export type RahmenArt = 'teilprozess' | 'mehrfach'
+/**
+ * Art eines Rahmens: Abschnitt, „für jedes Stück“, „weiter beim ersten“
+ * (Teilprozess mit Terminierung je Zweig) oder „in beliebiger Reihenfolge“
+ * (Ad-hoc-Teilprozess). Die eingebetteten Zweige „Zweig n“ eines
+ * Ad-hoc-Rahmens sind Abschnitte.
+ */
+export type RahmenArt = 'teilprozess' | 'mehrfach' | 'erster' | 'adhoc'
 
 /** Rahmen eines aufgeklappten Teilprozesses; kein Knoten im Spaltenraster. */
 export interface LayoutRahmen extends Rechteck {
@@ -228,6 +254,15 @@ export interface LayoutRahmen extends Rechteck {
   zweigPfad: string[]
   /** Markierung der Mehrfachinstanz, in der Mitte der Unterkante */
   mehrfach?: MehrfachMarke
+  /** Nur Ad-hoc-Rahmen: die Aktivitäten darin (je Zweig eine), in der Reihenfolge der Liste */
+  aktivitaeten?: string[]
+  /** Dokumentation im BPMN */
+  doku?: string
+}
+
+/** Trägt der Rahmen eine Markierung in der Mitte der Unterkante (Mehrfachinstanz, Ad-hoc-Tilde)? Dort sitzt kein Randereignis. */
+export function hatMarke(r: Pick<LayoutRahmen, 'mehrfach' | 'art'>): boolean {
+  return !!r.mehrfach || r.art === 'adhoc'
 }
 
 export interface Layout {
@@ -291,6 +326,8 @@ interface TeilRahmen {
   ankerSpur: number
   zweigPfad: string[]
   mehrfach?: MehrfachMarke
+  aktivitaeten?: string[]
+  doku?: string
 }
 
 interface Teil {
@@ -419,7 +456,7 @@ function bahnVon(ctx: Kontext, rolleId: Id | null): string {
 }
 
 /** Bahn eines Rahmens: die Rolle mit den meisten Aufgaben darin, sonst die Bahn, in der der Ablauf gerade ist. */
-function rahmenBahn(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext): string {
+function rahmenBahn(b: Rahmenbaustein, bahn: string, ctx: Kontext): string {
   const rolle = rahmenRolle(b, (r) => (r !== null && ctx.rollenIds.has(r) ? r : null))
   return rolle === undefined ? bahn : rolle === null ? OHNE_ROLLE : rolle
 }
@@ -508,8 +545,16 @@ function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
     }
     case 'parallel': {
       const art = b.art
-      if (art !== 'alle') return unerwartet(art)
-      return layoutVerzweigung(b, bahn, ctx)
+      switch (art) {
+        case 'alle':
+          return layoutVerzweigung(b, bahn, ctx)
+        case 'erster':
+        case 'nacheinander':
+          // Rahmen: „weiter beim ersten“ mit Terminierung je Zweig, „in beliebiger Reihenfolge“ als Ad-hoc-Teilprozess
+          return layoutRahmenMitRand({ ...b, art }, bahn, ctx)
+        default:
+          return unerwartet(art)
+      }
     }
     case 'entscheidung':
     case 'oder':
@@ -536,9 +581,40 @@ function layoutMehrfach(b: Mehrfach, bahn: string, ctx: Kontext): Teil {
 }
 
 /** Rahmen samt Randereignissen: Ausstiege für Enden darin (nur am äußersten Rahmen) und Unterbrechungen. */
-function layoutRahmenMitRand(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, marke?: MehrfachMarke): Teil {
+function layoutRahmenMitRand(b: Rahmenbaustein, bahn: string, ctx: Kontext, marke?: MehrfachMarke): Teil {
   const { teil, fehler } = layoutRahmen(b, bahn, ctx, marke)
-  return fehler.length > 0 || b.unterbrechungen?.length ? layoutRandwege(b, teil, fehler, ctx) : teil
+  return fehler.length > 0 || unterbrechungenVon(b).length > 0 ? layoutRandwege(b, teil, fehler, ctx) : teil
+}
+
+/**
+ * Inhalt eines Ad-hoc-Rahmens („in beliebiger Reihenfolge“): je Zweig genau eine
+ * Aktivität ohne Sequenzfluss, untereinander ab der ersten Spalte. Ein Zweig aus
+ * einer Aufgabe, einem Abschnitt oder „für jedes Stück“ ohne Unterbrechungen
+ * bleibt, wie er ist; sonst wird er ein eingebetteter Teilprozess „Zweig n“ mit
+ * eigenem Start und Ende. `fertig`: Jede Aktivität kann normal zu Ende laufen.
+ */
+function layoutAdhoc(b: Parallel, bahn: string, ctx: Kontext): { teil: Teil; aktivitaeten: string[]; fertig: boolean } {
+  const t = neuerTeil(bahn)
+  const aktivitaeten: string[] = []
+  let fertig = true
+  let versatz = 0
+  b.zweige.forEach((z, i) => {
+    const einzeln = einzelneAktivitaet(z)
+    const zweig: Teilprozess = { typ: 'teilprozess', id: z.id, name: `Zweig ${i + 1}`, koerper: z }
+    const teil = einzeln ? layoutBlock(einzeln, bahn, ctx) : layoutRahmen(zweig, bahn, ctx, undefined, b.id).teil
+    fertig &&= teil.austritt !== null
+    if (teil.eintritt) aktivitaeten.push(teil.eintritt)
+    // gestapelt wie Zweige, alle ab der ersten Spalte
+    verschiebe(teil, 0, new Map([[bahn, versatz]]))
+    merkeZweig(teil, b.id, i)
+    if (i === 0) t.anker.set(bahn, teil.anker.get(bahn) ?? 0)
+    versatz += teil.hoehe.get(bahn) ?? 1
+    uebernimm(t, teil)
+    t.breite = Math.max(t.breite, teil.breite)
+  })
+  belege(t, bahn, Math.max(1, versatz))
+  t.breite = Math.max(1, t.breite)
+  return { teil: t, aktivitaeten, fertig }
 }
 
 interface ZweigLayout {
@@ -552,6 +628,12 @@ interface ZweigLayout {
   endet: boolean
   springt: boolean
   linie?: Spur
+}
+
+/** Kennung der Wege an den Randereignissen eines Schritts im Zweigpfad; sie beginnen am Schritt selbst (nicht an einer Raute darin). */
+const RAND_ZWEIG = 'rand:'
+function randZweig(id: Id): string {
+  return `${RAND_ZWEIG}${id}`
 }
 
 /** Knoten und Rahmen eines Zweigs merken sich, in welchem Zweig (Nummer von oben) und welchem Baustein darin sie liegen. */
@@ -698,7 +780,24 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
   t.anker.set(bahn, anker)
 
   const fortsetzend = zweige.filter((z) => !z.endet && !z.springt && (z.leer || z.teil.austritt !== null))
-  if (!xor || fortsetzend.length >= 2) {
+  if (b.typ === 'parallel' && b.art === 'erster') {
+    // Weiter beim ersten: Jeder Zweig endet in einer Terminierung, alle in der Spalte hinter dem breitesten Zweig.
+    // Am Ende steht, wie oft der Zweig zuerst fertig ist; damit würfelt das Tokenspiel.
+    const gewinn = ersterAusgang(b, 'gesamt').je
+    for (const z of fortsetzend) {
+      const i = b.zweige.findIndex((x) => x.id === z.id)
+      const endBahn = z.leer ? bahn : z.teil.austrittsBahn
+      const spur = z.leer ? (z.linie?.spur ?? 0) : (z.teil.anker.get(endBahn) ?? 0)
+      const endeId = xmlId(`${z.id}_ende`)
+      const anteil = gewinn[i]?.weiter ?? 0
+      t.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: '', blockId: b.id, bahn: endBahn, spalte: 1 + maxBreite, spur, terminierung: true, zuerst: anteil, doku: `Zweig ${i + 1} ist in ${formatiereProzent(anteil, 1)} der Fälle zuerst fertig; dann werden die übrigen Zweige abgebrochen` }))
+      if (z.leer) t.kanten.push(kante(ctx, aufId, endeId, { ueber: z.linie }))
+      else if (z.teil.austritt) t.kanten.push(kanteAus(ctx, z.teil.austritt, endeId))
+    }
+    t.austritt = null
+    t.austrittsBahn = bahn
+    t.breite = maxBreite + 2
+  } else if (!xor || fortsetzend.length >= 2) {
     const zuId = xmlId(`${b.id}_zu`)
     t.knoten.push(knoten(ctx, { id: zuId, art: artZu, name: '', blockId: b.id, bahn, spalte: 1 + maxBreite, spur: anker, richtung: 'zu' }))
     for (const z of fortsetzend) {
@@ -787,38 +886,75 @@ function spaltenFuerRand(anzahl: number, mehrfach: boolean): number {
   return Math.ceil((noetig - 42) / MASSE.spalte)
 }
 
+/** Art eines Rahmens im Layout */
+function rahmenArt(b: Rahmenbaustein): RahmenArt {
+  if (b.typ !== 'parallel') return b.typ
+  return b.art === 'erster' ? 'erster' : 'adhoc'
+}
+
+/** Dokumentation der Gleichzeitig-Rahmen im BPMN */
+function rahmenDoku(b: Rahmenbaustein): string | undefined {
+  if (b.typ !== 'parallel') return undefined
+  return b.art === 'erster'
+    ? 'Weiter beim ersten: Die Zweige laufen gleichzeitig. Sobald einer fertig ist, beendet seine Terminierung den Teilprozess, und die übrigen Zweige werden abgebrochen.'
+    : 'In beliebiger Reihenfolge: Eine Person erledigt jeden Zweig genau einmal, einen nach dem anderen; die Reihenfolge ist egal. Die Rechnung nimmt die Reihenfolge der Liste an.'
+}
+
 /**
- * Rahmen (Abschnitt oder „für jedes Stück“, im BPMN ein aufgeklappter
- * Teilprozess) in einer Bahn mit innerem Start, dem Körper und innerem Ende.
+ * Rahmen (im BPMN ein aufgeklappter Teilprozess) in einer Bahn. Abschnitt und
+ * „für jedes Stück“: innerer Start, der Körper, inneres Ende. „Weiter beim
+ * ersten“: innerer Start, paralleles Gateway, die Zweige gestapelt, jeder mit
+ * einer Terminierung in der Spalte hinter dem breitesten Zweig; der Rahmen hat
+ * einen Ausgang, wenn ein Zweig sie erreicht. „In beliebiger Reihenfolge“
+ * (Ad-hoc): je Zweig eine Aktivität ohne Sequenzfluss, ohne Start und Ende;
+ * Ein- und Austritt auf der Höhe der ersten.
+ *
  * Kopfspur oben, Fußspur unten. Der äußerste Rahmen fängt die Fehler-Enden
  * darin; `fehler` nennt sie, die Randereignisse dafür legt `layoutRandwege`
- * wie Unterbrechungen. Bei einer Mehrfachinstanz bleibt die Mitte der
- * Unterkante für die Markierung frei; reicht der Platz für die Randereignisse
- * nicht, bekommt der Rahmen am Ende leere Spalten.
+ * wie Unterbrechungen. Trägt der Rahmen eine Markierung (Mehrfachinstanz,
+ * Ad-hoc), bleibt die Mitte der Unterkante frei; reicht der Platz für die
+ * Randereignisse nicht, bekommt der Rahmen am Ende leere Spalten.
+ * `blockId`: Baustein im Modell, falls nicht `b` selbst (eingebettete Zweige).
  */
-function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, marke?: MehrfachMarke): { teil: Teil; fehler: string[] } {
+function layoutRahmen(b: Rahmenbaustein, bahn: string, ctx: Kontext, marke?: MehrfachMarke, blockId: Id = b.id): { teil: Teil; fehler: string[] } {
   const eigeneBahn = ctx.bahnZwang ?? rahmenBahn(b, bahn, ctx)
   const id = xmlId(b.id)
+  const art = rahmenArt(b)
   const aussen = { bahnZwang: ctx.bahnZwang, rahmen: ctx.rahmen }
   ctx.bahnZwang = eigeneBahn
   ctx.rahmen = id
-  const koerper = layoutSequenz(b.koerper.schritte, eigeneBahn, ctx)
+  let aktivitaeten: string[] | undefined
+  let adhocFertig = false
+  let koerper: Teil
+  if (b.typ !== 'parallel') koerper = layoutSequenz(b.koerper.schritte, eigeneBahn, ctx)
+  else if (b.art === 'erster') koerper = layoutVerzweigung(b, eigeneBahn, ctx)
+  else {
+    const adhoc = layoutAdhoc(b, eigeneBahn, ctx)
+    koerper = adhoc.teil
+    aktivitaeten = adhoc.aktivitaeten
+    adhocFertig = adhoc.fertig
+  }
+  const mitStart = art !== 'adhoc'
   const startId = xmlId(`${b.id}_start`)
   const endeId = xmlId(`${b.id}_ende`)
   // Kopfspur über dem Inhalt, eine Spalte für den inneren Start
-  verschiebe(koerper, 1, new Map([[eigeneBahn, 1]]))
+  verschiebe(koerper, mitStart ? 1 : 0, new Map([[eigeneBahn, 1]]))
   const ankerSpur = koerper.anker.get(eigeneBahn) ?? 1
   const t = neuerTeil(eigeneBahn)
-  t.knoten.push(knoten(ctx, { id: startId, art: 'start', name: '', blockId: b.id, bahn: eigeneBahn, spalte: 0, spur: ankerSpur }))
+  if (mitStart) t.knoten.push(knoten(ctx, { id: startId, art: 'start', name: '', blockId, bahn: eigeneBahn, spalte: 0, spur: ankerSpur }))
   uebernimm(t, koerper)
   // Läuft der Körper nie normal zu Ende (jeder Weg endet vorher), gibt es kein inneres Ende und, außer ohne Stück, keinen Ausgang.
-  const normalesEnde = !koerper.eintritt || koerper.austritt !== null
+  // „Weiter beim ersten“ endet in den Terminierungen seiner Zweige, ohne eigenes Ende.
+  const normalesEnde = art === 'erster' ? false : art === 'adhoc' ? adhocFertig : !koerper.eintritt || koerper.austritt !== null
   // Fehler steigen durch geschachtelte Rahmen auf; nur der äußerste fängt sie, je Ergebnis ein Randereignis.
   const fehler = aussen.rahmen === null ? [...new Set(koerper.knoten.filter((k) => k.art === 'ende' && k.fehler).map((k) => k.fehler!))] : []
-  const randAnzahl = fehler.length + (b.unterbrechungen?.length ?? 0)
-  const endSpalte = Math.max(normalesEnde ? 1 + koerper.breite : koerper.breite, spaltenFuerRand(randAnzahl, !!marke))
-  if (normalesEnde) {
-    t.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: '', blockId: b.id, bahn: eigeneBahn, spalte: endSpalte, spur: ankerSpur }))
+  const randAnzahl = fehler.length + unterbrechungenVon(b).length
+  const inhaltBis = art === 'adhoc' ? koerper.breite - 1 : normalesEnde ? 1 + koerper.breite : koerper.breite
+  const endSpalte = Math.max(inhaltBis, spaltenFuerRand(randAnzahl, !!marke || art === 'adhoc'))
+  if (art === 'adhoc') {
+    // keine Sequenzflüsse im Ad-hoc-Rahmen
+  } else if (normalesEnde) {
+    t.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: '', blockId, bahn: eigeneBahn, spalte: endSpalte, spur: ankerSpur }))
     t.kanten.push(kante(ctx, startId, koerper.eintritt ?? endeId))
     if (koerper.eintritt && koerper.austritt) t.kanten.push(kanteAus(ctx, koerper.austritt, endeId))
   } else if (koerper.eintritt) t.kanten.push(kante(ctx, startId, koerper.eintritt))
@@ -830,12 +966,16 @@ function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, mar
   const inhalt = Math.max(ankerSpur + 1, (koerper.hoehe.get(eigeneBahn) ?? 0) + 1)
   const fussSpur = inhalt
   belege(t, eigeneBahn, fussSpur + 1)
-  t.rahmen.push({ id, blockId: b.id, art: b.typ, name: b.name, bahn: eigeneBahn, eltern: aussen.rahmen, spalteVon: 0, spalteBis: endSpalte, spurVon: 0, spurBis: fussSpur, ankerSpur, zweigPfad: [], ...(marke ? { mehrfach: marke } : {}) })
+  const name = b.typ === 'parallel' ? parallelName(b) : b.name
+  const doku = rahmenDoku(b)
+  t.rahmen.push({ id, blockId, art, name, bahn: eigeneBahn, eltern: aussen.rahmen, spalteVon: 0, spalteBis: endSpalte, spurVon: 0, spurBis: fussSpur, ankerSpur, zweigPfad: [], ...(marke ? { mehrfach: marke } : {}), ...(aktivitaeten ? { aktivitaeten } : {}), ...(doku ? { doku } : {}) })
   t.breite = endSpalte + 1
   t.eintritt = id
   // Ein Mehrfach-Rahmen ohne Stück ist sofort fertig: Dann geht es auch ohne inneres Ende hinaus.
   const ohneStueck = !!marke && kannNull(anzahlVerteilung(marke.anzahl, marke.streuung))
-  t.austritt = normalesEnde || ohneStueck ? { knoten: id, name: '', doku: '' } : null
+  // „Weiter beim ersten“ geht hinaus, sobald ein Zweig seine Terminierung erreicht.
+  const terminiert = art === 'erster' && koerper.knoten.some((k) => k.terminierung && k.rahmen === id)
+  t.austritt = normalesEnde || ohneStueck || terminiert ? { knoten: id, name: '', doku: '' } : null
   t.austrittsBahn = eigeneBahn
   t.anker.set(eigeneBahn, ankerSpur)
   return { teil: t, fehler }
@@ -893,17 +1033,18 @@ function unterbrechungDoku(b: Unterbrechbar, u: Unterbrechung, anteil: number, s
  * Abgänge ohne Kreuzung. Die Abgangsspur liegt dünn direkt unter dem Schritt und
  * trägt auch die Nachrichtenflüsse zu den Randereignissen.
  */
-function layoutRandwege(b: Unterbrechbar, schritt: Teil, fehler: string[], ctx: Kontext): Teil {
+function layoutRandwege(b: Block, schritt: Teil, fehler: string[], ctx: Kontext): Teil {
   const bahn = schritt.austrittsBahn
   const wirt = schritt.eintritt!
   const ws = schritt.breite
   const anteile = unterbrechungsAnteile(b)
   const wege: Randweg[] = []
-  for (const u of b.unterbrechungen ?? []) {
+  // Unterbrechungen gibt es nur an Aufgabe, Abschnitt und „für jedes Stück“; Fehler-Randereignisse an jedem äußersten Rahmen
+  for (const u of unterbrechungenVon(b)) {
     const teil = layoutSequenz(u.schritte, bahn, ctx)
     const leer = teil.eintritt === null
     const anteil = u.unterbrechend ? (anteile.je.get(u.id) ?? 0) : nebenwegAnzahl(u)
-    const weg: Randweg = { randId: xmlId(`${u.id}_rand`), name: u.bezeichnung, doku: unterbrechungDoku(b, u, anteil, ctx.stunden), ereignis: u.art, unterbrechend: u.unterbrechend, von: u.art === 'nachricht' ? u.von : null, anteil, teil, weiter: false, leer, inBahn: true }
+    const weg: Randweg = { randId: xmlId(`${u.id}_rand`), name: u.bezeichnung, doku: unterbrechungDoku(b as Unterbrechbar, u, anteil, ctx.stunden), ereignis: u.art, unterbrechend: u.unterbrechend, von: u.art === 'nachricht' ? u.von : null, anteil, teil, weiter: false, leer, inBahn: true }
     const mitEnde = (name: string, fehlerId?: string) => {
       const endeId = xmlId(`${u.id}_ende`)
       const endBahn = teil.austrittsBahn
@@ -928,7 +1069,7 @@ function layoutRandwege(b: Unterbrechbar, schritt: Teil, fehler: string[], ctx: 
       teil.austritt = null
     } else weg.weiter = true
     if (leer && weg.weiter) belege(teil, bahn, 1)
-    merkeZweig(teil, b.id, wege.length)
+    merkeZweig(teil, randZweig(b.id), wege.length)
     wege.push(weg)
   }
   // Ausstieg aus dem Rahmen für ein Ergebnis: Fehler-Randereignis, dahinter ein Ende mit dem Ergebnis
@@ -940,7 +1081,7 @@ function layoutRandwege(b: Unterbrechbar, schritt: Teil, fehler: string[], ctx: 
     belege(teil, bahn, 1)
     teil.breite = 1
     teil.eintritt = zielId
-    merkeZweig(teil, b.id, wege.length)
+    merkeZweig(teil, randZweig(b.id), wege.length)
     wege.push({ randId: xmlId(`${b.id}_fehler_${j + 1}`), name: '', doku: '', ereignis: null, fehler: f, unterbrechend: true, von: null, teil, weiter: false, leer: false, inBahn: true })
   })
 
@@ -1094,7 +1235,7 @@ function rahmenZeilen(name: string, breite: number): number {
 function ersteBahnVon(p: Prozess, ctx: Kontext): string {
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ === 'aufgabe') return bahnVon(ctx, block.rolleId)
-    if (block.typ === 'teilprozess' || block.typ === 'mehrfach') {
+    if (istRahmen(block)) {
       const r = rahmenRolle(block, (x) => (x !== null && ctx.rollenIds.has(x) ? x : null))
       if (r !== undefined) return r === null ? OHNE_ROLLE : r
     }
@@ -1169,8 +1310,9 @@ function hinterRahmen(l: Layout): [Id, number][] {
         const [v2, z2, b2] = r.zweigPfad[j].split('|')
         if (v1 !== v2) break
         if (z1 !== z2) {
-          // Anfang des Blocks: die Raute der Verzweigung bzw. der Schritt mit Unterbrechungen (Aufgabe oder Rahmen)
-          const anker = knotenNach.get(xmlId(`${v1}_auf`)) ?? knotenNach.get(xmlId(v1)) ?? rahmenNach.get(xmlId(v1))
+          // Anfang des Blocks: die Raute der Verzweigung, der Ad-hoc-Rahmen bzw. der Schritt mit Randereignissen (Aufgabe oder Rahmen)
+          const schritt = v1.startsWith(RAND_ZWEIG) ? v1.slice(RAND_ZWEIG.length) : null
+          const anker = schritt !== null ? (knotenNach.get(xmlId(schritt)) ?? rahmenNach.get(xmlId(schritt))) : (knotenNach.get(xmlId(`${v1}_auf`)) ?? rahmenNach.get(xmlId(v1)))
           if (!anker || !b1 || !b2) break
           const anfang = 'spalteVon' in anker ? anker.spalteVon : anker.spalte
           // Der Baustein im unteren Zweig rückt hinter den im oberen.
@@ -1302,6 +1444,8 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
       spalteBis: r.spalteBis,
       zweigPfad: r.zweigPfad,
       ...(r.mehrfach ? { mehrfach: r.mehrfach } : {}),
+      ...(r.aktivitaeten ? { aktivitaeten: r.aktivitaeten } : {}),
+      ...(r.doku ? { doku: r.doku } : {}),
       x: 0,
       y: oben,
       breite: 0,
@@ -1309,6 +1453,14 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
     }
   })
   const eltern = new Map(rahmen.map((r) => [r.id, r.eltern]))
+  // Beginnt oder endet ein Rahmen in derselben Spalte wie ein Rahmen darin (Ad-hoc-Rahmen mit eingebettetem Zweig),
+  // liegt seine Kante je Ebene 8 px weiter außen; sonst lägen beide Kanten aufeinander.
+  const kinderVon = new Map<string, LayoutRahmen[]>()
+  for (const r of rahmen) if (r.eltern) kinderVon.set(r.eltern, [...(kinderVon.get(r.eltern) ?? []), r])
+  const tiefe = (r: LayoutRahmen, seite: 'links' | 'rechts'): number =>
+    Math.max(0, ...(kinderVon.get(r.id) ?? []).filter((c) => (seite === 'links' ? c.spalteVon === r.spalteVon : c.spalteBis === r.spalteBis)).map((c) => tiefe(c, seite) + 1))
+  const versatzLinks = new Map(rahmen.map((r) => [r.id, RAHMEN_RAND.ebene * tiefe(r, 'links')]))
+  const versatzRechts = new Map(rahmen.map((r) => [r.id, RAHMEN_RAND.ebene * tiefe(r, 'rechts')]))
   // senkrechte Ausdehnung je Knoten samt Beschriftung (Gateways oben, Ereignisse unten)
   const ausdehnung = new Map(
     gitter.map((k) => {
@@ -1330,7 +1482,7 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
       return r.y + r.hoehe + 4 <= y1 || r.y - 4 >= y2
     })
   // Ein- und Austritt der Rahmen als Ersatzknoten für die Linienführung: Die Kante endet bzw. beginnt auf der Seitenkante.
-  const ersatz = (r: LayoutRahmen, spalte: number): LayoutKnoten => ({
+  const ersatz = (r: LayoutRahmen, spalte: number, versatz: number): LayoutKnoten => ({
     id: r.id,
     art: 'aufgabe',
     name: '',
@@ -1341,11 +1493,11 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
     rahmen: r.eltern,
     x: 0,
     y: r.anschlussY,
-    breite: 2 * ((belegt.get(spalte) ?? 0) + RAHMEN_RAND.innen),
+    breite: 2 * ((belegt.get(spalte) ?? 0) + RAHMEN_RAND.innen + versatz),
     hoehe: 0,
   })
-  const rahmenEin = new Map(rahmen.map((r) => [r.id, ersatz(r, r.spalteVon)]))
-  const rahmenAus = new Map(rahmen.map((r) => [r.id, ersatz(r, r.spalteBis)]))
+  const rahmenEin = new Map(rahmen.map((r) => [r.id, ersatz(r, r.spalteVon, versatzLinks.get(r.id)!)]))
+  const rahmenAus = new Map(rahmen.map((r) => [r.id, ersatz(r, r.spalteBis, versatzRechts.get(r.id)!)]))
   const rahmenNach = new Map(rahmen.map((r) => [r.id, r]))
 
   // Randereignisse auf der Unterkante ihres Wirts, von rechts nach links: Spalte, Abstand des Mittelpunkts von der Spaltenmitte, Unterkante
@@ -1358,7 +1510,7 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
     if (aufgabe && aufgabe.art !== 'rand') {
       randGeo.set(k.id, { spalte: aufgabe.spalte, ersteSpalte: aufgabe.spalte, dx: MASSE.aufgabe.breite / 2 - RAND.aufgabeRechts - nr * RAHMEN.randAbstand, unten: aufgabe.y + MASSE.aufgabe.hoehe })
     } else if (r) {
-      randGeo.set(k.id, { spalte: r.spalteBis, ersteSpalte: r.spalteVon, dx: (belegt.get(r.spalteBis) ?? 0) + RAHMEN_RAND.innen - RAHMEN.randRechts - nr * RAHMEN.randAbstand, unten: r.y + r.hoehe })
+      randGeo.set(k.id, { spalte: r.spalteBis, ersteSpalte: r.spalteVon, dx: (belegt.get(r.spalteBis) ?? 0) + RAHMEN_RAND.innen + versatzRechts.get(r.id)! - RAHMEN.randRechts - nr * RAHMEN.randAbstand, unten: r.y + r.hoehe })
     }
   }
   // Der Fluss eines Randereignisses beginnt unten am Kreis und läuft senkrecht bis zur Höhe seines ersten Ziels bzw. seiner Stufe in der Abgangsspur
@@ -1413,8 +1565,8 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
   }
   // Seitenkanten der Rahmen neben dem belegten Bereich der ersten und letzten inneren Spalte
   for (const r of rahmen) {
-    const links = linien.spalteMitte(r.spalteVon) - (belegt.get(r.spalteVon) ?? 0) - RAHMEN_RAND.innen
-    const rechts = linien.spalteMitte(r.spalteBis) + (belegt.get(r.spalteBis) ?? 0) + RAHMEN_RAND.innen
+    const links = linien.spalteMitte(r.spalteVon) - (belegt.get(r.spalteVon) ?? 0) - RAHMEN_RAND.innen - versatzLinks.get(r.id)!
+    const rechts = linien.spalteMitte(r.spalteBis) + (belegt.get(r.spalteBis) ?? 0) + RAHMEN_RAND.innen + versatzRechts.get(r.id)!
     r.x = links
     r.breite = rechts - links
     if (r.name) {

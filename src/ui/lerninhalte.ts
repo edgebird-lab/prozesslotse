@@ -17,6 +17,8 @@ export type LernThema =
   | 'ereignis'
   | 'ruecksprung'
   | 'parallel'
+  | 'erster'
+  | 'nacheinander'
   | 'oder'
   | 'wiederholung'
   | 'warten'
@@ -74,6 +76,18 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Paralleles Gateway (AND)',
     symbol: 'und',
     text: 'Eine Raute mit Plus: Alle Zweige laufen gleichzeitig los. Weiter geht es erst, wenn alle fertig sind; die Dauer bestimmt der längste Zweig. Deshalb darf ein Zweig hier den Prozess nicht beenden, sonst würde die Zusammenführung ewig warten.',
+  },
+  erster: {
+    titel: 'Weiter beim ersten',
+    bpmn: 'Teilprozess mit Terminierungs-Endereignissen',
+    symbol: 'erster',
+    text: 'Mehrere Dinge laufen gleichzeitig los, z. B. Anfragen bei zwei Lieferanten. Sobald eins fertig ist, geht es weiter, und die übrigen werden abgebrochen. Im Diagramm ist das ein Rahmen: Hinter der Raute mit Plus endet jeder Zweig in einem dicken Kreis mit gefülltem Punkt (Terminierung). Die erste Terminierung beendet den Rahmen und alles, was darin noch läuft. Die Dauer ist die des schnellsten Zweigs; was abgebrochen wird, zählt trotzdem als Arbeit.',
+  },
+  nacheinander: {
+    titel: 'In beliebiger Reihenfolge',
+    bpmn: 'Ad-hoc-Teilprozess',
+    symbol: 'adhoc',
+    text: 'Eine Person erledigt mehrere Dinge, die Reihenfolge ist ihr überlassen, z. B. Unterlagen prüfen, Termin vereinbaren, Akte anlegen. Im Diagramm ist das ein Rahmen mit einer Tilde (~) unten in der Mitte; darin stehen die Zweige ohne Pfeile, jeder wird genau einmal erledigt. Hat ein Zweig mehrere Schritte, steht er in einem eigenen kleinen Rahmen „Zweig n“. Gerechnet wird in der Reihenfolge der Liste; anders als bei „Gleichzeitig“ addieren sich die Zeiten.',
   },
   oder: {
     titel: 'Mehrere Wege möglich',

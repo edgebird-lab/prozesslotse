@@ -13,6 +13,7 @@ const TYP: Record<string, KnotenTyp> = {
   'bpmn:ManualTask': 'aktivitaet',
   'bpmn:IntermediateCatchEvent': 'aktivitaet',
   'bpmn:SubProcess': 'rahmen',
+  'bpmn:AdHocSubProcess': 'rahmen',
   'bpmn:BoundaryEvent': 'rand',
 }
 
@@ -23,6 +24,7 @@ interface Element extends ModdleElement {
   cancelActivity?: boolean
   default?: { id: string }
   loopCharacteristics?: { $type: string; isSequential?: boolean; loopCardinality?: { body?: string } }
+  ordering?: string
 }
 
 /**
@@ -30,7 +32,9 @@ interface Element extends ModdleElement {
  * Tokenspiel. Teilprozesse werden rekursiv gelesen; jeder Knoten kennt seinen
  * Rahmen, Randereignisse ihren Wirt, Endereignisse ihre Art. Mehrfachinstanzen
  * tragen ihre Art (nacheinander oder gleichzeitig) und, falls angegeben, die
- * feste Anzahl (`loopCardinality`).
+ * feste Anzahl (`loopCardinality`). Ein Ad-hoc-Teilprozess (nur
+ * `ordering="Sequential"`) kennt seine Aktivitäten: alle, die darin ohne
+ * eingehenden Sequenzfluss stehen.
  */
 export async function graphAusXml(xml: string): Promise<TokenGraph> {
   const { rootElement, warnings } = await BpmnModdle().fromXML(xml)
@@ -65,15 +69,26 @@ export async function graphAusXml(xml: string): Promise<TokenGraph> {
         if (definition?.errorRef) k.fehler = definition.errorRef.id
       }
       knoten.set(e.id, k)
-      if (typ === 'rahmen') lies(e, e.id)
+      if (typ === 'rahmen') {
+        if (e.$type === 'bpmn:AdHocSubProcess') {
+          if (e.ordering !== 'Sequential') throw new Error(`Ad-hoc-Teilprozess ${e.id} ohne ordering="Sequential"`)
+          adhoc.push(e)
+        }
+        lies(e, e.id)
+      }
     }
   }
+  const adhoc: Element[] = []
   lies(prozess, null)
   const ziel = new Map<string, string>()
   for (const f of fluesse) {
     knoten.get(f.sourceRef!.id)!.raus.push(f.id)
     knoten.get(f.targetRef!.id)!.rein.push(f.id)
     ziel.set(f.id, f.targetRef!.id)
+  }
+  // Aktivitäten eines Ad-hoc-Teilprozesses: alles darin ohne eingehenden Fluss (außer Randereignissen)
+  for (const e of adhoc) {
+    knoten.get(e.id)!.adhoc = (e.flowElements ?? []).filter((x) => x.$type !== 'bpmn:SequenceFlow' && x.$type !== 'bpmn:BoundaryEvent' && knoten.get(x.id)!.rein.length === 0).map((x) => x.id)
   }
   const alle = (behaelter: Element): Element[] => (behaelter.flowElements ?? []).flatMap((e) => [e, ...alle(e)])
   for (const e of alle(prozess)) if (e.default) knoten.get(e.id)!.standard = e.default.id

@@ -10,6 +10,7 @@ import {
   type Oder,
   type OderZweig,
   type Parallel,
+  type ParallelArt,
   type Projekt,
   type Prozess,
   type Rolle,
@@ -78,11 +79,11 @@ export function neueOder(werte: Partial<Oder> = {}): Oder {
   return { typ: 'oder', id: neueId('oder'), frage: '', zweige: [neuerOderZweig('', 0.5), neuerOderZweig('', 0.5), keiner], standard: keiner.id, ...werte }
 }
 
-export function neueParallel(anzahlZweige = 2): Parallel {
+export function neueParallel(anzahlZweige = 2, art: ParallelArt = 'alle'): Parallel {
   return {
     typ: 'parallel',
     id: neueId('par'),
-    art: 'alle',
+    art,
     zweige: Array.from({ length: Math.max(2, anzahlZweige) }, () => neueSequenz()),
   }
 }

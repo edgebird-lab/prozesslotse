@@ -12,7 +12,7 @@ export function symbolFuer(b: Block, p: Prozess): SymbolArt {
     case 'entscheidung':
       return b.art === 'ereignis' ? 'ereignisgateway' : 'xor'
     case 'parallel':
-      return 'und'
+      return b.art === 'alle' ? 'und' : b.art === 'erster' ? 'erster' : 'adhoc'
     case 'oder':
       return 'oder'
     case 'wiederholung':

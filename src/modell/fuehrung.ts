@@ -2,7 +2,7 @@
  * Führung durch den Ablauf: Wo steht die Einfügeposition, wohin springt sie
  * nach dem Einfügen und was passiert bei „Abschnitt fertig“.
  */
-import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, nebenlaeufig, unterbrechungVon } from './operationen'
+import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, nebenlaeufig, parallelName, unterbrechungVon } from './operationen'
 import { unerwartet, type Block, type Cursor, type Prozess } from './typen'
 
 export interface Ort {
@@ -29,7 +29,7 @@ function bereichText(p: Prozess, sequenzId: string): string {
     const z = b.zweige.find((x) => x.id === sequenzId)
     return `im Ausgang „${z?.bezeichnung || '?'}“ von „${b.frage || 'Entscheidung'}“`
   }
-  if (b.typ === 'parallel') return `in Zweig ${b.zweige.findIndex((x) => x.id === sequenzId) + 1} von „Gleichzeitig“`
+  if (b.typ === 'parallel') return `in Zweig ${b.zweige.findIndex((x) => x.id === sequenzId) + 1} von „${parallelName(b)}“`
   if (b.typ === 'oder') {
     const z = b.zweige.find((x) => x.id === sequenzId)
     return `im Weg „${z?.bezeichnung || '?'}“ von „${b.frage || 'Mehrere Wege'}“`

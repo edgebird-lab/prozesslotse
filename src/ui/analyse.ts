@@ -3,6 +3,7 @@ import { findeSchwachstellen } from '../analyse/hinweise'
 import { berechneKennzahlen, type Kennzahlen } from '../analyse/kennzahlen'
 import { simuliere, type Simulationsergebnis } from '../analyse/simulation'
 import { erzeugeBpmn, type BpmnErgebnis } from '../bpmn/export'
+import { xmlId } from '../bpmn/layout'
 import { hatFehler, pruefeProzess, sortiereBefunde, type Befund, type Schwere } from '../modell/pruefung'
 import type { Id, Prozess } from '../modell/typen'
 
@@ -96,7 +97,9 @@ function zeigen(b: Befund): boolean {
 /** Das sichtbarste BPMN-Element eines Bausteins: Aufgabe, Verzweigung oder Frage der Wiederholung. */
 export function hauptElement(bpmn: BpmnErgebnis, blockId: Id): string | null {
   const elemente = bpmn.blockZuElementen.get(blockId) ?? []
-  return elemente.find((e) => e.endsWith('_auf') || e.endsWith('_frage')) ?? elemente[0] ?? null
+  // ein Rahmen des Bausteins selbst zuerst (bei „weiter beim ersten“ und „in beliebiger Reihenfolge“ liegt die Raute bzw. ein Zweig darin)
+  const rahmen = bpmn.layout.rahmen.find((r) => r.blockId === blockId && r.id === xmlId(blockId))
+  return rahmen?.id ?? elemente.find((e) => e.endsWith('_auf') || e.endsWith('_frage')) ?? elemente[0] ?? null
 }
 
 const RANG: Record<Schwere, number> = { fehler: 0, warnung: 1, hinweis: 2 }

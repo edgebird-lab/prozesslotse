@@ -33,9 +33,9 @@
  */
 import { anzahlVerteilung, erwartungLaeufe, erwartungPotenz, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
 import { durchlaufe, nachrichtenVerweise, nebenwegAnzahl, oderWahrscheinlichkeiten, unterbrechungsAnteile, unterbrechungsZeit } from '../modell/operationen'
-import { erwartungGesamt, erwartungMaximum, erwartungMinimum, erwartungOder, verteilungMehrfach } from './verteilung'
+import { erwartungGesamt, erwartungMaximum, erwartungMinimum, erwartungOder, ersterAusgang, masse, verteilungMehrfach } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
-import { unerwartet, unterbrechungenVon, type Aufgabe, type Block, type Id, type Mehrfach, type Prozess, type Rolle, type Teilnehmer, type Unterbrechbar } from '../modell/typen'
+import { unerwartet, unterbrechungenVon, type Aufgabe, type Block, type Id, type Mehrfach, type Parallel, type Prozess, type Rolle, type Teilnehmer, type Unterbrechbar } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
 // Ergebnis
@@ -116,8 +116,10 @@ export interface Kennzahlen {
   wiederholAnteil: Map<Id, number>
   /** Nachrichten mit externen Teilnehmern (Kunde, Lieferant) je Vorgang */
   kontakte: KontaktKennzahl[]
-  /** Wie oft jede Stelle je Vorgang erreicht wird: Aufgaben, Warten, Abschnitte, „für jedes Stück“, Unterbrechungen (wie oft sie eintreten) */
+  /** Wie oft jede Stelle je Vorgang erreicht wird: Aufgaben, Warten, Abschnitte, „für jedes Stück“, „weiter beim ersten“, „in beliebiger Reihenfolge“, Unterbrechungen (wie oft sie eintreten) */
   haeufigkeiten: Map<Id, number>
+  /** Je Zweig von „weiter beim ersten“: wie oft er je Vorgang zuerst fertig ist (die übrigen werden dann abgebrochen) */
+  zuerstFertig: Map<Id, number>
 }
 
 // ---------------------------------------------------------------------------
@@ -140,10 +142,12 @@ interface Zaehler {
   uebertragungMin: number
   paare: Map<string, number>
   enden: Map<string, number>
+  /** je Zweig von „weiter beim ersten“: wie oft er zuerst fertig ist */
+  zuerst: Map<Id, number>
 }
 
 function neueZaehler(): Zaehler {
-  return { haeufigkeit: new Map(), uebergaben: 0, systemwechsel: 0, medienbrueche: 0, uebertragungMin: 0, paare: new Map(), enden: new Map() }
+  return { haeufigkeit: new Map(), uebergaben: 0, systemwechsel: 0, medienbrueche: 0, uebertragungMin: 0, paare: new Map(), enden: new Map(), zuerst: new Map() }
 }
 
 function plus<K>(m: Map<K, number>, k: K, w: number): void {
@@ -301,9 +305,20 @@ function flussOhneUnterbrechung(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): E
       return { aus, rueck }
     }
     case 'parallel': {
-      // Bisher nur „alle“; neue Arten (weiter beim ersten, nacheinander) rechnen anders und müssen hier unterschieden werden.
       const art = b.art
-      if (art !== 'alle') return unerwartet(art)
+      switch (art) {
+        case 'alle':
+          break
+        case 'erster':
+          plus(z.haeufigkeit, b.id, f.anteil)
+          return flussErster(b, f, z, ctx)
+        case 'nacheinander':
+          // Reihenfolge der Liste: wie eine Folge, Übergaben vom letzten Schritt eines Zweigs zum ersten des nächsten
+          plus(z.haeufigkeit, b.id, f.anteil)
+          return flussSequenz(b.zweige.flatMap((zweig) => zweig.schritte), f, z, ctx)
+        default:
+          return unerwartet(art)
+      }
       if (b.zweige.length === 0) return { aus: f, rueck: new Map() }
       let anteil = Infinity
       const letzte = new Map<string, number>()
@@ -368,6 +383,36 @@ function flussOhneUnterbrechung(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): E
     default:
       return unerwartet(b)
   }
+}
+
+/**
+ * „Weiter beim ersten“: Alle Zweige laufen mit dem ganzen Fluss (was der
+ * Gewinner abbricht, zählt voll). Hinein geht es zu jedem Zweig, heraus nur vom
+ * Gewinner: Zweig i gewinnt mit P(i zuerst), aus der Verteilung der Zweigdauern.
+ * Endet der Gewinner (ab Schritt 5), endet der Vorgang mit seinem Ergebnis.
+ */
+function flussErster(b: Parallel, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
+  const gewinn = ersterAusgang(b, 'gesamt').je
+  const aus = leererFluss()
+  const rueck = new Map<Id, Fluss>()
+  b.zweige.forEach((zweig, i) => {
+    const { zz, zurueck } = mitEigenenEnden(z)
+    const o = flussSequenz(zweig.schritte, f, zz, ctx)
+    zurueck()
+    const g = gewinn[i]
+    plus(z.zuerst, zweig.id, f.anteil * (g.weiter + [...g.ende.values(), ...g.rueck.values()].reduce((s, x) => s + x, 0)))
+    // letzte Aufgaben des Gewinners: der Strang des Zweigs, umgerechnet auf die Fälle, in denen er gewinnt
+    const c = f.anteil > 0 ? o.aus.anteil / f.anteil : 0
+    if (c > 1e-12) addiereLetzte(aus.letzte, o.aus.letzte, g.weiter / c)
+    aus.anteil += f.anteil * g.weiter
+    for (const [e, q] of g.ende) plus(z.enden, e, f.anteil * q)
+    for (const [id, q] of g.rueck) {
+      const r = o.rueck.get(id)
+      const cr = r && f.anteil > 0 ? r.anteil / f.anteil : 0
+      addiereRueck(rueck, new Map([[id, cr > 1e-12 ? skaliere(r!, q / cr) : { anteil: f.anteil * q, letzte: new Map() }]]))
+    }
+  })
+  return { aus, rueck }
 }
 
 /**
@@ -589,7 +634,16 @@ function dauerOhneUnterbrechung(b: Block): Dauer {
     }
     case 'parallel': {
       const art = b.art
-      if (art !== 'alle') return unerwartet(art)
+      switch (art) {
+        case 'alle':
+          break
+        case 'erster':
+          return dauerErster(b)
+        case 'nacheinander':
+          return dauerSequenz(b.zweige.flatMap((z) => z.schritte))
+        default:
+          return unerwartet(art)
+      }
       const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
       if (zweige.length === 0) return { gesamt: 0, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map() }
       const laengster = zweige.reduce((a, x) => (x.gesamt > a.gesamt ? x : a))
@@ -668,6 +722,26 @@ function dauerOhneUnterbrechung(b: Block): Dauer {
     default:
       return unerwartet(b)
   }
+}
+
+/**
+ * „Weiter beim ersten“: Dauer ist das Minimum der Zweige (mit Enden: wer zuerst
+ * fertig ist oder abbricht), aus den Verteilungen; TCT dieselbe Kombination mit
+ * Bearbeitungszeiten. Beiträge: jeder Zweig mit seiner Gewinnwahrscheinlichkeit,
+ * auf den exakten Erwartungswert umgerechnet.
+ */
+function dauerErster(b: Parallel): Dauer {
+  const gesamtTeile = ersterAusgang(b, 'gesamt')
+  const gesamt = erwartungGesamt(gesamtTeile.teile)
+  const arbeit = erwartungGesamt(ersterAusgang(b, 'arbeit').teile)
+  const gewinn = gesamtTeile.je.map((g) => g.weiter + [...g.ende.values(), ...g.rueck.values()].reduce((s, x) => s + x, 0))
+  const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
+  const beitraege = new Map<Id, Beitrag>()
+  const naiv = zweige.reduce((s, x, i) => s + gewinn[i] * x.gesamt, 0)
+  zweige.forEach((x, i) => addiereBeitraege(beitraege, x.beitraege, naiv > 0 ? (gewinn[i] * gesamt) / naiv : gewinn[i]))
+  const rueck = new Map<Id, number>()
+  for (const [id, v] of gesamtTeile.teile.rueck) rueck.set(id, masse(v))
+  return { gesamt, arbeit, weiter: masse(gesamtTeile.teile.weiter), rueck, beitraege }
 }
 
 // ---------------------------------------------------------------------------
@@ -762,6 +836,7 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   return {
     kontakte,
     haeufigkeiten: z.haeufigkeit,
+    zuerstFertig: z.zuerst,
     durchlaufzeitMin: dauer.gesamt,
     kritischeArbeitMin: dauer.arbeit,
     flusseffizienz: dauer.gesamt > 0 ? dauer.arbeit / dauer.gesamt : 0,
