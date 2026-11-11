@@ -61,7 +61,7 @@ function anteile(layout: ReturnType<typeof erzeugeBpmn>['layout']): Map<string, 
 function form(g: TokenGraph): string[] {
   const quelle = new Map<string, string>()
   for (const k of g.knoten) for (const f of k.raus) quelle.set(f, k.id)
-  const knoten = g.knoten.map((k) => [k.id, k.typ, k.rahmen ?? '', k.endeArt ?? '', k.fehler ?? '', k.wirt ?? '', k.randArt ?? '', k.unterbrechend ?? ''].join(':'))
+  const knoten = g.knoten.map((k) => [k.id, k.typ, k.rahmen ?? '', k.endeArt ?? '', k.fehler ?? '', k.wirt ?? '', k.randArt ?? '', k.unterbrechend ?? '', k.mehrfach ? (k.mehrfach.nacheinander ? 'nacheinander' : 'gleichzeitig') : ''].join(':'))
   return [...knoten, ...[...g.ziel].map(([f, z]) => `${quelle.get(f)}->${z}`)].sort()
 }
 

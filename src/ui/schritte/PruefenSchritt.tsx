@@ -6,6 +6,7 @@ import type { Befund, Schwere } from '../../modell/pruefung'
 import type { Prozess } from '../../modell/typen'
 import { formatiereDauer, formatiereEuro, formatiereProzent, formatiereZahl } from '../../modell/zeit'
 import { useAnalyse, useSimulation } from '../analyse'
+import { useBestaetigen } from '../frage'
 import { vorzeichen } from '../hilfen'
 import { SCHWERE_TEXT, zaehle } from '../befundtext'
 import { useApp } from '../kontext'
@@ -193,9 +194,11 @@ export function Zeitverteilung({ p, k }: { p: Prozess; k: Kennzahlen }) {
       continue
     }
     const kz = k.schritte.get(block.id)
-    if (!kz || (block.typ !== 'aufgabe' && block.typ !== 'warten')) continue
+    if (!kz || (block.typ !== 'aufgabe' && block.typ !== 'warten' && block.typ !== 'mehrfach')) continue
     if (kz.beitragWartenMin + kz.beitragArbeitMin <= 0.01) continue
-    zeilen.push({ id: block.id, name: blockTitel(block), warten: kz.beitragWartenMin, arbeit: kz.beitragArbeitMin })
+    // bei „für jedes Stück“ die Liegezeit vor dem ersten Stück
+    const name = block.typ === 'mehrfach' ? `Vor dem ersten Stück von „${blockTitel(block)}“` : blockTitel(block)
+    zeilen.push({ id: block.id, name, warten: kz.beitragWartenMin, arbeit: kz.beitragArbeitMin })
   }
   zeilen.sort((a, b) => b.warten + b.arbeit - (a.warten + a.arbeit))
   const MAX = 7
@@ -328,7 +331,7 @@ export function Auslastung({ k }: { k: Kennzahlen }) {
 // ---------------------------------------------------------------------------
 // Befunde
 
-export function Befundliste({ befunde, onZumSchritt }: { befunde: Befund[]; onZumSchritt?: (b: Befund) => void }) {
+export function Befundliste({ befunde, onZumSchritt, onUmwandeln, onOeffne }: { befunde: Befund[]; onZumSchritt?: (b: Befund) => void; onUmwandeln?: (b: Befund) => void; onOeffne?: (b: Befund) => void }) {
   if (befunde.length === 0) {
     return (
       <p className="status status-gut">
@@ -349,11 +352,23 @@ export function Befundliste({ befunde, onZumSchritt }: { befunde: Befund[]; onZu
             <p>{b.text}</p>
             {b.quelle && <small className="leise">Regel: {b.quelle}</small>}
           </div>
-          {b.blockId && onZumSchritt && (
-            <button type="button" className="knopf knopf-klein" onClick={() => onZumSchritt(b)}>
-              Zum Schritt
-            </button>
-          )}
+          <div className="befund-knoepfe">
+            {b.umwandlung && onUmwandeln && (
+              <button type="button" className="knopf knopf-klein" onClick={() => onUmwandeln(b)}>
+                {b.umwandlung.knopf}
+              </button>
+            )}
+            {b.oeffne === 'beteiligte' && onOeffne && (
+              <button type="button" className="knopf knopf-klein" onClick={() => onOeffne(b)}>
+                Zu den Beteiligten
+              </button>
+            )}
+            {b.blockId && onZumSchritt && (
+              <button type="button" className="knopf knopf-klein" onClick={() => onZumSchritt(b)}>
+                Zum Schritt
+              </button>
+            )}
+          </div>
         </li>
       ))}
     </ul>
@@ -361,7 +376,8 @@ export function Befundliste({ befunde, onZumSchritt }: { befunde: Befund[]; onZu
 }
 
 export function PruefenSchritt() {
-  const { z, p, dispatch } = useApp()
+  const { z, p, aendere, dispatch } = useApp()
+  const bestaetige = useBestaetigen()
   const a = useAnalyse(p)
   const sim = useSimulation(p)
   const ist = useAnalyse(z.projekt.ist)
@@ -395,6 +411,14 @@ export function PruefenSchritt() {
             dispatch({ typ: 'auswahl', auswahl: b.blockId ?? null })
             dispatch({ typ: 'schritt', schritt: 'ablauf' })
           }}
+          onUmwandeln={async (b) => {
+            const u = b.umwandlung
+            if (!u) return
+            // Umgebaut wird nur auf Wunsch; gehen dabei Schritte verloren, fragt die Oberfläche vorher.
+            if (u.rueckfrage && !(await bestaetige('Umwandeln?', u.rueckfrage, 'Umwandeln'))) return
+            aendere((q) => u.anwenden(q))
+          }}
+          onOeffne={() => dispatch({ typ: 'schritt', schritt: 'beteiligte' })}
         />
       </section>
       <div className="schritt-fuss">

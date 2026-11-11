@@ -12,6 +12,8 @@ const SCHRITTE = ['Rahmen', 'Beteiligte', 'Ablauf', 'Prüfen', 'Verbessern', 'Be
 
 for (const schema of ['light', 'dark'] as const) {
   test(`alle Schritte ohne schwere Barrieren (${schema === 'light' ? 'hell' : 'dunkel'})`, async ({ page }) => {
+    // sieben Seiten mit axe: braucht neben den übrigen, parallel laufenden Tests mehr als die üblichen 30 Sekunden
+    test.setTimeout(60_000)
     await page.emulateMedia({ colorScheme: schema })
     await page.goto('/')
     await pruefe(page)

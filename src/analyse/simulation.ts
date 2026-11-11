@@ -7,6 +7,7 @@
  * Bearbeitungszeiten. Das 90-%-Quantil ist deshalb eher zu niedrig. Mit
  * festem Startwert ist das Ergebnis reproduzierbar.
  */
+import { anzahlVerteilung, zieheAnzahl } from '../modell/anzahl'
 import { oderZiehung } from '../modell/operationen'
 import { unerwartet, type Block, type Id, type Prozess } from '../modell/typen'
 
@@ -135,6 +136,36 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
     }
     case 'teilprozess':
       return laufeSequenz(b.koerper.schritte, zufall)
+    case 'mehrfach': {
+      // N wie in der Rechnung ziehen; die Liegezeit zählt einmal, wenn es Stücke gibt
+      const n = zieheAnzahl(anzahlVerteilung(b.anzahl, b.streuung), zufall)
+      if (n === 0) return { zeit: 0, ende: null, rueck: null }
+      const ausfuehrung = b.ausfuehrung
+      switch (ausfuehrung) {
+        case 'nacheinander': {
+          let zeit = b.liegezeitMin
+          for (let i = 0; i < n; i++) {
+            const r = laufeSequenz(b.koerper.schritte, zufall)
+            zeit += r.zeit
+            if (r.ende !== null || r.rueck) return { zeit, ende: r.ende, rueck: r.rueck }
+          }
+          return { zeit, ende: null, rueck: null }
+        }
+        case 'gleichzeitig': {
+          // das späteste Stück zählt; Enden darin meldet die Prüfung als Fehler
+          let spaetestes = 0
+          let ende: string | null = null
+          for (let i = 0; i < n; i++) {
+            const r = laufeSequenz(b.koerper.schritte, zufall)
+            spaetestes = Math.max(spaetestes, r.zeit)
+            ende ??= r.ende
+          }
+          return { zeit: b.liegezeitMin + spaetestes, ende, rueck: null }
+        }
+        default:
+          return unerwartet(ausfuehrung)
+      }
+    }
     default:
       return unerwartet(b)
   }

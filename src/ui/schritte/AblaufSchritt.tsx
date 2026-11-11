@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useBestaetigen } from '../frage'
-import { neueAufgabe, neueEntscheidung, neueId, neueOder, neueParallel, neuerTeilprozess, neuesWarten, neueWiederholung } from '../../modell/bausteine'
+import { neueAufgabe, neueEntscheidung, neueId, neuerMehrfach, neueOder, neueParallel, neuerTeilprozess, neuesWarten, neueWiederholung } from '../../modell/bausteine'
 import { abschnittFertig, beschreibeCursor, cursorNachEinfuegen } from '../../modell/fuehrung'
 import {
   aendereBlock,
@@ -14,6 +14,7 @@ import {
   findeBlock,
   findeSequenz,
   fuegeEin,
+  istRahmen,
   kannZusammenfassen,
   kinderSequenzen,
   loeseAbschnittAuf,
@@ -27,8 +28,8 @@ import {
   verschiebeBlock,
   type Glied,
 } from '../../modell/operationen'
-import { unerwartet, type Block, type BlockTyp, type Cursor, type Id, type Prozess, type Sequenz, type Teilprozess } from '../../modell/typen'
-import { formatiereDauer, formatiereProzent } from '../../modell/zeit'
+import { unerwartet, type Block, type BlockTyp, type Cursor, type Id, type Mehrfach, type Prozess, type Sequenz, type Teilprozess } from '../../modell/typen'
+import { formatiereDauer, formatiereProzent, formatiereZahl } from '../../modell/zeit'
 import { wirksamerCursor } from '../../zustand'
 import { useApp } from '../kontext'
 import type { LernThema } from '../lerninhalte'
@@ -46,6 +47,7 @@ const WAHL: { typ: BlockTyp; text: string; beschreibung: string; symbol: SymbolA
   { typ: 'parallel', text: 'Mehreres gleichzeitig', beschreibung: 'Zweige laufen parallel', symbol: 'und' },
   { typ: 'wiederholung', text: 'Etwas wird wiederholt', beschreibung: 'z. B. Nacharbeit nach einer Prüfung', symbol: 'wiederholung' },
   { typ: 'warten', text: 'Warten', beschreibung: 'auf einen Termin oder eine Nachricht', symbol: 'warten-zeit' },
+  { typ: 'mehrfach', text: 'Etwas für jedes Stück einer Liste', beschreibung: 'jede Position, jeden Lieferanten, jeden Beleg', symbol: 'mehrfach' },
   { typ: 'teilprozess', text: 'Ein Abschnitt mit Namen', beschreibung: 'fasst Schritte zusammen, z. B. für eine Frist über mehrere Schritte', symbol: 'teilprozess' },
 ]
 
@@ -57,6 +59,14 @@ const TYPNAME: Record<BlockTyp, string> = {
   wiederholung: 'Wiederholung',
   warten: 'Warten',
   teilprozess: 'Abschnitt',
+  mehrfach: 'Für jedes Stück',
+}
+
+/** Innerster Baustein „für jedes Stück“ auf der Kette und ob die Stelle als erste direkt in seinem Körper liegt. */
+function mehrfachUeber(kette: Glied[], sequenzId: Id, index: number): { mehrfach: Mehrfach | null; ersterImKoerper: boolean } {
+  const glied = [...kette].reverse().find((g) => g.block.typ === 'mehrfach')
+  const mehrfach = glied?.block.typ === 'mehrfach' ? glied.block : null
+  return { mehrfach, ersterImKoerper: !!mehrfach && mehrfach.koerper.id === sequenzId && index === 0 }
 }
 
 function lernthema(b: Block): LernThema {
@@ -104,19 +114,21 @@ function neuerEntwurf(typ: BlockTyp, p: Prozess, vorgaenger: Block | null): Bloc
       return neuesWarten()
     case 'teilprozess':
       return neuerTeilprozess()
+    case 'mehrfach':
+      return neuerMehrfach()
     default:
       return unerwartet(typ)
   }
 }
 
 /**
- * Bahn, in der ein Abschnitt im Diagramm steht: Der äußerste Abschnitt über ihm
- * (oder er selbst) bestimmt sie, als Rolle mit den meisten Aufgaben darin.
- * null, solange darin keine Aufgabe steht.
+ * Bahn, in der ein Rahmen (Abschnitt, für jedes Stück) im Diagramm steht: Der
+ * äußerste Rahmen über ihm (oder er selbst) bestimmt sie, als Rolle mit den
+ * meisten Aufgaben darin. null, solange darin keine Aufgabe steht.
  */
-function bahnDesAbschnitts(p: Prozess, abschnitt: Teilprozess, kette: Glied[]): string | null {
+function bahnDesAbschnitts(p: Prozess, abschnitt: Teilprozess | Mehrfach, kette: Glied[]): string | null {
   const aeusserster = rahmenUeber(kette)[0] ?? abschnitt
-  if (aeusserster.typ !== 'teilprozess') return null
+  if (!istRahmen(aeusserster)) return null
   const gueltig = (r: Id | null) => (r !== null && p.rollen.some((x) => x.id === r) ? r : null)
   const rolle = rahmenRolle(aeusserster, gueltig)
   if (rolle === undefined) return null
@@ -229,7 +241,8 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
           inParallele: ort.inParallele,
           neu: true,
           ziele: ruecksprungZiele(p, cursor.sequenzId, cursor.index, false),
-          rahmenBahn: entwurf.typ === 'teilprozess' ? bahnDesAbschnitts(p, entwurf, findeSequenz(p, cursor.sequenzId)?.kette ?? []) : undefined,
+          rahmenBahn: istRahmen(entwurf) ? bahnDesAbschnitts(p, entwurf, findeSequenz(p, cursor.sequenzId)?.kette ?? []) : undefined,
+          ...mehrfachUeber(findeSequenz(p, cursor.sequenzId)?.kette ?? [], cursor.sequenzId, cursor.index),
         }}
       />
       {fehlt && <p className="feld-hilfe">{fehlt}</p>}
@@ -264,7 +277,9 @@ function BlockBearbeiten() {
           ? `Zweig ${i + 1}`
           : b.typ === 'teilprozess'
             ? 'Schritte im Abschnitt'
-            : 'Wiederholte Schritte'
+            : b.typ === 'mehrfach'
+              ? 'Schritte je Stück'
+              : 'Wiederholte Schritte'
 
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return <BereichBearbeiten bereichId={b.id} />
 
@@ -284,7 +299,8 @@ function BlockBearbeiten() {
           neu: false,
           ziele: b.typ === 'entscheidung' ? ruecksprungZiele(p, fund.sequenz.id, fund.index, true) : undefined,
           setzeDanach: (zweigId, danach) => aendere((q) => setzeDanach(q, b.id, zweigId, danach)),
-          rahmenBahn: b.typ === 'teilprozess' ? bahnDesAbschnitts(p, b, fund.kette) : undefined,
+          rahmenBahn: istRahmen(b) ? bahnDesAbschnitts(p, b, fund.kette) : undefined,
+          ...mehrfachUeber(fund.kette, fund.sequenz.id, fund.index),
           loeseAuf: b.typ === 'teilprozess' ? () => aendere((q) => loeseAbschnittAuf(q, b.id), { auswahl: null }) : undefined,
         }}
       />
@@ -488,6 +504,11 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
   else if (b.typ === 'entscheidung' && b.art === 'ereignis') meta = 'je nachdem, was zuerst passiert'
   else if (b.typ === 'oder') meta = 'einer, mehrere oder alle Wege'
   else if (b.typ === 'teilprozess') meta = 'Abschnitt'
+  else if (b.typ === 'mehrfach') {
+    meta = `Ø ${formatiereZahl(b.anzahl, 1)} · ${b.ausfuehrung === 'nacheinander' ? 'nacheinander' : 'gleichzeitig'}`
+    if (b.streuung === 'schwankt') meta += ' · schwankt'
+    if (b.liegezeitMin > 0) meta += ` · liegt ${formatiereDauer(b.liegezeitMin, std)}`
+  }
   const gewaehlt = z.auswahl === b.id
   return (
     <>
@@ -535,6 +556,12 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
       {b.typ === 'teilprozess' && (
         <div className="zweig">
           <div className="zweig-kopf">Schritte im Abschnitt</div>
+          <SequenzListe seq={b.koerper} cursor={cursor} />
+        </div>
+      )}
+      {b.typ === 'mehrfach' && (
+        <div className="zweig">
+          <div className="zweig-kopf">je Stück</div>
           <SequenzListe seq={b.koerper} cursor={cursor} />
         </div>
       )}

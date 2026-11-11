@@ -22,12 +22,15 @@ interface Element extends ModdleElement {
   attachedToRef?: { id: string }
   cancelActivity?: boolean
   default?: { id: string }
+  loopCharacteristics?: { $type: string; isSequential?: boolean; loopCardinality?: { body?: string } }
 }
 
 /**
  * Liest exportiertes BPMN mit bpmn-moddle und baut den Graphen für das
  * Tokenspiel. Teilprozesse werden rekursiv gelesen; jeder Knoten kennt seinen
- * Rahmen, Randereignisse ihren Wirt, Endereignisse ihre Art.
+ * Rahmen, Randereignisse ihren Wirt, Endereignisse ihre Art. Mehrfachinstanzen
+ * tragen ihre Art (nacheinander oder gleichzeitig) und, falls angegeben, die
+ * feste Anzahl (`loopCardinality`).
  */
 export async function graphAusXml(xml: string): Promise<TokenGraph> {
   const { rootElement, warnings } = await BpmnModdle().fromXML(xml)
@@ -49,6 +52,11 @@ export async function graphAusXml(xml: string): Promise<TokenGraph> {
       if (typ === 'ende') {
         k.endeArt = definition?.$type === 'bpmn:ErrorEventDefinition' ? 'fehler' : definition?.$type === 'bpmn:TerminateEventDefinition' ? 'terminierung' : 'normal'
         if (definition?.errorRef) k.fehler = definition.errorRef.id
+      }
+      const schleife = e.loopCharacteristics
+      if (schleife?.$type === 'bpmn:MultiInstanceLoopCharacteristics') {
+        const anzahl = schleife.loopCardinality?.body !== undefined ? Number(schleife.loopCardinality.body) : undefined
+        k.mehrfach = { nacheinander: schleife.isSequential === true, ...(anzahl !== undefined && Number.isFinite(anzahl) ? { anzahl, streuung: 'fest' as const } : {}) }
       }
       if (typ === 'rand') {
         k.wirt = e.attachedToRef?.id

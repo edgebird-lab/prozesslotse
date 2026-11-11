@@ -10,11 +10,11 @@ import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { erzeugeBpmn } from './export'
 import { graphAusLayout, pruefeSoundness, zaehleMitFehler, type TokenGraph } from './tokenspiel'
 
-/** Vergleichbare Form eines Graphen: Knoten mit Typ, Rahmen und Art (Ende, Randereignis), Flüsse von → nach */
+/** Vergleichbare Form eines Graphen: Knoten mit Typ, Rahmen und Art (Ende, Randereignis, Mehrfachinstanz), Flüsse von → nach */
 function form(g: TokenGraph): string[] {
   const quelle = new Map<string, string>()
   for (const k of g.knoten) for (const f of k.raus) quelle.set(f, k.id)
-  const knoten = g.knoten.map((k) => [k.id, k.typ, k.rahmen ?? '', k.endeArt ?? '', k.fehler ?? '', k.wirt ?? '', k.randArt ?? '', k.unterbrechend ?? ''].join(':'))
+  const knoten = g.knoten.map((k) => [k.id, k.typ, k.rahmen ?? '', k.endeArt ?? '', k.fehler ?? '', k.wirt ?? '', k.randArt ?? '', k.unterbrechend ?? '', k.mehrfach ? (k.mehrfach.nacheinander ? 'nacheinander' : 'gleichzeitig') : ''].join(':'))
   return [...knoten, ...[...g.ziel].map(([f, z]) => `${quelle.get(f)}->${z}`)].sort()
 }
 
@@ -131,7 +131,7 @@ describe('Neue Konstrukte: Rücksprung und Ereignis-Entscheidung', () => {
       const e = pruefeSoundness(graphAusLayout(erzeugeBpmn(p).layout), 2_000)
       if (!e.vollstaendig) continue
       if (fehler.length === 0 && !e.sound) widersprueche.push(`Startwert ${s}: kein Prüffehler, aber ${e.fehler[0]}`)
-      if (fehler.length > 0 && e.sound && fehler.some((f) => /unerreichbar|ausweglos|fragelos|verklemmung|totesende/.test(f.schluessel)))
+      if (fehler.length > 0 && e.sound && fehler.some((f) => /unerreichbar|ausweglos|fragelos|verklemmung|totesende|^nie:/.test(f.schluessel)))
         widersprueche.push(`Startwert ${s}: Prüffehler ${fehler[0].schluessel}, aber sound`)
     }
     expect(widersprueche.slice(0, 10)).toEqual([])

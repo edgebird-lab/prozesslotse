@@ -10,8 +10,9 @@
  * die Listen klein bleiben, werden sie zusammengefasst; das geschieht
  * mittelwerttreu, so dass Erwartungswerte von Summen exakt bleiben.
  */
+import { anzahlVerteilung, erwartungMaximumOhneNull, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
 import { oderZiehung } from '../modell/operationen'
-import { unerwartet, type Block, type Id, type Oder } from '../modell/typen'
+import { unerwartet, type Block, type Id, type Mehrfach, type Oder } from '../modell/typen'
 
 export interface Verteilung {
   wert: number[]
@@ -207,8 +208,106 @@ export function verteilungBlock(b: Block, art: Zeitart): Teilverteilungen {
     }
     case 'teilprozess':
       return verteilungSequenz(b.koerper.schritte, art)
+    case 'mehrfach':
+      return verteilungMehrfach(b, art)
     default:
       return unerwartet(b)
+  }
+}
+
+/** Erwartung über alle Teile (weiter, Rücksprünge, Enden): die Dauer des Bausteins im Schnitt. */
+export function erwartungGesamt(t: Teilverteilungen): number {
+  const teile = [t.weiter, ...t.rueck.values(), ...t.ende.values()]
+  return teile.reduce((s, v) => s + erwartung(v) * masse(v), 0)
+}
+
+/**
+ * W^{*k} und Σ_{j<k} W^{*j} durch Verdoppeln, mit O(log k) Faltungen:
+ * P_2k = P_k ∗ P_k, S_2k = S_k + P_k ∗ S_k; ein Stück mehr: S_k+1 = S_k + P_k, P_k+1 = P_k ∗ W.
+ */
+function potenzUndSumme(w: Verteilung, k: number): { potenz: Verteilung; summe: Verteilung } {
+  if (k <= 0) return { potenz: punkt(0), summe: leer() }
+  const halb = potenzUndSumme(w, Math.floor(k / 2))
+  let potenz = falte(halb.potenz, halb.potenz)
+  let summe = addiere(halb.summe, falte(halb.potenz, halb.summe))
+  if (k % 2 === 1) {
+    summe = addiere(summe, potenz)
+    potenz = falte(potenz, w)
+  }
+  return { potenz, summe }
+}
+
+/** Spätestes von N Stücken mit der Dauer d (Masse 1): Verteilungsfunktion E[F(t)^N] ohne den Teil N = 0. */
+function spaetestes(v: AnzahlVerteilung, d: Verteilung): Verteilung {
+  const m = masse(d)
+  if (m <= 0) return leer()
+  let kumuliert = 0
+  let vorher = 0
+  const paare: [number, number][] = []
+  d.wert.forEach((w, i) => {
+    kumuliert += d.masse[i] / m
+    const g = erwartungMaximumOhneNull(v, Math.min(1, kumuliert))
+    if (g - vorher > MIN_MASSE) paare.push([w, g - vorher])
+    vorher = g
+  })
+  return ordne(paare)
+}
+
+/**
+ * „Für jedes Stück“: N Durchläufe des Körpers (N aus anzahl.ts), dazu einmal
+ * die Liegezeit, wenn N ≥ 1. Nacheinander ist es die Mischung über N der
+ * N-fachen Faltung; ein Ende in einem Durchlauf beendet die Reihe (wie eine
+ * Wiederholung mit höchstens N Durchläufen). Gleichzeitig zählt das späteste
+ * Stück, F(t) = E[F_K(t)^N].
+ */
+export function verteilungMehrfach(b: Mehrfach, art: Zeitart): Teilverteilungen {
+  const v = anzahlVerteilung(b.anzahl, b.streuung)
+  const x = verteilungSequenz(b.koerper.schritte, art)
+  const liegen = art === 'gesamt' ? b.liegezeitMin : 0
+  const ohne = wahrscheinlichkeit(v, 0)
+  const rueck = new Map<Id, Verteilung>()
+  const ende = new Map<string, Verteilung>()
+  let weiter = ohne > 0 ? punkt(0, ohne) : leer()
+  const ausfuehrung = b.ausfuehrung
+  switch (ausfuehrung) {
+    case 'nacheinander': {
+      // vorher: gewichtete Dauer der Stücke vor dem, in dem es endet oder zurückspringt
+      const nach = (vorher: Verteilung) => {
+        for (const [e, d] of x.ende) plus(ende, e, verschiebe(falte(vorher, d), liegen))
+        for (const [id, d] of x.rueck) plus(rueck, id, verschiebe(falte(vorher, d), liegen))
+      }
+      if (v.streuung === 'schwankt') {
+        // nach jedem Stück mit p ein weiteres
+        const vorher = geometrisch(skaliere(x.weiter, v.p))
+        weiter = addiere(weiter, verschiebe(falte(vorher, skaliere(x.weiter, 1 - v.p)), liegen))
+        nach(vorher)
+        return { weiter, rueck, ende }
+      }
+      // fest: N = ⌊n⌋ mit 1 − r, ⌊n⌋ + 1 mit r
+      const { potenz, summe } = potenzUndSumme(x.weiter, v.k0)
+      if (v.k0 >= 1 && 1 - v.rest > 0) weiter = addiere(weiter, skaliere(verschiebe(potenz, liegen), 1 - v.rest))
+      if (v.rest > 0) weiter = addiere(weiter, skaliere(verschiebe(falte(potenz, x.weiter), liegen), v.rest))
+      // Stück j + 1 beginnt mit P(N > j): sicher für j < ⌊n⌋, mit r für j = ⌊n⌋
+      nach(v.rest > 0 ? addiere(summe, skaliere(potenz, v.rest)) : summe)
+      return { weiter, rueck, ende }
+    }
+    case 'gleichzeitig': {
+      // Dauer eines Stücks, wie auch immer es endet (Enden meldet die Prüfung hier als Fehler; sie zählen anteilig)
+      const teile = [x.weiter, ...x.rueck.values(), ...x.ende.values()]
+      const stueck = teile.reduce((s, t) => addiere(s, t), leer())
+      const spaet = verschiebe(spaetestes(v, stueck), liegen)
+      const mitStueck = mindestens(v, 1)
+      if (mitStueck <= 0) return { weiter, rueck, ende }
+      const c = masse(x.weiter)
+      const normal = Math.max(0, erwartungMaximumOhneNull(v, c))
+      weiter = addiere(weiter, skaliere(spaet, normal / mitStueck))
+      const abbruch = Math.max(0, mitStueck - normal)
+      const summeEnden = [...x.ende.values()].reduce((s, d) => s + masse(d), 0)
+      if (abbruch > 1e-12 && summeEnden > 0) for (const [e, d] of x.ende) plus(ende, e, skaliere(spaet, (abbruch * masse(d)) / summeEnden / mitStueck))
+      return { weiter, rueck, ende }
+    }
+    default:
+      return unerwartet(ausfuehrung)
   }
 }
 

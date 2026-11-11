@@ -51,17 +51,26 @@ Hinweise für Schritt 2 und später:
 
 ## Schritt 2 – Für jede Position
 
-- [ ] Typ `Mehrfach`, `neuerMehrfach`, `pruefeBlock`; Ziehung von N (fest, schwankt) an einer Stelle für alle Nutzer
-- [ ] Operationen, Rücksprungziele (nicht aus dem Körper heraus), Führung („je Stück in …“)
-- [ ] Prüfregeln (leer, n < 0, schwankt mit n < 1, Liegezeit < 0, Ende bei gleichzeitig bis Schritt 5, Hinweis n < 1)
-- [ ] Kennzahlen: K, E[c^N], Liegezeit einmal, Übergaben; Verteilung (Faltung bzw. E[F^N]); Simulation; TCT
-- [ ] Layout: Aufgabe mit Markierung oder Rahmen mit freier Mitte der Unterkante
-- [ ] Export: `multiInstanceLoopCharacteristics`, `loopCardinality` nur ganzzahlig und fest, Dokumentation
-- [ ] Tokenspiel: Mehrfach-Rahmen (Suche 0 oder 1 Instanz, Zählung N nach Verteilung)
-- [ ] Schwachstellen: „Gleichzeitig, aber zu wenig Leute“, Liegezeit des Bausteins
-- [ ] Umwandlungshinweise: Mengenschleife → Mehrfach (exakt gleiche Zahlen), „beides“ → ODER, Rolle „Kunde“ → Externer; „Mehrere Durchgänge“ nicht mehr für neue Wiederholungen
-- [ ] Zufallsgenerator, Oberfläche (Bausteinwahl, Formular mit Live-Anzeigen, Symbol, Lernhinweis, Gliederung), Tests von Hand, Browsertest, Diagramm angesehen, Doku
-- [ ] Commit und Push
+Fertig am 2026-11-11, Commit „Für jedes Stück einer Liste (Mehrfachinstanz) mit Umwandlungshinweisen“ auf `modellierung` (Hash siehe `git log`). Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 2)“.
+
+- [x] Typ `Mehrfach`, `neuerMehrfach`, `pruefeBlock`; Ziehung von N (fest, schwankt) an einer Stelle für alle Nutzer (`src/modell/anzahl.ts`)
+- [x] Operationen, Rücksprungziele (nicht aus dem Körper heraus), Führung („je Stück in …“); `istRahmen` gilt für Mehrfach, `alsMarkierteAufgabe` entscheidet Aufgabe oder Rahmen
+- [x] Prüfregeln (leer, n < 0, schwankt mit n < 1, n = 0 als Fehler, Liegezeit < 0, Ende bei gleichzeitig als `abbruch` bis Schritt 5, Hinweis n < 1, Rollen im Rahmen)
+- [x] Kennzahlen: K, E[c^N], Liegezeit einmal, Übergaben; Verteilung (Faltung durch Verdoppeln bzw. E[F^N]); Simulation; TCT
+- [x] Layout: Aufgabe mit Markierung oder Rahmen mit freier Mitte der Unterkante (leere Spalten, wenn die Randereignisse sonst nicht passen)
+- [x] Export: `multiInstanceLoopCharacteristics`, `loopCardinality` nur ganzzahlig und fest, Dokumentation; `graphAusXml` liest die Markierung
+- [x] Tokenspiel: Mehrfach an Aktivität und Rahmen (Suche 0 oder 1 Stück nach der Verteilung, Zählung N nach Verteilung, Abbruch leert alle Stücke)
+- [x] Schwachstellen: „Gleichzeitig, aber zu wenig Leute“, Liegezeit des Bausteins
+- [x] Umwandlungshinweise: Mengenschleife → Mehrfach (exakt gleiche Zahlen), „beides“ → ODER, Rolle „Kunde“ → Externer; „Mehrere Durchgänge“ nicht mehr für neue Wiederholungen
+- [x] Zufallsgenerator, Oberfläche (Bausteinwahl, Formular mit Live-Anzeigen, Symbol, Lernhinweis, Gliederung, Knöpfe „Umwandeln“ und „Zu den Beteiligten“), Tests von Hand (`src/analyse/mehrfach.test.ts`), Browsertests (`e2e/mehrfach.spec.ts`), Diagramme mit `render.mjs` angesehen (Aufgabe mit Markierung, Rahmen mit Ende, gleichzeitig im Zweig, in einem Abschnitt, sechs Ergebnisse, zwei Zufallsprozesse), Doku
+- [x] Commit und Push
+
+Hinweise für Schritt 3 und später:
+
+- `alsMarkierteAufgabe` muss mit den Unterbrechungen zusätzlich verlangen, dass weder die Aufgabe noch der Baustein welche hat (sonst Rahmen).
+- Randereignisse an Mehrfach-Rahmen lassen die Mitte frei (`RAHMEN.markeHalb`, `spaltenFuerRand` in `layout.ts`); Unterbrechungen am Mehrfach-Rahmen können dieselbe Rechnung nutzen.
+- Tokenspiel: Ein unterbrechendes Randereignis am Mehrfach-Rahmen muss wie das Fehler-Randereignis alle Stücke leeren; `bereichVon` liefert diesen Bereich.
+- Schritt 5 ersetzt in `verteilungMehrfach` (Fall „gleichzeitig“) und in `flussMehrfach` die anteilige Rechnung für Enden durch die Abbruchkombination (Abbruch-Teil E[1 − (1 − G(t))^N], Weiter-Teil E[H(t)^N]) und hebt den Prüffehler `abbruch` auf; die Simulation nimmt dann den frühesten Abbruch.
 
 ## Schritt 3 – Unterbrechung
 
@@ -106,3 +115,4 @@ Hinweise für Schritt 2 und später:
 | --- | --- | --- |
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
 | Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
+| Schritt 2, für jedes Stück | 178 in 19 Dateien | 21 |

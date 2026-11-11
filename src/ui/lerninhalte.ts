@@ -21,6 +21,7 @@ export type LernThema =
   | 'wiederholung'
   | 'warten'
   | 'teilprozess'
+  | 'mehrfach'
   | 'pruefen'
   | 'verbessern'
 
@@ -96,6 +97,12 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Aufgeklappter Teilprozess',
     symbol: 'teilprozess',
     text: 'Ein Rahmen mit Namen fasst zusammengehörige Schritte zusammen, z. B. „Ware versenden“. Er hat einen eigenen Start und ein eigenes Ende; der Ablauf läuft am linken Rand hinein und am rechten heraus. Endet der Vorgang im Abschnitt, zeigt ein Blitz den Ausstieg aus dem Rahmen: innen ein Ende mit Blitz, am Rand des Rahmens ein Blitz im Doppelkreis, von dem es zum Ende mit dem Ergebnis geht. Gemeint ist kein technischer Fehler. Alle Schritte des Abschnitts stehen in einer Bahn; Schritte anderer Rollen tragen die Rolle in Klammern.',
+  },
+  mehrfach: {
+    titel: 'Für jedes Stück einer Liste',
+    bpmn: 'Mehrfachinstanz (Multi-Instance)',
+    symbol: 'mehrfach',
+    text: 'Die Schritte laufen einmal je Stück, z. B. für jede Position einer Bestellung oder für jeden Lieferanten. Im Diagramm zeigt eine Markierung unten in der Mitte, wie: drei waagerechte Striche heißen der Reihe nach, drei senkrechte zur selben Zeit. Ist es nur eine Aufgabe, trägt sie die Markierung selbst; mehrere Schritte stehen in einem Rahmen. Die Liegezeit, bis jemand mit dem ersten Stück anfängt, zählt einmal, die Bearbeitung je Stück. Zur selben Zeit heißt: so viele Leute wie Stücke, oder man wartet auf mehrere Antworten zugleich.',
   },
   pruefen: {
     titel: 'Was die Zahlen bedeuten',

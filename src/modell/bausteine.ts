@@ -6,6 +6,7 @@ import {
   type Id,
   type Medium,
   type MediumArt,
+  type Mehrfach,
   type Oder,
   type OderZweig,
   type Parallel,
@@ -88,6 +89,11 @@ export function neueParallel(anzahlZweige = 2): Parallel {
 /** Neuer Abschnitt mit Namen (aufgeklappter Teilprozess), zunächst ohne Schritte. */
 export function neuerTeilprozess(werte: Partial<Teilprozess> = {}): Teilprozess {
   return { typ: 'teilprozess', id: neueId('tp'), name: '', koerper: neueSequenz(), ...werte }
+}
+
+/** Neuer Baustein „für jedes Stück einer Liste“: im Schnitt drei Stücke, immer etwa gleich viele, eine Person arbeitet sie der Reihe nach ab. */
+export function neuerMehrfach(werte: Partial<Mehrfach> = {}): Mehrfach {
+  return { typ: 'mehrfach', id: neueId('mf'), name: '', anzahl: 3, streuung: 'fest', ausfuehrung: 'nacheinander', liegezeitMin: 0, koerper: neueSequenz(), ...werte }
 }
 
 export function neueWiederholung(werte: Partial<Wiederholung> = {}): Wiederholung {

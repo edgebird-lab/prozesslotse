@@ -67,7 +67,10 @@ const KURZ: Record<string, string> = {
   name: 'Ohne Namen',
   zeit: 'Ohne Zeit',
   rueckziel: 'Rücksprung ins Leere',
-  rahmenrueck: 'Rücksprung aus Abschnitt',
+  rahmenrueck: 'Rücksprung aus Rahmen',
+  abbruch: 'Ende neben Gleichzeitigem',
+  anzahl: 'Anzahl ungültig',
+  nie: 'Läuft nie',
   doppelt: 'Endet und springt',
   ereignis: 'Ereignis fehlt',
 }

@@ -16,8 +16,19 @@
  * einschließlich des Rahmens mit dem passenden Fehler-Randereignis und legt eine
  * Marke auf dessen Ausgang. Abbrüche schalten zuletzt: erst, wenn in dem
  * Bereich, den sie beenden, sonst nichts mehr schalten kann.
+ *
+ * Mehrfachinstanzen („für jedes Stück“): Eine Aktivität mit Markierung schaltet
+ * einmal und zählt N-mal. Ein Mehrfach-Rahmen startet nacheinander eine
+ * Instanz, deren Marke `Pfad|*` die noch offenen Stücke zählt; ist ein Stück
+ * fertig, beginnt in derselben Instanz das nächste. Gleichzeitig startet er N
+ * Instanzen und gibt die Marke weiter, wenn die letzte fertig ist. Die Suche
+ * prüft null und ein Stück (soweit die Anzahl sie zulässt); die Zählung zieht N
+ * wie die Rechnung (anzahl.ts). Ein Fehler, den der Mehrfach-Rahmen fängt,
+ * leert alle seine Instanzen.
  */
 
+import { anzahlVerteilung, kannNull, kannStueck, zieheAnzahl } from '../modell/anzahl'
+import type { MehrfachStreuung } from '../modell/typen'
 import type { KnotenArt, Layout } from './layout'
 
 export type KnotenTyp = 'start' | 'ende' | 'aktivitaet' | 'xor' | 'und' | 'oder' | 'ereignisgateway' | 'rahmen' | 'rand'
@@ -41,6 +52,8 @@ export interface TokenKnoten {
   wirt?: string
   randArt?: 'fehler' | 'zeit' | 'nachricht'
   unterbrechend?: boolean
+  /** Mehrfachinstanz an einer Aktivität oder einem Rahmen; Anzahl und Streuung, soweit bekannt (aus dem XML nur eine feste ganze Anzahl) */
+  mehrfach?: { nacheinander: boolean; anzahl?: number; streuung?: MehrfachStreuung }
 }
 
 export interface TokenGraph {
@@ -64,10 +77,11 @@ const TYP_AUS_LAYOUT: Record<KnotenArt, KnotenTyp> = {
 /** Graph direkt aus dem Layout, aus dem auch das BPMN-XML entsteht. */
 export function graphAusLayout(l: Layout): TokenGraph {
   const knoten = new Map<string, TokenKnoten>()
-  for (const r of l.rahmen) knoten.set(r.id, { id: r.id, typ: 'rahmen', rein: [], raus: [], rahmen: r.eltern })
+  for (const r of l.rahmen) knoten.set(r.id, { id: r.id, typ: 'rahmen', rein: [], raus: [], rahmen: r.eltern, ...(r.mehrfach ? { mehrfach: { ...r.mehrfach } } : {}) })
   for (const k of l.knoten) {
     const t: TokenKnoten = { id: k.id, typ: TYP_AUS_LAYOUT[k.art], rein: [], raus: [], rahmen: k.rahmen ?? null }
     if (k.mindestensEiner) t.mindestensEiner = true
+    if (k.mehrfach) t.mehrfach = { ...k.mehrfach }
     if (k.art === 'ende') {
       t.endeArt = k.fehler ? 'fehler' : 'normal'
       if (k.fehler) t.fehler = k.fehler
@@ -180,6 +194,61 @@ function imBereich(s: string, pfad: string): boolean {
   return pfad === '' || s.startsWith(`${pfad}|`) || s.startsWith(`${pfad}/`)
 }
 
+/** Ein Abbruch am Rahmen der Instanz `pfad` beendet sie; bei einer Mehrfachinstanz alle Stücke derselben Aktivierung. */
+function bereichVon(n: Netz, pfad: string): (s: string) => boolean {
+  if (pfad === '') return () => true
+  const r = n.nach.get(rahmenVonPfad(pfad))
+  if (!r?.mehrfach) return (s) => imBereich(s, pfad)
+  const aussen = elternPfad(pfad)
+  const praefix = `${aussen ? `${aussen}/` : ''}${r.id}:`
+  return (s) => s.startsWith(praefix)
+}
+
+/** Läuft neben der Instanz `pfad` noch ein Stück desselben Mehrfach-Rahmens? */
+function weitereStuecke(m: Markierung, pfad: string): boolean {
+  const aussen = elternPfad(pfad)
+  const rahmen = rahmenVonPfad(pfad)
+  for (const x of m.keys()) {
+    if (!x.endsWith('|*')) continue
+    const p = x.slice(0, -2)
+    if (p !== pfad && elternPfad(p) === aussen && rahmenVonPfad(p) === rahmen) return true
+  }
+  return false
+}
+
+/** Was die Anzahl einer Mehrfachinstanz zulässt; ohne bekannte Anzahl beides. */
+function stueckMoeglich(k: TokenKnoten): { ohne: boolean; mit: boolean } {
+  const m = k.mehrfach
+  if (!m || m.anzahl === undefined) return { ohne: !!m, mit: true }
+  const v = anzahlVerteilung(m.anzahl, m.streuung ?? 'fest')
+  return { ohne: kannNull(v), mit: kannStueck(v) }
+}
+
+/** N für eine Aktivierung, wie in der Rechnung gezogen; ohne bekannte Anzahl eins. */
+function zieheStuecke(k: TokenKnoten, zufall: () => number): number {
+  const m = k.mehrfach
+  if (!m || m.anzahl === undefined) return 1
+  return zieheAnzahl(anzahlVerteilung(m.anzahl, m.streuung ?? 'fest'), zufall)
+}
+
+/**
+ * Startet einen Mehrfach-Rahmen mit `stuecke` Stücken: nacheinander eine
+ * Instanz, deren Marke die offenen Stücke zählt; gleichzeitig eine Instanz je Stück.
+ */
+function starteStuecke(n: Netz, m: Markierung, ausloeser: string, k: TokenKnoten, pfad: string, stuecke: number): Markierung {
+  const neu = mit(m, [ausloeser], [])
+  const start = n.innerStart.get(k.id)
+  const nacheinander = k.mehrfach?.nacheinander ?? true
+  let nr = 1
+  for (let i = 0; i < (nacheinander ? 1 : stuecke); i++) {
+    while (neu.has(`${kindPfad(pfad, k.id, nr)}|*`)) nr++
+    const c = kindPfad(pfad, k.id, nr)
+    neu.set(`${c}|*`, nacheinander ? stuecke : 1)
+    for (const o of start?.raus ?? []) neu.set(schl(c, o), (neu.get(schl(c, o)) ?? 0) + 1)
+  }
+  return neu
+}
+
 function schluessel(m: Markierung): string {
   return [...m.entries()]
     .filter(([, n]) => n > 0)
@@ -237,26 +306,28 @@ function oderAuswahlen(k: TokenKnoten): string[][] {
   return auswahlen
 }
 
-/** Was in einer Markierung schalten kann; Wahlstellen (Entweder-oder, ODER) mit allen Möglichkeiten erst beim Ausführen. */
+/** Was in einer Markierung schalten kann; Wahlstellen (Entweder-oder, ODER, Zahl der Stücke) mit allen Möglichkeiten erst beim Ausführen. */
 type Moeglichkeit =
   | { art: 'fest'; ausloeser: string; knoten: string; weg: string[]; hin: string[] }
   | { art: 'wahl'; ausloeser: string; knoten: TokenKnoten; pfad: string }
-  | { art: 'abbruch'; ausloeser: string; knoten: string; bereich: string; danach: Markierung; auch?: string }
+  | { art: 'mehrfach'; ausloeser: string; knoten: TokenKnoten; pfad: string }
+  | { art: 'abbruch'; ausloeser: string; knoten: string; bereich: (s: string) => boolean; danach: Markierung; auch?: string }
 
 /** Wirkung eines Abbruchs: Terminierung leert ihre Ebene; Fehler steigt zum Rahmen mit passendem Randereignis auf. */
-function abbruch(n: Netz, k: TokenKnoten, s: string, pfad: string, m: Markierung): { bereich: string; danach: Markierung; auch?: string } | null {
+function abbruch(n: Netz, k: TokenKnoten, s: string, pfad: string, m: Markierung): { bereich: (s: string) => boolean; danach: Markierung; auch?: string } | null {
   if (k.endeArt === 'terminierung') {
     const danach = new Map([...m].filter(([x]) => !imBereich(x, pfad) || x === `${pfad}|*`))
     danach.delete(s)
-    return { bereich: pfad, danach }
+    return { bereich: (x) => imBereich(x, pfad), danach }
   }
   for (let p = pfad; p !== ''; p = elternPfad(p)) {
     const fang = (n.rand.get(rahmenVonPfad(p)) ?? []).find((r) => r.randArt === 'fehler' && (!r.fehler || r.fehler === k.fehler))
     if (!fang) continue
-    const danach = new Map([...m].filter(([x]) => !imBereich(x, p)))
+    const bereich = bereichVon(n, p)
+    const danach = new Map([...m].filter(([x]) => !bereich(x)))
     const aussen = elternPfad(p)
     for (const o of fang.raus) danach.set(schl(aussen, o), (danach.get(schl(aussen, o)) ?? 0) + 1)
-    return { bereich: p, danach, auch: fang.id }
+    return { bereich, danach, auch: fang.id }
   }
   return null
 }
@@ -272,7 +343,13 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
       if ([...m.keys()].some((x) => x !== s && imBereich(x, pfad))) continue
       const r = n.nach.get(rahmenVonPfad(pfad))!
       const aussen = elternPfad(pfad)
-      liste.push({ art: 'fest', ausloeser: s, knoten: r.id, weg: [s], hin: r.raus.map((o) => schl(aussen, o)) })
+      if (r.mehrfach?.nacheinander && anzahl > 1) {
+        // nächstes Stück in derselben Instanz
+        liste.push({ art: 'fest', ausloeser: s, knoten: r.id, weg: [s], hin: (n.innerStart.get(r.id)?.raus ?? []).map((o) => schl(pfad, o)) })
+      } else if (r.mehrfach && !r.mehrfach.nacheinander && weitereStuecke(m, pfad)) {
+        // andere Stücke laufen noch: nur diese Instanz endet
+        liste.push({ art: 'fest', ausloeser: s, knoten: r.id, weg: [s], hin: [] })
+      } else liste.push({ art: 'fest', ausloeser: s, knoten: r.id, weg: [s], hin: r.raus.map((o) => schl(aussen, o)) })
       continue
     }
     const k = n.nach.get(n.g.ziel.get(f)!)
@@ -282,7 +359,8 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
       case 'rand':
         break
       case 'aktivitaet':
-        liste.push({ art: 'fest', ausloeser: s, knoten: k.id, weg: [s], hin: k.raus.map((o) => schl(pfad, o)) })
+        if (k.mehrfach) liste.push({ art: 'mehrfach', ausloeser: s, knoten: k, pfad })
+        else liste.push({ art: 'fest', ausloeser: s, knoten: k.id, weg: [s], hin: k.raus.map((o) => schl(pfad, o)) })
         break
       case 'ende':
         if (k.endeArt === 'fehler' || k.endeArt === 'terminierung') {
@@ -291,6 +369,10 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
         } else liste.push({ art: 'fest', ausloeser: s, knoten: k.id, weg: [s], hin: [] })
         break
       case 'rahmen': {
+        if (k.mehrfach) {
+          liste.push({ art: 'mehrfach', ausloeser: s, knoten: k, pfad })
+          break
+        }
         let nr = 1
         while (m.has(`${kindPfad(pfad, k.id, nr)}|*`)) nr++
         const c = kindPfad(pfad, k.id, nr)
@@ -317,7 +399,7 @@ function moeglichkeiten(n: Netz, m: Markierung): Moeglichkeit[] {
     }
   }
   // Abbruch zuletzt: nur, wenn in dem Bereich, den er beendet, sonst nichts mehr schalten kann
-  for (const a of abbrueche) if (a.art === 'abbruch' && !liste.some((x) => imBereich(x.ausloeser, a.bereich))) liste.push(a)
+  for (const a of abbrueche) if (a.art === 'abbruch' && !liste.some((x) => a.bereich(x.ausloeser))) liste.push(a)
   return liste
 }
 
@@ -327,12 +409,25 @@ interface Schritt {
   auch?: string
   /** gewählter ausgehender Fluss bei Verzweigungen */
   wahl?: string
+  /** Mehrfachinstanz ohne Stück: Die Marke läuft vorbei, ausgeführt wird nichts. */
+  vorbei?: boolean
   danach: Markierung
 }
 
-function ausfuehrungen(mo: Moeglichkeit, m: Markierung): Schritt[] {
+function ausfuehrungen(n: Netz, mo: Moeglichkeit, m: Markierung): Schritt[] {
   if (mo.art === 'fest') return [{ knoten: mo.knoten, danach: mit(m, mo.weg, mo.hin) }]
   if (mo.art === 'abbruch') return [{ knoten: mo.knoten, auch: mo.auch, danach: mo.danach }]
+  if (mo.art === 'mehrfach') {
+    // Suche: ohne Stück und mit einem Stück, soweit die Anzahl das zulässt; weitere Stücke wiederholen nur dasselbe
+    const k = mo.knoten
+    const moeglich = stueckMoeglich(k)
+    const vorbei = mit(m, [mo.ausloeser], k.raus.map((o) => schl(mo.pfad, o)))
+    if (k.typ === 'aktivitaet') return [moeglich.mit ? { knoten: k.id, danach: vorbei } : { knoten: k.id, vorbei: true, danach: vorbei }]
+    const liste: Schritt[] = []
+    if (moeglich.ohne) liste.push({ knoten: k.id, vorbei: true, wahl: 'ohne', danach: vorbei })
+    if (moeglich.mit) liste.push({ knoten: k.id, wahl: 'eins', danach: starteStuecke(n, m, mo.ausloeser, k, mo.pfad, 1) })
+    return liste
+  }
   const k = mo.knoten
   if (k.typ === 'oder') return oderAuswahlen(k).map((wahl) => ({ knoten: k.id, wahl: wahl.join('+'), danach: mit(m, [mo.ausloeser], wahl.map((o) => schl(mo.pfad, o))) }))
   return k.raus.map((o) => ({ knoten: k.id, wahl: o, danach: mit(m, [mo.ausloeser], [schl(mo.pfad, o)]) }))
@@ -353,7 +448,7 @@ function schritte(n: Netz, m: Markierung, reduziert = false): Schritt[] {
     const erster = auswahl.map((x) => x.ausloeser).sort()[0]
     liste = auswahl.filter((x) => x.ausloeser === erster)
   }
-  return liste.flatMap((mo) => ausfuehrungen(mo, m))
+  return liste.flatMap((mo) => ausfuehrungen(n, mo, m))
 }
 
 export interface SoundnessErgebnis {
@@ -410,14 +505,15 @@ function durchsuche(n: Netz, maxZustaende: number, reduziert: boolean): Soundnes
       return { sound: false, vollstaendig: false, fehler: [`Zustandsraum größer als ${maxZustaende}, nicht vollständig geprüft`], zustaende: index.size, reduziert }
     }
     const m = warteschlange[i]
-    if (!unsicher && [...m.values()].some((x) => x > 1)) {
+    // Die Marke einer Instanz zählt offene Stücke; mehr als eine Marke auf einem Fluss ist ein Fehler.
+    if (!unsicher && [...m].some(([x, k]) => k > 1 && !x.endsWith('|*'))) {
       unsicher = true
       fehler.push(`mehr als eine Marke auf einem Fluss: ${schluessel(m)}`)
     }
     const moeglich = schritte(n, m, reduziert)
     if (moeglich.length === 0 && m.size > 0) fehler.push(`Verklemmung in Zustand ${schluessel(m)}`)
     for (const s of moeglich) {
-      gefeuert.add(s.knoten)
+      if (!s.vorbei) gefeuert.add(s.knoten)
       if (s.auch) gefeuert.add(s.auch)
       nachfolger[i].push(merke(s.danach))
     }
@@ -463,10 +559,21 @@ export interface Zaehlung {
   fehler: number
 }
 
-/** Ein Schritt mit zufälliger Wahl an Verzweigungen. */
-function wuerfle(mo: Moeglichkeit, m: Markierung, anteil: Map<string, number>, zufall: () => number): Markierung {
-  if (mo.art === 'fest') return mit(m, mo.weg, mo.hin)
+/** Ein Schritt mit zufälliger Wahl an Verzweigungen; `zaehle` erfährt, wie oft eine Aktivität dabei ausgeführt wird. */
+function wuerfle(n: Netz, mo: Moeglichkeit, m: Markierung, anteil: Map<string, number>, zufall: () => number, zaehle: (id: string, mal: number) => void): Markierung {
+  if (mo.art === 'fest') {
+    if (n.nach.get(mo.knoten)?.typ === 'aktivitaet') zaehle(mo.knoten, 1)
+    return mit(m, mo.weg, mo.hin)
+  }
   if (mo.art === 'abbruch') return mo.danach
+  if (mo.art === 'mehrfach') {
+    // N wie in der Rechnung; eine Aktivität zählt N-mal, ein Rahmen startet N Stücke
+    const k = mo.knoten
+    const stuecke = zieheStuecke(k, zufall)
+    if (k.typ === 'aktivitaet' && stuecke > 0) zaehle(k.id, stuecke)
+    if (k.typ === 'aktivitaet' || stuecke === 0) return mit(m, [mo.ausloeser], k.raus.map((o) => schl(mo.pfad, o)))
+    return starteStuecke(n, m, mo.ausloeser, k, mo.pfad, stuecke)
+  }
   const k = mo.knoten
   if (k.typ === 'oder') {
     // jeder Weg unabhängig nach seinem Wurf; ohne Standard wird eine leere Auswahl neu gewürfelt
@@ -507,8 +614,7 @@ export function zaehleMitFehler(g: TokenGraph, anteil: Map<string, number>, laeu
       const moeglich = moeglichkeiten(n, m)
       const mo = moeglich.find((x) => x.art !== 'abbruch') ?? moeglich[0]
       if (!mo) break // Verklemmung; zeigt die Soundness-Prüfung
-      if (mo.art === 'fest' && n.nach.get(mo.knoten)?.typ === 'aktivitaet') lauf.set(mo.knoten, (lauf.get(mo.knoten) ?? 0) + 1)
-      m = wuerfle(mo, m, anteil, zufall)
+      m = wuerfle(n, mo, m, anteil, zufall, (id, mal) => lauf.set(id, (lauf.get(id) ?? 0) + mal))
     }
     for (const [id, x] of lauf) {
       summe.set(id, (summe.get(id) ?? 0) + x)

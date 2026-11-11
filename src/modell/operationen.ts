@@ -3,8 +3,9 @@
  * Prozess und lassen den alten unverändert; darauf bauen Rückgängig und der
  * Ist-Soll-Vergleich auf.
  */
-import { neuerRuecksprungBereich, neuerTeilprozess, neueSequenz } from './bausteine'
-import { unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type Oder, type Prozess, type Sequenz, type Teilprozess } from './typen'
+import { anzahlVerteilung, kannNull } from './anzahl'
+import { neuerMehrfach, neuerOderZweig, neuerRuecksprungBereich, neuerTeilprozess, neueSequenz } from './bausteine'
+import { unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type Mehrfach, type Oder, type Prozess, type Sequenz, type Teilprozess, type Wiederholung } from './typen'
 
 /** Ein Schritt auf dem Weg von außen nach innen: ein Baustein und die Kindsequenz, in der es weitergeht. */
 export interface Glied {
@@ -22,7 +23,7 @@ export interface Fundstelle {
   kette: Glied[]
 }
 
-/** Zweige einer Entscheidung oder Parallele, Körper einer Wiederholung oder eines Abschnitts. */
+/** Zweige einer Entscheidung oder Parallele, Körper einer Wiederholung, eines Abschnitts oder von „für jedes Stück“. */
 export function kinderSequenzen(b: Block): Sequenz[] {
   switch (b.typ) {
     case 'entscheidung':
@@ -34,6 +35,8 @@ export function kinderSequenzen(b: Block): Sequenz[] {
     case 'wiederholung':
       return [b.koerper]
     case 'teilprozess':
+      return [b.koerper]
+    case 'mehrfach':
       return [b.koerper]
     case 'aufgabe':
     case 'warten':
@@ -92,8 +95,9 @@ export function anzahlBloecke(p: Prozess): number {
 
 /**
  * Läuft die Kindsequenz des Glieds womöglich neben anderen Teilen desselben
- * Vorgangs (ein Zweig von Gleichzeitig, ein ODER-Weg)? Dort darf der Prozess
- * (noch) nicht enden, und kein Rücksprung darf herausführen.
+ * Vorgangs (ein Zweig von Gleichzeitig, ein ODER-Weg, der Körper von „für jedes
+ * Stück“, wenn die Stücke gleichzeitig laufen)? Dort darf der Prozess (noch)
+ * nicht enden, und kein Rücksprung darf herausführen.
  */
 export function gliedNebenlaeufig(g: Glied): boolean {
   const b = g.block
@@ -109,6 +113,17 @@ export function gliedNebenlaeufig(g: Glied): boolean {
     }
     case 'oder':
       return true
+    case 'mehrfach': {
+      const ausfuehrung = b.ausfuehrung
+      switch (ausfuehrung) {
+        case 'gleichzeitig':
+          return true
+        case 'nacheinander':
+          return false
+        default:
+          return unerwartet(ausfuehrung)
+      }
+    }
     case 'entscheidung':
     case 'wiederholung':
     case 'teilprozess':
@@ -125,9 +140,20 @@ export function nebenlaeufig(kette: Glied[]): boolean {
   return kette.some(gliedNebenlaeufig)
 }
 
-/** Ist der Block ein Rahmen (im BPMN ein aufgeklappter Teilprozess)? Kein Sequenzfluss und kein Rücksprung quert seine Grenze. */
-export function istRahmen(b: Block): boolean {
-  return b.typ === 'teilprozess'
+/**
+ * Ist der Block ein Rahmen (Abschnitt oder „für jedes Stück“)? Kein Sequenzfluss
+ * und kein Rücksprung quert seine Grenze. Besteht der Körper von „für jedes Stück“
+ * aus einer einzelnen Aufgabe, zeichnet das Diagramm statt des Rahmens die
+ * Markierung an der Aufgabe; die Grenze gilt trotzdem.
+ */
+export function istRahmen(b: Block): b is Teilprozess | Mehrfach {
+  return b.typ === 'teilprozess' || b.typ === 'mehrfach'
+}
+
+/** Wird „für jedes Stück“ als einzelne Aufgabe mit Markierung gezeichnet (statt als Rahmen)? Dann die Aufgabe, sonst null. */
+export function alsMarkierteAufgabe(b: Mehrfach): Aufgabe | null {
+  const [erste, ...rest] = b.koerper.schritte
+  return erste?.typ === 'aufgabe' && rest.length === 0 ? erste : null
 }
 
 /** Alle Rahmen über der Stelle am Ende der Kette, von außen nach innen. */
@@ -136,12 +162,12 @@ export function rahmenUeber(kette: Glied[]): Block[] {
 }
 
 /**
- * Rolle, in deren Bahn ein Abschnitt mit allen Schritten steht: die mit den
- * meisten Aufgaben darin, bei Gleichstand die der ersten Aufgabe. `undefined`,
- * wenn der Abschnitt keine Aufgabe enthält (dann gilt die Bahn, in der der Ablauf
- * gerade ist); `null` steht für Aufgaben ohne Rolle.
+ * Rolle, in deren Bahn ein Rahmen (Abschnitt, „für jedes Stück“) mit allen
+ * Schritten steht: die mit den meisten Aufgaben darin, bei Gleichstand die der
+ * ersten Aufgabe. `undefined`, wenn der Rahmen keine Aufgabe enthält (dann gilt
+ * die Bahn, in der der Ablauf gerade ist); `null` steht für Aufgaben ohne Rolle.
  */
-export function rahmenRolle(b: Teilprozess, gueltig: (rolleId: Id | null) => Id | null = (r) => r): Id | null | undefined {
+export function rahmenRolle(b: Teilprozess | Mehrfach, gueltig: (rolleId: Id | null) => Id | null = (r) => r): Id | null | undefined {
   const anzahl = new Map<Id | null, number>()
   let erste: Id | null | undefined
   for (const { block } of durchlaufe(b.koerper)) {
@@ -227,6 +253,8 @@ function abbildeBlock(b: Block, f: SchrittAbbildung): Block {
     case 'wiederholung':
       return { ...b, koerper: abbildeSequenz(b.koerper, f) }
     case 'teilprozess':
+      return { ...b, koerper: abbildeSequenz(b.koerper, f) }
+    case 'mehrfach':
       return { ...b, koerper: abbildeSequenz(b.koerper, f) }
     case 'aufgabe':
     case 'warten':
@@ -387,6 +415,8 @@ export function blockTitel(b: Block): string {
       return b.name || 'Warten'
     case 'teilprozess':
       return b.name || 'Abschnitt ohne Namen'
+    case 'mehrfach':
+      return b.name || 'Für jedes Stück'
     default:
       return unerwartet(b)
   }
@@ -639,6 +669,12 @@ export function ausgaengeBlock(b: Block): Set<Ausgang> {
     }
     case 'teilprozess':
       return ausgaengeSequenz(b.koerper.schritte)
+    case 'mehrfach': {
+      // Kommen auch Vorgänge ohne Stück vor, läuft der Ablauf an ihnen vorbei weiter.
+      const aus = ausgaengeSequenz(b.koerper.schritte)
+      if (kannNull(anzahlVerteilung(b.anzahl, b.streuung))) aus.add('weiter')
+      return aus
+    }
     default:
       return unerwartet(b)
   }
@@ -689,4 +725,70 @@ export function loeseAbschnittAuf(p: Prozess, abschnittId: Id): Prozess {
 /** Kann der Ablauf hinter diesem Block normal weiterlaufen? */
 export function kannWeiterlaufen(b: Block): boolean {
   return ausgaengeBlock(b).has('weiter')
+}
+
+// ---------------------------------------------------------------------------
+// Umwandlungen alter Notlösungen (die Prüfung bietet sie als Hinweis an)
+
+/**
+ * Lässt sich die Wiederholung als „für jedes Stück“ abbilden? Nur eine
+ * Mengenschleife (Modus „anteil“, Zweck „menge“), aus deren Körper kein Ende und
+ * kein Rücksprung hinausführt.
+ */
+export function istMengenschleife(b: Block): b is Wiederholung {
+  return b.typ === 'wiederholung' && b.modus === 'anteil' && b.zweck === 'menge' && b.anteilWiederholung >= 0 && b.anteilWiederholung < 1 && b.koerper.schritte.length > 0 && !verlaesstBlock(b)
+}
+
+/**
+ * Wandelt eine Mengenschleife in „für jedes Stück“ um: nacheinander, Anzahl
+ * schwankt mit Mittel 1 / (1 − p), keine eigene Liegezeit. Die Zahl der
+ * Durchläufe hat dann genau dieselbe Verteilung, und weil die Schritte ihre
+ * Liegezeit behalten, bleiben alle Kennzahlen gleich. Die Kennung bleibt.
+ */
+export function mengenschleifeAlsMehrfach(p: Prozess, wiederholungId: Id): Prozess {
+  const f = findeBlock(p, wiederholungId)
+  if (!f || !istMengenschleife(f.block)) return p
+  const w = f.block
+  const name = w.frage.trim().replace(/\s*\?$/, '') || 'Für jedes Stück'
+  return ersetzeBlock(p, neuerMehrfach({ id: w.id, name, anzahl: 1 / (1 - w.anteilWiederholung), streuung: 'schwankt', ausfuehrung: 'nacheinander', liegezeitMin: 0, koerper: w.koerper }))
+}
+
+/** Bezeichnet ein Ausgang den Fall „beide zugleich“ (Notlösung für ODER)? */
+export function heisstBeides(bezeichnung: string): boolean {
+  return /(^|[^\p{L}])beide[sn]?($|[^\p{L}])/iu.test(bezeichnung)
+}
+
+/**
+ * Entscheidung mit drei Ausgängen „A“, „B“ und „beides“, die alle normal
+ * weiterführen: Sie lässt sich als ODER mit den Wegen A und B abbilden. Liefert
+ * den Ausgang „beides“, sonst null.
+ */
+export function beidesAusgang(b: Block): EntscheidungsZweig | null {
+  if (b.typ !== 'entscheidung' || b.art !== 'daten' || b.zweige.length !== 3) return null
+  const beide = b.zweige.filter((z) => heisstBeides(z.bezeichnung))
+  if (beide.length !== 1 || b.zweige.some((z) => z.ende !== null || z.zurueckZu !== null)) return null
+  return beide[0]
+}
+
+/**
+ * Wandelt „A / B / beides“ in eine ODER-Verzweigung mit den Wegen A und B um,
+ * von denen immer mindestens einer zutrifft. Jeder Weg kommt so oft vor wie
+ * sein Ausgang und „beides“ zusammen; bei zwei Wegen laufen dann beide genau in
+ * den Fällen von „beides“. Die Schritte im Ausgang „beides“ entfallen, denn
+ * dort laufen jetzt die Wege A und B gemeinsam.
+ */
+export function beidesAlsOder(p: Prozess, entscheidungId: Id): Prozess {
+  const f = findeBlock(p, entscheidungId)
+  if (!f || f.block.typ !== 'entscheidung') return p
+  const beide = beidesAusgang(f.block)
+  if (!beide) return p
+  const e = f.block
+  const zweige = e.zweige.filter((z) => z.id !== beide.id).map((z) => neuerOderZweig(z.bezeichnung, Math.min(1, z.anteil + beide.anteil), { id: z.id, schritte: z.schritte }))
+  const oder: Oder = { typ: 'oder', id: e.id, frage: e.frage, zweige, standard: null }
+  return normalisiere(ersetzeBlock(p, oder))
+}
+
+/** Deutet der Name einer Rolle auf einen externen Beteiligten (Kunde, Lieferant, Bank, Behörde)? */
+export function wirktExtern(name: string): boolean {
+  return /(^|[^\p{L}])(kund(e|in|en|innen)|lieferant(in|en|innen)?|bank(en)?|beh(ö|oe)rden?)($|[^\p{L}])/iu.test(name.trim())
 }

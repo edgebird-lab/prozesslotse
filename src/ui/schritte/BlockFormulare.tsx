@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useBestaetigen } from '../frage'
 import { neuerOderZweig, neueRolle, neuesMedium, neueSequenz, neuerZweig } from '../../modell/bausteine'
-import { blockTitel, freigabeAusgang } from '../../modell/operationen'
+import { alsMarkierteAufgabe, blockTitel, freigabeAusgang } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
 import type { RuecksprungZiel } from '../../modell/operationen'
-import { MEDIUM_ARTEN, unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Oder, type OderZweig, type Parallel, type Teilprozess, type Warten, type Wiederholung } from '../../modell/typen'
-import { formatiereProzent } from '../../modell/zeit'
-import { Auswahl, Feld, ProzentEingabe, ZeitEingabe } from '../Eingaben'
+import { MEDIUM_ARTEN, unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Mehrfach, type Oder, type OderZweig, type Parallel, type Teilprozess, type Warten, type Wiederholung } from '../../modell/typen'
+import { formatiereDauer, formatiereProzent, formatiereZahl } from '../../modell/zeit'
+import { Auswahl, Feld, ProzentEingabe, ZahlEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
 import { Kreuz, Symbol } from '../Symbol'
 
@@ -27,8 +27,12 @@ export interface FormularKontext {
    * Rückruf (neuer Entwurf) merkt sich das Formular das Ziel im Ausgang.
    */
   setzeDanach?: (zweigId: Id, danach: Danach) => void
-  /** Nur Abschnitt: Name der Bahn, in der er im Diagramm steht (null, solange er keine Aufgabe enthält) */
+  /** Nur Rahmen (Abschnitt, für jedes Stück): Name der Bahn, in der er im Diagramm steht (null, solange er keine Aufgabe enthält) */
   rahmenBahn?: string | null
+  /** Innerster Baustein „für jedes Stück“, in dessen Körper der Schritt liegt (für die Fragen zur Wartezeit) */
+  mehrfach?: Mehrfach | null
+  /** Steht der Schritt als erster direkt in diesem Körper? */
+  ersterImKoerper?: boolean
   /** Nur bestehender Abschnitt: löst ihn auf, seine Schritte stehen danach wieder in der Folge */
   loeseAuf?: () => void
 }
@@ -55,6 +59,8 @@ export function BlockFormular({ block, onAendern, kontext }: Props<Block>) {
       return <WartenFormular block={block} onAendern={onAendern} kontext={kontext} />
     case 'teilprozess':
       return <TeilprozessFormular block={block} onAendern={onAendern} kontext={kontext} />
+    case 'mehrfach':
+      return <MehrfachFormular block={block} onAendern={onAendern} kontext={kontext} />
     default:
       return unerwartet(block)
   }
@@ -199,6 +205,11 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
   const naechste = kontext.nachfolger?.typ === 'entscheidung' ? kontext.nachfolger : null
   const ausgang = naechste ? freigabeAusgang(naechste) : null
   const folge = naechste && ausgang ? { entscheidung: naechste, ausgang } : null
+  // In „für jedes Stück“ zählt die Liegezeit vor dem ersten Stück einmal am Baustein; hier geht es um die Wartezeit je Stück.
+  const mf = kontext.mehrfach ?? null
+  const liegeLabel = mf ? (mf.ausfuehrung === 'nacheinander' && kontext.ersterImKoerper ? 'Wartezeit zwischen zwei Stücken' : 'Wartezeit je Stück') : 'Wie lange liegt der Vorgang vorher?'
+  const liegeHilfe = mf ? `Bis jemand mit dem ersten Stück anfängt, zählt bei „${blockTitel(mf)}“ einmal.` : 'Wartezeit, bis jemand damit anfängt.'
+  const bearbeitungHilfe = mf ? `Je Stück. Liegezeit zählt einmal, Bearbeitung je Stück: ${formatiereZahl(mf.anzahl, 1)} × ${formatiereDauer(a.bearbeitungMin, std)}.` : 'Reine Arbeitszeit im Schnitt.'
 
   return (
     <>
@@ -210,10 +221,10 @@ function AufgabeFormular({ block: a, onAendern, kontext }: Props<Aufgabe>) {
         <MediumWahl label="Womit?" wert={a.mediumId} onAendern={(mediumId) => setze({ mediumId })} />
       </div>
       <div className="feldreihe">
-        <Feld label="Wie lange dauert die Bearbeitung?" hilfe="Reine Arbeitszeit im Schnitt.">
+        <Feld label="Wie lange dauert die Bearbeitung?" hilfe={bearbeitungHilfe}>
           {(id) => <ZeitEingabe id={id} wert={a.bearbeitungMin} stundenProTag={std} onAendern={(m) => setze({ bearbeitungMin: m })} />}
         </Feld>
-        <Feld label="Wie lange liegt der Vorgang vorher?" hilfe="Wartezeit, bis jemand damit anfängt.">
+        <Feld label={liegeLabel} hilfe={liegeHilfe}>
           {(id) => <ZeitEingabe id={id} wert={a.liegezeitMin} stundenProTag={std} onAendern={(m) => setze({ liegezeitMin: m })} />}
         </Feld>
       </div>
@@ -570,19 +581,29 @@ function ParallelFormular({ block: b, onAendern }: Props<Parallel>) {
   )
 }
 
-/** Auswahl, wozu wiederholt wird; nur Nacharbeit gilt als Schwachstelle. */
+/**
+ * Wozu wiederholt wird; nur Nacharbeit gilt als Schwachstelle. „Mehrere
+ * Durchgänge“ gibt es nur noch für Wiederholungen, die es schon tragen; für
+ * neue verweist der Hinweis auf „Etwas für jedes Stück einer Liste“.
+ */
 export function ZweckWahl({ w, onAendern }: { w: Wiederholung; onAendern: (w: Wiederholung) => void }) {
+  if (w.zweck !== 'menge') {
+    return <p className="feld-hilfe">Für mehrere gleiche Durchgänge, z. B. je Position, gibt es den Baustein „Etwas für jedes Stück einer Liste“.</p>
+  }
   return (
-    <Auswahl
-      label="Wozu wird wiederholt?"
-      wert={w.zweck ?? 'nacharbeit'}
-      spalten={2}
-      optionen={[
-        { wert: 'nacharbeit', text: 'Korrektur', beschreibung: 'Fehler beheben, Nacharbeit' },
-        { wert: 'menge', text: 'Mehrere Durchgänge', beschreibung: 'z. B. je Position, gewollt' },
-      ]}
-      onAendern={(zweck) => onAendern({ ...w, zweck })}
-    />
+    <>
+      <Auswahl
+        label="Wozu wird wiederholt?"
+        wert={w.zweck}
+        spalten={2}
+        optionen={[
+          { wert: 'nacharbeit', text: 'Korrektur', beschreibung: 'Fehler beheben, Nacharbeit' },
+          { wert: 'menge', text: 'Mehrere Durchgänge', beschreibung: 'z. B. je Position, gewollt' },
+        ]}
+        onAendern={(zweck) => onAendern({ ...w, zweck })}
+      />
+      <p className="feld-hilfe">Mehrere gleiche Durchgänge bildet der Baustein „Etwas für jedes Stück einer Liste“ besser ab. Unter „Prüfen“ lässt sich diese Wiederholung umwandeln; die Zahlen bleiben gleich.</p>
+    </>
   )
 }
 
@@ -644,6 +665,62 @@ function TeilprozessFormular({ block: t, onAendern, kontext }: Props<Teilprozess
           <span className="leise">Die Schritte bleiben, nur der Rahmen fällt weg.</span>
         </div>
       )}
+    </>
+  )
+}
+
+function MehrfachFormular({ block: m, onAendern, kontext }: Props<Mehrfach>) {
+  const { p } = useApp()
+  const std = p.arbeitsstundenProTag
+  const setze = (w: Partial<Mehrfach>) => onAendern({ ...m, ...w })
+  const einzeln = alsMarkierteAufgabe(m)
+  const bahn = kontext.rahmenBahn
+  return (
+    <>
+      <Feld label="Wofür?" hilfe="Was ist das einzelne Stück? Z. B. „Für jede Position“, „Für jeden Lieferanten“, „Für jeden Beleg“.">
+        {(id) => <input id={id} type="text" autoFocus={kontext.neu} value={m.name} placeholder="z. B. Für jede Position" onChange={(e) => setze({ name: e.target.value })} />}
+      </Feld>
+      <Feld
+        label="Wie viele hat ein einzelner Vorgang im Schnitt?"
+        hilfe={p.vorgaengeProTag > 0 ? `Bei ${formatiereZahl(p.vorgaengeProTag, 1)} Vorgängen am Tag sind das ${formatiereZahl(p.vorgaengeProTag * m.anzahl, 1)} am Tag.` : undefined}
+      >
+        {(id) => <ZahlEingabe id={id} wert={m.anzahl} min={0} onAendern={(anzahl) => setze({ anzahl })} />}
+      </Feld>
+      <Auswahl
+        label="Sind es immer etwa gleich viele?"
+        wert={m.streuung}
+        spalten={2}
+        optionen={[
+          { wert: 'fest', text: 'Ja' },
+          { wert: 'schwankt', text: 'Nein, das schwankt stark', beschreibung: 'mal eins, mal viele' },
+        ]}
+        onAendern={(streuung) => setze({ streuung })}
+      />
+      <Auswahl
+        label="Wie werden sie erledigt?"
+        wert={m.ausfuehrung}
+        spalten={2}
+        optionen={[
+          { wert: 'nacheinander', text: 'Eine Person arbeitet sie der Reihe nach ab', symbol: <Symbol art="mehrfach" groesse={24} /> },
+          {
+            wert: 'gleichzeitig',
+            text: 'Zur selben Zeit',
+            beschreibung: 'Mehrere Leute teilen sich die Liste, oder man wartet auf mehrere Antworten zugleich',
+            symbol: <Symbol art="mehrfach-gleichzeitig" groesse={24} />,
+          },
+        ]}
+        onAendern={(ausfuehrung) => setze({ ausfuehrung })}
+      />
+      <Feld label="Wie lange liegt der Vorgang, bevor jemand mit dem ersten Stück anfängt?" hilfe="Zählt einmal je Vorgang, nicht je Stück.">
+        {(id) => <ZeitEingabe id={id} wert={m.liegezeitMin} stundenProTag={std} onAendern={(liegezeitMin) => setze({ liegezeitMin })} />}
+      </Feld>
+      <p className="feld-hilfe">
+        {einzeln
+          ? `Im Diagramm trägt die Aufgabe „${einzeln.name || 'ohne Namen'}“ die Markierung für mehrere Stücke.`
+          : bahn
+            ? `Im Diagramm stehen die Schritte je Stück in einem Rahmen in der Bahn „${bahn}“; Schritte anderer Rollen tragen die Rolle in Klammern.`
+            : 'Im Diagramm stehen die Schritte je Stück in einem Rahmen mit Markierung, in der Bahn der Rolle mit den meisten Schritten darin. Ist es nur eine Aufgabe, trägt sie die Markierung selbst.'}
+      </p>
     </>
   )
 }

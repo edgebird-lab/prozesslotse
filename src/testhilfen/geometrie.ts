@@ -1,4 +1,4 @@
-import type { Layout, LayoutKnoten, LayoutRahmen, Punkt, Rechteck } from '../bpmn/layout'
+import { RAHMEN, type Layout, type LayoutKnoten, type LayoutRahmen, type Punkt, type Rechteck } from '../bpmn/layout'
 
 function ueberlappen(a: Rechteck, b: Rechteck): boolean {
   return a.x < b.x + b.breite - 1 && b.x < a.x + a.breite - 1 && a.y < b.y + b.hoehe - 1 && b.y < a.y + a.hoehe - 1
@@ -51,7 +51,7 @@ export function gemeinsameStrecke(p1: Punkt, q1: Punkt, p2: Punkt, q2: Punkt): n
 export function aufRand(p: Punkt, k: LayoutKnoten | LayoutRahmen): boolean {
   const cx = k.x + k.breite / 2
   const cy = k.y + k.hoehe / 2
-  if (!('art' in k) || k.art === 'aufgabe' || k.art === 'teilprozess') {
+  if (!('art' in k) || k.art === 'aufgabe' || k.art === 'teilprozess' || k.art === 'mehrfach') {
     const innenX = p.x > k.x - 0.5 && p.x < k.x + k.breite + 0.5
     const innenY = p.y > k.y - 0.5 && p.y < k.y + k.hoehe + 0.5
     return (innenY && (Math.abs(p.x - k.x) < 0.5 || Math.abs(p.x - k.x - k.breite) < 0.5)) || (innenX && (Math.abs(p.y - k.y) < 0.5 || Math.abs(p.y - k.y - k.hoehe) < 0.5))
@@ -113,6 +113,8 @@ export function geometrieFehler(l: Layout): string[] {
     const cy = k.y + k.hoehe / 2
     if (!w) fehler.push(`Randereignis ${k.id} ohne Wirt`)
     else if (Math.abs(cy - (w.y + w.hoehe)) > 0.5 || k.x < w.x - 0.5 || k.x + k.breite > w.x + w.breite + 0.5) fehler.push(`Randereignis ${k.id} sitzt nicht auf der Unterkante von ${w.id}`)
+    // Die Mitte der Unterkante eines Mehrfach-Rahmens gehört der Markierung
+    else if (w.mehrfach && k.x < w.x + w.breite / 2 + RAHMEN.markeHalb - 0.5 && k.x + k.breite > w.x + w.breite / 2 - RAHMEN.markeHalb + 0.5) fehler.push(`Randereignis ${k.id} verdeckt die Mehrfach-Markierung von ${w.id}`)
   }
 
   for (const e of l.kanten) {

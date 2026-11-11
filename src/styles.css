@@ -1489,6 +1489,15 @@ fieldset {
   font-size: 0.9rem;
   color: var(--text-2);
 }
+.befund-knoepfe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.befund-knoepfe:empty {
+  display: none;
+}
 .befunde-kompakt .befund {
   padding: 6px 10px;
 }

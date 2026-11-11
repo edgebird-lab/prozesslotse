@@ -26,6 +26,10 @@ export function fehltNoch(b: Block): string | null {
       return null
     case 'teilprozess':
       return b.name.trim() ? null : 'Gib dem Abschnitt zuerst einen Namen, z. B. „Ware versenden“.'
+    case 'mehrfach':
+      if (!b.name.trim()) return 'Schreib zuerst, wofür es gilt, z. B. „Für jede Position“.'
+      if (b.streuung === 'schwankt' && b.anzahl < 1) return 'Wenn die Zahl schwankt, sind es im Schnitt mindestens 1 Stück.'
+      return b.anzahl > 0 ? null : 'Wie viele Stücke hat ein Vorgang im Schnitt? Die Zahl muss über 0 liegen.'
     default:
       return unerwartet(b)
   }

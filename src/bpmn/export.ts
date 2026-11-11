@@ -9,12 +9,19 @@
  * Abschnitt, steht dort ein Fehler-Ende mit einem `bpmn:error` je Ergebnis; ein
  * Fehler-Randereignis am äußersten Abschnitt fängt es und führt zum Ende mit
  * diesem Ergebnis.
+ *
+ * „Für jedes Stück“ wird eine Mehrfachinstanz (`multiInstanceLoopCharacteristics`,
+ * `isSequential` = nacheinander): an der Aufgabe, wenn der Körper eine einzelne
+ * Aufgabe ist, sonst an einem aufgeklappten Teilprozess. `loopCardinality`
+ * steht nur bei fester, ganzzahliger Anzahl im XML; Mittel, Streuung und
+ * Liegezeit stehen in der Dokumentation.
  */
+import { anzahlVerteilung } from '../modell/anzahl'
 import { findeBlock, mediumName, rolleName } from '../modell/operationen'
-import { istDigital, type Id, type Projekt, type Prozess } from '../modell/typen'
+import { istDigital, type Id, type Mehrfach, type Projekt, type Prozess } from '../modell/typen'
 import { einbettungXml, type Einbettung } from './einbettung'
-import { formatiereDauer, formatiereProzent } from '../modell/zeit'
-import { berechneLayout, xmlId, type Layout, type LayoutKante, type LayoutKnoten, type LayoutRahmen, type Rechteck } from './layout'
+import { formatiereDauer, formatiereProzent, formatiereZahl } from '../modell/zeit'
+import { berechneLayout, xmlId, type Layout, type LayoutKante, type LayoutKnoten, type LayoutRahmen, type MehrfachMarke, type Rechteck } from './layout'
 
 export interface BpmnErgebnis {
   xml: string
@@ -68,7 +75,24 @@ function aufgabenDoku(p: Prozess, k: LayoutKnoten): string {
   if (a.art === 'pruefung') teile.push('Prüfung')
   if (a.art === 'freigabe') teile.push(`Freigabe, erteilt in ${formatiereProzent(a.freigabeQuote)} der Fälle`)
   if (a.brauchtVorgaenger === false) teile.push('Braucht das Ergebnis des vorherigen Schritts nicht')
+  const mf = k.mehrfachBlock ? findeBlock(p, k.mehrfachBlock)?.block : undefined
+  if (mf?.typ === 'mehrfach') teile.push(mehrfachDoku(p, mf))
   return teile.join(' · ')
+}
+
+/** Dokumentation einer Mehrfachinstanz: wofür, wie viele Stücke, wie sie erledigt werden, Liegezeit vor dem ersten. */
+export function mehrfachDoku(p: Prozess, b: Mehrfach): string {
+  const wie = b.streuung === 'fest' ? 'immer etwa gleich viele' : 'die Zahl schwankt stark'
+  const ausfuehrung = b.ausfuehrung === 'nacheinander' ? 'der Reihe nach' : 'zur selben Zeit'
+  return `${b.name || 'Für jedes Stück'}: im Schnitt ${formatiereZahl(b.anzahl, 2)} Stück je Vorgang, ${wie}, ${ausfuehrung}; Liegezeit vor dem ersten Stück ${formatiereDauer(b.liegezeitMin, p.arbeitsstundenProTag)}`
+}
+
+/** Markierung der Mehrfachinstanz; die Anzahl nur, wenn sie fest und ganzzahlig ist (ein Mittel wie 2,5 ist keine gültige Anzahl). */
+function mehrfachXml(m: MehrfachMarke | undefined, e: string): string {
+  if (!m) return ''
+  const v = anzahlVerteilung(m.anzahl, 'fest')
+  if (m.streuung !== 'fest' || v.rest > 0) return `${e}<bpmn:multiInstanceLoopCharacteristics isSequential="${m.nacheinander}" />\n`
+  return `${e}<bpmn:multiInstanceLoopCharacteristics isSequential="${m.nacheinander}">\n${e}  <bpmn:loopCardinality xsi:type="bpmn:tFormalExpression">${v.k0}</bpmn:loopCardinality>\n${e}</bpmn:multiInstanceLoopCharacteristics>\n`
 }
 
 const EREIGNIS_DEFINITION: Record<string, string> = {
@@ -101,7 +125,7 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
       return `${e}<bpmn:intermediateCatchEvent id="${k.id}"${attrName(k.name)}>\n${doku(blockDoku.get(k.id) ?? '', `${e}  `)}${flussRefs}${definition(k.ereignis)}${e}</bpmn:intermediateCatchEvent>\n`
     case 'aufgabe': {
       const typ = aufgabenTyp(p, k)
-      return `${e}<${typ} id="${k.id}"${attrName(k.name)}>\n${doku(aufgabenDoku(p, k), `${e}  `)}${flussRefs}${e}</${typ}>\n`
+      return `${e}<${typ} id="${k.id}"${attrName(k.name)}>\n${doku(aufgabenDoku(p, k), `${e}  `)}${flussRefs}${mehrfachXml(k.mehrfach, `${e}  `)}${e}</${typ}>\n`
     }
     case 'xor':
     case 'und': {
@@ -150,6 +174,8 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
     if (!k.blockId) continue
     elementZuBlock.set(k.id, k.blockId)
     blockZuElementen.set(k.blockId, [...(blockZuElementen.get(k.blockId) ?? []), k.id])
+    // Die Aufgabe mit Markierung steht auch für ihren Baustein „für jedes Stück“.
+    if (k.mehrfachBlock) blockZuElementen.set(k.mehrfachBlock, [...(blockZuElementen.get(k.mehrfachBlock) ?? []), k.id])
     if (k.art === 'warten') blockDoku.set(k.id, `Wartezeit im Schnitt: ${formatiereDauer(warteDauer(p, k.blockId), p.arbeitsstundenProTag)}`)
   }
 
@@ -193,7 +219,9 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   }
   const rahmenXml = (r: LayoutRahmen, e: string): string => {
     const flussRefs = (rein.get(r.id) ?? []).map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + (raus.get(r.id) ?? []).map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
-    return `${e}<bpmn:subProcess id="${r.id}"${attrName(r.name)}>\n${flussRefs}${ebene(r.id, `${e}  `)}${e}</bpmn:subProcess>\n`
+    const mf = r.mehrfach ? findeBlock(p, r.blockId)?.block : undefined
+    const text = mf?.typ === 'mehrfach' ? doku(mehrfachDoku(p, mf), `${e}  `) : ''
+    return `${e}<bpmn:subProcess id="${r.id}"${attrName(r.name)}>\n${text}${flussRefs}${mehrfachXml(r.mehrfach, `${e}  `)}${ebene(r.id, `${e}  `)}${e}</bpmn:subProcess>\n`
   }
   x += ebene(null, '    ')
   x += '  </bpmn:process>\n'

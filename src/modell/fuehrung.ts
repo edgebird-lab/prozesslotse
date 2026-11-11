@@ -12,7 +12,7 @@ export interface Ort {
   position: string
   /** Schritte an dieser Stelle würden nie erreicht. */
   unerreichbar: boolean
-  /** In nebenläufiger Umgebung (Gleichzeitig, ODER) darf der Prozess noch nicht enden. */
+  /** In nebenläufiger Umgebung (Gleichzeitig, ODER, Stücke zur selben Zeit) darf der Prozess noch nicht enden. */
   inParallele: boolean
   vorgaenger: Block | null
   /** Was „Abschnitt fertig“ bewirkt, als kurzer Text. */
@@ -35,6 +35,7 @@ function bereichText(p: Prozess, sequenzId: string): string {
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return `im Bereich mit Rücksprung ab „${b.koerper.schritte[0] ? bereichTitel(b.koerper.schritte[0]) : '…'}“`
   if (b.typ === 'wiederholung') return `in der Wiederholung „${b.frage || 'Wiederholung'}“`
   if (b.typ === 'teilprozess') return `im Abschnitt „${b.name || 'ohne Namen'}“`
+  if (b.typ === 'mehrfach') return `je Stück in „${b.name || 'Für jedes Stück'}“`
   return 'im Ablauf'
 }
 
@@ -83,6 +84,7 @@ export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {
       return block.zweige.length > 0 ? { sequenzId: block.zweige[0].id, index: block.zweige[0].schritte.length } : { ...c, index: c.index + 1 }
     case 'wiederholung':
     case 'teilprozess':
+    case 'mehrfach':
       return { sequenzId: block.koerper.id, index: block.koerper.schritte.length }
     case 'aufgabe':
     case 'warten':

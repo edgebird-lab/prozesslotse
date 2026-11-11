@@ -9,8 +9,10 @@
  * - **Spuren**: Innerhalb einer Bahn werden Zweige übereinander gestapelt.
  *   Jeder Zweig bekommt in jeder Bahn ein eigenes Band, das über die ganze
  *   Breite seines Blocks reserviert ist.
- * - **Rahmen** (Abschnitte, im BPMN aufgeklappte Teilprozesse) liegen mit
- *   allem darin in einer Bahn. Über dem Inhalt liegt eine dünne Kopfspur für
+ * - **Rahmen** (Abschnitte und „für jedes Stück“, im BPMN aufgeklappte
+ *   Teilprozesse) liegen mit allem darin in einer Bahn. Ist der Körper von
+ *   „für jedes Stück“ eine einzelne Aufgabe, trägt sie die Markierung der
+ *   Mehrfachinstanz, und es gibt keinen Rahmen. Über dem Inhalt liegt eine dünne Kopfspur für
  *   den Namen, darunter eine dünne Fußspur. Die Hauptlinie eines Teils liegt in
  *   jeder Bahn auf seiner Ankerspur; Folgen richten ihre Teile darauf aus, damit
  *   Ein- und Austritt eines Rahmens auf einer Höhe mit den Nachbarn liegen.
@@ -24,9 +26,10 @@
  * eines fremden Flusses in einem Rahmen, rückt der betroffene Baustein hinter
  * den Rahmen (Bahnwechsel neben Rahmen).
  */
-import { durchlaufe, oderWahrscheinlichkeiten, oderZiehung, rahmenRolle } from '../modell/operationen'
+import { anzahlVerteilung, kannNull } from '../modell/anzahl'
+import { alsMarkierteAufgabe, durchlaufe, oderWahrscheinlichkeiten, oderZiehung, rahmenRolle } from '../modell/operationen'
 import { fuehreLinien, RAHMEN_RAND, type NachrichtAuftrag } from './linien'
-import { unerwartet, type Aufgabe, type Block, type EntscheidungsZweig, type Id, type OderZweig, type Prozess, type Rolle, type Sequenz, type Teilprozess, type Wiederholung } from '../modell/typen'
+import { unerwartet, type Aufgabe, type Block, type EntscheidungsZweig, type Id, type Mehrfach, type MehrfachStreuung, type OderZweig, type Prozess, type Rolle, type Sequenz, type Teilprozess, type Wiederholung } from '../modell/typen'
 import { formatiereProzent } from '../modell/zeit'
 
 export const MASSE = {
@@ -55,6 +58,15 @@ export const RAHMEN = {
   randRechts: 30,
   /** Mittelpunktsabstand der Randereignisse */
   randAbstand: 38,
+  /** Halbe Breite der Mehrfach-Markierung in der Mitte der Unterkante, mit Rand; dort sitzt kein Randereignis */
+  markeHalb: 18,
+}
+
+/** Mehrfachinstanz („für jedes Stück“) an einer Aufgabe oder einem Rahmen; Anzahl und Streuung braucht das Tokenspiel. */
+export interface MehrfachMarke {
+  nacheinander: boolean
+  anzahl: number
+  streuung: MehrfachStreuung
 }
 
 export const OHNE_ROLLE = '__ohne_rolle__'
@@ -95,6 +107,10 @@ export interface LayoutKnoten extends Rechteck {
   wirt?: string
   /** Zweige, in denen der Knoten liegt, von außen nach innen (`Verzweigung|Zweig|Baustein`); für das Rücken hinter Rahmen */
   zweigPfad?: string[]
+  /** Aufgabe mit Markierung der Mehrfachinstanz („für jedes Stück“ mit einer einzelnen Aufgabe) */
+  mehrfach?: MehrfachMarke
+  /** dazu der Baustein „für jedes Stück“ im Modell */
+  mehrfachBlock?: Id
 }
 
 export interface Spur {
@@ -151,7 +167,7 @@ export interface LayoutNachricht {
   punkte: Punkt[]
 }
 
-export type RahmenArt = 'teilprozess'
+export type RahmenArt = 'teilprozess' | 'mehrfach'
 
 /** Rahmen eines aufgeklappten Teilprozesses; kein Knoten im Spaltenraster. */
 export interface LayoutRahmen extends Rechteck {
@@ -171,6 +187,8 @@ export interface LayoutRahmen extends Rechteck {
   /** Feld des Namens (bpmn-js zeichnet ihn oben in der Mitte) */
   beschriftung?: Rechteck
   zweigPfad: string[]
+  /** Markierung der Mehrfachinstanz, in der Mitte der Unterkante */
+  mehrfach?: MehrfachMarke
 }
 
 export interface Layout {
@@ -229,6 +247,7 @@ interface TeilRahmen {
   /** Spur der Hauptlinie (innerer Start und inneres Ende) */
   ankerSpur: number
   zweigPfad: string[]
+  mehrfach?: MehrfachMarke
 }
 
 interface Teil {
@@ -353,8 +372,8 @@ function bahnVon(ctx: Kontext, rolleId: Id | null): string {
   return rolleId !== null && ctx.rollenIds.has(rolleId) ? rolleId : OHNE_ROLLE
 }
 
-/** Bahn eines Abschnitts: die Rolle mit den meisten Aufgaben darin, sonst die Bahn, in der der Ablauf gerade ist. */
-function rahmenBahn(b: Teilprozess, bahn: string, ctx: Kontext): string {
+/** Bahn eines Rahmens: die Rolle mit den meisten Aufgaben darin, sonst die Bahn, in der der Ablauf gerade ist. */
+function rahmenBahn(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext): string {
   const rolle = rahmenRolle(b, (r) => (r !== null && ctx.rollenIds.has(r) ? r : null))
   return rolle === undefined ? bahn : rolle === null ? OHNE_ROLLE : rolle
 }
@@ -447,10 +466,22 @@ function layoutBlock(b: Block, bahn: string, ctx: Kontext): Teil {
     case 'wiederholung':
       return layoutWiederholung(b, bahn, ctx)
     case 'teilprozess':
-      return layoutTeilprozess(b, bahn, ctx)
+      return layoutRahmen(b, bahn, ctx)
+    case 'mehrfach':
+      return layoutMehrfach(b, bahn, ctx)
     default:
       return unerwartet(b)
   }
+}
+
+/** „Für jedes Stück“: eine einzelne Aufgabe trägt die Markierung, sonst ein Rahmen mit Markierung. */
+function layoutMehrfach(b: Mehrfach, bahn: string, ctx: Kontext): Teil {
+  const marke: MehrfachMarke = { nacheinander: b.ausfuehrung === 'nacheinander', anzahl: b.anzahl, streuung: b.streuung }
+  const einzeln = alsMarkierteAufgabe(b)
+  if (!einzeln) return layoutRahmen(b, bahn, ctx, marke)
+  const t = layoutBlock(einzeln, bahn, ctx)
+  Object.assign(t.knoten[0], { mehrfach: marke, mehrfachBlock: b.id })
+  return t
 }
 
 interface ZweigLayout {
@@ -687,14 +718,24 @@ function layoutWiederholung(b: Wiederholung, bahn: string, ctx: Kontext): Teil {
   return t
 }
 
+/** Mindestzahl innerer Spalten, damit `anzahl` Randereignisse rechts der Mehrfach-Markierung Platz haben (Rahmen mindestens 42 px breiter als seine Spalten). */
+function spaltenFuerRand(anzahl: number): number {
+  if (anzahl <= 0) return 0
+  const noetig = 2 * (RAHMEN.markeHalb + MASSE.ereignis.breite / 2 + RAHMEN.randRechts + (anzahl - 1) * RAHMEN.randAbstand)
+  return Math.ceil((noetig - 42) / MASSE.spalte)
+}
+
 /**
- * Abschnitt (aufgeklappter Teilprozess): ein Rahmen in einer Bahn mit innerem
- * Start, dem Körper und innerem Ende. Kopfspur oben, Fußspur unten. Der
- * äußerste Rahmen fängt die Fehler-Enden darin mit je einem Randereignis auf
- * seiner Unterkante; der Fluss läuft von dort zu einem Ende mit dem Ergebnis
- * in einem eigenen Band darunter, in der Spalte hinter dem Rahmen.
+ * Rahmen (Abschnitt oder „für jedes Stück“, im BPMN ein aufgeklappter
+ * Teilprozess) in einer Bahn mit innerem Start, dem Körper und innerem Ende.
+ * Kopfspur oben, Fußspur unten. Der äußerste Rahmen fängt die Fehler-Enden
+ * darin mit je einem Randereignis auf seiner Unterkante; der Fluss läuft von
+ * dort zu einem Ende mit dem Ergebnis in einem eigenen Band darunter, in der
+ * Spalte hinter dem Rahmen. Bei einer Mehrfachinstanz bleibt die Mitte der
+ * Unterkante für die Markierung frei; reicht der Platz rechts davon nicht,
+ * bekommt der Rahmen am Ende leere Spalten.
  */
-function layoutTeilprozess(b: Teilprozess, bahn: string, ctx: Kontext): Teil {
+function layoutRahmen(b: Teilprozess | Mehrfach, bahn: string, ctx: Kontext, marke?: MehrfachMarke): Teil {
   const eigeneBahn = ctx.bahnZwang ?? rahmenBahn(b, bahn, ctx)
   const id = xmlId(b.id)
   const aussen = { bahnZwang: ctx.bahnZwang, rahmen: ctx.rahmen }
@@ -709,9 +750,10 @@ function layoutTeilprozess(b: Teilprozess, bahn: string, ctx: Kontext): Teil {
   const t = neuerTeil(eigeneBahn)
   t.knoten.push(knoten(ctx, { id: startId, art: 'start', name: '', blockId: b.id, bahn: eigeneBahn, spalte: 0, spur: ankerSpur }))
   uebernimm(t, koerper)
-  // Läuft der Körper nie normal zu Ende (jeder Weg endet vorher), gibt es kein inneres Ende und keinen Ausgang.
+  // Läuft der Körper nie normal zu Ende (jeder Weg endet vorher), gibt es kein inneres Ende und, außer ohne Stück, keinen Ausgang.
   const normalesEnde = !koerper.eintritt || koerper.austritt !== null
-  const endSpalte = normalesEnde ? 1 + koerper.breite : koerper.breite
+  const randAnzahl = aussen.rahmen === null && marke ? new Set(koerper.knoten.filter((k) => k.art === 'ende' && k.fehler).map((k) => k.fehler)).size : 0
+  const endSpalte = Math.max(normalesEnde ? 1 + koerper.breite : koerper.breite, spaltenFuerRand(randAnzahl))
   if (normalesEnde) {
     t.knoten.push(knoten(ctx, { id: endeId, art: 'ende', name: '', blockId: b.id, bahn: eigeneBahn, spalte: endSpalte, spur: ankerSpur }))
     t.kanten.push(kante(ctx, startId, koerper.eintritt ?? endeId))
@@ -725,10 +767,12 @@ function layoutTeilprozess(b: Teilprozess, bahn: string, ctx: Kontext): Teil {
   const inhalt = Math.max(ankerSpur + 1, (koerper.hoehe.get(eigeneBahn) ?? 0) + 1)
   const fussSpur = inhalt
   belege(t, eigeneBahn, fussSpur + 1)
-  t.rahmen.push({ id, blockId: b.id, art: 'teilprozess', name: b.name, bahn: eigeneBahn, eltern: aussen.rahmen, spalteVon: 0, spalteBis: endSpalte, spurVon: 0, spurBis: fussSpur, ankerSpur, zweigPfad: [] })
+  t.rahmen.push({ id, blockId: b.id, art: b.typ, name: b.name, bahn: eigeneBahn, eltern: aussen.rahmen, spalteVon: 0, spalteBis: endSpalte, spurVon: 0, spurBis: fussSpur, ankerSpur, zweigPfad: [], ...(marke ? { mehrfach: marke } : {}) })
   t.breite = endSpalte + 1
   t.eintritt = id
-  t.austritt = normalesEnde ? { knoten: id, name: '', doku: '' } : null
+  // Ein Mehrfach-Rahmen ohne Stück ist sofort fertig: Dann geht es auch ohne inneres Ende hinaus.
+  const ohneStueck = !!marke && kannNull(anzahlVerteilung(marke.anzahl, marke.streuung))
+  t.austritt = normalesEnde || ohneStueck ? { knoten: id, name: '', doku: '' } : null
   t.austrittsBahn = eigeneBahn
   t.anker.set(eigeneBahn, ankerSpur)
 
@@ -788,7 +832,7 @@ function rahmenZeilen(name: string, breite: number): number {
 function ersteBahnVon(p: Prozess, ctx: Kontext): string {
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ === 'aufgabe') return bahnVon(ctx, block.rolleId)
-    if (block.typ === 'teilprozess') {
+    if (block.typ === 'teilprozess' || block.typ === 'mehrfach') {
       const r = rahmenRolle(block, (x) => (x !== null && ctx.rollenIds.has(x) ? x : null))
       if (r !== undefined) return r === null ? OHNE_ROLLE : r
     }
@@ -971,7 +1015,23 @@ function layoutRunde(p: Prozess, schub: Map<Id, number>): Layout {
   const rahmen: LayoutRahmen[] = t.rahmen.map((r) => {
     const oben = spurOben({ bahn: r.bahn, spur: r.spurVon }) + RAHMEN.oben
     const unten = spurMitte({ bahn: r.bahn, spur: r.spurBis })
-    return { id: r.id, blockId: r.blockId, art: r.art, name: r.name, bahn: r.bahn, eltern: r.eltern, anschlussY: spurMitte({ bahn: r.bahn, spur: r.ankerSpur }), spalteVon: r.spalteVon, spalteBis: r.spalteBis, zweigPfad: r.zweigPfad, x: 0, y: oben, breite: 0, hoehe: unten - oben }
+    return {
+      id: r.id,
+      blockId: r.blockId,
+      art: r.art,
+      name: r.name,
+      bahn: r.bahn,
+      eltern: r.eltern,
+      anschlussY: spurMitte({ bahn: r.bahn, spur: r.ankerSpur }),
+      spalteVon: r.spalteVon,
+      spalteBis: r.spalteBis,
+      zweigPfad: r.zweigPfad,
+      ...(r.mehrfach ? { mehrfach: r.mehrfach } : {}),
+      x: 0,
+      y: oben,
+      breite: 0,
+      hoehe: unten - oben,
+    }
   })
   const eltern = new Map(rahmen.map((r) => [r.id, r.eltern]))
   // senkrechte Ausdehnung je Knoten samt Beschriftung (Gateways oben, Ereignisse unten)

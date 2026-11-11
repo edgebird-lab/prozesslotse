@@ -68,6 +68,12 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       fordere(istText(x.name), `${wo}: Abschnitt ohne Namensfeld.`)
       pruefeSequenz(x.koerper, `${wo}, Abschnitt`)
       return
+    case 'mehrfach':
+      fordere(istText(x.name) && istZahl(x.anzahl) && istZahl(x.liegezeitMin), `${wo}: „Für jedes Stück“ unvollständig.`)
+      fordere(x.streuung === 'fest' || x.streuung === 'schwankt', `${wo}: unbekannte Streuung der Anzahl.`)
+      fordere(x.ausfuehrung === 'nacheinander' || x.ausfuehrung === 'gleichzeitig', `${wo}: unbekannte Ausführung von „Für jedes Stück“.`)
+      pruefeSequenz(x.koerper, `${wo}, je Stück`)
+      return
     case 'wiederholung':
       fordere(istText(x.frage) && istZahl(x.anteilWiederholung) && (x.modus === 'anteil' || x.modus === 'ruecksprung'), `${wo}: Wiederholung unvollständig.`)
       fordere(x.zweck === undefined || x.zweck === 'nacharbeit' || x.zweck === 'menge', `${wo}: Zweck der Wiederholung ungültig.`)
@@ -114,7 +120,7 @@ function entferneFremdeAbsender(p: Prozess): void {
         }
       }
       if (b.typ === 'parallel' || b.typ === 'oder') for (const z of b.zweige) sequenz(z.schritte)
-      if (b.typ === 'wiederholung' || b.typ === 'teilprozess') sequenz(b.koerper.schritte)
+      if (b.typ === 'wiederholung' || b.typ === 'teilprozess' || b.typ === 'mehrfach') sequenz(b.koerper.schritte)
     }
   }
   sequenz(p.ablauf.schritte)

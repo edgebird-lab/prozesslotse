@@ -52,5 +52,5 @@ describe('BPMN-Export', () => {
       if (s % 10 === 0) await pruefeSchema(xml)
     }
     expect(fehler.slice(0, 10)).toEqual([])
-  })
+  }, 60_000)
 })

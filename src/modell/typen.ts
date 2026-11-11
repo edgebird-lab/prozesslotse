@@ -218,7 +218,33 @@ export interface Teilprozess {
   koerper: Sequenz
 }
 
-export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten | Teilprozess
+/** fest: immer etwa gleich viele Stücke; schwankt: die Zahl streut stark (geometrisch ab 1) */
+export type MehrfachStreuung = 'fest' | 'schwankt'
+/** nacheinander: eine Person arbeitet die Stücke der Reihe nach ab; gleichzeitig: alle Stücke zur selben Zeit */
+export type MehrfachAusfuehrung = 'nacheinander' | 'gleichzeitig'
+
+/**
+ * Für jedes Stück einer Liste (Mehrfachinstanz), z. B. „Für jede Position“: Der
+ * Körper läuft einmal je Stück. Die Anzahl N je Vorgang hat das Mittel
+ * `anzahl`; wie sie streut, legt `streuung` fest (siehe anzahl.ts). Die
+ * Liegezeit zählt einmal vor dem ersten Stück, nicht je Stück. Im Diagramm
+ * trägt eine einzelne Aufgabe die Markierung, sonst ein Rahmen.
+ */
+export interface Mehrfach {
+  typ: 'mehrfach'
+  id: Id
+  /** z. B. „Für jede Position“ */
+  name: string
+  /** Stücke je Vorgang im Schnitt, ≥ 0 (bei „schwankt“ ≥ 1) */
+  anzahl: number
+  streuung: MehrfachStreuung
+  ausfuehrung: MehrfachAusfuehrung
+  /** Liegezeit einmal vor dem ersten Stück, in Minuten */
+  liegezeitMin: number
+  koerper: Sequenz
+}
+
+export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten | Teilprozess | Mehrfach
 export type BlockTyp = Block['typ']
 
 /** Für erschöpfende Unterscheidungen: Der Übersetzer meldet jeden vergessenen Fall. */

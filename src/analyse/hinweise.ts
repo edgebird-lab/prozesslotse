@@ -141,6 +141,34 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
           blockId: block.id,
         })
       }
+    } else if (block.typ === 'mehrfach') {
+      // Liegezeit vor dem ersten Stück, wie bei einer Aufgabe
+      if (kz && k.durchlaufzeitMin > 0 && kz.beitragWartenMin / k.durchlaufzeitMin >= LIEGEZEIT_SCHWELLE) {
+        add({
+          schluessel: `liegezeit:${block.id}`,
+          schwere: 'warnung',
+          titel: 'Lange Liegezeit',
+          text: `Bevor jemand mit dem ersten Stück von „${blockTitel(block)}“ anfängt, liegt der Vorgang ${formatiereDauer(block.liegezeitMin, std)}, das sind ${formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)} der Durchlaufzeit. Ursache klären: Stapelbearbeitung, Vertretung, feste Termine?`,
+          blockId: block.id,
+        })
+      }
+      // Gleichzeitig heißt: so viele Leute wie Stücke. Hat eine Rolle im Körper weniger, arbeitet sie tatsächlich nacheinander.
+      if (block.ausfuehrung === 'gleichzeitig') {
+        const rollen = new Set<Id>()
+        for (const { block: x } of durchlaufe(block.koerper)) if (x.typ === 'aufgabe' && x.rolleId) rollen.add(x.rolleId)
+        for (const id of rollen) {
+          const rolle = p.rollen.find((r) => r.id === id)
+          if (!rolle || block.anzahl <= bedienende(rolle.personen)) continue
+          add({
+            schluessel: `mehrfachrolle:${block.id}:${id}`,
+            schwere: 'hinweis',
+            titel: 'Gleichzeitig, aber zu wenig Leute',
+            text: `„${blockTitel(block)}“ rechnet damit, dass die im Schnitt ${formatiereZahl(block.anzahl, 1)} Stücke zur selben Zeit erledigt werden. ${rolle.name || 'Die Rolle'} hat aber nur ${personenText(bedienende(rolle.personen))}; wer mehrere Stücke zugleich erledigen müsste, arbeitet sie tatsächlich nacheinander. Die berechnete Durchlaufzeit ist dann zu niedrig.`,
+            blockId: block.id,
+            rolleId: id,
+          })
+        }
+      }
     } else if (block.typ === 'entscheidung' && block.art === 'ereignis') {
       for (const zweig of block.zweige) {
         const kz = k.schritte.get(zweig.id)

@@ -12,6 +12,7 @@ import {
   neuesMedium,
   neuesWarten,
   neueWiederholung,
+  neuerMehrfach,
   neuerTeilprozess,
 } from '../modell/bausteine'
 import { durchlaufe, findeBlock, nebenlaeufig, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
@@ -20,8 +21,10 @@ import type { Block, Prozess, Sequenz } from '../modell/typen'
 /**
  * Zufällige, gültige Prozesse für Belastungstests: verschachtelte
  * Entscheidungen (auch ereignisbasiert), Gleichzeitig, ODER, Wiederholungen,
- * Warten, Abschnitte (auch verschachtelt und mit Enden darin), vorzeitige Enden
- * und Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche.
+ * Warten, Abschnitte (auch verschachtelt und mit Enden darin), „für jedes
+ * Stück“ (fest und schwankend, nacheinander mit Enden darin und gleichzeitig,
+ * als Aufgabe mit Markierung und als Rahmen), vorzeitige Enden und
+ * Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche.
  */
 export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: boolean } = {}): Prozess {
   // auchUngueltig: jeder Ausgang darf enden oder zurückspringen, also auch alle; dann entstehen unerreichbare Schritte und Endlosschleifen
@@ -44,7 +47,29 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
   function block(tiefe: number, inParallel: boolean): Block {
     const r = zufall()
     if (tiefe >= 3 || r < 0.45) return aufgabe()
-    if (r < 0.52) return neuesWarten({ name: 'Warten', dauerMin: 30, art: 'nachricht', von: nachricht() })
+    if (r < 0.485) return neuesWarten({ name: 'Warten', dauerMin: 30, art: 'nachricht', von: nachricht() })
+    if (r < 0.52) {
+      // Für jedes Stück: oft eine einzelne Aufgabe (Markierung an der Aufgabe), sonst ein Rahmen. Gleichzeitig ist der Körper
+      // nebenläufig, also ohne Enden. Ungültig: ein leerer Körper oder 0 Stücke.
+      const n = ++nr
+      const gleichzeitig = zufall() < 0.4
+      const schwankt = zufall() < 0.4
+      const anzahl = frei && zufall() < 0.1 ? 0 : schwankt ? wahl([1.5, 2.5, 4]) : wahl([0.5, 1, 2, 2.5, 3])
+      const einzeln = zufall() < 0.35
+      const schritte = einzeln ? [aufgabe()] : sequenz(tiefe + 1, inParallel || gleichzeitig, frei && zufall() < 0.1 ? 0 : 1)
+      // nacheinander darf ein Stück den Vorgang beenden: Fehler-Ende im Rahmen, gefangen am äußersten Rahmen
+      if (!einzeln && !gleichzeitig && !inParallel && zufall() < 0.5) {
+        schritte.push(neueEntscheidung({ frage: 'Stück in Ordnung?', zweige: [neuerZweig('Ja', 0.9), neuerZweig('Nein', 0.1, { ende: `Stück ${n} abgelehnt` })] }))
+      }
+      return neuerMehrfach({
+        name: `Für jedes Stück ${n}`,
+        anzahl,
+        streuung: schwankt ? 'schwankt' : 'fest',
+        ausfuehrung: gleichzeitig ? 'gleichzeitig' : 'nacheinander',
+        liegezeitMin: wahl([0, 0, 30]),
+        koerper: { id: `mk${n}`, schritte },
+      })
+    }
     if (r < 0.75) {
       const ereignisse = zufall() < 0.3
       const n = 2 + Math.floor(zufall() * 2)

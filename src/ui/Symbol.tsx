@@ -22,6 +22,8 @@ export type SymbolArt =
   | 'ereignisgateway'
   | 'ruecksprung'
   | 'teilprozess'
+  | 'mehrfach'
+  | 'mehrfach-gleichzeitig'
 
 export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
   return (
@@ -162,6 +164,22 @@ function inhalt(art: SymbolArt) {
           <circle cx="9" cy="18" r="2.6" {...strich} strokeWidth={1.2} />
           <path d="M11.6 18h7.8" {...strich} strokeWidth={1.2} />
           <circle cx="22" cy="18" r="2.6" {...strich} strokeWidth={2.2} />
+        </>
+      )
+    case 'mehrfach':
+      // Aufgabe mit drei waagerechten Strichen unten in der Mitte: je Stück, der Reihe nach
+      return (
+        <>
+          <rect x="3" y="5" width="26" height="22" rx="4" {...strich} />
+          <path d="M12.5 15.5h7M12.5 18.5h7M12.5 21.5h7" {...strich} strokeWidth={1.5} />
+        </>
+      )
+    case 'mehrfach-gleichzeitig':
+      // drei senkrechte Striche: alle Stücke zur selben Zeit
+      return (
+        <>
+          <rect x="3" y="5" width="26" height="22" rx="4" {...strich} />
+          <path d="M13 15v7M16 15v7M19 15v7" {...strich} strokeWidth={1.5} />
         </>
       )
     case 'ruecksprung':

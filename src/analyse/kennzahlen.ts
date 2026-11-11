@@ -18,11 +18,17 @@
  *    Maximum der Erwartungswerte wäre zu optimistisch, sobald Zweige streuen.
  *    Die Flusseffizienz ist TCT / CT (Dumas u. a.): dieselben Regeln, einmal
  *    nur mit Bearbeitungszeiten (TCT) und einmal mit allen Zeiten (CT).
+ *
+ * „Für jedes Stück“ mit N Stücken (Verteilung in anzahl.ts) und c = P(ein
+ * Durchlauf endet normal): nacheinander laufen im Schnitt
+ * K = E[(1 − c^N)/(1 − c)] Durchläufe, gleichzeitig K = E[N]; weiter geht es
+ * mit E[c^N]. Die Liegezeit des Bausteins zählt einmal, wenn N ≥ 1.
  */
+import { anzahlVerteilung, erwartungLaeufe, erwartungPotenz, mindestens, wahrscheinlichkeit, type AnzahlVerteilung } from '../modell/anzahl'
 import { durchlaufe, nachrichtenVerweise, oderWahrscheinlichkeiten } from '../modell/operationen'
-import { erwartungMaximum, erwartungOder } from './verteilung'
+import { erwartungGesamt, erwartungMaximum, erwartungOder, verteilungBlock } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
-import { unerwartet, type Aufgabe, type Block, type Id, type Prozess, type Rolle, type Teilnehmer } from '../modell/typen'
+import { unerwartet, type Aufgabe, type Block, type Id, type Mehrfach, type Prozess, type Rolle, type Teilnehmer } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
 // Ergebnis
@@ -163,6 +169,12 @@ function addiere(ziel: Fluss, f: Fluss): void {
   for (const [k, w] of f.letzte) plus(ziel.letzte, k, w)
 }
 
+/** Letzte Aufgaben: ziel += quelle · faktor */
+function addiereLetzte(ziel: Map<string, number>, quelle: Map<string, number>, faktor: number): void {
+  if (faktor === 0) return
+  for (const [k, w] of quelle) plus(ziel, k, w * faktor)
+}
+
 function addiereRueck(ziel: Map<Id, Fluss>, quelle: Map<Id, Fluss>, ohne?: Id): void {
   for (const [id, f] of quelle) {
     if (id === ohne) continue
@@ -279,9 +291,112 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
     case 'teilprozess':
       // Ein Abschnitt rechnet wie die Folge seiner Schritte; Enden darin beenden den Vorgang.
       return flussSequenz(b.koerper.schritte, f, z, ctx)
+    case 'mehrfach':
+      return flussMehrfach(b, f, z, ctx)
     default:
       return unerwartet(b)
   }
+}
+
+/**
+ * „Für jedes Stück“. Die Antwort eines Durchlaufs auf einen Einheitsfluss
+ * (Sonde) liefert c (normal zu Ende), q (Durchlauf ohne Aufgabe) und u (letzte
+ * Aufgaben am Ende). Nacheinander beginnt Stück j mit dem Zufluss
+ * f · P(N ≥ j) · c^(j−1); vor dem ersten steht der Vorgänger, vor jedem weiteren
+ * die letzte Aufgabe des Stücks davor (Übergaben zwischen den Stücken wie bei
+ * einer Wiederholung). Gleichzeitig laufen alle N Stücke; hinein und heraus
+ * zählt je Vorgang ein Strang.
+ */
+function flussMehrfach(b: Mehrfach, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
+  const v = anzahlVerteilung(b.anzahl, b.streuung)
+  // erreicht, auch wenn N = 0 (für den Eintrag des Bausteins in den Kennzahlen)
+  plus(z.haeufigkeit, b.id, f.anteil)
+  const sonde = flussSequenz(b.koerper.schritte, { anteil: 1, letzte: new Map([[SONDE, 1]]) }, neueZaehler(), ctx)
+  const c = Math.min(1, sonde.aus.anteil)
+  const q = Math.min(1, sonde.aus.letzte.get(SONDE) ?? 0)
+  const u = new Map([...sonde.aus.letzte].filter(([k]) => k !== SONDE))
+  const p0 = wahrscheinlichkeit(v, 0)
+  const p1 = mindestens(v, 1)
+  const ausfuehrung = b.ausfuehrung
+  switch (ausfuehrung) {
+    case 'nacheinander': {
+      const { zufluss, letzte, aus } = stueckeNacheinander(v, f, c, q, u)
+      const o = flussSequenz(b.koerper.schritte, { anteil: zufluss, letzte }, z, ctx)
+      // Ohne Stück läuft der Vorgang am Baustein vorbei.
+      addiereLetzte(aus.letzte, f.letzte, p0)
+      aus.anteil += f.anteil * p0
+      return { aus, rueck: o.rueck }
+    }
+    case 'gleichzeitig': {
+      // Enden im Körper meldet die Prüfung bis zum Abbruch in nebenläufiger Umgebung als Fehler; hier zählen sie anteilig.
+      const zz: Zaehler = { ...z, enden: new Map() }
+      const zufluss = f.anteil * v.n
+      const letzte = new Map<string, number>()
+      addiereLetzte(letzte, f.letzte, p1)
+      const o = flussSequenz(b.koerper.schritte, { anteil: zufluss, letzte }, zz, ctx)
+      z.uebergaben = zz.uebergaben
+      z.systemwechsel = zz.systemwechsel
+      z.medienbrueche = zz.medienbrueche
+      z.uebertragungMin = zz.uebertragungMin
+      const weiter = erwartungPotenz(v, c)
+      const endSumme = [...zz.enden.values()].reduce((s, x) => s + x, 0)
+      for (const [e, x] of zz.enden) plus(z.enden, e, endSumme > 0 ? (x / endSumme) * f.anteil * Math.max(0, 1 - weiter) : 0)
+      // ein Strang heraus: die letzte Aufgabe eines Stücks, bei N = 0 der Vorgänger
+      const aus: Fluss = { anteil: f.anteil * weiter, letzte: new Map() }
+      const mitStueck = weiter - p0
+      if (c > 0 && p1 > 0) {
+        const faktor = mitStueck / (p1 * c)
+        addiereLetzte(aus.letzte, f.letzte, p1 * q * faktor)
+        addiereLetzte(aus.letzte, u, f.anteil * p1 * faktor)
+      }
+      addiereLetzte(aus.letzte, f.letzte, p0)
+      return { aus, rueck: o.rueck }
+    }
+    default:
+      return unerwartet(ausfuehrung)
+  }
+}
+
+/**
+ * Zufluss und letzte Aufgaben über alle Stücke, nacheinander, ohne die
+ * Vorgänge mit N = 0. `aus` ist, was nach dem letzten Stück weiterläuft.
+ */
+function stueckeNacheinander(v: AnzahlVerteilung, f: Fluss, c: number, q: number, u: Map<string, number>): { zufluss: number; letzte: Map<string, number>; aus: Fluss } {
+  const letzte = new Map<string, number>()
+  const aus: Fluss = { anteil: 0, letzte: new Map() }
+  if (v.streuung === 'schwankt') {
+    // Nach jedem Stück folgt mit p ein weiteres: geschlossen wie eine Wiederholung
+    const zufluss = f.anteil * erwartungLaeufe(v, c)
+    const nenner = 1 - v.p * q
+    addiereLetzte(letzte, f.letzte, 1 / nenner)
+    addiereLetzte(letzte, u, (v.p * zufluss) / nenner)
+    // Ende eines Stücks: q · Λ + Zufluss · u, davon (1 − p) zum Schluss
+    addiereLetzte(aus.letzte, letzte, (1 - v.p) * q)
+    addiereLetzte(aus.letzte, u, (1 - v.p) * zufluss)
+    aus.anteil = (1 - v.p) * c * zufluss
+    return { zufluss, letzte, aus }
+  }
+  // fest: höchstens ⌊n⌋ + 1 Stücke, Schritt für Schritt
+  let zufluss = 0
+  let a = f.anteil * mindestens(v, 1)
+  let vor = new Map<string, number>()
+  addiereLetzte(vor, f.letzte, mindestens(v, 1))
+  const bis = v.k0 + (v.rest > 0 ? 1 : 0)
+  for (let j = 1; j <= bis; j++) {
+    zufluss += a
+    addiereLetzte(letzte, vor, 1)
+    const nachL = new Map<string, number>()
+    addiereLetzte(nachL, vor, q)
+    addiereLetzte(nachL, u, a)
+    const nachA = a * c
+    const weiter = mindestens(v, j) > 0 ? mindestens(v, j + 1) / mindestens(v, j) : 0
+    addiereLetzte(aus.letzte, nachL, 1 - weiter)
+    aus.anteil += nachA * (1 - weiter)
+    vor = new Map()
+    addiereLetzte(vor, nachL, weiter)
+    a = nachA * weiter
+  }
+  return { zufluss, letzte, aus }
 }
 
 // ---------------------------------------------------------------------------
@@ -401,6 +516,34 @@ function dauerBlock(b: Block): Dauer {
     }
     case 'teilprozess':
       return dauerSequenz(b.koerper.schritte)
+    case 'mehrfach': {
+      const v = anzahlVerteilung(b.anzahl, b.streuung)
+      const x = dauerSequenz(b.koerper.schritte)
+      // Die Liegezeit des Bausteins zählt einmal, wenn es Stücke gibt; zur TCT zählt sie nicht.
+      const liegen = mindestens(v, 1) * b.liegezeitMin
+      const beitraege = new Map<Id, Beitrag>([[b.id, { warten: liegen, arbeit: 0 }]])
+      const ausfuehrung = b.ausfuehrung
+      switch (ausfuehrung) {
+        case 'nacheinander': {
+          // im Schnitt K Durchläufe, jeder mit der Dauer des Körpers (Enden darin beenden die Reihe)
+          const k = erwartungLaeufe(v, x.weiter)
+          addiereBeitraege(beitraege, x.beitraege, k)
+          const rueck = new Map<Id, number>()
+          for (const [id, r] of x.rueck) rueck.set(id, r * k)
+          return { gesamt: liegen + k * x.gesamt, arbeit: k * x.arbeit, weiter: erwartungPotenz(v, x.weiter), rueck, beitraege }
+        }
+        case 'gleichzeitig': {
+          // spätestes von N Stücken, aus der Verteilung eines Stücks (wie bei „Gleichzeitig“)
+          const gesamt = erwartungGesamt(verteilungBlock(b, 'gesamt'))
+          const arbeit = erwartungGesamt(verteilungBlock(b, 'arbeit'))
+          // Beiträge: ein Stück, auf den exakten Erwartungswert hochgerechnet
+          addiereBeitraege(beitraege, x.beitraege, x.gesamt > 0 ? (gesamt - liegen) / x.gesamt : 0)
+          return { gesamt, arbeit, weiter: erwartungPotenz(v, x.weiter), rueck: new Map(), beitraege }
+        }
+        default:
+          return unerwartet(ausfuehrung)
+      }
+    }
     default:
       return unerwartet(b)
   }
@@ -447,6 +590,10 @@ export function berechneKennzahlen(p: Prozess): Kennzahlen {
   }
   for (const { block } of durchlaufe(p.ablauf)) {
     if (block.typ === 'warten') {
+      const beitrag = dauer.beitraege.get(block.id) ?? { warten: 0, arbeit: 0 }
+      schritte.set(block.id, { id: block.id, haeufigkeit: z.haeufigkeit.get(block.id) ?? 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
+    } else if (block.typ === 'mehrfach') {
+      // Liegezeit vor dem ersten Stück
       const beitrag = dauer.beitraege.get(block.id) ?? { warten: 0, arbeit: 0 }
       schritte.set(block.id, { id: block.id, haeufigkeit: z.haeufigkeit.get(block.id) ?? 0, arbeitMin: 0, kosten: 0, beitragWartenMin: beitrag.warten, beitragArbeitMin: 0 })
     } else if (block.typ === 'entscheidung' && block.art === 'ereignis') {

@@ -21,6 +21,8 @@ export function symbolFuer(b: Block, p: Prozess): SymbolArt {
       return b.art === 'zeit' ? 'warten-zeit' : 'warten-nachricht'
     case 'teilprozess':
       return 'teilprozess'
+    case 'mehrfach':
+      return b.ausfuehrung === 'gleichzeitig' ? 'mehrfach-gleichzeitig' : 'mehrfach'
     default:
       return unerwartet(b)
   }
