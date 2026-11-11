@@ -904,6 +904,16 @@ fieldset {
   margin: 0;
   max-width: 80ch;
 }
+/* Hinweis zum Browser-Speicher unter der Kopfzeile */
+.browser-hinweis {
+  margin: 12px 20px 0;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.browser-hinweis p {
+  margin: 0;
+  max-width: 90ch;
+}
 .fremd-buehne {
   flex: 1;
   min-height: 60vh;

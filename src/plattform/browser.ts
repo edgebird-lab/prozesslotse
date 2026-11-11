@@ -11,7 +11,8 @@ const MIME: Record<DateiArt, string> = {
 /**
  * Browser: Öffnen läuft über das Dateifeld der Oberfläche, Speichern über
  * einen Download. Das Projekt liegt zusätzlich im Browserspeicher, deshalb
- * fragt der Browser beim Schließen nicht nach.
+ * fragt der Browser beim Schließen nicht nach; nur solange der Browserspeicher
+ * ungespeicherte Änderungen nicht sichert, warnt die Oberfläche (App.tsx).
  */
 export const browserPlattform: Plattform = {
   desktop: false,

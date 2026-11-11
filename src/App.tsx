@@ -2,7 +2,18 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Cha
 import { beispielMitCompliance } from './compliance/beispiel'
 import { neuesProjekt } from './modell/bausteine'
 import { beispielOnlineProjekt } from './modell/beispiel'
-import { ladeAusBrowser, ladeDokumentInfo, ladeEinstellungen, loescheBrowserDaten, speichereDokumentInfo, speichereEinstellungen, speichereImBrowser } from './modell/speicher'
+import { heuteIso } from './compliance/datum'
+import {
+  browserRohdaten,
+  ladeBrowserStand,
+  ladeDokumentInfo,
+  ladeEinstellungen,
+  loescheBrowserDaten,
+  speichereDokumentInfo,
+  speichereEinstellungen,
+  speichereImBrowser,
+  verwirfBrowserRohdaten,
+} from './modell/speicher'
 import type { Id, Prozess } from './modell/typen'
 import { plattform, type MenueBefehl, type Zuletzt } from './plattform'
 import { aktiverProzess, istGeaendert, reduziere, SCHRITTE, startZustand } from './zustand'
@@ -26,14 +37,27 @@ import './styles.css'
 
 const VERSION = '0.2.0'
 
-function erstZustand() {
-  const gespeichert = ladeAusBrowser()
-  const info = gespeichert ? ladeDokumentInfo() : null
-  const projekt = gespeichert ?? neuesProjekt()
-  // Wiederhergestellt: zugehörige Datei merken; ungespeicherte Änderungen bleiben als „geändert“ markiert
-  const dokument = info ? { pfad: info.pfad, name: info.name, gespeichert: info.ungespeichert ? null : projekt } : {}
+/** Hinweis zum Browser-Speicher; bleibt stehen, bis er erledigt ist. */
+interface BrowserHinweis {
+  text: string
+  /** Rohdaten liegen unverändert im Speicher, bis der Nutzer entscheidet; bis dahin wird nichts gesichert */
+  geschuetzt: boolean
+}
+
+const VERALTET =
+  'Der Browser-Speicher war zuletzt voll. Wiederhergestellt ist deshalb ein älterer Stand als neues, ungespeichertes Dokument; neuere Änderungen gibt es nur in der Projektdatei, falls du sie gespeichert hast.'
+
+function startStand() {
+  const b = ladeBrowserStand()
+  const info = b.projekt ? ladeDokumentInfo() : null
+  const projekt = b.projekt ?? neuesProjekt()
+  // Zur Datei gehört nur ein vollständig übernommener, aktueller Stand; ungespeicherte Änderungen bleiben als „geändert“ markiert.
+  // Sonst gilt der Stand als neues, ungespeichertes Dokument: So überschreibt Speichern keine Datei mit einem älteren oder unvollständigen Stand.
+  const zurDatei = info !== null && !info.veraltet && b.problem === null
+  const dokument = zurDatei ? { pfad: info.pfad, name: info.name, gespeichert: info.ungespeichert ? null : projekt } : b.projekt && (b.problem || info?.veraltet) ? { gespeichert: null } : {}
   const z = startZustand(projekt, ladeEinstellungen().lernmodus, dokument)
-  return projekt.ist.ablauf.schritte.length > 0 ? { ...z, schritt: 'ablauf' as const } : z
+  const hinweis: BrowserHinweis | null = b.problem ? { text: b.problem, geschuetzt: b.geschuetzt } : info?.veraltet ? { text: VERALTET, geschuetzt: false } : null
+  return { zustand: projekt.ist.ablauf.schritte.length > 0 ? { ...z, schritt: 'ablauf' as const } : z, hinweis }
 }
 
 export default function App() {
@@ -45,7 +69,10 @@ export default function App() {
 }
 
 function Hauptfenster() {
-  const [z, dispatch] = useReducer(reduziere, undefined, erstZustand)
+  const [start] = useState(startStand)
+  const [z, dispatch] = useReducer(reduziere, start.zustand)
+  const [browserHinweis, setBrowserHinweis] = useState<BrowserHinweis | null>(start.hinweis)
+  const [browserVoll, setBrowserVoll] = useState(false)
   const [hervorhebung, setHervorhebung] = useState<Id[]>([])
   const [meldung, setMeldung] = useState('')
   const [fremd, setFremd] = useState<FremdesBpmn | null>(null)
@@ -73,12 +100,29 @@ function Hauptfenster() {
 
   // Sofort speichern: Ein Projekt ist nur wenige Kilobyte groß, und ein verzögertes
   // Speichern ginge verloren, wenn der Tab direkt nach einer Änderung geschlossen wird.
+  const geschuetzt = browserHinweis?.geschuetzt === true
   useEffect(() => {
+    // Rohdaten, die sich nicht laden ließen, bleiben unverändert, bis entschieden ist
+    if (geschuetzt) return
     // Mit freigegebenen Versionen kann der Speicher des Browsers voll werden; die Kopfzeile meldet das bei jeder Änderung
-    // (nach dem Zeichnen, damit die Meldung keinen zweiten Durchlauf im selben Effekt auslöst)
-    if (!speichereImBrowser(z.projekt)) window.setTimeout(() => melde('Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.'))
-    speichereDokumentInfo({ pfad: z.dokument.pfad, name: z.dokument.name, ungespeichert: geaendert })
-  }, [z.projekt, z.dokument, geaendert, melde])
+    // (nach dem Zeichnen, damit Zustand und Meldung keinen zweiten Durchlauf im selben Effekt auslösen)
+    const ok = speichereImBrowser(z.projekt)
+    window.setTimeout(() => {
+      setBrowserVoll(!ok)
+      if (!ok) melde('Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.')
+    })
+    // Die Dateiangaben gehören nur zu einem Stand, der wirklich im Browser liegt; sonst gilt der dortige Stand als veraltet
+    speichereDokumentInfo(ok ? { pfad: z.dokument.pfad, name: z.dokument.name, ungespeichert: geaendert } : { pfad: null, name: null, ungespeichert: true, veraltet: true })
+  }, [z.projekt, z.dokument, geaendert, melde, geschuetzt])
+
+  // Im Browser fragt das Schließen nach, solange der Browser-Speicher ungespeicherte Änderungen nicht sichert
+  const ohneSicherung = browserVoll || geschuetzt
+  useEffect(() => {
+    if (plattform.desktop || !ohneSicherung || !geaendert) return
+    const warne = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warne)
+    return () => window.removeEventListener('beforeunload', warne)
+  }, [ohneSicherung, geaendert])
 
   useEffect(() => speichereEinstellungen({ lernmodus: z.lernmodus }), [z.lernmodus])
 
@@ -216,8 +260,30 @@ function Hauptfenster() {
     })
     if (ok !== 'ja') return
     loescheBrowserDaten()
+    setBrowserHinweis(null)
     dispatch({ typ: 'laden', projekt: neuesProjekt() })
     melde('Daten im Browser gelöscht.')
+  }, [frage, melde])
+
+  const rohdatenHerunterladen = useCallback(() => {
+    const text = browserRohdaten()
+    if (text) void datei.exportiere(`prozesslotse-rohdaten-${heuteIso()}.json`, text, 'projekt')
+  }, [datei])
+
+  const rohdatenVerwerfen = useCallback(async () => {
+    const ok = await frage({
+      titel: 'Rohdaten verwerfen?',
+      text: 'Die nicht geladenen Daten werden aus dem Browser-Speicher entfernt. Danach sichert der Prozesslotse wieder den aktuellen Stand im Browser.',
+      knoepfe: [
+        { wert: 'ja', text: 'Verwerfen', art: 'gefahr' },
+        { wert: 'nein', text: 'Abbrechen' },
+      ],
+      abbrechen: 'nein',
+    })
+    if (ok !== 'ja') return
+    verwirfBrowserRohdaten()
+    setBrowserHinweis(null)
+    melde('Rohdaten verworfen. Der aktuelle Stand wird wieder im Browser gesichert.')
   }, [frage, melde])
 
   return (
@@ -234,6 +300,9 @@ function Hauptfenster() {
           hidden
           onChange={(e) => void dateiGewaehlt(e)}
         />
+        {browserHinweis && (
+          <BrowserHinweisLeiste hinweis={browserHinweis} onHerunterladen={rohdatenHerunterladen} onVerwerfen={() => void rohdatenVerwerfen()} onSchliessen={() => setBrowserHinweis(null)} />
+        )}
         {fremd ? (
           <FremdeAnsicht fremd={fremd} onSchliessen={() => setFremd(null)} />
         ) : (
@@ -392,6 +461,34 @@ function Schrittleiste() {
         ))}
       </ol>
     </nav>
+  )
+}
+
+/** Was beim Start aus dem Browser-Speicher nicht übernommen werden konnte; geschützte Rohdaten lassen sich herunterladen oder verwerfen. */
+function BrowserHinweisLeiste({ hinweis, onHerunterladen, onVerwerfen, onSchliessen }: { hinweis: BrowserHinweis; onHerunterladen: () => void; onVerwerfen: () => void; onSchliessen: () => void }) {
+  return (
+    <section className={`banner ${hinweis.geschuetzt ? 'banner-fehler' : 'banner-hinweis'} browser-hinweis`} aria-label="Browser-Speicher">
+      <p>
+        {hinweis.text}
+        {hinweis.geschuetzt && ' Die Rohdaten bleiben unverändert im Browser, bis du entscheidest. Bis dahin sichert der Prozesslotse nichts im Browser.'}
+      </p>
+      <div className="knopfreihe">
+        {hinweis.geschuetzt ? (
+          <>
+            <button type="button" className="knopf" onClick={onHerunterladen}>
+              Rohdaten herunterladen
+            </button>
+            <button type="button" className="knopf knopf-gefahr" onClick={onVerwerfen}>
+              Rohdaten verwerfen …
+            </button>
+          </>
+        ) : (
+          <button type="button" className="knopf" onClick={onSchliessen}>
+            Schließen
+          </button>
+        )}
+      </div>
+    </section>
   )
 }
 

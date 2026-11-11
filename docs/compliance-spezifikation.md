@@ -1013,9 +1013,11 @@ Außerdem ändern sich:
 
 - Das Projekt mit `compliance` liegt wie bisher im `localStorage` (Schlüssel `prozesslotse:projekt`) und in der Projektdatei.
 - Versionen enthalten Prozess und beide Dokumente. Ziel: unter 150 KB je Version beim Lieferdienst; Phase 3 misst das.
-- `App.tsx` schreibt das ganze Projekt bei jeder Änderung sofort in den `localStorage`, auch im Windows-Programm (WebView2). Mit Versionen würde jeder Tastendruck Hunderte KB schreiben. Deshalb liegen die Versionen unter einem eigenen Schlüssel `prozesslotse:versionen`. `speichereImBrowser` schreibt ihn nur, wenn sich das Array `versionen` geändert hat (Referenzvergleich). `ladeAusBrowser` setzt beides wieder zusammen.
-- `speichereImBrowser` liefert schon `false` bei einem Fehler. Neu: Die Kopfzeile meldet dann „Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.“
-- Menüpunkt „Daten im Browser löschen“ entfernt Projekt, Versionen und Einstellungen nach Bestätigung.
+- `App.tsx` schreibt das ganze Projekt bei jeder Änderung sofort in den `localStorage`, auch im Windows-Programm (WebView2). Mit Versionen würde jeder Tastendruck Hunderte KB schreiben. Deshalb liegen die Versionen unter einem eigenen Schlüssel `prozesslotse:versionen`, als `{ merkmal, versionen }`.
+- Den Speicher teilen sich alle Tabs derselben Herkunft und im Windows-Programm alle installierten Fassungen. Deshalb bindet ein Merkmal (Anzahl und Streuwert des Inhalts) die Versionen an das Projekt: Es steht im gespeicherten Projekt (Feld `versionenMerkmal`, gelangt nie in eine Datei) und klein unter `prozesslotse:versionen-merkmal`. `speichereImBrowser` schreibt die Versionen nur, wenn das gespeicherte Merkmal nicht passt. Verglichen wird mit dem tatsächlich gespeicherten Merkmal, nicht mit dem zuletzt selbst geschriebenen; so stellt ein Tab seine Versionen wieder her, wenn ein anderer sie ersetzt oder entfernt hat. `ladeBrowserStand` hängt Versionen nur an, wenn ihr Merkmal zum Projekt passt. Ein Projekt ohne Merkmal stammt aus einer anderen Fassung; seine Versionen stehen dann im Projekt selbst.
+- Lässt sich der gespeicherte Stand nicht vollständig übernehmen (ungültiges Feld, unlesbarer Text, Versionen, die nicht zum Projekt passen), geht nichts still verloren: Die Rohdaten bleiben unverändert, bis der Nutzer entscheidet, und bis dahin sichert die App nichts im Browser. Eine Leiste unter der Kopfzeile nennt den Grund und bietet „Rohdaten herunterladen“ und „Rohdaten verwerfen …“. Sind nur die Compliance-Angaben beschädigt, öffnet die App den Prozess allein (4.4). Ein Stand, der nicht vollständig übernommen wurde, gilt als neues, ungespeichertes Dokument ohne Pfad.
+- `speichereImBrowser` liefert `false`, wenn das Projekt nicht hineinpasst; die Kopfzeile meldet dann bei jeder Änderung „Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.“ Passen neue Versionen nicht, bleibt das vorige Paar aus Projekt und Versionen stehen. Die Dateiangaben (`prozesslotse:dokument`) gehören nur zu einem Stand, der wirklich im Browser liegt; sonst werden sie als veraltet markiert. Beim nächsten Start kommt der ältere Stand dann mit einem Hinweis als neues, ungespeichertes Dokument, nie unter dem Namen der Datei. Im Browser fragt das Schließen des Tabs nach, solange der Browser-Speicher ungespeicherte Änderungen nicht sichert.
+- Menüpunkt „Daten im Browser löschen“ entfernt Projekt, Versionen, Merkmal, Dateiangaben und Einstellungen nach Bestätigung, auch nicht geladene Rohdaten.
 - Im Windows-Programm liest der Rust-Teil Dateien bis 20 MB (`MAX_GROESSE` in `src-tauri/src/lib.rs`). Das reicht für rund 100 Versionen; die README nennt die Grenze.
 
 ### 7.4 Export
@@ -1248,6 +1250,10 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | Änderung am Soll-Prozess | `compliance` unverändert |
 | `localStorage.setItem` wirft | Meldung in der Kopfzeile |
 | Tippen in einem Feld bei 3 Versionen | Schlüssel `prozesslotse:versionen` wird nicht neu geschrieben |
+| zwei Tabs: B legt ein neues Projekt an oder öffnet eines mit eigenen Versionen, danach tippt A | nach dem Neuladen hat A genau seine Versionen |
+| ältere Fassung schreibt ein Projekt mit Versionen im Projekt; alter Schlüssel `prozesslotse:versionen` | Versionen aus dem Projekt; der fremde Schlüssel bleibt unverändert, Hinweis |
+| ungültiges Feld im gespeicherten Projekt | nur der Prozess, Hinweis mit Feld; Rohdaten unverändert, bis verworfen |
+| Versionen passen nicht mehr in den Speicher, danach Neustart | älterer Stand als neues, ungespeichertes Dokument mit Hinweis |
 | `uebernimmFirmenangaben` | 5 Felder übernommen, Unterlagen und Versionen unverändert |
 | `gestricheneKontrollen(9.1, Ergebnis der Regel `freigabe`, Vorschlag „Freigabe „Rechnung freigeben“ streichen“)` | `['auf_freigeben']` |
 | `bpmnFuerExport` mit Option „ohne Compliance-Angaben“ | eingebettetes Projekt ohne `compliance`; Projekt in der App unverändert |
@@ -1283,7 +1289,8 @@ Die Ausgabe des Beispiels geht als PDF an eine Steuerberatung und, falls möglic
 | `docx` erscheint fast wöchentlich neu, eine Version könnte fehlerhaft oder kompromittiert sein | defekte Dateien, Lieferkettenrisiko | exakt pinnen, Lockfile, Updates nur bewusst mit `npm audit` und Tests aus 9.8 |
 | Nutzungsrechte am Muster der BStBK/DStV unklar | Änderungsbedarf nach Veröffentlichung | nur Gliederung und Kapitelnamen, eigene Texte; offene Frage 4 |
 | Satzbausteine lesen sich holprig | geringe Akzeptanz | Muster ohne Beugung („Zuständig: …“), Testleser in Phase 7 |
-| Versionen füllen den Browser-Speicher | Datenverlust | Meldung bei Speicherfehler, Größe messen, Datei speichern |
+| Versionen füllen den Browser-Speicher | Datenverlust | Meldung bei Speicherfehler, Größe messen, Datei speichern; älterer Stand nie unter dem Namen der Datei, Nachfrage beim Schließen des Tabs (7.3) |
+| Mehrere Tabs oder Programmfassungen teilen den Browser-Speicher | fremde oder verlorene Versionen | Merkmal bindet die Versionen an das Projekt; was nicht passt, bleibt als Rohdaten erhalten (7.3) |
 | `docx` scheitert an der Tauri-CSP oder bläht das Bündel auf | kein DOCX im Programm | Test in Phase 0, dynamischer Import, Rückfall nur PDF |
 | Ein Projekt beschreibt nur einen Prozess | Firmenangaben mehrfach pflegen, Widersprüche | Übernahme aus anderer Datei; Firmenmappe später |
 | Kommerzielle Nutzung durch olbricht-digital berührt StBerG oder RDG | rechtliches Risiko | offene Frage 6, vor dem Angebot klären |

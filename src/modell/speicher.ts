@@ -10,6 +10,10 @@ const EINSTELLUNGEN_SCHLUESSEL = 'prozesslotse:einstellungen'
 const DOKUMENT_SCHLUESSEL = 'prozesslotse:dokument'
 /** Freigegebene Versionen der Compliance-Doku liegen getrennt, damit nicht jeder Tastendruck sie neu schreibt. */
 const VERSIONEN_SCHLUESSEL = 'prozesslotse:versionen'
+/** Merkmal der gespeicherten Versionen; klein, damit jedes Speichern es billig mit dem tatsächlichen Stand vergleichen kann. */
+const MERKMAL_SCHLUESSEL = 'prozesslotse:versionen-merkmal'
+/** Feld im gespeicherten Projekt: Merkmal der Versionen, die zu ihm gehören ('' = keine). Gehört nie in eine Datei. */
+const MERKMAL_FELD = 'versionenMerkmal'
 
 export class Formatfehler extends Error {
   /** Feld, an dem die Prüfung scheiterte, z. B. „systeme.med_erp.seit“ (nur bei Compliance-Angaben gesetzt) */
@@ -138,6 +142,8 @@ function migriereVon1(prozess: unknown): void {
 /** Prüft geladene Daten und gibt sie als Projekt zurück; wirft `Formatfehler`. Ältere Formate werden umgestellt. */
 export function leseProjekt(daten: unknown): Projekt {
   fordere(istObj(daten), 'Die Datei enthält kein Prozesslotse-Projekt.')
+  // gehört nur in den Browser-Speicher; eine andere Programmfassung kann es mit in eine Datei geschrieben haben
+  delete daten[MERKMAL_FELD]
   if (daten.formatVersion === 1) {
     migriereVon1(daten.ist)
     if (daten.soll !== null) migriereVon1(daten.soll)
@@ -180,53 +186,202 @@ export function alsJson(p: Projekt): string {
   return JSON.stringify(p, null, 2)
 }
 
-// Browser-Speicher: kann in privaten Fenstern fehlen oder blockiert sein.
+// ---------- Browser-Speicher ----------
+// Kann in privaten Fenstern fehlen oder blockiert sein. Er gehört allen Tabs derselben Herkunft
+// und im Windows-Programm allen installierten Fassungen (gemeinsamer WebView2-Datenordner).
+// Projekt und Versionen liegen unter getrennten Schlüsseln; ein Merkmal im Projekt bindet sie
+// aneinander, damit nie Versionen eines anderen Stands am Projekt hängen.
 
-export function ladeAusBrowser(): Projekt | null {
+function browserSpeicher(): Storage | null {
   try {
-    const text = globalThis.localStorage?.getItem(PROJEKT_SCHLUESSEL)
-    if (!text) return null
-    const daten: unknown = JSON.parse(text)
-    // Versionen der Compliance-Doku liegen unter eigenem Schlüssel und kommen vor der Prüfung wieder dazu
-    const versionen = globalThis.localStorage?.getItem(VERSIONEN_SCHLUESSEL)
-    if (versionen && istObj(daten) && istObj(daten.compliance)) daten.compliance.versionen = JSON.parse(versionen)
-    return leseProjekt(daten)
+    return globalThis.localStorage ?? null
   } catch {
     return null
   }
 }
 
-/** Zuletzt geschriebene Versionen (Referenz); nur eine neue Liste wird erneut geschrieben. */
-let geschriebeneVersionen: unknown = undefined
+/** Kurzer Streuwert (cyrb53) über einen Text. */
+function streuwert(s: string): string {
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    h1 = Math.imul(h1 ^ c, 2654435761)
+    h2 = Math.imul(h2 ^ c, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
+}
 
-export function speichereImBrowser(p: Projekt): boolean {
+const merkmale = new WeakMap<object, string>()
+
+/** Merkmal einer Versionsliste (Anzahl und Streuwert des Inhalts); Listen sind unveränderlich, also je Liste einmal berechnet. */
+function merkmalVon(versionen: readonly unknown[]): string {
+  let m = merkmale.get(versionen)
+  if (m === undefined) {
+    m = `${versionen.length}-${streuwert(JSON.stringify(versionen))}`
+    merkmale.set(versionen, m)
+  }
+  return m
+}
+
+/**
+ * Ließ sich der gespeicherte Stand nicht vollständig übernehmen, bleiben seine Rohdaten unverändert,
+ * bis der Nutzer entscheidet (`verwirfBrowserRohdaten`, `loescheBrowserDaten`); bis dahin schreibt
+ * dieser Tab nichts in den Browser-Speicher.
+ */
+let rohdatenGeschuetzt = false
+
+/** Was beim Start aus dem Browser-Speicher wiederhergestellt wird. */
+export interface BrowserStand {
+  /** Projekt; bei beschädigten Compliance-Angaben nur der Prozess. null: nichts Verwendbares gespeichert */
+  projekt: Projekt | null
+  /** Was nicht übernommen werden konnte; null, wenn alles passt */
+  problem: string | null
+  /** Die Rohdaten bleiben unverändert im Speicher, bis der Nutzer entscheidet */
+  geschuetzt: boolean
+}
+
+/** Gespeicherte Versionen mit dem Merkmal, unter dem sie geschrieben wurden; null bei unlesbarem oder altem Inhalt. */
+function leseVersionen(text: string): { merkmal: string; versionen: unknown[] } | null {
   try {
-    const speicher = globalThis.localStorage
-    if (!speicher) return true
-    const versionen = p.compliance?.versionen ?? null
-    if (versionen !== geschriebeneVersionen) {
-      if (versionen && versionen.length > 0) speicher.setItem(VERSIONEN_SCHLUESSEL, JSON.stringify(versionen))
-      else speicher.removeItem(VERSIONEN_SCHLUESSEL)
-      geschriebeneVersionen = versionen
+    const d: unknown = JSON.parse(text)
+    if (istObj(d) && istText(d.merkmal) && Array.isArray(d.versionen)) return { merkmal: d.merkmal, versionen: d.versionen }
+  } catch {
+    // unlesbar: gehört zu keinem Projekt
+  }
+  return null
+}
+
+/**
+ * Stellt den Stand aus dem Browser-Speicher wieder her. Versionen kommen nur dazu, wenn ihr Merkmal
+ * zu dem im Projekt passt. Was nicht passt oder sich nicht laden lässt, wird nicht verworfen: Die
+ * Rohdaten bleiben stehen (`geschuetzt`), und `problem` sagt, was fehlt.
+ */
+export function ladeBrowserStand(): BrowserStand {
+  const leer: BrowserStand = { projekt: null, problem: null, geschuetzt: false }
+  let projektText: string | null
+  let versionenText: string | null
+  try {
+    const speicher = browserSpeicher()
+    projektText = speicher?.getItem(PROJEKT_SCHLUESSEL) ?? null
+    versionenText = speicher?.getItem(VERSIONEN_SCHLUESSEL) ?? null
+  } catch {
+    return leer
+  }
+  const schuetze = (projekt: Projekt | null, problem: string): BrowserStand => {
+    rohdatenGeschuetzt = true
+    return { projekt, problem, geschuetzt: true }
+  }
+  if (!projektText) return versionenText ? schuetze(null, 'Im Browser-Speicher lagen freigegebene Versionen ohne das zugehörige Projekt.') : leer
+  let daten: unknown
+  try {
+    daten = JSON.parse(projektText)
+  } catch {
+    return schuetze(null, 'Der Stand im Browser-Speicher ließ sich nicht laden: Er ist kein gültiges JSON.')
+  }
+  // Ohne Merkmal stammt das Projekt aus einer anderen Fassung des Programms; seine Versionen stehen dann, falls es welche hat, im Projekt selbst
+  const erwartet = istObj(daten) && istText(daten[MERKMAL_FELD]) ? daten[MERKMAL_FELD] : ''
+  const gespeichert = versionenText === null ? null : leseVersionen(versionenText)
+  let problem: string | null = null
+  let geschuetzt = false
+  if (erwartet) {
+    if (gespeichert?.merkmal === erwartet && istObj(daten) && istObj(daten.compliance)) daten.compliance.versionen = gespeichert.versionen
+    else {
+      problem = 'Die freigegebenen Versionen zu diesem Stand fehlen im Browser-Speicher oder passen nicht dazu. Geöffnet ist der Stand ohne Versionen; öffne am besten die zuletzt gespeicherte Projektdatei.'
+      geschuetzt = versionenText !== null
     }
-    const ohneVersionen = p.compliance && p.compliance.versionen.length > 0 ? { ...p, compliance: { ...p.compliance, versionen: [] } } : p
-    speicher.setItem(PROJEKT_SCHLUESSEL, JSON.stringify(ohneVersionen))
+  } else if (versionenText !== null) {
+    problem = 'Im Browser-Speicher lagen außerdem freigegebene Versionen, die nicht zu diesem Stand gehören.'
+    geschuetzt = true
+  }
+  try {
+    const projekt = leseProjekt(daten)
+    if (geschuetzt) rohdatenGeschuetzt = true
+    return { projekt, problem, geschuetzt }
+  } catch (e) {
+    if (e instanceof ComplianceFormatfehler) return schuetze(e.ohneCompliance, `Die Compliance-Angaben im Browser-Speicher sind beschädigt (${e.detail}). Geöffnet ist nur der Prozess.`)
+    return schuetze(null, `Der Stand im Browser-Speicher ließ sich nicht laden: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
+/** Wiederhergestelltes Projekt oder null; was nicht übernommen werden konnte, sagt `ladeBrowserStand`. */
+export function ladeAusBrowser(): Projekt | null {
+  return ladeBrowserStand().projekt
+}
+
+/**
+ * Schreibt das Projekt in den Browser-Speicher; false, wenn es nicht hineinpasst. Die Versionen
+ * werden nur geschrieben, wenn das gespeicherte Merkmal nicht zu ihnen passt. Verglichen wird mit
+ * dem tatsächlich gespeicherten Merkmal, nicht mit dem zuletzt selbst geschriebenen: Ein anderer
+ * Tab kann die Versionen inzwischen ersetzt oder entfernt haben. Passen die Versionen nicht hinein,
+ * bleibt das vorige Paar aus Projekt und Versionen unverändert stehen.
+ */
+export function speichereImBrowser(p: Projekt): boolean {
+  if (rohdatenGeschuetzt) return true
+  const speicher = browserSpeicher()
+  if (!speicher) return true
+  try {
+    const versionen = p.compliance?.versionen ?? []
+    const merkmal = versionen.length > 0 ? merkmalVon(versionen) : ''
+    if ((speicher.getItem(MERKMAL_SCHLUESSEL) ?? '') !== merkmal) {
+      // Während des Schreibens gilt kein Merkmal; erst danach verweist das Projekt auf die neuen Versionen
+      speicher.removeItem(MERKMAL_SCHLUESSEL)
+      if (merkmal) {
+        speicher.setItem(VERSIONEN_SCHLUESSEL, `{"merkmal":"${merkmal}","versionen":${JSON.stringify(versionen)}}`)
+        speicher.setItem(MERKMAL_SCHLUESSEL, merkmal)
+      } else speicher.removeItem(VERSIONEN_SCHLUESSEL)
+    }
+    const ohneVersionen = p.compliance && versionen.length > 0 ? { ...p, compliance: { ...p.compliance, versionen: [] } } : p
+    speicher.setItem(PROJEKT_SCHLUESSEL, JSON.stringify({ ...ohneVersionen, [MERKMAL_FELD]: merkmal }))
     return true
   } catch {
     return false
   }
 }
 
-/** „Daten im Browser löschen“: Projekt, Versionen, Dateiangaben und Einstellungen. */
-export function loescheBrowserDaten(): void {
-  for (const s of [PROJEKT_SCHLUESSEL, VERSIONEN_SCHLUESSEL, DOKUMENT_SCHLUESSEL, EINSTELLUNGEN_SCHLUESSEL]) {
+function entferne(schluessel: string[]): void {
+  for (const s of schluessel) {
     try {
-      globalThis.localStorage?.removeItem(s)
+      browserSpeicher()?.removeItem(s)
     } catch {
       // nicht kritisch
     }
   }
-  geschriebeneVersionen = undefined
+}
+
+/** „Daten im Browser löschen“: Projekt, Versionen, Dateiangaben und Einstellungen, auch nicht geladene Rohdaten. */
+export function loescheBrowserDaten(): void {
+  entferne([PROJEKT_SCHLUESSEL, VERSIONEN_SCHLUESSEL, MERKMAL_SCHLUESSEL, DOKUMENT_SCHLUESSEL, EINSTELLUNGEN_SCHLUESSEL])
+  rohdatenGeschuetzt = false
+}
+
+/** Rohdaten, die sich nicht laden ließen, als JSON zum Herunterladen; null, wenn keine da sind. */
+export function browserRohdaten(): string | null {
+  try {
+    const speicher = browserSpeicher()
+    const projekt = speicher?.getItem(PROJEKT_SCHLUESSEL) ?? null
+    const versionen = speicher?.getItem(VERSIONEN_SCHLUESSEL) ?? null
+    if (projekt === null && versionen === null) return null
+    const wert = (t: string | null): unknown => {
+      try {
+        return t === null ? null : JSON.parse(t)
+      } catch {
+        return t
+      }
+    }
+    const hinweis = 'Rohdaten aus dem Browser-Speicher des Prozesslotsen; nicht geladen, weil sie fehlerhaft sind oder nicht zusammenpassen.'
+    return JSON.stringify({ hinweis, projekt: wert(projekt), versionen: wert(versionen) }, null, 2)
+  } catch {
+    return null
+  }
+}
+
+/** Der Nutzer hat entschieden: nicht geladene Rohdaten verwerfen; danach wird der aktuelle Stand wieder gesichert. */
+export function verwirfBrowserRohdaten(): void {
+  entferne([PROJEKT_SCHLUESSEL, VERSIONEN_SCHLUESSEL, MERKMAL_SCHLUESSEL, DOKUMENT_SCHLUESSEL])
+  rohdatenGeschuetzt = false
 }
 
 /** Zur Wiederherstellung: zu welcher Datei das Projekt im Browserspeicher gehört und ob es ungespeicherte Änderungen hat. */
@@ -234,14 +389,16 @@ export interface DokumentInfo {
   pfad: string | null
   name: string | null
   ungespeichert: boolean
+  /** Der Stand im Browser ist älter als der zuletzt bearbeitete, weil er nicht mehr hineinpasste. */
+  veraltet?: boolean
 }
 
 export function ladeDokumentInfo(): DokumentInfo | null {
   try {
-    const text = globalThis.localStorage?.getItem(DOKUMENT_SCHLUESSEL)
+    const text = browserSpeicher()?.getItem(DOKUMENT_SCHLUESSEL)
     const d: unknown = text ? JSON.parse(text) : null
     if (istObj(d) && (d.pfad === null || istText(d.pfad)) && (d.name === null || istText(d.name)) && typeof d.ungespeichert === 'boolean') {
-      return { pfad: d.pfad, name: d.name, ungespeichert: d.ungespeichert }
+      return { pfad: d.pfad, name: d.name, ungespeichert: d.ungespeichert, ...(d.veraltet === true ? { veraltet: true } : {}) }
     }
   } catch {
     // ohne Angaben weiter
@@ -250,23 +407,19 @@ export function ladeDokumentInfo(): DokumentInfo | null {
 }
 
 export function speichereDokumentInfo(d: DokumentInfo): void {
+  if (rohdatenGeschuetzt) return
   try {
-    globalThis.localStorage?.setItem(DOKUMENT_SCHLUESSEL, JSON.stringify(d))
+    browserSpeicher()?.setItem(DOKUMENT_SCHLUESSEL, JSON.stringify(d))
   } catch {
-    // nicht kritisch
+    // Passt nicht einmal das: lieber ohne Angaben als mit denen eines anderen Stands
+    entferne([DOKUMENT_SCHLUESSEL])
   }
 }
 
-/** Vergisst das zwischengespeicherte Projekt, z. B. wenn beim Schließen „Nicht speichern“ gewählt wurde. */
+/** Vergisst das zwischengespeicherte Projekt, z. B. wenn beim Schließen „Nicht speichern“ gewählt wurde. Nicht geladene Rohdaten bleiben. */
 export function vergissImBrowser(): void {
-  try {
-    globalThis.localStorage?.removeItem(PROJEKT_SCHLUESSEL)
-    globalThis.localStorage?.removeItem(DOKUMENT_SCHLUESSEL)
-    globalThis.localStorage?.removeItem(VERSIONEN_SCHLUESSEL)
-    geschriebeneVersionen = undefined
-  } catch {
-    // nicht kritisch
-  }
+  if (rohdatenGeschuetzt) return
+  entferne([PROJEKT_SCHLUESSEL, DOKUMENT_SCHLUESSEL, VERSIONEN_SCHLUESSEL, MERKMAL_SCHLUESSEL])
 }
 
 export interface Einstellungen {
