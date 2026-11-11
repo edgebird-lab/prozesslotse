@@ -14,6 +14,7 @@ import {
   type Rolle,
   type Sequenz,
   type Teilnehmer,
+  type Teilprozess,
   type Warten,
   type Wiederholung,
 } from './typen'
@@ -79,8 +80,14 @@ export function neueParallel(anzahlZweige = 2): Parallel {
   return {
     typ: 'parallel',
     id: neueId('par'),
+    art: 'alle',
     zweige: Array.from({ length: Math.max(2, anzahlZweige) }, () => neueSequenz()),
   }
+}
+
+/** Neuer Abschnitt mit Namen (aufgeklappter Teilprozess), zunächst ohne Schritte. */
+export function neuerTeilprozess(werte: Partial<Teilprozess> = {}): Teilprozess {
+  return { typ: 'teilprozess', id: neueId('tp'), name: '', koerper: neueSequenz(), ...werte }
 }
 
 export function neueWiederholung(werte: Partial<Wiederholung> = {}): Wiederholung {

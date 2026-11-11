@@ -147,7 +147,7 @@ describe('Dateiformat', () => {
       if (Array.isArray(x)) return x.forEach(entferne)
       if (typeof x !== 'object' || x === null) return
       const o = x as Record<string, unknown>
-      if (o.typ === 'entscheidung') delete o.art
+      if (o.typ === 'entscheidung' || o.typ === 'parallel') delete o.art
       if (o.typ === 'wiederholung') delete o.modus
       if ('anteil' in o && 'bezeichnung' in o) {
         delete o.zurueckZu
@@ -157,6 +157,6 @@ describe('Dateiformat', () => {
     }
     entferne(v1.ist.ablauf)
     expect(leseProjektText(JSON.stringify(v1))).toEqual(v2)
-    expect(beispielLieferdienst().formatVersion).toBe(3)
+    expect(beispielLieferdienst().formatVersion).toBe(4)
   })
 })

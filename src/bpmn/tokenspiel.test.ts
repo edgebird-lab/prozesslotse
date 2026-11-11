@@ -10,11 +10,12 @@ import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import { erzeugeBpmn } from './export'
 import { graphAusLayout, pruefeSoundness, zaehleMitFehler, type TokenGraph } from './tokenspiel'
 
-/** Vergleichbare Form eines Graphen: Knoten mit Typ und Flüsse von → nach */
+/** Vergleichbare Form eines Graphen: Knoten mit Typ, Rahmen und Art (Ende, Randereignis), Flüsse von → nach */
 function form(g: TokenGraph): string[] {
   const quelle = new Map<string, string>()
   for (const k of g.knoten) for (const f of k.raus) quelle.set(f, k.id)
-  return [...g.knoten.map((k) => `${k.id}:${k.typ}`), ...[...g.ziel].map(([f, z]) => `${quelle.get(f)}->${z}`)].sort()
+  const knoten = g.knoten.map((k) => [k.id, k.typ, k.rahmen ?? '', k.endeArt ?? '', k.fehler ?? '', k.wirt ?? '', k.randArt ?? '', k.unterbrechend ?? ''].join(':'))
+  return [...knoten, ...[...g.ziel].map(([f, z]) => `${quelle.get(f)}->${z}`)].sort()
 }
 
 describe('Tokenspiel auf dem exportierten BPMN', () => {

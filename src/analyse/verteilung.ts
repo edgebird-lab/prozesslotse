@@ -4,12 +4,14 @@
  * Erwartungswerte, sobald die Zweige streuen (Entscheidungen, Wiederholungen).
  *
  * Eine Verteilung ist eine Liste von Werten mit Masse. Die Masse darf unter 1
- * liegen (Teilverteilung, z. B. „Rücksprung mit 20 %“). Damit die Listen klein
- * bleiben, werden sie zusammengefasst; das geschieht mittelwerttreu, so dass
- * Erwartungswerte von Summen exakt bleiben.
+ * liegen (Teilverteilung, z. B. „Rücksprung mit 20 %“). Jeder Baustein liefert
+ * Teilverteilungen mit zusammen Masse 1: W (weiter hinter dem Baustein), R_b
+ * (Rücksprung zu Bereich b) und E_r (der Vorgang endet mit Ergebnis r). Damit
+ * die Listen klein bleiben, werden sie zusammengefasst; das geschieht
+ * mittelwerttreu, so dass Erwartungswerte von Summen exakt bleiben.
  */
 import { oderZiehung } from '../modell/operationen'
-import type { Block, Id, Oder } from '../modell/typen'
+import { unerwartet, type Block, type Id, type Oder } from '../modell/typen'
 
 export interface Verteilung {
   wert: number[]
@@ -127,55 +129,70 @@ function geometrisch(wieder: Verteilung): Verteilung {
   return summe
 }
 
-interface Ergebnis {
-  /** Dauer bei normalem Weiterlaufen */
+export interface Teilverteilungen {
+  /** Dauer bei normalem Weiterlaufen (W) */
   weiter: Verteilung
-  /** Dauer bis zu einem Rücksprung, je Rücksprungbereich */
+  /** Dauer bis zu einem Rücksprung, je Rücksprungbereich (R) */
   rueck: Map<Id, Verteilung>
+  /** Dauer bis zum Ende des Vorgangs, je Ergebnis (E) */
+  ende: Map<string, Verteilung>
 }
 
 export type Zeitart = 'gesamt' | 'arbeit'
 
-function plus(ziel: Map<Id, Verteilung>, id: Id, v: Verteilung): void {
+function plus(ziel: Map<string, Verteilung>, id: string, v: Verteilung): void {
   ziel.set(id, ziel.has(id) ? addiere(ziel.get(id)!, v) : v)
 }
 
 /** Verteilung der Dauer einer Folge von Schritten (Gesamtzeit oder nur Bearbeitung). */
-export function verteilungSequenz(schritte: Block[], art: Zeitart): Ergebnis {
+export function verteilungSequenz(schritte: Block[], art: Zeitart): Teilverteilungen {
   let weiter = punkt(0)
   const rueck = new Map<Id, Verteilung>()
+  const ende = new Map<string, Verteilung>()
   for (const b of schritte) {
     const x = verteilungBlock(b, art)
+    // Rücksprünge und Enden eines Bausteins kommen nach der Zeit davor
     for (const [id, r] of x.rueck) plus(rueck, id, falte(weiter, r))
+    for (const [e, v] of x.ende) plus(ende, e, falte(weiter, v))
     weiter = falte(weiter, x.weiter)
   }
-  return { weiter, rueck }
+  return { weiter, rueck, ende }
 }
 
-function verteilungBlock(b: Block, art: Zeitart): Ergebnis {
+export function verteilungBlock(b: Block, art: Zeitart): Teilverteilungen {
   switch (b.typ) {
     case 'aufgabe':
-      return { weiter: punkt(art === 'gesamt' ? b.liegezeitMin + b.bearbeitungMin : b.bearbeitungMin), rueck: new Map() }
+      return { weiter: punkt(art === 'gesamt' ? b.liegezeitMin + b.bearbeitungMin : b.bearbeitungMin), rueck: new Map(), ende: new Map() }
     case 'warten':
-      return { weiter: punkt(art === 'gesamt' ? b.dauerMin : 0), rueck: new Map() }
+      return { weiter: punkt(art === 'gesamt' ? b.dauerMin : 0), rueck: new Map(), ende: new Map() }
     case 'entscheidung': {
       let weiter = leer()
       const rueck = new Map<Id, Verteilung>()
+      const ende = new Map<string, Verteilung>()
       for (const z of b.zweige) {
         const x = verteilungSequenz(z.schritte, art)
         const warten = art === 'gesamt' && b.art === 'ereignis' && z.ereignis ? z.ereignis.dauerMin : 0
         const aus = skaliere(verschiebe(x.weiter, warten), z.anteil)
         for (const [id, r] of x.rueck) plus(rueck, id, skaliere(verschiebe(r, warten), z.anteil))
-        if (z.ende !== null) continue // innerhalb von „Gleichzeitig“ nicht erlaubt; die Prüfung meldet es
-        if (z.zurueckZu !== null) plus(rueck, z.zurueckZu, aus)
+        for (const [e, v] of x.ende) plus(ende, e, skaliere(verschiebe(v, warten), z.anteil))
+        if (z.ende !== null) plus(ende, z.ende, aus)
+        else if (z.zurueckZu !== null) plus(rueck, z.zurueckZu, aus)
         else weiter = addiere(weiter, aus)
       }
-      return { weiter, rueck }
+      return { weiter, rueck, ende }
     }
-    case 'parallel':
-      return { weiter: maximum(b.zweige.map((z) => verteilungSequenz(z.schritte, art).weiter)), rueck: new Map() }
+    case 'parallel': {
+      const parallelArt = b.art
+      switch (parallelArt) {
+        case 'alle':
+          // Enden in Zweigen meldet die Prüfung als Fehler (Verklemmung); die Abbruchkombination folgt mit Schritt 5 von Format 4.
+          return { weiter: maximum(b.zweige.map((z) => verteilungSequenz(z.schritte, art).weiter)), rueck: new Map(), ende: new Map() }
+        default:
+          return unerwartet(parallelArt)
+      }
+    }
     case 'oder':
-      return { weiter: verteilungOder(b, art), rueck: new Map() }
+      return { weiter: verteilungOder(b, art), rueck: new Map(), ende: new Map() }
     case 'wiederholung': {
       const x = verteilungSequenz(b.koerper.schritte, art)
       const p = Math.min(Math.max(b.anteilWiederholung, 0), 0.999)
@@ -184,8 +201,14 @@ function verteilungBlock(b: Block, art: Zeitart): Ergebnis {
       const vorher = geometrisch(wieder)
       const rueck = new Map<Id, Verteilung>()
       for (const [id, r] of x.rueck) if (id !== b.id) rueck.set(id, falte(vorher, r))
-      return { weiter: falte(vorher, aus), rueck }
+      const ende = new Map<string, Verteilung>()
+      for (const [e, v] of x.ende) ende.set(e, falte(vorher, v))
+      return { weiter: falte(vorher, aus), rueck, ende }
     }
+    case 'teilprozess':
+      return verteilungSequenz(b.koerper.schritte, art)
+    default:
+      return unerwartet(b)
   }
 }
 

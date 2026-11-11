@@ -8,7 +8,7 @@
  * festem Startwert ist das Ergebnis reproduzierbar.
  */
 import { oderZiehung } from '../modell/operationen'
-import type { Block, Id, Prozess } from '../modell/typen'
+import { unerwartet, type Block, type Id, type Prozess } from '../modell/typen'
 
 export interface ErgebnisDauer {
   ergebnis: string
@@ -111,6 +111,8 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
       return { zeit, ende, rueck: null }
     }
     case 'parallel': {
+      const art = b.art
+      if (art !== 'alle') return unerwartet(art)
       let zeit = 0
       let ende: string | null = null
       for (const z of b.zweige) {
@@ -131,6 +133,10 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
       }
       return { zeit, ende: null, rueck: null }
     }
+    case 'teilprozess':
+      return laufeSequenz(b.koerper.schritte, zufall)
+    default:
+      return unerwartet(b)
   }
 }
 

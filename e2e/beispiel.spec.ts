@@ -33,7 +33,7 @@ test('übernimmt einen Vorschlag und exportiert den Bericht', async ({ page }) =
 
   const [json] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Projekt als Datei speichern' }).click()])
   const projekt = JSON.parse(await readFile((await json.path())!, 'utf8'))
-  expect(projekt.formatVersion).toBe(3)
+  expect(projekt.formatVersion).toBe(4)
   expect(projekt.massnahmen).toHaveLength(1)
 
   const [svg] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'SVG-Bild' }).first().click()])

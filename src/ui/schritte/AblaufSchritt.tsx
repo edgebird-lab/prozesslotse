@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useBestaetigen } from '../frage'
-import { neueAufgabe, neueEntscheidung, neueOder, neueParallel, neuesWarten, neueWiederholung } from '../../modell/bausteine'
+import { neueAufgabe, neueEntscheidung, neueId, neueOder, neueParallel, neuerTeilprozess, neuesWarten, neueWiederholung } from '../../modell/bausteine'
 import { abschnittFertig, beschreibeCursor, cursorNachEinfuegen } from '../../modell/fuehrung'
 import {
   aendereBlock,
@@ -10,24 +10,31 @@ import {
   entferneBlock,
   entferneRuecksprung,
   ersetzeBlock,
+  fasseZusammen,
   findeBlock,
   findeSequenz,
   fuegeEin,
+  kannZusammenfassen,
   kinderSequenzen,
-  liegtInParallele,
+  loeseAbschnittAuf,
+  nebenlaeufig,
   normalisiere,
+  rahmenRolle,
+  rahmenUeber,
   rolleName,
   ruecksprungZiele,
   setzeRuecksprung,
   verschiebeBlock,
+  type Glied,
 } from '../../modell/operationen'
-import type { Block, BlockTyp, Cursor, Id, Prozess, Sequenz } from '../../modell/typen'
+import { unerwartet, type Block, type BlockTyp, type Cursor, type Id, type Prozess, type Sequenz, type Teilprozess } from '../../modell/typen'
 import { formatiereDauer, formatiereProzent } from '../../modell/zeit'
 import { wirksamerCursor } from '../../zustand'
 import { useApp } from '../kontext'
 import type { LernThema } from '../lerninhalte'
 import { Lernhinweis } from '../Lernhinweis'
 import { Symbol, type SymbolArt } from '../Symbol'
+import { Feld } from '../Eingaben'
 import { fehltNoch } from '../entwurf'
 import { symbolFuer } from '../symbolart'
 import { BlockFormular, ZweckWahl, type Danach } from './BlockFormulare'
@@ -39,6 +46,7 @@ const WAHL: { typ: BlockTyp; text: string; beschreibung: string; symbol: SymbolA
   { typ: 'parallel', text: 'Mehreres gleichzeitig', beschreibung: 'Zweige laufen parallel', symbol: 'und' },
   { typ: 'wiederholung', text: 'Etwas wird wiederholt', beschreibung: 'z. B. Nacharbeit nach einer Prüfung', symbol: 'wiederholung' },
   { typ: 'warten', text: 'Warten', beschreibung: 'auf einen Termin oder eine Nachricht', symbol: 'warten-zeit' },
+  { typ: 'teilprozess', text: 'Ein Abschnitt mit Namen', beschreibung: 'fasst Schritte zusammen, z. B. für eine Frist über mehrere Schritte', symbol: 'teilprozess' },
 ]
 
 const TYPNAME: Record<BlockTyp, string> = {
@@ -48,6 +56,7 @@ const TYPNAME: Record<BlockTyp, string> = {
   parallel: 'Gleichzeitig',
   wiederholung: 'Wiederholung',
   warten: 'Warten',
+  teilprozess: 'Abschnitt',
 }
 
 function lernthema(b: Block): LernThema {
@@ -93,7 +102,25 @@ function neuerEntwurf(typ: BlockTyp, p: Prozess, vorgaenger: Block | null): Bloc
       return neueWiederholung()
     case 'warten':
       return neuesWarten()
+    case 'teilprozess':
+      return neuerTeilprozess()
+    default:
+      return unerwartet(typ)
   }
+}
+
+/**
+ * Bahn, in der ein Abschnitt im Diagramm steht: Der äußerste Abschnitt über ihm
+ * (oder er selbst) bestimmt sie, als Rolle mit den meisten Aufgaben darin.
+ * null, solange darin keine Aufgabe steht.
+ */
+function bahnDesAbschnitts(p: Prozess, abschnitt: Teilprozess, kette: Glied[]): string | null {
+  const aeusserster = rahmenUeber(kette)[0] ?? abschnitt
+  if (aeusserster.typ !== 'teilprozess') return null
+  const gueltig = (r: Id | null) => (r !== null && p.rollen.some((x) => x.id === r) ? r : null)
+  const rolle = rahmenRolle(aeusserster, gueltig)
+  if (rolle === undefined) return null
+  return rolle === null ? 'Ohne Rolle' : p.rollen.find((r) => r.id === rolle)?.name || 'Unbenannte Rolle'
 }
 
 export function AblaufSchritt() {
@@ -202,6 +229,7 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
           inParallele: ort.inParallele,
           neu: true,
           ziele: ruecksprungZiele(p, cursor.sequenzId, cursor.index, false),
+          rahmenBahn: entwurf.typ === 'teilprozess' ? bahnDesAbschnitts(p, entwurf, findeSequenz(p, cursor.sequenzId)?.kette ?? []) : undefined,
         }}
       />
       {fehlt && <p className="feld-hilfe">{fehlt}</p>}
@@ -220,6 +248,7 @@ function NaechsterSchritt({ cursor }: { cursor: Cursor }) {
 function BlockBearbeiten() {
   const { z, p, aendere, dispatch } = useApp()
   const bestaetige = useBestaetigen()
+  const [zusammenfassen, setZusammenfassen] = useState(false)
   const fund = z.auswahl ? findeBlock(p, z.auswahl) : null
   if (!fund) return null
   const b = fund.block
@@ -233,7 +262,9 @@ function BlockBearbeiten() {
         ? `Weg „${b.zweige[i].bezeichnung || i + 1}“`
         : b.typ === 'parallel'
           ? `Zweig ${i + 1}`
-          : 'Wiederholte Schritte'
+          : b.typ === 'teilprozess'
+            ? 'Schritte im Abschnitt'
+            : 'Wiederholte Schritte'
 
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return <BereichBearbeiten bereichId={b.id} />
 
@@ -249,12 +280,15 @@ function BlockBearbeiten() {
         kontext={{
           vorgaenger,
           nachfolger: fund.sequenz.schritte[fund.index + 1] ?? null,
-          inParallele: liegtInParallele(fund.vorfahren),
+          inParallele: nebenlaeufig(fund.kette),
           neu: false,
           ziele: b.typ === 'entscheidung' ? ruecksprungZiele(p, fund.sequenz.id, fund.index, true) : undefined,
           setzeDanach: (zweigId, danach) => aendere((q) => setzeDanach(q, b.id, zweigId, danach)),
+          rahmenBahn: b.typ === 'teilprozess' ? bahnDesAbschnitts(p, b, fund.kette) : undefined,
+          loeseAuf: b.typ === 'teilprozess' ? () => aendere((q) => loeseAbschnittAuf(q, b.id), { auswahl: null }) : undefined,
         }}
       />
+      {zusammenfassen && <Zusammenfassen sequenz={fund.sequenz} von={fund.index} onFertig={() => setZusammenfassen(false)} />}
       {kinder.length > 0 && (
         <div className="kinder-links">
           <p className="leise">Schritte hinzufügen:</p>
@@ -275,6 +309,9 @@ function BlockBearbeiten() {
         <button type="button" className="knopf" disabled={fund.index === fund.sequenz.schritte.length - 1} onClick={() => aendere((q) => verschiebeBlock(q, b.id, 1))}>
           ↓ Nach unten
         </button>
+        <button type="button" className="knopf" aria-expanded={zusammenfassen} onClick={() => setZusammenfassen((x) => !x)}>
+          Ab hier zusammenfassen …
+        </button>
         <button
           type="button"
           className="knopf knopf-gefahr"
@@ -287,6 +324,55 @@ function BlockBearbeiten() {
         </button>
       </div>
     </section>
+  )
+}
+
+/**
+ * „Ab hier zu einem Abschnitt zusammenfassen“: wählt den letzten Schritt derselben
+ * Folge und den Namen. Angeboten werden nur Bereiche, deren Rücksprünge darin bleiben.
+ */
+function Zusammenfassen({ sequenz, von, onFertig }: { sequenz: Sequenz; von: number; onFertig: () => void }) {
+  const { p, aendere } = useApp()
+  const moeglich = sequenz.schritte.map((b, i) => ({ b, i })).filter(({ i }) => i >= von && kannZusammenfassen(p, sequenz.id, von, i))
+  const [bis, setBis] = useState(moeglich[0]?.i ?? von)
+  const [name, setName] = useState('')
+  const fassen = (e: FormEvent) => {
+    e.preventDefault()
+    if (!name.trim() || moeglich.length === 0) return
+    const id = neueId('tp')
+    aendere((q) => fasseZusammen(q, sequenz.id, von, bis, name.trim(), id), { auswahl: id })
+    onFertig()
+  }
+  if (moeglich.length === 0) {
+    return <p className="feld-hilfe">Ab hier lässt sich nichts zusammenfassen: Ein Rücksprung würde aus dem Abschnitt hinausführen.</p>
+  }
+  return (
+    <form className="eingerueckt" onSubmit={fassen} aria-label="Zu einem Abschnitt zusammenfassen">
+      <div className="feldreihe">
+        <Feld label="Bis einschließlich">
+          {(id) => (
+            <select id={id} value={bis} onChange={(e) => setBis(Number(e.target.value))}>
+              {moeglich.map(({ b, i }) => (
+                <option key={b.id} value={i}>
+                  {blockTitel(b)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Feld>
+        <Feld label="Wie heißt der Abschnitt?" hilfe="z. B. „Ware versenden“">
+          {(id) => <input id={id} type="text" value={name} placeholder="z. B. Ware versenden" onChange={(e) => setName(e.target.value)} />}
+        </Feld>
+      </div>
+      <div className="knopfreihe">
+        <button type="submit" className="knopf knopf-haupt" disabled={!name.trim()}>
+          Zusammenfassen
+        </button>
+        <button type="button" className="knopf knopf-leise" onClick={onFertig}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -401,6 +487,7 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
   else if (b.typ === 'wiederholung' && b.modus === 'anteil') meta = `wiederholt in ${formatiereProzent(b.anteilWiederholung)}`
   else if (b.typ === 'entscheidung' && b.art === 'ereignis') meta = 'je nachdem, was zuerst passiert'
   else if (b.typ === 'oder') meta = 'einer, mehrere oder alle Wege'
+  else if (b.typ === 'teilprozess') meta = 'Abschnitt'
   const gewaehlt = z.auswahl === b.id
   return (
     <>
@@ -442,6 +529,12 @@ function BlockEintrag({ b, cursor }: { b: Block; cursor: Cursor }) {
       {b.typ === 'wiederholung' && (
         <div className="zweig">
           <div className="zweig-kopf">{b.modus === 'ruecksprung' ? 'läuft erneut, wenn ein Ausgang hierher zurückspringt' : `wird wiederholt, wenn „${b.frage || '?'}“`}</div>
+          <SequenzListe seq={b.koerper} cursor={cursor} />
+        </div>
+      )}
+      {b.typ === 'teilprozess' && (
+        <div className="zweig">
+          <div className="zweig-kopf">Schritte im Abschnitt</div>
           <SequenzListe seq={b.koerper} cursor={cursor} />
         </div>
       )}

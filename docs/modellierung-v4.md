@@ -96,7 +96,7 @@ Die Regeln aus [datenmodell.md](datenmodell.md) gelten weiter. Neu, gelegt in `l
 2. **Kein Sequenzfluss quert eine Rahmengrenze.** Flüsse zwischen Knoten desselben Rahmens bleiben innen, Flüsse zwischen Knoten außerhalb berühren das Innere nicht. Ausgenommen sind nur Ein- und Austritt eines Rahmens an seinen Kanten.
 3. **Keine Linie läuft auf einer Rahmenkante** (gemeinsame Strecke gemessen wie in `gemeinsameStrecke`). Nachrichtenflüsse dürfen Rahmenkanten senkrecht queren, denn zu Elementen in einem Rahmen geht es nicht anders.
 4. **Ein Randereignis sitzt auf dem Rand seines Wirts:** Mittelpunkt auf der Unterkante, ganz innerhalb der Breite des Wirts. Randereignisse eines Wirts überlappen sich nicht und lassen die Mitte der Unterkante eines Mehrfach-Rahmens für die Markierung frei. Ihr Fluss beginnt auf dem eigenen Kreis und läuft nicht durch den Wirt.
-5. **Beschriftungen von Rahmen** (oben links in der Kopfspur) liegen auf keinem Knoten und keiner anderen Beschriftung; fremde Linien darauf zählen in `beschriftungenAufLinien`.
+5. **Beschriftungen von Rahmen** (oben in der Mitte der Kopfspur; so zeichnet bpmn-js den Namen eines aufgeklappten Teilprozesses) liegen auf keinem Knoten und keiner anderen Beschriftung; fremde Linien darauf zählen in `beschriftungenAufLinien`.
 6. Die Überlappungsprüfung nimmt Randereignis und Wirt sowie Knoten und eigenen Rahmen aus. „Liegt in seiner Bahn“ gilt auch für Rahmen. Die Tests mit 300 Zufallsprozessen bleiben ohne Befund.
 
 ## 1 Teilprozess („Abschnitt mit Namen“)
@@ -146,6 +146,17 @@ export interface Teilprozess {
 - Abschnitt [A 20 Min.; Entscheidung „Lieferbar?“: 90 % weiter, 10 % endet „nicht lieferbar“], danach B 30 Min.: Dauer 20 + 0,9 · 30 = 47 Min.; Enden 90 % regulär, 10 % „nicht lieferbar“; Häufigkeit A 1, B 0,9. Export: Fehler-Ende innen, `bpmn:error`, Fehler-Randereignis am Abschnitt, außen ein Ende „nicht lieferbar“; bpmn-moddle ohne Warnung; Tokenspiel sound auf Layout und XML.
 - Zwei verschachtelte Abschnitte mit Ende im inneren: ein Fehler-Randereignis, nur am äußeren.
 - Geometrie: Gleichzeitig mit Zweig 1 = Abschnitt in Bahn B und Zweig 2 = Aufgabe in A, dann Aufgabe in C in denselben Spalten: Der Bahnwechsel von Zweig 2 liegt hinter dem Rahmen.
+
+**Umsetzung (Schritt 1, Stand 2026-11-11).** Gebaut wie oben, mit diesen Präzisierungen:
+
+- *Name des Rahmens:* bpmn-js schreibt ihn oben in die Mitte, nicht links; das Feld für die Prüfung liegt entsprechend. Die Kopfspur wächst, wenn der Name mehr als zwei Zeilen braucht.
+- *Anker je Bahn:* `Teil.anker` ist eine Spur je Bahn, in der die Hauptlinie hinein- oder hinausläuft. Eine Folge senkt ihre Teile je Bahn auf den größten Anker; Bahnen ohne Rahmen behalten Spur 0. Ohne Abschnitte bleibt jedes Diagramm Byte für Byte wie in Format 3 (Test mit Prüfsummen beider Beispiele).
+- *Seitenkanten:* 12 px neben der belegten Breite der ersten bzw. letzten inneren Spalte; alle Kanalspuren der Lücke (nicht nur die, die die Höhe des Rahmens kreuzen) bleiben mindestens 8 px außerhalb. Geschachtelte Rahmen teilen sich nie eine Lücke, weil jeder einen eigenen inneren Start und ein eigenes Ende hat; der Versatz von 8 px je Ebene wird erst für den Ad-hoc-Rahmen (Schritt 4) nötig.
+- *Bahnwechsel neben Rahmen:* Für jedes Stück, das einen Rahmen eines anderen Zweigs quert, rückt der oberste Baustein des **weiter unten liegenden** der beiden Zweige hinter den betroffenen obersten Baustein des anderen (nicht immer der Baustein mit dem Stück). Nur so endet das Rücken sicher: Rückt immer der Baustein mit dem Stück hinter den Rahmen, können sich zwei Zweige gegenseitig weiterschieben. Der Layouter wiederholt Layout und Prüfung, bis nichts mehr quert (höchstens zwölf Runden). Beginnt ein Zweig dadurch später, wechselt der Fluss aus der Verzweigung die Höhe gleich hinter der Raute und läuft im eigenen Band weiter.
+- *Fehler-Randereignis:* Spalte 0 des Blocks ist der ganze Rahmen; die Enden mit Ergebnis stehen in der Spalte dahinter, je eines in einem eigenen Band unter dem Rahmen.
+- *Körper ohne normales Ende:* Endet jeder Weg im Abschnitt vorher, hat er kein inneres Ende und keinen Ausgang (sonst stünde ein totes Ende im Diagramm); was dahinter folgt, meldet die Prüfung als unerreichbar.
+- *Rücksprung über die Grenze* (nur in von Hand gebauten Dateien): Die Prüfung meldet einen Fehler, im BPMN entfällt der Rückfluss.
+- *Tokenspiel:* Die Instanz eines Rahmens steht als eigene Marke `Pfad|*` in der Markierung, bis sie fertig ist; eine ODER-Zusammenführung, eine Terminierung oder ein Fehler-Ende sehen nur Marken derselben Instanz.
 
 ## 2 Für jede Position (Mehrfach)
 

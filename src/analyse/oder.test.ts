@@ -143,11 +143,12 @@ describe('ODER-Verzweigung', () => {
   })
 
   it('wartet im Tokenspiel auf alle gewählten Wege', () => {
-    // Die Zusammenführung kennt den Bereich davor; ohne diese Regel würde sie beim ersten Weg schalten.
+    // Regel der Norm: Die Zusammenführung schaltet erst, wenn keine Marke mehr einen leeren Eingang erreichen kann.
     const { o } = unterlagen()
     const g = graphAusLayout(erzeugeBpmn(prozess([o, aufgabe('Antrag bescheiden', 15)])).layout)
     const zu = g.knoten.find((k) => k.id === `${o.id}_zu`)!
-    expect(zu.bereich?.length).toBeGreaterThan(0)
+    expect(zu.typ).toBe('oder')
+    expect(zu.rein.length).toBeGreaterThan(1)
     const e = pruefeSoundness(g)
     expect(e.fehler).toEqual([])
     // mehr als eine Marke auf einem Fluss würde die Prüfung melden; also wird nie doppelt durchlaufen

@@ -23,22 +23,31 @@
 
 ## Schritt 1 – Teilprozess, mit den gemeinsamen Grundlagen
 
-- [ ] `FORMAT_VERSION = 4`, Migration 3 → 4 (`Parallel.art = 'alle'`), Test mit einer Format-3-Datei
-- [ ] Typen `Teilprozess`, `ParallelArt = 'alle'`; `neuerTeilprozess`; `pruefeBlock`
-- [ ] `kinderSequenzen`, `durchlaufe`, `abbildeBlock`, `findeSequenz` und alle Nutzer; erschöpfende `switch`
-- [ ] Ketten-Prädikate `nebenlaeufig(kette)` und `rahmenUeber(kette)` statt `liegtInParallele`; `ruecksprungZiele`, `setzeRuecksprung`, Prüfung „Rücksprung aus einem Rahmen“
-- [ ] `fasseZusammen` und „Abschnitt auflösen“
-- [ ] Prüfregeln (leer, Name, Rollen-Hinweis, Ende an nebenläufiger Stelle bis Schritt 5)
-- [ ] Kennzahlen wie eine Folge; `verteilung.ts` mit Ende-Teil (Teilverteilungen W, R, E); Simulation
-- [ ] Layout: `Teil.anker`, `bahnZwang`, `LayoutRahmen`, Kopf- und Fußspur, Seitenkanten, Bahnwechsel neben Rahmen, `spalteFrei` mit Rahmen, Namen „(Rolle)“
-- [ ] Export: `subProcess` mit `isExpanded`, Start und Ende innen, `flowNodeRef` nur für den Rahmen; Ende im Rahmen als Fehler-Ende mit `bpmn:error` und Fehler-Randereignis am äußersten Rahmen
-- [ ] Tokenspiel: Bereiche, Instanz-Marken, Fehler-Ende, „Abbruch zuletzt“, inklusive Zusammenführung nach der Norm (ersetzt `bereich`); `graphAusXml` rekursiv; Vergleich XML = Layout mit Bereichen
-- [ ] `geometrieFehler`: Rahmen nur verschachtelt, kein Sequenzfluss über Rahmengrenzen, keine Linie auf Rahmenkanten, Rahmenbeschriftungen
-- [ ] Zufallsgenerator: Abschnitte (auch verschachtelt, mit Ende innen an nicht nebenläufiger Stelle)
-- [ ] Oberfläche: Bausteinwahl „Ein Abschnitt mit Namen“, Formular mit Bahnsatz, Symbol, Lernhinweis, Gliederung, Ort, „Ab hier zusammenfassen …“, Führung
-- [ ] Tests von Hand (Design, Abschnitt 1), Browsertest, Diagramm angesehen
-- [ ] Doku: `datenmodell.md` (Baustein, Zeichenregeln), `fragenkatalog.md`, README
-- [ ] Commit und Push
+Fertig am 2026-11-11, Commit „Abschnitt mit Namen (aufgeklappter Teilprozess), Dateiformat 4“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 1)“.
+
+- [x] `FORMAT_VERSION = 4`, Migration 3 → 4 (`Parallel.art = 'alle'`), Test mit einer Format-3-Datei (gleiches Projekt, gleiche Kennzahlen, BPMN beider Beispiele per Prüfsumme gleich dem Stand von Format 3)
+- [x] Typen `Teilprozess`, `ParallelArt = 'alle'`; `neuerTeilprozess`; `pruefeBlock`
+- [x] `kinderSequenzen`, `durchlaufe`, `abbildeBlock`, `findeSequenz` und alle Nutzer; erschöpfende `switch` mit `unerwartet(x: never)` in `typen.ts`, auch über `Parallel.art` in Kennzahlen, Verteilung, Simulation, Layout und `gliedNebenlaeufig`
+- [x] Ketten-Prädikate `nebenlaeufig(kette)` und `rahmenUeber(kette)` statt `liegtInParallele` (`Fundstelle.kette`, `SequenzFundstelle.kette`, `Glied`); `ruecksprungZiele`, `setzeRuecksprung`, Prüfung „Rücksprung aus einem Abschnitt“ (`rahmenrueck`)
+- [x] `fasseZusammen` (mit `kannZusammenfassen`: kein Rücksprung aus dem neuen Rahmen hinaus) und `loeseAbschnittAuf`
+- [x] Prüfregeln: leerer Abschnitt (Fehler), ohne Namen (Warnung), mehrere Rollen (Hinweis mit Bahn), Ende im Abschnitt an nebenläufiger Stelle (Fehler „Verklemmung“, bis Schritt 5)
+- [x] Kennzahlen wie eine Folge; `verteilung.ts` mit `Teilverteilungen` (W, R, E), die Entscheidung legt ihre Enden ab; Simulation
+- [x] Layout: `Teil.anker` je Bahn, `bahnZwang`, `LayoutRahmen` in `Layout.rahmen`, Kopf- und Fußspur, Seitenkanten, Bahnwechsel neben Rahmen (`hinterRahmen`, Runden in `berechneLayout`), `spalteFrei` mit Rahmen, Namen „(Rolle)“, Fehler-Randereignisse auf der Unterkante mit eigenem Band je Ergebnis
+- [x] Export: `subProcess` mit `isExpanded`, Start und Ende innen, `flowNodeRef` nur für Elemente der Prozessebene; Ende im Rahmen als Fehler-Ende mit `bpmn:error` (`errorCode` = Ergebnis) und Fehler-Randereignis am äußersten Rahmen
+- [x] Tokenspiel: Bereiche, Instanz-Marken (`Pfad|Fluss`, `Pfad|*`), Fehler-Ende, Terminierung, „Abbruch zuletzt“, inklusive Zusammenführung nach der Norm (`bereich` und `ergaenzeOderBereiche` entfallen); `graphAusXml` rekursiv; Vergleich XML = Layout mit Rahmen, Enden und Randereignissen
+- [x] `geometrieFehler`: Rahmen nur verschachtelt, Knoten mit 6 px Abstand im eigenen Rahmen und an keinem fremden, kein Sequenzfluss über Rahmengrenzen, keine Linie auf Rahmenkanten, Randereignis auf der Unterkante, Rahmen in der Bahn, Rahmenbeschriftungen (auch in `beschriftungenAufLinien`)
+- [x] Zufallsgenerator: Abschnitte (auch verschachtelt, mit Ende innen an nicht nebenläufiger Stelle; mit `auchUngueltig` auch leer)
+- [x] Oberfläche: Bausteinwahl „Ein Abschnitt mit Namen“, Formular mit Bahnsatz und „Abschnitt auflösen“, Symbol, Lernhinweis, Gliederung, Ort, „Ab hier zusammenfassen …“, Führung
+- [x] Tests von Hand (Design, Abschnitt 1: 47 Min., 36 Min., Bahnwechsel hinter dem Rahmen), Browsertests (`e2e/abschnitt.spec.ts`), Diagramme mit `render.mjs` angesehen (einfacher, verschachtelter Abschnitt, Bahnwechsel, zwei Zufallsprozesse)
+- [x] Doku: `datenmodell.md` (Baustein, Format 4, Prüfregeln, Zeichenregeln für Rahmen), `fragenkatalog.md`, README (Bausteine, BPMN, Linien, Qualität, Grenzen)
+- [x] Commit und Push
+
+Hinweise für Schritt 2 und später:
+
+- `berechneLayout` legt so lange neu, bis kein Sequenzfluss mehr einen fremden Rahmen quert; `hinterRahmen` liefert dafür Mindest-Startspalten (`Kontext.schub`). Neue Rahmenarten müssen ihre Knoten und Rahmen über `merkeZweig` mit dem Zweigpfad versehen, sonst greift das Rücken nicht.
+- Randereignisse sind Knoten mit `art: 'rand'` und `wirt`; ihre Lage rechnet `layoutRunde` aus dem Rahmen (rechts beginnend, 38 px Abstand). Für Unterbrechungen an Aufgaben (Schritt 3) muss das auf Aufgaben als Wirt erweitert werden.
+- Das Tokenspiel kennt Randereignisse bisher nur als Fänger von Fehlern; Wahl an Aufgabe und Rahmen (Schritt 3) und Mehrfach-Instanzen (Schritt 2, Instanznummer im Pfad) fehlen noch.
+- Kein Rücksprung quert eine Rahmengrenze; `layoutTeilprozess` verwirft solche Sprünge (nur in ungültigen Dateien möglich).
 
 ## Schritt 2 – Für jede Position
 
@@ -96,3 +105,4 @@
 | Stand | Unit-Tests | Browsertests |
 | --- | --- | --- |
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
+| Schritt 1, Abschnitt | 151 in 18 Dateien | 19 |

@@ -3,8 +3,14 @@
  * Prozess und lassen den alten unverändert; darauf bauen Rückgängig und der
  * Ist-Soll-Vergleich auf.
  */
-import { neuerRuecksprungBereich } from './bausteine'
-import type { Aufgabe, Block, Entscheidung, EntscheidungsZweig, Id, Oder, Prozess, Sequenz } from './typen'
+import { neuerRuecksprungBereich, neuerTeilprozess, neueSequenz } from './bausteine'
+import { unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type Oder, type Prozess, type Sequenz, type Teilprozess } from './typen'
+
+/** Ein Schritt auf dem Weg von außen nach innen: ein Baustein und die Kindsequenz, in der es weitergeht. */
+export interface Glied {
+  block: Block
+  sequenz: Sequenz
+}
 
 export interface Fundstelle {
   block: Block
@@ -12,9 +18,11 @@ export interface Fundstelle {
   index: number
   /** Blöcke, in deren Zweigen oder Körper der Block liegt, von außen nach innen. */
   vorfahren: Block[]
+  /** Dieselben Blöcke mit der Kindsequenz, in der der Block liegt (für Prädikate wie `nebenlaeufig`). */
+  kette: Glied[]
 }
 
-/** Zweige einer Entscheidung oder Parallele, Körper einer Wiederholung. */
+/** Zweige einer Entscheidung oder Parallele, Körper einer Wiederholung oder eines Abschnitts. */
 export function kinderSequenzen(b: Block): Sequenz[] {
   switch (b.typ) {
     case 'entscheidung':
@@ -25,17 +33,23 @@ export function kinderSequenzen(b: Block): Sequenz[] {
       return b.zweige
     case 'wiederholung':
       return [b.koerper]
-    default:
+    case 'teilprozess':
+      return [b.koerper]
+    case 'aufgabe':
+    case 'warten':
       return []
+    default:
+      return unerwartet(b)
   }
 }
 
 /** Alle Blöcke in Lesereihenfolge (Tiefensuche). */
-export function* durchlaufe(seq: Sequenz, vorfahren: Block[] = []): Generator<Fundstelle> {
+export function* durchlaufe(seq: Sequenz, kette: Glied[] = []): Generator<Fundstelle> {
+  const vorfahren = kette.map((g) => g.block)
   for (let index = 0; index < seq.schritte.length; index++) {
     const block = seq.schritte[index]
-    yield { block, sequenz: seq, index, vorfahren }
-    for (const kind of kinderSequenzen(block)) yield* durchlaufe(kind, [...vorfahren, block])
+    yield { block, sequenz: seq, index, vorfahren, kette }
+    for (const kind of kinderSequenzen(block)) yield* durchlaufe(kind, [...kette, { block, sequenz: kind }])
   }
 }
 
@@ -50,13 +64,15 @@ export interface SequenzFundstelle {
   besitzer: Block | null
   /** Besitzer und alle seine Vorfahren, von außen nach innen. */
   vorfahren: Block[]
+  /** Weg von außen bis in diese Sequenz; das letzte Glied ist (Besitzer, Sequenz). */
+  kette: Glied[]
 }
 
 export function findeSequenz(p: Prozess, id: Id): SequenzFundstelle | null {
-  if (p.ablauf.id === id) return { sequenz: p.ablauf, besitzer: null, vorfahren: [] }
+  if (p.ablauf.id === id) return { sequenz: p.ablauf, besitzer: null, vorfahren: [], kette: [] }
   for (const f of durchlaufe(p.ablauf)) {
     for (const kind of kinderSequenzen(f.block)) {
-      if (kind.id === id) return { sequenz: kind, besitzer: f.block, vorfahren: [...f.vorfahren, f.block] }
+      if (kind.id === id) return { sequenz: kind, besitzer: f.block, vorfahren: [...f.vorfahren, f.block], kette: [...f.kette, { block: f.block, sequenz: kind }] }
     }
   }
   return null
@@ -74,14 +90,70 @@ export function anzahlBloecke(p: Prozess): number {
   return n
 }
 
-/** Laufen die Zweige des Blocks womöglich gleichzeitig (Gleichzeitig, ODER)? Dann darf kein Zweig enden oder herausspringen. */
-export function istNebenlaeufig(b: Block): boolean {
-  return b.typ === 'parallel' || b.typ === 'oder'
+/**
+ * Läuft die Kindsequenz des Glieds womöglich neben anderen Teilen desselben
+ * Vorgangs (ein Zweig von Gleichzeitig, ein ODER-Weg)? Dort darf der Prozess
+ * (noch) nicht enden, und kein Rücksprung darf herausführen.
+ */
+export function gliedNebenlaeufig(g: Glied): boolean {
+  const b = g.block
+  switch (b.typ) {
+    case 'parallel': {
+      const art = b.art
+      switch (art) {
+        case 'alle':
+          return true
+        default:
+          return unerwartet(art)
+      }
+    }
+    case 'oder':
+      return true
+    case 'entscheidung':
+    case 'wiederholung':
+    case 'teilprozess':
+    case 'aufgabe':
+    case 'warten':
+      return false
+    default:
+      return unerwartet(b)
+  }
 }
 
-/** Liegt die Stelle innerhalb von „Gleichzeitig“ oder einer ODER-Verzweigung? Dort darf der Prozess nicht enden. */
-export function liegtInParallele(vorfahren: Block[]): boolean {
-  return vorfahren.some(istNebenlaeufig)
+/** Liegt die Stelle am Ende dieser Kette in einer nebenläufigen Umgebung? */
+export function nebenlaeufig(kette: Glied[]): boolean {
+  return kette.some(gliedNebenlaeufig)
+}
+
+/** Ist der Block ein Rahmen (im BPMN ein aufgeklappter Teilprozess)? Kein Sequenzfluss und kein Rücksprung quert seine Grenze. */
+export function istRahmen(b: Block): boolean {
+  return b.typ === 'teilprozess'
+}
+
+/** Alle Rahmen über der Stelle am Ende der Kette, von außen nach innen. */
+export function rahmenUeber(kette: Glied[]): Block[] {
+  return kette.map((g) => g.block).filter(istRahmen)
+}
+
+/**
+ * Rolle, in deren Bahn ein Abschnitt mit allen Schritten steht: die mit den
+ * meisten Aufgaben darin, bei Gleichstand die der ersten Aufgabe. `undefined`,
+ * wenn der Abschnitt keine Aufgabe enthält (dann gilt die Bahn, in der der Ablauf
+ * gerade ist); `null` steht für Aufgaben ohne Rolle.
+ */
+export function rahmenRolle(b: Teilprozess, gueltig: (rolleId: Id | null) => Id | null = (r) => r): Id | null | undefined {
+  const anzahl = new Map<Id | null, number>()
+  let erste: Id | null | undefined
+  for (const { block } of durchlaufe(b.koerper)) {
+    if (block.typ !== 'aufgabe') continue
+    const r = gueltig(block.rolleId)
+    if (erste === undefined) erste = r
+    anzahl.set(r, (anzahl.get(r) ?? 0) + 1)
+  }
+  if (erste === undefined) return undefined
+  let beste: Id | null = erste
+  for (const [r, n] of anzahl) if (n > anzahl.get(beste)!) beste = r
+  return beste
 }
 
 const klemme01 = (x: number) => Math.min(1, Math.max(0, x))
@@ -154,8 +226,13 @@ function abbildeBlock(b: Block, f: SchrittAbbildung): Block {
       return { ...b, zweige: b.zweige.map((z) => abbildeSequenz(z, f)) }
     case 'wiederholung':
       return { ...b, koerper: abbildeSequenz(b.koerper, f) }
-    default:
+    case 'teilprozess':
+      return { ...b, koerper: abbildeSequenz(b.koerper, f) }
+    case 'aufgabe':
+    case 'warten':
       return b
+    default:
+      return unerwartet(b)
   }
 }
 
@@ -308,6 +385,10 @@ export function blockTitel(b: Block): string {
       return b.frage ? `Wiederholung: ${b.frage}` : 'Wiederholung'
     case 'warten':
       return b.name || 'Warten'
+    case 'teilprozess':
+      return b.name || 'Abschnitt ohne Namen'
+    default:
+      return unerwartet(b)
   }
 }
 
@@ -323,8 +404,10 @@ export interface RuecksprungZiel {
 /**
  * Mögliche Ziele für „zurück zu …“ aus einer Entscheidung an der Stelle
  * (sequenzId, index): alle Schritte davor in derselben Sequenz und in den
- * umgebenden Sequenzen, aber nicht über „Gleichzeitig“ hinweg (das gäbe eine
- * Verklemmung). `mitSelbst`: die Entscheidung an `index` selbst ist auch ein Ziel.
+ * umgebenden Sequenzen, aber nicht über eine nebenläufige Umgebung hinweg
+ * (das gäbe eine Verklemmung) und nicht aus einem Rahmen hinaus (kein
+ * Sequenzfluss quert seine Grenze). `mitSelbst`: die Entscheidung an `index`
+ * selbst ist auch ein Ziel.
  */
 export function ruecksprungZiele(p: Prozess, sequenzId: Id, index: number, mitSelbst: boolean): RuecksprungZiel[] {
   const ebenen: RuecksprungZiel[][] = []
@@ -335,7 +418,8 @@ export function ruecksprungZiele(p: Prozess, sequenzId: Id, index: number, mitSe
     const ab = seq.besitzer?.typ === 'wiederholung' && seq.besitzer.modus === 'ruecksprung' ? 1 : 0
     ebenen.push(seq.sequenz.schritte.slice(ab, bis + 1).map((b) => ({ id: b.id, titel: bereichTitel(b) })))
     const besitzer = seq.besitzer
-    if (!besitzer || istNebenlaeufig(besitzer)) break
+    const glied = seq.kette[seq.kette.length - 1]
+    if (!besitzer || !glied || gliedNebenlaeufig(glied) || istRahmen(besitzer)) break
     const ort = findeBlock(p, besitzer.id)
     if (!ort) break
     seq = findeSequenz(p, ort.sequenz.id)
@@ -358,8 +442,9 @@ export function setzeRuecksprung(p: Prozess, entscheidungId: Id, zweigId: Id, zi
   const kette = [...ent.vorfahren, ent.block]
   const imZiel = kette.findIndex((b) => ziel.sequenz.schritte.includes(b))
   if (imZiel < 0) return p
-  // Liegt auf dem Weg vom Zielabschnitt zur Entscheidung ein „Gleichzeitig“ (auch als Block im Zielabschnitt selbst), wäre der Rücksprung eine Verklemmung.
-  if (kette.slice(imZiel).some(istNebenlaeufig)) return p
+  // Liegt auf dem Weg vom Zielabschnitt zur Entscheidung eine nebenläufige Umgebung (auch als Block im Zielabschnitt selbst),
+  // wäre der Rücksprung eine Verklemmung; liegt dort ein Rahmen, querte er dessen Grenze.
+  if (ent.kette.slice(imZiel).some(gliedNebenlaeufig) || kette.slice(imZiel, -1).some(istRahmen)) return p
   const i = ziel.index
   const j = ziel.sequenz.schritte.indexOf(kette[imZiel])
   if (j < i) return p
@@ -552,7 +637,53 @@ export function ausgaengeBlock(b: Block): Set<Ausgang> {
       if (b.modus === 'anteil' && b.anteilWiederholung >= 1) aus.delete('weiter')
       return aus
     }
+    case 'teilprozess':
+      return ausgaengeSequenz(b.koerper.schritte)
+    default:
+      return unerwartet(b)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Abschnitte zusammenfassen und auflösen
+
+/** Bereiche, auf die Ausgänge innerhalb der Schritte zurückspringen, und die Bereiche darin. */
+function ruecksprungVerweise(schritte: Block[]): { ziele: Set<Id>; bereiche: Set<Id> } {
+  const ziele = new Set<Id>()
+  const bereiche = new Set<Id>()
+  for (const { block } of durchlaufe({ id: '', schritte })) {
+    if (block.typ === 'entscheidung') for (const z of block.zweige) if (z.zurueckZu) ziele.add(z.zurueckZu)
+    if (block.typ === 'wiederholung' && block.modus === 'ruecksprung') bereiche.add(block.id)
+  }
+  return { ziele, bereiche }
+}
+
+/**
+ * Lassen sich die Schritte `von` bis `bis` (beide eingeschlossen) der Sequenz zu
+ * einem Abschnitt zusammenfassen? Nicht, wenn ein Rücksprung von innen die neue
+ * Rahmengrenze queren würde, also auf einen Bereich außerhalb zeigt.
+ */
+export function kannZusammenfassen(p: Prozess, sequenzId: Id, von: number, bis: number): boolean {
+  const seq = findeSequenz(p, sequenzId)
+  if (!seq || von < 0 || bis < von || bis >= seq.sequenz.schritte.length) return false
+  const { ziele, bereiche } = ruecksprungVerweise(seq.sequenz.schritte.slice(von, bis + 1))
+  for (const z of ziele) if (!bereiche.has(z)) return false
+  return true
+}
+
+/** Fasst die Schritte `von` bis `bis` einer Sequenz zu einem Abschnitt mit Namen zusammen (aufgeklappter Teilprozess). */
+export function fasseZusammen(p: Prozess, sequenzId: Id, von: number, bis: number, name: string, id?: Id): Prozess {
+  if (!kannZusammenfassen(p, sequenzId, von, bis)) return p
+  const seq = findeSequenz(p, sequenzId)!
+  const abschnitt = neuerTeilprozess({ name, koerper: neueSequenz(seq.sequenz.schritte.slice(von, bis + 1)), ...(id ? { id } : {}) })
+  return ersetzeBereich(p, sequenzId, von, bis - von + 1, [abschnitt])
+}
+
+/** Löst einen Abschnitt auf: Seine Schritte stehen danach wieder direkt in der umgebenden Folge. */
+export function loeseAbschnittAuf(p: Prozess, abschnittId: Id): Prozess {
+  const f = findeBlock(p, abschnittId)
+  if (!f || f.block.typ !== 'teilprozess') return p
+  return ersetzeBereich(p, f.sequenz.id, f.index, 1, f.block.koerper.schritte)
 }
 
 /** Kann der Ablauf hinter diesem Block normal weiterlaufen? */

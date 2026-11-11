@@ -22,7 +22,7 @@
 import { durchlaufe, nachrichtenVerweise, oderWahrscheinlichkeiten } from '../modell/operationen'
 import { erwartungMaximum, erwartungOder } from './verteilung'
 import { bedienende, engpassSchwelle, WARTEFAKTOR_SCHWELLE, wartefaktor } from './warteschlange'
-import type { Aufgabe, Block, Id, Prozess, Rolle, Teilnehmer } from '../modell/typen'
+import { unerwartet, type Aufgabe, type Block, type Id, type Prozess, type Rolle, type Teilnehmer } from '../modell/typen'
 
 // ---------------------------------------------------------------------------
 // Ergebnis
@@ -218,6 +218,9 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
       return { aus, rueck }
     }
     case 'parallel': {
+      // Bisher nur „alle“; neue Arten (weiter beim ersten, nacheinander) rechnen anders und müssen hier unterschieden werden.
+      const art = b.art
+      if (art !== 'alle') return unerwartet(art)
       if (b.zweige.length === 0) return { aus: f, rueck: new Map() }
       let anteil = Infinity
       const letzte = new Map<string, number>()
@@ -273,6 +276,11 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
       addiereRueck(rueck, o.rueck, b.id)
       return { aus: b.modus === 'anteil' ? skaliere(o.aus, 1 - p) : o.aus, rueck }
     }
+    case 'teilprozess':
+      // Ein Abschnitt rechnet wie die Folge seiner Schritte; Enden darin beenden den Vorgang.
+      return flussSequenz(b.koerper.schritte, f, z, ctx)
+    default:
+      return unerwartet(b)
   }
 }
 
@@ -344,6 +352,8 @@ function dauerBlock(b: Block): Dauer {
       return d
     }
     case 'parallel': {
+      const art = b.art
+      if (art !== 'alle') return unerwartet(art)
       const zweige = b.zweige.map((z) => dauerSequenz(z.schritte))
       if (zweige.length === 0) return { gesamt: 0, arbeit: 0, weiter: 1, rueck: new Map(), beitraege: new Map() }
       const laengster = zweige.reduce((a, x) => (x.gesamt > a.gesamt ? x : a))
@@ -389,6 +399,10 @@ function dauerBlock(b: Block): Dauer {
       addiereBeitraege(beitraege, x.beitraege, n)
       return { gesamt: x.gesamt * n, arbeit: x.arbeit * n, weiter, rueck, beitraege }
     }
+    case 'teilprozess':
+      return dauerSequenz(b.koerper.schritte)
+    default:
+      return unerwartet(b)
   }
 }
 

@@ -218,6 +218,7 @@ export function beispielOnlinebestellung(): Prozess {
         {
           typ: 'parallel',
           id: 'par_versand',
+          art: 'alle',
           zweige: [
             { id: 'seq_rechnung', schritte: [aufgabe('auf_rechnung', 'Rechnung erstellen', 'rol_buchhaltung', 'med_erp', 2, STD, { brauchtVorgaenger: null })] },
             {

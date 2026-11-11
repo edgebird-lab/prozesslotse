@@ -1,4 +1,4 @@
-import type { Block, Prozess } from '../modell/typen'
+import { unerwartet, type Block, type Prozess } from '../modell/typen'
 import type { SymbolArt } from './Symbol'
 
 /** Passendes BPMN-Symbol für einen Baustein. */
@@ -19,5 +19,9 @@ export function symbolFuer(b: Block, p: Prozess): SymbolArt {
       return b.modus === 'ruecksprung' ? 'ruecksprung' : 'wiederholung'
     case 'warten':
       return b.art === 'zeit' ? 'warten-zeit' : 'warten-nachricht'
+    case 'teilprozess':
+      return 'teilprozess'
+    default:
+      return unerwartet(b)
   }
 }

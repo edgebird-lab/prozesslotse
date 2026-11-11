@@ -3,8 +3,8 @@
  * und Benennung nach den Seven Process Modeling Guidelines (7PMG,
  * Mendling, Reijers, van der Aalst 2010).
  */
-import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, istNebenlaeufig, kannWeiterlaufen, liegtInParallele, nachrichtenVerweise, oderWahrscheinlichkeiten } from './operationen'
-import type { Block, Id, Prozess } from './typen'
+import { anzahlBloecke, ausgaengeBlock, ausgaengeSequenz, blockTitel, durchlaufe, gliedNebenlaeufig, istRahmen, kannWeiterlaufen, nachrichtenVerweise, nebenlaeufig, oderWahrscheinlichkeiten, rahmenRolle } from './operationen'
+import { unerwartet, type Block, type Id, type Prozess } from './typen'
 
 export type Schwere = 'fehler' | 'warnung' | 'hinweis'
 
@@ -75,7 +75,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
     }
   }
 
-  for (const { block: b, vorfahren } of durchlaufe(p.ablauf)) {
+  for (const { block: b, vorfahren, kette } of durchlaufe(p.ablauf)) {
     switch (b.typ) {
       case 'aufgabe': {
         if (!b.name.trim()) {
@@ -127,8 +127,14 @@ export function pruefeProzess(p: Prozess): Befund[] {
           if (!z.bezeichnung.trim()) {
             add({ schluessel: `bezeichnung:${z.id}`, schwere: 'warnung', titel: 'Ausgang ohne Bezeichnung', text: `Ausgang ${i + 1} von „${blockTitel(b)}“ braucht eine Antwort, z. B. „Ja“ oder „Nein“.`, blockId: b.id })
           }
-          if (z.ende !== null && liegtInParallele([...vorfahren, b])) {
-            add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“ oder einer ODER-Verzweigung. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
+          if (z.ende !== null && nebenlaeufig(kette)) {
+            add({
+              schluessel: `verklemmung:${z.id}`,
+              schwere: 'fehler',
+              titel: 'Verklemmung',
+              text: `Der Ausgang „${z.bezeichnung}“ beendet den Prozess innerhalb von „Gleichzeitig“ oder einer ODER-Verzweigung${vorfahren.some(istRahmen) ? ' (der Abschnitt darum liegt selbst in einem ihrer Zweige)' : ''}. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`,
+              blockId: b.id,
+            })
           }
           if ((z.ende !== null || z.zurueckZu !== null) && z.schritte.length > 0 && !ausgaengeSequenz(z.schritte).has('weiter')) {
             add({
@@ -147,8 +153,17 @@ export function pruefeProzess(p: Prozess): Befund[] {
             const t = vorfahren.findIndex((v) => v.id === z.zurueckZu && v.typ === 'wiederholung' && v.modus === 'ruecksprung')
             if (t < 0) {
               add({ schluessel: `rueckziel:${z.id}`, schwere: 'fehler', titel: 'Rücksprung ins Leere', text: `Der Ausgang „${z.bezeichnung}“ springt zu einem Schritt zurück, der nicht vor dieser Entscheidung liegt.`, blockId: b.id })
-            } else if (vorfahren.slice(t + 1).some(istNebenlaeufig)) {
+            } else if (kette.slice(t + 1).some(gliedNebenlaeufig)) {
               add({ schluessel: `verklemmung:${z.id}`, schwere: 'fehler', titel: 'Verklemmung', text: `Der Ausgang „${z.bezeichnung}“ springt aus „Gleichzeitig“ oder einer ODER-Verzweigung heraus zurück. Die Zusammenführung würde dann ewig auf diesen Zweig warten.`, blockId: b.id })
+            } else if (vorfahren.slice(t + 1).some(istRahmen)) {
+              const rahmen = vorfahren.slice(t + 1).find(istRahmen)!
+              add({
+                schluessel: `rahmenrueck:${z.id}`,
+                schwere: 'fehler',
+                titel: 'Rücksprung aus einem Abschnitt',
+                text: `Der Ausgang „${z.bezeichnung}“ springt aus dem Abschnitt „${blockTitel(rahmen)}“ hinaus zurück. Ein Abschnitt hat einen eigenen Start und ein eigenes Ende; zurück geht es nur zu Schritten im selben Abschnitt.`,
+                blockId: b.id,
+              })
             }
           }
           if (b.art === 'ereignis') {
@@ -265,6 +280,34 @@ export function pruefeProzess(p: Prozess): Befund[] {
         pruefeSequenzen([b.koerper.schritte])
         break
       }
+      case 'teilprozess': {
+        const titel = blockTitel(b)
+        if (b.koerper.schritte.length === 0) {
+          add({ schluessel: `leer:${b.id}`, schwere: 'fehler', titel: 'Leerer Abschnitt', text: `Im Abschnitt „${titel}“ steht noch kein Schritt. Schritte ergänzen oder den Abschnitt löschen.`, blockId: b.id })
+        }
+        if (!b.name.trim()) {
+          add({ schluessel: `name:${b.id}`, schwere: 'warnung', titel: 'Abschnitt ohne Namen', text: 'Gib dem Abschnitt einen Namen, z. B. „Ware versenden“; er steht im Diagramm oben im Rahmen.', blockId: b.id })
+        }
+        // Alle Schritte eines Abschnitts stehen in einer Bahn; der äußerste Abschnitt bestimmt sie.
+        if (!vorfahren.some(istRahmen)) {
+          const gueltig = (r: Id | null) => (r !== null && rollenIds.has(r) ? r : null)
+          const rollen = new Set<Id | null>()
+          for (const { block: x } of durchlaufe(b.koerper)) if (x.typ === 'aufgabe') rollen.add(gueltig(x.rolleId))
+          if (rollen.size >= 2) {
+            const bahn = rahmenRolle(b, gueltig)
+            const bahnName = bahn ? p.rollen.find((r) => r.id === bahn)?.name || 'Unbenannte Rolle' : 'Ohne Rolle'
+            add({
+              schluessel: `rahmenbahn:${b.id}`,
+              schwere: 'hinweis',
+              titel: 'Mehrere Rollen in einem Abschnitt',
+              text: `Im Diagramm stehen alle Schritte von „${titel}“ in der Bahn „${bahnName}“; Schritte anderer Rollen tragen die Rolle in Klammern.`,
+              blockId: b.id,
+            })
+          }
+        }
+        pruefeSequenzen([b.koerper.schritte])
+        break
+      }
       case 'warten': {
         if (!b.name.trim()) {
           add({ schluessel: `name:${b.id}`, schwere: 'warnung', titel: 'Warten ohne Namen', text: 'Worauf wird gewartet, z. B. „Lieferung abwarten“?', blockId: b.id })
@@ -274,6 +317,8 @@ export function pruefeProzess(p: Prozess): Befund[] {
         }
         break
       }
+      default:
+        unerwartet(b)
     }
   }
 

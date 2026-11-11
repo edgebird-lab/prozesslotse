@@ -1,4 +1,4 @@
-import type { Block } from '../modell/typen'
+import { unerwartet, type Block } from '../modell/typen'
 
 /** Was fehlt, bevor ein neuer Baustein eingefügt werden kann; `null` wenn alles da ist. */
 export function fehltNoch(b: Block): string | null {
@@ -24,5 +24,9 @@ export function fehltNoch(b: Block): string | null {
     }
     case 'parallel':
       return null
+    case 'teilprozess':
+      return b.name.trim() ? null : 'Gib dem Abschnitt zuerst einen Namen, z. B. „Ware versenden“.'
+    default:
+      return unerwartet(b)
   }
 }

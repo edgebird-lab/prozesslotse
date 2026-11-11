@@ -4,7 +4,7 @@ import { neuerOderZweig, neueRolle, neuesMedium, neueSequenz, neuerZweig } from 
 import { blockTitel, freigabeAusgang } from '../../modell/operationen'
 import { istObjektVerbName } from '../../modell/pruefung'
 import type { RuecksprungZiel } from '../../modell/operationen'
-import { MEDIUM_ARTEN, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Oder, type OderZweig, type Parallel, type Warten, type Wiederholung } from '../../modell/typen'
+import { MEDIUM_ARTEN, unerwartet, type Aufgabe, type Block, type Entscheidung, type EntscheidungsZweig, type Id, type MediumArt, type Oder, type OderZweig, type Parallel, type Teilprozess, type Warten, type Wiederholung } from '../../modell/typen'
 import { formatiereProzent } from '../../modell/zeit'
 import { Auswahl, Feld, ProzentEingabe, ZeitEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
@@ -27,6 +27,10 @@ export interface FormularKontext {
    * Rückruf (neuer Entwurf) merkt sich das Formular das Ziel im Ausgang.
    */
   setzeDanach?: (zweigId: Id, danach: Danach) => void
+  /** Nur Abschnitt: Name der Bahn, in der er im Diagramm steht (null, solange er keine Aufgabe enthält) */
+  rahmenBahn?: string | null
+  /** Nur bestehender Abschnitt: löst ihn auf, seine Schritte stehen danach wieder in der Folge */
+  loeseAuf?: () => void
 }
 
 interface Props<B extends Block> {
@@ -49,6 +53,10 @@ export function BlockFormular({ block, onAendern, kontext }: Props<Block>) {
       return <WiederholungFormular block={block} onAendern={onAendern} kontext={kontext} />
     case 'warten':
       return <WartenFormular block={block} onAendern={onAendern} kontext={kontext} />
+    case 'teilprozess':
+      return <TeilprozessFormular block={block} onAendern={onAendern} kontext={kontext} />
+    default:
+      return unerwartet(block)
   }
 }
 
@@ -612,6 +620,30 @@ function WiederholungFormular({ block: w, onAendern, kontext }: Props<Wiederholu
       >
         {(id) => <ProzentEingabe id={id} anteil={w.anteilWiederholung} max={99} onAendern={(anteilWiederholung) => onAendern({ ...w, anteilWiederholung })} />}
       </Feld>
+    </>
+  )
+}
+
+function TeilprozessFormular({ block: t, onAendern, kontext }: Props<Teilprozess>) {
+  const bahn = kontext.rahmenBahn
+  return (
+    <>
+      <Feld label="Wie heißt der Abschnitt?" hilfe="Was darin erledigt wird, z. B. „Ware versenden“. Der Name steht im Diagramm oben im Rahmen.">
+        {(id) => <input id={id} type="text" autoFocus={kontext.neu} value={t.name} placeholder="z. B. Ware versenden" onChange={(e) => onAendern({ ...t, name: e.target.value })} />}
+      </Feld>
+      <p className="feld-hilfe">
+        {bahn
+          ? `Im Diagramm stehen alle Schritte dieses Abschnitts in der Bahn „${bahn}“; Schritte anderer Rollen tragen die Rolle in Klammern.`
+          : 'Im Diagramm steht der Abschnitt mit allen Schritten in einer Bahn, der Rolle mit den meisten Schritten darin; Schritte anderer Rollen tragen die Rolle in Klammern.'}
+      </p>
+      {kontext.loeseAuf && (
+        <div className="knopfreihe">
+          <button type="button" className="knopf knopf-leise" onClick={kontext.loeseAuf}>
+            Abschnitt auflösen
+          </button>
+          <span className="leise">Die Schritte bleiben, nur der Rahmen fällt weg.</span>
+        </div>
+      )}
     </>
   )
 }

@@ -2,8 +2,8 @@
  * Führung durch den Ablauf: Wo steht die Einfügeposition, wohin springt sie
  * nach dem Einfügen und was passiert bei „Abschnitt fertig“.
  */
-import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, liegtInParallele } from './operationen'
-import type { Block, Cursor, Prozess } from './typen'
+import { bereichTitel, blockTitel, findeBlock, findeSequenz, kannWeiterlaufen, nebenlaeufig } from './operationen'
+import { unerwartet, type Block, type Cursor, type Prozess } from './typen'
 
 export interface Ort {
   /** z. B. „im Ausgang ‚Nein‘ von ‚Ware vorrätig?‘“ */
@@ -12,7 +12,7 @@ export interface Ort {
   position: string
   /** Schritte an dieser Stelle würden nie erreicht. */
   unerreichbar: boolean
-  /** Innerhalb von „Gleichzeitig“ darf der Prozess nicht enden. */
+  /** In nebenläufiger Umgebung (Gleichzeitig, ODER) darf der Prozess noch nicht enden. */
   inParallele: boolean
   vorgaenger: Block | null
   /** Was „Abschnitt fertig“ bewirkt, als kurzer Text. */
@@ -34,6 +34,7 @@ function bereichText(p: Prozess, sequenzId: string): string {
   }
   if (b.typ === 'wiederholung' && b.modus === 'ruecksprung') return `im Bereich mit Rücksprung ab „${b.koerper.schritte[0] ? bereichTitel(b.koerper.schritte[0]) : '…'}“`
   if (b.typ === 'wiederholung') return `in der Wiederholung „${b.frage || 'Wiederholung'}“`
+  if (b.typ === 'teilprozess') return `im Abschnitt „${b.name || 'ohne Namen'}“`
   return 'im Ablauf'
 }
 
@@ -53,7 +54,7 @@ export function beschreibeCursor(p: Prozess, c: Cursor): Ort {
     bereich: bereichText(p, c.sequenzId),
     position: vorgaenger ? `nach „${blockTitel(vorgaenger)}“` : 'am Anfang',
     unerreichbar,
-    inParallele: f ? liegtInParallele(f.vorfahren) : false,
+    inParallele: f ? nebenlaeufig(f.kette) : false,
     vorgaenger,
     weiterText,
   }
@@ -81,9 +82,13 @@ export function cursorNachEinfuegen(block: Block, c: Cursor): Cursor {
     case 'oder':
       return block.zweige.length > 0 ? { sequenzId: block.zweige[0].id, index: block.zweige[0].schritte.length } : { ...c, index: c.index + 1 }
     case 'wiederholung':
+    case 'teilprozess':
       return { sequenzId: block.koerper.id, index: block.koerper.schritte.length }
-    default:
+    case 'aufgabe':
+    case 'warten':
       return { sequenzId: c.sequenzId, index: c.index + 1 }
+    default:
+      return unerwartet(block)
   }
 }
 

@@ -39,11 +39,12 @@ Der Assistent führt eine **Einfügeposition**: Er fragt immer an einer bestimmt
 | Mehrere Dinge gleichzeitig | Wie viele Zweige? | weiter im ersten Zweig |
 | Etwas wird wiederholt | Wozu wird wiederholt: Korrektur oder mehrere Durchgänge? · Welche Frage entscheidet über die Wiederholung? · In wie viel Prozent der Durchläufe wird wiederholt? | weiter im Körper der Wiederholung |
 | Warten | Worauf wird gewartet? · Auf einen Zeitpunkt oder auf eine Nachricht? · Wie lange im Schnitt? · Bei Nachricht und externen Beteiligten: Von wem kommt sie? | weiter hinter dem Warten |
+| Ein Abschnitt mit Namen | Wie heißt der Abschnitt? (Pflicht, z. B. „Ware versenden“). Das Formular nennt die Bahn, in der der Abschnitt im Diagramm steht. | weiter im Abschnitt („im Abschnitt „Ware versenden““); „Abschnitt fertig“ führt dahinter |
 | Dieser Abschnitt ist fertig | – | nächster Ausgang oder Zweig; nach dem letzten hinter den Baustein; im Hauptablauf zu „Prüfen“ |
 
 Zeiten werden als Zahl mit Einheit (Minuten, Stunden, Arbeitstage) eingegeben. Eine Entscheidung beginnt mit „Ja“/„Nein“ zu je 50 %; ein Knopf verteilt die Anteile so, dass sie 100 % ergeben.
 
-Jeder Schritt lässt sich später in der Gliederung auswählen, ändern, verschieben und löschen; Rückgängig und Wiederholen gelten für alle Änderungen.
+Jeder Schritt lässt sich später in der Gliederung auswählen, ändern, verschieben und löschen; Rückgängig und Wiederholen gelten für alle Änderungen. Bei jedem ausgewählten Schritt fasst „Ab hier zusammenfassen …“ ihn und die folgenden Schritte derselben Folge bis zu einem gewählten zu einem Abschnitt zusammen (Fragen: bis einschließlich welchem Schritt? Wie heißt der Abschnitt?). Angeboten werden nur Bereiche, aus denen kein Rücksprung hinausführt. Im Formular eines Abschnitts stellt „Abschnitt auflösen“ die Schritte zurück in die Folge.
 
 ## Warum diese Fragen
 
@@ -54,3 +55,4 @@ Jeder Schritt lässt sich später in der Gliederung auswählen, ändern, verschi
 - **Anteile an Entscheidungen** und der Wiederholungsanteil bestimmen, wie oft jeder Schritt im Schnitt läuft.
 - **„Zurück zu …“** bildet Korrekturschleifen ab, etwa: Daten fehlerhaft → Kunde fragen → bei Korrektur zurück zur Erfassung. Angeboten werden nur Schritte davor, und nie aus „Gleichzeitig“ heraus, damit keine Verklemmung entstehen kann.
 - **„Was zuerst passiert“** bildet Fälle ab, in denen nicht die Firma entscheidet, sondern ein Ereignis: Antwort des Kunden, Stornierung oder Ablauf einer Frist.
+- **Abschnitte** fassen Schritte zusammen, die zusammengehören, etwa für eine Frist über mehrere Schritte (Unterbrechungen folgen in einem späteren Schritt). Endet der Vorgang darin, zeigt das Diagramm den Ausstieg aus dem Rahmen. Weil ein Rahmen in einer Bahn steht, nennt das Formular die Bahn, und die Prüfung weist auf Abschnitte mit mehreren Rollen hin.

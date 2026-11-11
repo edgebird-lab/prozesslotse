@@ -1,5 +1,5 @@
 import { BpmnModdle, type ModdleElement } from 'bpmn-moddle'
-import { ergaenzeOderBereiche, type KnotenTyp, type TokenGraph, type TokenKnoten } from '../bpmn/tokenspiel'
+import type { KnotenTyp, TokenGraph, TokenKnoten } from '../bpmn/tokenspiel'
 
 const TYP: Record<string, KnotenTyp> = {
   'bpmn:StartEvent': 'start',
@@ -12,35 +12,62 @@ const TYP: Record<string, KnotenTyp> = {
   'bpmn:UserTask': 'aktivitaet',
   'bpmn:ManualTask': 'aktivitaet',
   'bpmn:IntermediateCatchEvent': 'aktivitaet',
+  'bpmn:SubProcess': 'rahmen',
+  'bpmn:BoundaryEvent': 'rand',
 }
 
-/** Liest exportiertes BPMN mit bpmn-moddle und baut den Graphen für das Tokenspiel. */
+interface Element extends ModdleElement {
+  flowElements?: Element[]
+  eventDefinitions?: { $type: string; errorRef?: { id: string } }[]
+  attachedToRef?: { id: string }
+  cancelActivity?: boolean
+  default?: { id: string }
+}
+
+/**
+ * Liest exportiertes BPMN mit bpmn-moddle und baut den Graphen für das
+ * Tokenspiel. Teilprozesse werden rekursiv gelesen; jeder Knoten kennt seinen
+ * Rahmen, Randereignisse ihren Wirt, Endereignisse ihre Art.
+ */
 export async function graphAusXml(xml: string): Promise<TokenGraph> {
   const { rootElement, warnings } = await BpmnModdle().fromXML(xml)
   if (warnings.length > 0) throw new Error(warnings.map((w) => w.message).join('; '))
-  const prozess = (rootElement.rootElements ?? []).find((e) => e.$type === 'bpmn:Process')
+  const prozess = (rootElement.rootElements ?? []).find((e) => e.$type === 'bpmn:Process') as Element | undefined
   if (!prozess) throw new Error('kein Prozess im BPMN')
   const knoten = new Map<string, TokenKnoten>()
   const fluesse: ModdleElement[] = []
-  for (const e of prozess.flowElements ?? []) {
-    if (e.$type === 'bpmn:SequenceFlow') fluesse.push(e)
-    else {
+  const lies = (behaelter: Element, rahmen: string | null) => {
+    for (const e of behaelter.flowElements ?? []) {
+      if (e.$type === 'bpmn:SequenceFlow') {
+        fluesse.push(e)
+        continue
+      }
       const typ = TYP[e.$type]
       if (!typ) throw new Error(`unbekanntes Element ${e.$type}`)
-      knoten.set(e.id, { id: e.id, typ, rein: [], raus: [] })
+      const k: TokenKnoten = { id: e.id, typ, rein: [], raus: [], rahmen }
+      const definition = e.eventDefinitions?.[0]
+      if (typ === 'ende') {
+        k.endeArt = definition?.$type === 'bpmn:ErrorEventDefinition' ? 'fehler' : definition?.$type === 'bpmn:TerminateEventDefinition' ? 'terminierung' : 'normal'
+        if (definition?.errorRef) k.fehler = definition.errorRef.id
+      }
+      if (typ === 'rand') {
+        k.wirt = e.attachedToRef?.id
+        k.unterbrechend = e.cancelActivity !== false
+        k.randArt = definition?.$type === 'bpmn:ErrorEventDefinition' ? 'fehler' : definition?.$type === 'bpmn:TimerEventDefinition' ? 'zeit' : 'nachricht'
+        if (definition?.errorRef) k.fehler = definition.errorRef.id
+      }
+      knoten.set(e.id, k)
+      if (typ === 'rahmen') lies(e, e.id)
     }
   }
+  lies(prozess, null)
   const ziel = new Map<string, string>()
   for (const f of fluesse) {
     knoten.get(f.sourceRef!.id)!.raus.push(f.id)
     knoten.get(f.targetRef!.id)!.rein.push(f.id)
     ziel.set(f.id, f.targetRef!.id)
   }
-  for (const e of prozess.flowElements ?? []) {
-    const standard = (e as ModdleElement & { default?: { id: string } }).default
-    if (standard) knoten.get(e.id)!.standard = standard.id
-  }
-  const g = { knoten: [...knoten.values()], ziel }
-  ergaenzeOderBereiche(g)
-  return g
+  const alle = (behaelter: Element): Element[] => (behaelter.flowElements ?? []).flatMap((e) => [e, ...alle(e)])
+  for (const e of alle(prozess)) if (e.default) knoten.get(e.id)!.standard = e.default.id
+  return { knoten: [...knoten.values()], ziel }
 }

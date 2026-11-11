@@ -11,7 +11,7 @@
 export type Id = string
 
 /** Version des Dateiformats. Bei inkompatiblen Änderungen erhöhen; ältere Dateien migriert speicher.ts. */
-export const FORMAT_VERSION = 3
+export const FORMAT_VERSION = 4
 
 export type WarteArt = 'zeit' | 'nachricht'
 
@@ -133,10 +133,18 @@ export interface Entscheidung {
   zweige: EntscheidungsZweig[]
 }
 
+/**
+ * Wann es nach „Gleichzeitig“ weitergeht. Bisher gibt es nur „alle“: weiter,
+ * wenn alle Zweige fertig sind. Weitere Arten folgen (siehe modellierung-v4.md);
+ * jede Funktion über Gleichzeitig unterscheidet die Art erschöpfend.
+ */
+export type ParallelArt = 'alle'
+
 /** Gleichzeitig: alle Zweige laufen, weiter geht es, wenn alle fertig sind (paralleles Gateway). */
 export interface Parallel {
   typ: 'parallel'
   id: Id
+  art: ParallelArt
   zweige: Sequenz[]
 }
 
@@ -197,8 +205,26 @@ export interface Warten {
   von?: Id | null
 }
 
-export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten
+/**
+ * Abschnitt mit Namen (aufgeklappter Teilprozess): fasst Schritte in einem
+ * Rahmen mit eigenem Start und Ende zusammen. Gerechnet wird er wie die Folge
+ * seiner Schritte; im Diagramm liegt er mit allen Schritten in einer Bahn.
+ */
+export interface Teilprozess {
+  typ: 'teilprozess'
+  id: Id
+  /** Name des Abschnitts, z. B. „Ware versenden“ */
+  name: string
+  koerper: Sequenz
+}
+
+export type Block = Aufgabe | Entscheidung | Oder | Parallel | Wiederholung | Warten | Teilprozess
 export type BlockTyp = Block['typ']
+
+/** Für erschöpfende Unterscheidungen: Der Übersetzer meldet jeden vergessenen Fall. */
+export function unerwartet(x: never): never {
+  throw new Error(`Unerwarteter Fall: ${JSON.stringify(x)}`)
+}
 
 export type AusloeserArt = 'nachricht' | 'zeit' | 'bedingung' | 'manuell'
 

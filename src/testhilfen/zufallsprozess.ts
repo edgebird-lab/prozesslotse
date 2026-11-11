@@ -12,15 +12,16 @@ import {
   neuesMedium,
   neuesWarten,
   neueWiederholung,
+  neuerTeilprozess,
 } from '../modell/bausteine'
-import { durchlaufe, findeBlock, liegtInParallele, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
+import { durchlaufe, findeBlock, nebenlaeufig, ruecksprungZiele, setzeRuecksprung } from '../modell/operationen'
 import type { Block, Prozess, Sequenz } from '../modell/typen'
 
 /**
  * Zufällige, gültige Prozesse für Belastungstests: verschachtelte
- * Entscheidungen (auch ereignisbasiert), Gleichzeitig, Wiederholungen, Warten,
- * vorzeitige Enden und Rücksprünge, die über `setzeRuecksprung` entstehen wie
- * in der Oberfläche.
+ * Entscheidungen (auch ereignisbasiert), Gleichzeitig, ODER, Wiederholungen,
+ * Warten, Abschnitte (auch verschachtelt und mit Enden darin), vorzeitige Enden
+ * und Rücksprünge, die über `setzeRuecksprung` entstehen wie in der Oberfläche.
  */
 export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: boolean } = {}): Prozess {
   // auchUngueltig: jeder Ausgang darf enden oder zurückspringen, also auch alle; dann entstehen unerreichbare Schritte und Endlosschleifen
@@ -75,6 +76,12 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
       const faktor = summe < 1.15 ? 1.15 / summe : 1
       return neueOder({ frage: 'Welche Wege?', zweige: zweige.map((z) => ({ ...z, anteil: Math.min(0.95, z.anteil * faktor) })), standard: null })
     }
+    if (r >= 0.92 && r < 0.97 && tiefe <= 2) {
+      // Abschnitt (aufgeklappter Teilprozess); Enden darin kommen aus den Entscheidungen, wie sonst auch nicht in nebenläufiger Umgebung.
+      // Ungültig: ein leerer Abschnitt
+      const n = ++nr
+      return neuerTeilprozess({ name: `Abschnitt ${n}`, koerper: { id: `tk${n}`, schritte: sequenz(tiefe + 1, inParallel, frei && zufall() < 0.1 ? 0 : 1) } })
+    }
     return neueWiederholung({ frage: 'Nochmal?', koerper: { id: `k${++nr}`, schritte: sequenz(tiefe + 1, inParallel, 1) } })
   }
 
@@ -89,8 +96,8 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
 
   // Rücksprünge wie in der Oberfläche setzen: nie im ersten Ausgang (der führt weiter), nie aus „Gleichzeitig“ heraus
   const kandidaten: string[] = []
-  for (const { block: b, vorfahren } of durchlaufe(p.ablauf)) {
-    if (b.typ === 'entscheidung' && !liegtInParallele(vorfahren)) kandidaten.push(b.id)
+  for (const { block: b, kette } of durchlaufe(p.ablauf)) {
+    if (b.typ === 'entscheidung' && !nebenlaeufig(kette)) kandidaten.push(b.id)
   }
   for (const id of kandidaten) {
     if (zufall() >= 0.4) continue

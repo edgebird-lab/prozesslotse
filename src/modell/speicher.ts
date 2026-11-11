@@ -61,7 +61,12 @@ function pruefeBlock(x: unknown, wo: string): asserts x is Block {
       return
     case 'parallel':
       fordere(Array.isArray(x.zweige), `${wo}: Zweige fehlen.`)
+      fordere(x.art === 'alle', `${wo}: unbekannte Art von „Gleichzeitig“.`)
       x.zweige.forEach((z, i) => pruefeSequenz(z, `${wo}, Zweig ${i + 1}`))
+      return
+    case 'teilprozess':
+      fordere(istText(x.name), `${wo}: Abschnitt ohne Namensfeld.`)
+      pruefeSequenz(x.koerper, `${wo}, Abschnitt`)
       return
     case 'wiederholung':
       fordere(istText(x.frage) && istZahl(x.anteilWiederholung) && (x.modus === 'anteil' || x.modus === 'ruecksprung'), `${wo}: Wiederholung unvollständig.`)
@@ -109,7 +114,7 @@ function entferneFremdeAbsender(p: Prozess): void {
         }
       }
       if (b.typ === 'parallel' || b.typ === 'oder') for (const z of b.zweige) sequenz(z.schritte)
-      if (b.typ === 'wiederholung') sequenz(b.koerper.schritte)
+      if (b.typ === 'wiederholung' || b.typ === 'teilprozess') sequenz(b.koerper.schritte)
     }
   }
   sequenz(p.ablauf.schritte)
@@ -135,6 +140,23 @@ function migriereVon1(prozess: unknown): void {
   besuche(prozess.ablauf)
 }
 
+/**
+ * Format 3 → 4: „Gleichzeitig“ bekommt eine Art; bisher gab es nur „alle“
+ * (weiter, wenn alle Zweige fertig sind). Sonst ändert sich nichts. Ändert die
+ * Daten an Ort und Stelle.
+ */
+function migriereVon3(prozess: unknown): void {
+  if (!istObj(prozess)) return
+  prozess.formatVersion = 4
+  const besuche = (x: unknown) => {
+    if (Array.isArray(x)) return x.forEach(besuche)
+    if (!istObj(x)) return
+    if (x.typ === 'parallel') x.art ??= 'alle'
+    for (const wert of Object.values(x)) if (typeof wert === 'object' && wert !== null) besuche(wert)
+  }
+  besuche(prozess.ablauf)
+}
+
 /** Prüft geladene Daten und gibt sie als Projekt zurück; wirft `Formatfehler`. Ältere Formate werden umgestellt. */
 export function leseProjekt(daten: unknown): Projekt {
   fordere(istObj(daten), 'Die Datei enthält kein Prozesslotse-Projekt.')
@@ -147,6 +169,10 @@ export function leseProjekt(daten: unknown): Projekt {
     // Format 3 bringt nur neue Bausteine und Felder; bestehende Daten bleiben gültig.
     for (const p of [daten.ist, daten.soll]) if (istObj(p) && p.formatVersion === 2) p.formatVersion = 3
     daten.formatVersion = 3
+  }
+  if (daten.formatVersion === 3) {
+    for (const p of [daten.ist, daten.soll]) if (istObj(p) && p.formatVersion === 3) migriereVon3(p)
+    daten.formatVersion = 4
   }
   fordere(daten.formatVersion === FORMAT_VERSION, `Dateiformat ${String(daten.formatVersion)} wird nicht unterstützt.`)
   pruefeProzess(daten.ist, 'Ist-Prozess')

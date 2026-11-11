@@ -2,12 +2,19 @@
  * Erzeugt BPMN 2.0 XML mit Diagramm-Informationen (DI). Die Datei lässt sich
  * in bpmn.io, Camunda Modeler oder Signavio öffnen. Zeiten, Anteile und
  * Medienbrüche stehen als Dokumentation an den Elementen.
+ *
+ * Abschnitte werden aufgeklappte Teilprozesse (`subProcess` mit eigenem Start
+ * und Ende, im DI `isExpanded`); ihr Inhalt steht als `flowElements` darin, im
+ * Bahnensatz steht nur der Teilprozess selbst. Endet der Vorgang in einem
+ * Abschnitt, steht dort ein Fehler-Ende mit einem `bpmn:error` je Ergebnis; ein
+ * Fehler-Randereignis am äußersten Abschnitt fängt es und führt zum Ende mit
+ * diesem Ergebnis.
  */
 import { findeBlock, mediumName, rolleName } from '../modell/operationen'
 import { istDigital, type Id, type Projekt, type Prozess } from '../modell/typen'
 import { einbettungXml, type Einbettung } from './einbettung'
 import { formatiereDauer, formatiereProzent } from '../modell/zeit'
-import { berechneLayout, xmlId, type Layout, type LayoutKante, type LayoutKnoten, type Rechteck } from './layout'
+import { berechneLayout, xmlId, type Layout, type LayoutKante, type LayoutKnoten, type LayoutRahmen, type Rechteck } from './layout'
 
 export interface BpmnErgebnis {
   xml: string
@@ -70,9 +77,9 @@ const EREIGNIS_DEFINITION: Record<string, string> = {
   bedingung: 'bpmn:conditionalEventDefinition',
 }
 
-function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], blockDoku: Map<string, string>, standardFluss: Map<string, string>): string {
-  const e = '    '
+function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], blockDoku: Map<string, string>, standardFluss: Map<string, string>, e: string): string {
   const flussRefs = rein.map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + raus.map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
+  const fehlerDefinition = k.fehler ? `${e}  <bpmn:errorEventDefinition id="${k.id}_def" errorRef="${k.fehler}" />\n` : ''
   const definition = (art: string | null | undefined) => {
     if (!art || !EREIGNIS_DEFINITION[art]) return ''
     const tag = EREIGNIS_DEFINITION[art]
@@ -85,7 +92,11 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
     case 'start':
       return `${e}<bpmn:startEvent id="${k.id}"${attrName(k.name)}>\n${flussRefs}${definition(k.ereignis)}${e}</bpmn:startEvent>\n`
     case 'ende':
-      return `${e}<bpmn:endEvent id="${k.id}"${attrName(k.name)}>\n${flussRefs}${e}</bpmn:endEvent>\n`
+      // Im Abschnitt ein Fehler-Ende: Es steigt zum Randereignis des äußersten Abschnitts auf.
+      return `${e}<bpmn:endEvent id="${k.id}"${attrName(k.name)}>\n${flussRefs}${fehlerDefinition}${e}</bpmn:endEvent>\n`
+    case 'rand':
+      // Fehler-Randereignis: bricht den Abschnitt ab und führt zum Ende mit dem Ergebnis
+      return `${e}<bpmn:boundaryEvent id="${k.id}"${attrName(k.name)} attachedToRef="${k.wirt}" cancelActivity="true">\n${flussRefs}${fehlerDefinition}${e}</bpmn:boundaryEvent>\n`
     case 'warten':
       return `${e}<bpmn:intermediateCatchEvent id="${k.id}"${attrName(k.name)}>\n${doku(blockDoku.get(k.id) ?? '', `${e}  `)}${flussRefs}${definition(k.ereignis)}${e}</bpmn:intermediateCatchEvent>\n`
     case 'aufgabe': {
@@ -110,8 +121,7 @@ function knotenXml(p: Prozess, k: LayoutKnoten, rein: string[], raus: string[], 
   }
 }
 
-function kanteXml(k: LayoutKante): string {
-  const e = '    '
+function kanteXml(k: LayoutKante, e: string): string {
   if (!k.doku) return `${e}<bpmn:sequenceFlow id="${k.id}"${attrName(k.name)} sourceRef="${k.von}" targetRef="${k.nach}" />\n`
   return `${e}<bpmn:sequenceFlow id="${k.id}"${attrName(k.name)} sourceRef="${k.von}" targetRef="${k.nach}">\n${doku(k.doku, `${e}  `)}${e}</bpmn:sequenceFlow>\n`
 }
@@ -131,6 +141,11 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   const elementZuBlock = new Map<string, Id>()
   const blockZuElementen = new Map<Id, string[]>()
   const blockDoku = new Map<string, string>()
+  // Der Rahmen zuerst: Er ist das sichtbarste Element eines Abschnitts.
+  for (const r of layout.rahmen) {
+    elementZuBlock.set(r.id, r.blockId)
+    blockZuElementen.set(r.blockId, [...(blockZuElementen.get(r.blockId) ?? []), r.id])
+  }
   for (const k of layout.knoten) {
     if (!k.blockId) continue
     elementZuBlock.set(k.id, k.blockId)
@@ -159,13 +174,31 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   x += '    <bpmn:laneSet id="Bahnen">\n'
   for (const b of layout.bahnen) {
     x += `      <bpmn:lane id="${bahnId(b.schluessel)}"${attrName(b.name)}>\n`
-    for (const k of layout.knoten) if (k.bahn === b.schluessel) x += `        <bpmn:flowNodeRef>${k.id}</bpmn:flowNodeRef>\n`
+    // Nur Elemente der Prozessebene; der Inhalt eines Abschnitts gehört zu dessen Teilprozess.
+    for (const r of layout.rahmen) if (r.eltern === null && r.bahn === b.schluessel) x += `        <bpmn:flowNodeRef>${r.id}</bpmn:flowNodeRef>\n`
+    for (const k of layout.knoten) if ((k.rahmen ?? null) === null && k.bahn === b.schluessel) x += `        <bpmn:flowNodeRef>${k.id}</bpmn:flowNodeRef>\n`
     x += '      </bpmn:lane>\n'
   }
   x += '    </bpmn:laneSet>\n'
-  for (const k of layout.knoten) x += knotenXml(p, k, rein.get(k.id) ?? [], raus.get(k.id) ?? [], blockDoku, standardFluss)
-  for (const k of layout.kanten) x += kanteXml(k)
+  // Flüsse gehören zur Ebene ihrer Quelle
+  const rahmenNach = new Map(layout.rahmen.map((r) => [r.id, r]))
+  const knotenNach = new Map(layout.knoten.map((k) => [k.id, k]))
+  const ebeneVon = (id: string): string | null => (rahmenNach.has(id) ? rahmenNach.get(id)!.eltern : (knotenNach.get(id)?.rahmen ?? null))
+  const ebene = (rahmen: string | null, e: string): string => {
+    let s = ''
+    for (const r of layout.rahmen) if (r.eltern === rahmen) s += rahmenXml(r, e)
+    for (const k of layout.knoten) if ((k.rahmen ?? null) === rahmen) s += knotenXml(p, k, rein.get(k.id) ?? [], raus.get(k.id) ?? [], blockDoku, standardFluss, e)
+    for (const k of layout.kanten) if (ebeneVon(k.von) === rahmen) s += kanteXml(k, e)
+    return s
+  }
+  const rahmenXml = (r: LayoutRahmen, e: string): string => {
+    const flussRefs = (rein.get(r.id) ?? []).map((id) => `${e}  <bpmn:incoming>${id}</bpmn:incoming>\n`).join('') + (raus.get(r.id) ?? []).map((id) => `${e}  <bpmn:outgoing>${id}</bpmn:outgoing>\n`).join('')
+    return `${e}<bpmn:subProcess id="${r.id}"${attrName(r.name)}>\n${flussRefs}${ebene(r.id, `${e}  `)}${e}</bpmn:subProcess>\n`
+  }
+  x += ebene(null, '    ')
   x += '  </bpmn:process>\n'
+  // Je Ergebnis, mit dem der Vorgang in einem Abschnitt endet, ein Fehler mit diesem Code
+  for (const f of layout.fehler) x += `  <bpmn:error id="${f.id}"${attrName(f.name)} errorCode="${esc(f.name)}" />\n`
 
   x += '  <bpmndi:BPMNDiagram id="Diagramm">\n'
   x += '    <bpmndi:BPMNPlane id="Ebene" bpmnElement="Kollaboration">\n'
@@ -180,6 +213,12 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
   for (const b of layout.bahnen) {
     x += `      <bpmndi:BPMNShape id="${bahnId(b.schluessel)}_di" bpmnElement="${bahnId(b.schluessel)}" isHorizontal="true">\n`
     x += bounds(b, '        ')
+    x += '      </bpmndi:BPMNShape>\n'
+  }
+  // Aufgeklappte Teilprozesse; ihr Inhalt liegt auf derselben Ebene des Diagramms
+  for (const r of layout.rahmen) {
+    x += `      <bpmndi:BPMNShape id="${r.id}_di" bpmnElement="${r.id}" isExpanded="true">\n`
+    x += bounds(r, '        ')
     x += '      </bpmndi:BPMNShape>\n'
   }
   for (const k of layout.knoten) {

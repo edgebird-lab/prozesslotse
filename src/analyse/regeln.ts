@@ -94,6 +94,7 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
               {
                 typ: 'parallel',
                 id: parId,
+                art: 'alle',
                 zweige: [
                   { id: `${parId}_a`, schritte: [a] },
                   { id: `${parId}_b`, schritte: [{ ...b, brauchtVorgaenger: null }] },
@@ -160,7 +161,7 @@ export function findeVorschlaege(p: Prozess): Vorschlag[] {
         }
 
         // 5. Freigabe streichen; eine direkt folgende Entscheidung über die Freigabe entfällt mit
-        const fq = b.art === 'freigabe' ? freigabeQuote({ block: b, sequenz: seq, index: i, vorfahren: [] }) : null
+        const fq = b.art === 'freigabe' ? freigabeQuote({ block: b, sequenz: seq, index: i, vorfahren: [], kette: [] }) : null
         if (fq && fq.quote >= FREIGABE_REGEL_SCHWELLE) {
           const { entscheidung, ausgang } = fq
           vorschlaege.push({

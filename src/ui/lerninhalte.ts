@@ -20,6 +20,7 @@ export type LernThema =
   | 'oder'
   | 'wiederholung'
   | 'warten'
+  | 'teilprozess'
   | 'pruefen'
   | 'verbessern'
 
@@ -89,6 +90,12 @@ export const LERNINHALTE: Record<LernThema, Lerninhalt> = {
     bpmn: 'Zwischenereignis',
     symbol: 'warten-zeit',
     text: 'Ein doppelter Kreis: Der Vorgang wartet auf einen Zeitpunkt (Uhr) oder auf eine Nachricht von außen (Brief), z. B. auf eine Lieferung. Niemand arbeitet in dieser Zeit, aber sie zählt zur Durchlaufzeit.',
+  },
+  teilprozess: {
+    titel: 'Abschnitt',
+    bpmn: 'Aufgeklappter Teilprozess',
+    symbol: 'teilprozess',
+    text: 'Ein Rahmen mit Namen fasst zusammengehörige Schritte zusammen, z. B. „Ware versenden“. Er hat einen eigenen Start und ein eigenes Ende; der Ablauf läuft am linken Rand hinein und am rechten heraus. Endet der Vorgang im Abschnitt, zeigt ein Blitz den Ausstieg aus dem Rahmen: innen ein Ende mit Blitz, am Rand des Rahmens ein Blitz im Doppelkreis, von dem es zum Ende mit dem Ergebnis geht. Gemeint ist kein technischer Fehler. Alle Schritte des Abschnitts stehen in einer Bahn; Schritte anderer Rollen tragen die Rolle in Klammern.',
   },
   pruefen: {
     titel: 'Was die Zahlen bedeuten',

@@ -21,6 +21,7 @@ export type SymbolArt =
   | 'verbessern'
   | 'ereignisgateway'
   | 'ruecksprung'
+  | 'teilprozess'
 
 export function Symbol({ art, groesse = 28 }: { art: SymbolArt; groesse?: number }) {
   return (
@@ -151,6 +152,17 @@ function inhalt(art: SymbolArt) {
           <circle cx="16" cy="16" r="5" {...strich} strokeWidth={1.2} />
           <path d="M16 12.8 19 15l-1.1 3.4h-3.8L13 15Z" {...strich} strokeWidth={1.1} />
         </>,
+      )
+    case 'teilprozess':
+      // Rahmen mit Namenszeile, darin Start und Ende
+      return (
+        <>
+          <rect x="2.5" y="5.5" width="27" height="21" rx="3.5" {...strich} />
+          <path d="M11 10h10" {...strich} strokeWidth={1.2} />
+          <circle cx="9" cy="18" r="2.6" {...strich} strokeWidth={1.2} />
+          <path d="M11.6 18h7.8" {...strich} strokeWidth={1.2} />
+          <circle cx="22" cy="18" r="2.6" {...strich} strokeWidth={2.2} />
+        </>
       )
     case 'ruecksprung':
       return (
