@@ -23,8 +23,13 @@ export interface Rechteck {
 
 /** Was der Druck vom Diagramm wissen muss: Formen für die Schnittkanten, Pools und Bahnen für die Namen am Rand. */
 export interface DruckForm extends Rechteck {
-  /** form: Aufgabe, Ereignis, Verzweigung … samt Beschriftung, oder die Beschriftung eines Flusses */
-  art: 'form' | 'pool' | 'bahn'
+  /**
+   * form: Aufgabe, Ereignis, Verzweigung … samt Beschriftung, die Beschriftung eines Flusses oder
+   * der Name und die Markierung eines Rahmens; rahmen: aufgeklappter Teilprozess (Abschnitt,
+   * „für jedes Stück“ …). Ein Rahmen ist oft breiter als ein Ausschnitt; Schnitte dürfen durch
+   * ihn laufen wie durch eine Bahn, nur nicht durch seinen Namen oder seine Markierung.
+   */
+  art: 'form' | 'pool' | 'bahn' | 'rahmen'
   name: string
   /** Pool ohne Inhalt (externer Teilnehmer): kein Kopf am linken Rand, der Name steht in der Mitte */
   eingeklappt?: boolean
@@ -94,7 +99,36 @@ interface BpmnElement {
   height?: number
   waypoints?: unknown
   labelTarget?: { id: string; waypoints?: unknown }
-  businessObject?: { name?: string; processRef?: unknown }
+  /** Teilprozess zugeklappt (bpmn-js setzt das beim Import) */
+  collapsed?: boolean
+  businessObject?: { name?: string; processRef?: unknown; loopCharacteristics?: unknown }
+}
+
+/** Größter Abstand, bei dem eine Beschriftung noch zu ihrer Form gehört (Diagrammpixel) */
+const NAH = 30
+
+/** Abstand zweier Rechtecke (0, wenn sie sich berühren oder überlappen) */
+function abstand(a: Rechteck, b: Rechteck): number {
+  const dx = Math.max(0, a.x - (b.x + b.breite), b.x - (a.x + a.breite))
+  const dy = Math.max(0, a.y - (b.y + b.hoehe), b.y - (a.y + a.hoehe))
+  return Math.hypot(dx, dy)
+}
+
+/** Arten aufgeklappter Teilprozesse; bpmn-js schreibt ihren Namen oben in die Mitte. */
+const TEILPROZESSE = new Set(['bpmn:SubProcess', 'bpmn:AdHocSubProcess', 'bpmn:Transaction'])
+
+/** Schrift von bpmn-js (12 px Arial), geschätzte Breite eines Zeichens und Höhe einer Zeile; Abstand des Namens zum Rand */
+const RAHMEN_SCHRIFT = { zeichen: 6.6, zeile: 14.4, rand: 5 }
+/** Halbe Breite und Höhe der Markierung in der Mitte der Unterkante (Mehrfachinstanz, Ad-hoc-Tilde) */
+const MARKE = { halb: 18, hoehe: 20 }
+
+/** Name eines aufgeklappten Teilprozesses: oben in der Mitte, bei Bedarf umbrochen (geschätzt wie bei bpmn-js) */
+function rahmenName(r: Rechteck, name: string): Rechteck {
+  const platz = Math.max(20, r.breite - 2 * RAHMEN_SCHRIFT.rand)
+  const text = [...name].length * RAHMEN_SCHRIFT.zeichen
+  const zeilen = Math.max(1, Math.ceil(text / platz))
+  const breite = Math.min(platz, text) + 2 * RAHMEN_SCHRIFT.rand
+  return { x: r.x + (r.breite - breite) / 2, y: r.y, breite, hoehe: zeilen * RAHMEN_SCHRIFT.zeile + 2 * RAHMEN_SCHRIFT.rand }
 }
 
 const vereinige = (a: Rechteck, b: Rechteck): Rechteck => {
@@ -106,7 +140,9 @@ const vereinige = (a: Rechteck, b: Rechteck): Rechteck => {
 /**
  * Formen, Pools und Bahnen aus den Elementen von bpmn-js. Die Beschriftung einer
  * Form (z. B. unter einem Ereignis) gehört zur Form; Beschriftungen von Flüssen
- * („Ja“, „Nein“) zählen als eigene Formen.
+ * („Ja“, „Nein“) zählen als eigene Formen. Aufgeklappte Teilprozesse sind Rahmen;
+ * ihr Name und ihre Markierung zählen als eigene Formen. Randereignisse sind
+ * gewöhnliche Formen auf der Unterkante ihres Schritts.
  */
 export function druckFormen(elemente: readonly unknown[]): DruckForm[] {
   const formen = new Map<string, DruckForm>()
@@ -119,11 +155,18 @@ export function druckFormen(elemente: readonly unknown[]): DruckForm[] {
     if (e.type === 'label' && e.labelTarget) beschriftungen.push({ ziel: e.labelTarget.id, r, fluss: !!e.labelTarget.waypoints, id: e.id })
     else if (e.type === 'bpmn:Participant') formen.set(e.id, { ...r, art: 'pool', name, eingeklappt: !e.businessObject?.processRef })
     else if (e.type === 'bpmn:Lane') formen.set(e.id, { ...r, art: 'bahn', name })
-    else formen.set(e.id, { ...r, art: 'form', name })
+    else if (e.type && TEILPROZESSE.has(e.type) && e.collapsed !== true) {
+      // Rahmen: Schnitte dürfen hindurch, nicht aber durch Namen und Markierung
+      formen.set(e.id, { ...r, art: 'rahmen', name })
+      if (name) formen.set(`${e.id}#name`, { ...rahmenName(r, name), art: 'form', name })
+      if (e.businessObject?.loopCharacteristics || e.type === 'bpmn:AdHocSubProcess')
+        formen.set(`${e.id}#marke`, { x: r.x + r.breite / 2 - MARKE.halb, y: r.y + r.hoehe - MARKE.hoehe, breite: 2 * MARKE.halb, hoehe: MARKE.hoehe, art: 'form', name: '' })
+    } else formen.set(e.id, { ...r, art: 'form', name })
   }
   for (const b of beschriftungen) {
     const ziel = formen.get(b.ziel)
-    if (!b.fluss && ziel?.art === 'form') formen.set(b.ziel, { ...ziel, ...vereinige(ziel, b.r) })
+    // Steht die Beschriftung weit weg (der Name eines Randereignisses an seinem Abgang), ist sie eine eigene Form
+    if (!b.fluss && ziel?.art === 'form' && abstand(ziel, b.r) <= NAH) formen.set(b.ziel, { ...ziel, ...vereinige(ziel, b.r) })
     else formen.set(b.id, { ...b.r, art: 'form', name: '' })
   }
   return [...formen.values()]

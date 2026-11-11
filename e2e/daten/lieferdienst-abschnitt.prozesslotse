@@ -1,0 +1,897 @@
+{
+  "formatVersion": 4,
+  "ist": {
+    "formatVersion": 4,
+    "id": "pro_lieferdienst",
+    "name": "Bestellung bis Rechnung (Lieferdienst)",
+    "beschreibung": "Ein regionaler Lieferdienst nimmt Bestellungen telefonisch an, liefert am Folgetag aus und stellt danach die Rechnung.",
+    "ausloeser": {
+      "art": "nachricht",
+      "text": "Kunde bestellt telefonisch",
+      "von": "tln_kunde"
+    },
+    "ergebnis": "Ware zugestellt und berechnet",
+    "vorgaengeProTag": 120,
+    "arbeitsstundenProTag": 8,
+    "rollen": [
+      {
+        "id": "rol_innendienst",
+        "name": "Innendienst",
+        "stundensatz": 38,
+        "personen": 4,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_lager",
+        "name": "Lager",
+        "stundensatz": 34,
+        "personen": 5,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_disposition",
+        "name": "Disposition",
+        "stundensatz": 45,
+        "personen": 1,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_fahrer",
+        "name": "Fahrer",
+        "stundensatz": 32,
+        "personen": 6,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_buchhaltung",
+        "name": "Buchhaltung",
+        "stundensatz": 48,
+        "personen": 1,
+        "verfuegbarProzent": 60
+      },
+      {
+        "id": "rol_leitung",
+        "name": "Niederlassungsleitung",
+        "stundensatz": 65,
+        "personen": 1,
+        "verfuegbarProzent": 25
+      }
+    ],
+    "medien": [
+      {
+        "id": "med_papier",
+        "name": "Papier",
+        "art": "papier"
+      },
+      {
+        "id": "med_telefon",
+        "name": "Telefon",
+        "art": "telefon"
+      },
+      {
+        "id": "med_excel",
+        "name": "Excel-Tourenliste",
+        "art": "tabelle"
+      },
+      {
+        "id": "med_erp",
+        "name": "Warenwirtschaft",
+        "art": "erp"
+      }
+    ],
+    "teilnehmer": [
+      {
+        "id": "tln_kunde",
+        "name": "Kunde"
+      }
+    ],
+    "ablauf": {
+      "id": "haupt",
+      "schritte": [
+        {
+          "typ": "aufgabe",
+          "id": "auf_annehmen",
+          "name": "Bestellung telefonisch annehmen",
+          "rolleId": "rol_innendienst",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 6,
+          "liegezeitMin": 0,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": null,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_erfassen",
+          "name": "Bestellung in Warenwirtschaft erfassen",
+          "rolleId": "rol_innendienst",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 4,
+          "liegezeitMin": 90,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": {
+            "quelleMediumId": "med_papier",
+            "minuten": 3
+          }
+        },
+        {
+          "typ": "entscheidung",
+          "id": "ent_vorrat",
+          "art": "daten",
+          "frage": "Ware vorrätig?",
+          "zweige": [
+            {
+              "id": "zw_vorrat_ja",
+              "bezeichnung": "Ja",
+              "anteil": 0.92,
+              "schritte": [],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            },
+            {
+              "id": "zw_vorrat_nein",
+              "bezeichnung": "Nein",
+              "anteil": 0.08,
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_ersatz",
+                  "name": "Kunden anrufen und Ersatz anbieten",
+                  "rolleId": "rol_innendienst",
+                  "mediumId": "med_telefon",
+                  "bearbeitungMin": 5,
+                  "liegezeitMin": 60,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null
+                },
+                {
+                  "typ": "entscheidung",
+                  "id": "ent_ersatz",
+                  "art": "daten",
+                  "frage": "Ersatz angenommen?",
+                  "zweige": [
+                    {
+                      "id": "zw_ersatz_ja",
+                      "bezeichnung": "Ja",
+                      "anteil": 0.7,
+                      "schritte": [
+                        {
+                          "typ": "aufgabe",
+                          "id": "auf_aendern",
+                          "name": "Bestellung ändern",
+                          "rolleId": "rol_innendienst",
+                          "mediumId": "med_erp",
+                          "bearbeitungMin": 3,
+                          "liegezeitMin": 0,
+                          "art": "normal",
+                          "freigabeQuote": 0.9,
+                          "brauchtVorgaenger": true,
+                          "uebertragung": null
+                        }
+                      ],
+                      "ende": null,
+                      "zurueckZu": null,
+                      "ereignis": null
+                    },
+                    {
+                      "id": "zw_ersatz_nein",
+                      "bezeichnung": "Nein",
+                      "anteil": 0.3,
+                      "schritte": [
+                        {
+                          "typ": "aufgabe",
+                          "id": "auf_stornieren",
+                          "name": "Bestellung stornieren",
+                          "rolleId": "rol_innendienst",
+                          "mediumId": "med_erp",
+                          "bearbeitungMin": 2,
+                          "liegezeitMin": 0,
+                          "art": "normal",
+                          "freigabeQuote": 0.9,
+                          "brauchtVorgaenger": true,
+                          "uebertragung": null
+                        }
+                      ],
+                      "ende": "Bestellung storniert",
+                      "zurueckZu": null,
+                      "ereignis": null
+                    }
+                  ]
+                }
+              ],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            }
+          ]
+        },
+        {
+          "typ": "wiederholung",
+          "id": "wdh_kommission",
+          "modus": "anteil",
+          "frage": "Fehler gefunden?",
+          "anteilWiederholung": 0.2,
+          "koerper": {
+            "id": "seq_kommission",
+            "schritte": [
+              {
+                "typ": "teilprozess",
+                "id": "tp_bereitstellen",
+                "name": "Ware bereitstellen",
+                "koerper": {
+                  "id": "seq_69idcumn",
+                  "schritte": [
+                    {
+                      "typ": "aufgabe",
+                      "id": "auf_kommissionieren",
+                      "name": "Ware kommissionieren",
+                      "rolleId": "rol_lager",
+                      "mediumId": "med_papier",
+                      "bearbeitungMin": 8,
+                      "liegezeitMin": 120,
+                      "art": "normal",
+                      "freigabeQuote": 0.9,
+                      "brauchtVorgaenger": null,
+                      "uebertragung": null
+                    },
+                    {
+                      "typ": "aufgabe",
+                      "id": "auf_kontrollieren",
+                      "name": "Kommissionierung kontrollieren",
+                      "rolleId": "rol_lager",
+                      "mediumId": "med_papier",
+                      "bearbeitungMin": 2,
+                      "liegezeitMin": 15,
+                      "art": "pruefung",
+                      "freigabeQuote": 0.9,
+                      "brauchtVorgaenger": true,
+                      "uebertragung": null
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_tour",
+          "name": "Tour planen",
+          "rolleId": "rol_disposition",
+          "mediumId": "med_excel",
+          "bearbeitungMin": 1.5,
+          "liegezeitMin": 240,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": false,
+          "uebertragung": {
+            "quelleMediumId": "med_erp",
+            "minuten": 1
+          }
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_verladen",
+          "name": "Ware verladen",
+          "rolleId": "rol_lager",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 3,
+          "liegezeitMin": 480,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_ausliefern",
+          "name": "Ware ausliefern",
+          "rolleId": "rol_fahrer",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 12,
+          "liegezeitMin": 180,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null,
+          "unterbrechungen": [
+            {
+              "id": "ub_storno",
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_storno",
+                  "name": "Storno buchen",
+                  "rolleId": "rol_innendienst",
+                  "mediumId": "med_erp",
+                  "bearbeitungMin": 3,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": null,
+                  "uebertragung": null
+                }
+              ],
+              "bezeichnung": "Kunde storniert",
+              "art": "nachricht",
+              "von": "tln_kunde",
+              "unterbrechend": true,
+              "anteil": 0.03,
+              "fristMin": 480,
+              "zeitpunkt": "waehrend",
+              "ende": "Lieferung storniert",
+              "zurueckZu": null
+            }
+          ]
+        },
+        {
+          "typ": "entscheidung",
+          "id": "ent_angetroffen",
+          "art": "daten",
+          "frage": "Kunde angetroffen?",
+          "zweige": [
+            {
+              "id": "zw_angetroffen_ja",
+              "bezeichnung": "Ja",
+              "anteil": 0.9,
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_quittieren",
+                  "name": "Empfang quittieren lassen",
+                  "rolleId": "rol_fahrer",
+                  "mediumId": "med_papier",
+                  "bearbeitungMin": 2,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null
+                }
+              ],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            },
+            {
+              "id": "zw_angetroffen_nein",
+              "bezeichnung": "Nein",
+              "anteil": 0.1,
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_benachrichtigen",
+                  "name": "Benachrichtigung hinterlassen",
+                  "rolleId": "rol_fahrer",
+                  "mediumId": "med_papier",
+                  "bearbeitungMin": 1,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null,
+                  "nachrichtAn": "tln_kunde"
+                },
+                {
+                  "typ": "warten",
+                  "id": "wrt_termin",
+                  "name": "Neuen Liefertermin abwarten",
+                  "art": "nachricht",
+                  "dauerMin": 480,
+                  "von": "tln_kunde"
+                },
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_erneut",
+                  "name": "Ware erneut zustellen",
+                  "rolleId": "rol_fahrer",
+                  "mediumId": "med_papier",
+                  "bearbeitungMin": 12,
+                  "liegezeitMin": 120,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null
+                }
+              ],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            }
+          ]
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_abgeben",
+          "name": "Lieferscheine abgeben",
+          "rolleId": "rol_fahrer",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 1,
+          "liegezeitMin": 300,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_bestaetigen",
+          "name": "Zustellung im System bestätigen",
+          "rolleId": "rol_disposition",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 1.5,
+          "liegezeitMin": 240,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": {
+            "quelleMediumId": "med_papier",
+            "minuten": 1
+          }
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_rechnung",
+          "name": "Rechnung erstellen",
+          "rolleId": "rol_buchhaltung",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 1.5,
+          "liegezeitMin": 480,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_freigeben",
+          "name": "Rechnung freigeben",
+          "rolleId": "rol_leitung",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 1,
+          "liegezeitMin": 960,
+          "art": "freigabe",
+          "freigabeQuote": 0.98,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_versenden",
+          "name": "Rechnung versenden",
+          "rolleId": "rol_buchhaltung",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 0.5,
+          "liegezeitMin": 60,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null,
+          "nachrichtAn": "tln_kunde"
+        }
+      ]
+    }
+  },
+  "soll": null,
+  "massnahmen": [],
+  "verworfen": [],
+  "compliance": {
+    "version": 1,
+    "unternehmen": {
+      "name": "Lieferdienst Muster GmbH",
+      "rechtsform": "gmbh",
+      "anschrift": {
+        "strasse": "Musterstraße 1",
+        "plz": "12345",
+        "ort": "Musterstadt"
+      },
+      "telefon": "01234 5678",
+      "email": "info@lieferdienst.example",
+      "internet": "",
+      "branche": "Lebensmittel-Lieferdienst",
+      "geschaeftszweck": "Lieferung von Lebensmitteln an Kunden in der Region",
+      "gewinnermittlung": "bilanz",
+      "geschaeftsleitung": "Erika Mustermann",
+      "standorte": [
+        "Musterstadt, Lager und Büro"
+      ],
+      "personenMitDaten": 8,
+      "datenschutzbeauftragter": null,
+      "gemeinsamVerantwortlicher": null,
+      "vertreter": null,
+      "steuerberatung": "Kanzlei Beispiel"
+    },
+    "verarbeitung": {
+      "benennung": "",
+      "laufendeNummer": "1",
+      "eingefuehrtAm": null,
+      "fachabteilung": "",
+      "ansprechpartner": "",
+      "telefon": "",
+      "email": "",
+      "zwecke": [
+        "Bestellungen annehmen, ausliefern und abrechnen"
+      ]
+    },
+    "unterlagen": [
+      {
+        "id": "dob_bestellnotiz",
+        "name": "Bestellnotiz"
+      },
+      {
+        "id": "dob_bestellung",
+        "name": "Bestellung"
+      },
+      {
+        "id": "dob_lieferschein",
+        "name": "Lieferschein"
+      },
+      {
+        "id": "dob_tourenliste",
+        "name": "Tourenliste"
+      },
+      {
+        "id": "dob_rechnung",
+        "name": "Ausgangsrechnung"
+      }
+    ],
+    "ablageorte": [
+      {
+        "id": "dsp_warenwirtschaft",
+        "name": "Warenwirtschaft",
+        "mediumId": "med_erp"
+      },
+      {
+        "id": "dsp_ordner",
+        "name": "Ordner Lieferscheine",
+        "mediumId": "med_papier"
+      }
+    ],
+    "zugriffe": [
+      {
+        "aufgabeId": "auf_annehmen",
+        "unterlageId": "dob_bestellnotiz",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_erfassen",
+        "unterlageId": "dob_bestellnotiz",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_erfassen",
+        "unterlageId": "dob_bestellung",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_kommissionieren",
+        "unterlageId": "dob_bestellung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_tour",
+        "unterlageId": "dob_bestellung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_rechnung",
+        "unterlageId": "dob_bestellung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_kommissionieren",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_quittieren",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_ausliefern",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_abgeben",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_bestaetigen",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_tour",
+        "unterlageId": "dob_tourenliste",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_ausliefern",
+        "unterlageId": "dob_tourenliste",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_rechnung",
+        "unterlageId": "dob_rechnung",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_freigeben",
+        "unterlageId": "dob_rechnung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_versenden",
+        "unterlageId": "dob_rechnung",
+        "richtung": "liest"
+      }
+    ],
+    "datenobjekte": {
+      "dob_bestellnotiz": {
+        "aufbewahrungsart": "unklar",
+        "form": "papier",
+        "richtung": "intern",
+        "ablageSpeicherIds": [],
+        "ablageform": null,
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_bestellung": {
+        "aufbewahrungsart": "sonstige",
+        "form": "datensatz",
+        "richtung": "eingang",
+        "ablageSpeicherIds": [
+          "dsp_warenwirtschaft"
+        ],
+        "ablageform": "original",
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag",
+          "rechtspflicht"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_lieferschein": {
+        "aufbewahrungsart": "lieferschein",
+        "form": "papier",
+        "richtung": "ausgang",
+        "ablageSpeicherIds": [
+          "dsp_ordner"
+        ],
+        "ablageform": "original",
+        "originalVernichtet": null,
+        "aufbewahrungJahre": 6,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_tourenliste": {
+        "aufbewahrungsart": "keine",
+        "form": "datensatz",
+        "richtung": "intern",
+        "ablageSpeicherIds": [],
+        "ablageform": null,
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_rechnung": {
+        "aufbewahrungsart": "buchungsbeleg",
+        "form": "bild",
+        "richtung": "ausgang",
+        "ablageSpeicherIds": [
+          "dsp_warenwirtschaft"
+        ],
+        "ablageform": "original",
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag",
+          "zahlung"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag",
+          "rechtspflicht"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": [
+          {
+            "id": "emp_steuerberatung",
+            "kategorie": "Steuerberatung",
+            "name": "Kanzlei Beispiel",
+            "standort": "deutschland",
+            "drittland": "",
+            "garantie": null
+          }
+        ]
+      }
+    },
+    "systeme": {
+      "med_erp": {
+        "hersteller": "WaWi-Cloud (Beispielanbieter)",
+        "version": "",
+        "seit": null,
+        "betrieb": "cloud",
+        "dienstleister": "WaWi-Cloud (Beispielanbieter)",
+        "standort": "eu_ewr",
+        "drittland": "",
+        "garantie": null,
+        "auftragsverarbeitung": true,
+        "avVertrag": "nein",
+        "avVertragVom": null,
+        "unveraenderbarkeit": "protokolliert",
+        "sicherung": "anbieter",
+        "sicherungIntervall": "",
+        "wiederherstellungGetestet": null,
+        "zugriffsschutz": "eigenes Konto je Person, Rechte nach Rolle",
+        "wiederfinden": "Suche nach Rechnungs-, Bestell- oder Kundennummer",
+        "datenzugriff": "Export aller Rechnungen und Buchungsdaten als CSV und PDF; bei Vertragsende Gesamtexport nach Vertrag"
+      },
+      "med_excel": {
+        "hersteller": "Microsoft",
+        "version": "Excel 2024 (Kaufversion)",
+        "seit": "2025-01-01",
+        "betrieb": "lokal",
+        "dienstleister": "",
+        "standort": "unbekannt",
+        "drittland": "",
+        "garantie": null,
+        "auftragsverarbeitung": null,
+        "avVertrag": "unklar",
+        "avVertragVom": null,
+        "unveraenderbarkeit": "unklar",
+        "sicherung": "automatisch",
+        "sicherungIntervall": "täglich",
+        "wiederherstellungGetestet": "2026-06-30",
+        "zugriffsschutz": "eigenes Windows-Konto, Ordner nur für die Disposition",
+        "wiederfinden": "",
+        "datenzugriff": ""
+      }
+    },
+    "rollen": {},
+    "kontrollen": {
+      "auf_kontrollieren": {
+        "art": "plausibilitaet",
+        "ziel": "Ware vollständig und richtig",
+        "nachweis": "keiner"
+      },
+      "auf_freigeben": {
+        "art": "vier_augen",
+        "ziel": "Rechnung sachlich und rechnerisch richtig",
+        "nachweis": "system"
+      }
+    },
+    "weitereKontrollen": [],
+    "einweisung": {
+      "turnus": "jaehrlich",
+      "protokoll": true
+    },
+    "loeschung": {
+      "freigabe": "Erika Mustermann",
+      "durchfuehrung": "Buchhaltung",
+      "turnus": "jaehrlich"
+    },
+    "begruendungLaengereAufbewahrung": "",
+    "toms": {
+      "pseudonymisierung": {
+        "massnahmen": [],
+        "nichtZutreffend": "Keine Auswertungen, die Pseudonyme brauchen"
+      },
+      "verschluesselung": {
+        "massnahmen": [
+          "Webzugriffe und E-Mail-Versand über TLS"
+        ],
+        "nichtZutreffend": ""
+      },
+      "vertraulichkeit": {
+        "massnahmen": [
+          "Eigenes Benutzerkonto je Person, keine geteilten Passwörter",
+          "Papierunterlagen in abschließbarem Schrank oder Raum"
+        ],
+        "nichtZutreffend": ""
+      },
+      "verfuegbarkeit": {
+        "massnahmen": [
+          "Tägliche automatische Datensicherung"
+        ],
+        "nichtZutreffend": ""
+      },
+      "wiederherstellung": {
+        "massnahmen": [
+          "Rücksicherung mindestens jährlich getestet"
+        ],
+        "nichtZutreffend": ""
+      },
+      "ueberpruefung": {
+        "massnahmen": [],
+        "nichtZutreffend": ""
+      }
+    },
+    "mitgeltend": [],
+    "mitgeltendeUnterlagen": [],
+    "ersetzendesScannen": {
+      "verfahrensdoku": null,
+      "stand": null
+    },
+    "versionen": [],
+    "zuletztGeprueft": null
+  }
+}

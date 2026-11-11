@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { berechneLayout } from '../bpmn/layout'
 import { beispielLieferdienst, beispielOnlinebestellung } from '../modell/beispiel'
+import { zufallsProzess } from '../testhilfen/zufallsprozess'
 import type { Prozess } from '../modell/typen'
 import { ausschnittSvg, DRUCK, druckFormen, liegtGanzIn, planeAusschnitte, svgRahmen, uebersichtSvg, type AusschnittPlan, type DruckForm, type Rechteck } from './druckausschnitte'
 
@@ -238,4 +239,86 @@ describe('Schnittkanten zwischen den Formen und Namen am Rand (Sichtprüfung, Ma
       { x: 150, y: 100, breite: 20, hoehe: 14, art: 'form', name: '' },
     ])
   })
+})
+
+describe('Anlage 9.1 mit Rahmen und Randereignissen (Format 4)', () => {
+  /** Elemente, wie bpmn-js sie nach dem Import liefert, aus dem Layout des Prozesslotsen (gleiche Koordinaten wie im BPMN-Export) */
+  function bpmnElemente(p: Prozess): { r: Rechteck; elemente: unknown[] } {
+    const l = berechneLayout(p)
+    const form = (id: string, type: string, x: Rechteck, werte: Record<string, unknown> = {}) => ({ id, type, x: x.x, y: x.y, width: x.breite, height: x.hoehe, ...werte })
+    const elemente: unknown[] = [
+      form('Teilnehmer', 'bpmn:Participant', l.pool, { businessObject: { name: p.name, processRef: {} } }),
+      ...l.pools.map((pl) => form(pl.id, 'bpmn:Participant', pl, { businessObject: { name: pl.name } })),
+      ...l.bahnen.map((b) => form(`Bahn_${b.schluessel}`, 'bpmn:Lane', b, { businessObject: { name: b.name } })),
+      ...l.rahmen.map((ra) => form(ra.id, ra.art === 'adhoc' ? 'bpmn:AdHocSubProcess' : 'bpmn:SubProcess', ra, { collapsed: false, businessObject: { name: ra.name, ...(ra.mehrfach ? { loopCharacteristics: {} } : {}) } })),
+      ...l.knoten.map((k) => form(k.id, k.art === 'rand' ? 'bpmn:BoundaryEvent' : 'bpmn:Task', k, { businessObject: { name: k.name } })),
+      ...l.knoten.flatMap((k) => (k.beschriftung ? [form(`${k.id}_label`, 'label', k.beschriftung, { labelTarget: { id: k.id } })] : [])),
+      ...l.kanten.flatMap((k) => (k.beschriftung ? [form(`${k.id}_label`, 'label', k.beschriftung, { labelTarget: { id: k.id, waypoints: [] } })] : [])),
+    ]
+    const alle = elemente as { x: number; y: number; width: number; height: number }[]
+    const x1 = Math.min(...alle.map((e) => e.x))
+    const y1 = Math.min(...alle.map((e) => e.y))
+    const x2 = Math.max(...alle.map((e) => e.x + e.width))
+    const y2 = Math.max(...alle.map((e) => e.y + e.height))
+    return { r: { x: x1 - 1, y: y1 - 1, breite: x2 - x1 + 2, hoehe: y2 - y1 + 2 }, elemente }
+  }
+
+  it('ein aufgeklappter Teilprozess ist ein Rahmen; Name und Markierung zählen als Formen', () => {
+    const elemente = [
+      { id: 'tp_1', type: 'bpmn:SubProcess', x: 100, y: 50, width: 1200, height: 300, collapsed: false, businessObject: { name: 'Für jede Position', loopCharacteristics: {} } },
+      { id: 'tp_2', type: 'bpmn:AdHocSubProcess', x: 100, y: 400, width: 300, height: 200, collapsed: false, businessObject: { name: '' } },
+      { id: 'tp_3', type: 'bpmn:SubProcess', x: 500, y: 400, width: 100, height: 80, collapsed: true, businessObject: { name: 'Zu' } },
+    ]
+    const formen = druckFormen(elemente)
+    expect(formen.filter((f) => f.art === 'rahmen').map((f) => f.name)).toEqual(['Für jede Position', ''])
+    const name = formen.find((f) => f.art === 'form' && f.name === 'Für jede Position')!
+    // oben in der Mitte, so breit wie der Text
+    expect(name.y).toBe(50)
+    expect(name.x + name.breite / 2).toBeCloseTo(700)
+    expect(name.breite).toBeLessThan(150)
+    // Markierungen in der Mitte der Unterkante: Mehrfachinstanz und Ad-hoc-Tilde
+    const marken = formen.filter((f) => f.art === 'form' && f.name === '' && f.breite === 36)
+    expect(marken.map((m) => [m.x + 18, m.y + m.hoehe])).toEqual([
+      [700, 350],
+      [250, 600],
+    ])
+    // zugeklappt: eine gewöhnliche Form
+    expect(formen.find((f) => f.name === 'Zu')?.art).toBe('form')
+  })
+
+  it('der Name eines Randereignisses an seinem Abgang weit unten ist eine eigene Form', () => {
+    const elemente = [
+      { id: 'Rand', type: 'bpmn:BoundaryEvent', x: 300, y: 182, width: 36, height: 36, businessObject: { name: 'Kunde storniert' } },
+      { id: 'Rand_label', type: 'label', x: 345, y: 900, width: 90, height: 27, labelTarget: { id: 'Rand' } },
+      { id: 'Start', type: 'bpmn:StartEvent', x: 100, y: 100, width: 36, height: 36, businessObject: { name: 'Start' } },
+      { id: 'Start_label', type: 'label', x: 90, y: 143, width: 56, height: 14, labelTarget: { id: 'Start' } },
+    ]
+    expect(druckFormen(elemente)).toEqual([
+      { x: 300, y: 182, breite: 36, hoehe: 36, art: 'form', name: 'Kunde storniert' },
+      { x: 90, y: 100, breite: 56, hoehe: 57, art: 'form', name: 'Start' },
+      { x: 345, y: 900, breite: 90, hoehe: 27, art: 'form', name: '' },
+    ])
+  })
+
+  it('Zufallsprozesse mit Rahmen: jede Form, jeder Rahmenname und jedes Randereignis liegt ganz in einem Ausschnitt; Schnitte laufen durch Rahmen', () => {
+    let geprueft = 0
+    let durchRahmen = 0
+    for (let s = 1; s <= 300; s++) {
+      const p = zufallsProzess(s)
+      const { r, elemente } = bpmnElemente(p)
+      const formen = druckFormen(elemente)
+      const rahmen = formen.filter((f) => f.art === 'rahmen')
+      if (rahmen.length === 0) continue
+      const plan = planeAusschnitte(r, formen)
+      if (!plan) continue
+      geprueft++
+      pruefePlan(plan, r, formen)
+      // Randereignisse sind gewöhnliche Formen
+      expect(formen.filter((f) => f.art === 'form').length).toBeGreaterThanOrEqual(berechneLayout(p).knoten.length)
+      durchRahmen += plan.ausschnitte.slice(1).filter((a) => rahmen.some((f) => f.x < a.rahmen.x && a.rahmen.x < f.x + f.breite)).length
+    }
+    expect(geprueft).toBeGreaterThan(50)
+    // Wären Rahmen Formen, müsste jeder Schnitt um sie herum; so laufen viele hindurch
+    expect(durchRahmen).toBeGreaterThan(20)
+  }, 60_000)
 })
