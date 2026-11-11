@@ -277,11 +277,13 @@ Was erst nach dem Zusammenführen möglich war, jeweils mit Test:
 - **Hauptteil unter 500 kB:** Mit der Modellierung wuchs der Hauptteil auf 560 kB. Wie „Dokumentieren“ laden jetzt auch „Ablauf“, „Verbessern“ und „Bericht“ erst im Schritt (mit Fehlergrenze); Hauptteil 417 kB, samt der sofort mitgeladenen Teile 483 kB. Der Browsertest zählt die mitgeladenen Teile jetzt mit.
 - **Zeitgrenze der Unit-Tests** 30 s statt 5 s (`vite.config.ts`): Beide Zweige zusammen haben mehrere Prüfungen über 300 Zufallsprozesse, die unter Last gleichzeitig laufen.
 
-Tests nach dem Zusammenführen: `npm run lint` ohne Befund, `npx tsc -b` ohne Fehler, 692 Unit-Tests in 66 Dateien (434 davon zur Compliance-Doku), `npm run build` ohne Chunk-Warnung, 111 Browsertests (85 zur Compliance-Doku) mit `--workers=2`.
+Tests nach dem Zusammenführen: `npm run lint` ohne Befund, `npx tsc -b` ohne Fehler, 692 Unit-Tests in 66 Dateien (434 davon zur Compliance-Doku), `npm run build` ohne Chunk-Warnung, 111 Browsertests (85 zur Compliance-Doku) mit `--workers=2`. Windows-Programm: `cargo test` (6 Rust-Tests), Debug-Build und `npm run desktop:test` grün (48 Prüfungen in drei Programmstarts, PDF der Verfahrensdokumentation 19 Seiten A4). CI: Windows-Programm #2 grün (Installer-Test), Prüfung #20 rot wegen der Schrift unter Linux (siehe „Offen“), nach `f4ed513` Prüfung #21 grün.
+
+Installation auf Robins Rechner (am 11.11.2026 ausdrücklich gewünscht): Release-Installer `Prozesslotse_0.2.0_x64-setup.exe` (1,47 MiB) still installiert nach `%LOCALAPPDATA%\Prozesslotse`, pro Benutzer ohne Admin-Rechte. Startmenü-Eintrag und Desktop-Verknüpfung „Prozesslotse“ legt der Installer selbst an. `.prozesslotse` öffnet per Doppelklick im Programm (Probe mit einer Datei, Fenstertitel „Doppelklick-Probe.prozesslotse – Prozesslotse“), `.bpmn` steht nur unter „Öffnen mit“. Startprobe: Fenster „Prozesslotse“ mit der Willkommensseite, danach ohne Rückfrage geschlossen. Die Programmdaten (`%LOCALAPPDATA%\de.olbricht-digital.prozesslotse`) sind nach Desktop-Test und Doppelklick-Probe auf den Stand davor zurückgesetzt.
 
 ## Offen und bekannte Mängel
 
-- 8.3: Der CI-Lauf steht aus; `windows.yml` (Rust-Tests, Debug-Build, Installer-Test) startet erst beim Push auf `main`.
+- ~~8.3: Der CI-Lauf steht aus~~: Windows-Programm #2 (Rust-Tests, Release-Build, Installer-Test) nach dem Zusammenführen grün.
 - Die echten Dialoge (Speichern unter für Word, Als PDF speichern) beantwortet im Desktop-Test die Testantwort; einmal von Hand durchklicken steht aus (Robin).
 - ~~Word bricht in den schmalen Spalten von Tabelle 2.4 Wörter ohne Trennstrich um~~: behoben mit recht-8 (Tabellen in 9 pt, Spaltenbreiten nach Inhalt, `02850d1`).
 - Im Druck braucht die breiteste Tabelle des Beispiels 640 von 680 px. Sehr lange Wörter in eigenen Angaben können darüber hinausragen; Silbentrennung (`hyphens: auto`) beherrscht Edge hier nicht zuverlässig.

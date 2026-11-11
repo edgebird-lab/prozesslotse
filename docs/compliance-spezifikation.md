@@ -1503,7 +1503,7 @@ Jeder Schritt dauert etwa einen halben bis einen Arbeitstag und endet mit einem 
 
 - [ ] 8.1 `Plattform.speichereBytes` und Rust-Befehl `speichern_unter_bytes` (Rohdaten, 7.5), Filter „Word-Dokument (*.docx)“. Ergebnis: Rust-Test für das Schreiben von Bytes grün, DOCX aus dem Programm öffnet in Word.
 - [ ] 8.2 PDF der Compliance-Dokumente über das vorhandene `alsPdf`. Ergebnis: A4-PDF mit Fußzeile ohne Druckdialog.
-- [ ] 8.3 Programmtest `scripts/desktop-test.mjs` erweitern: Beispiel laden, freigeben, DOCX und PDF speichern (Dialog über `PROZESSLOTSE_TEST_SPEICHERN_DOCX` bzw. `PROZESSLOTSE_TEST_PDF`), Datei neu öffnen. Den Installer prüft nur die CI (`installer-test.ps1`), nie Robins Rechner. Ergebnis: `npm run desktop:test` grün ohne Admin-Rechte, Versionen und Angaben bleiben erhalten, CI-Lauf grün.
+- [ ] 8.3 Programmtest `scripts/desktop-test.mjs` erweitern: Beispiel laden, freigeben, DOCX und PDF speichern (Dialog über `PROZESSLOTSE_TEST_SPEICHERN_DOCX` bzw. `PROZESSLOTSE_TEST_PDF`), Datei neu öffnen. Den Installer prüft die CI (`installer-test.ps1`); auf Robins Rechner läuft er nur auf seinen ausdrücklichen Wunsch (am 11.11.2026 gewünscht: installiert pro Benutzer mit Desktop-Verknüpfung), Testläufe weiter mit `npm run desktop:test`. Ergebnis: `npm run desktop:test` grün ohne Admin-Rechte, Versionen und Angaben bleiben erhalten, CI-Lauf grün.
 
 | Phase | Arbeitstage |
 | --- | --- |
