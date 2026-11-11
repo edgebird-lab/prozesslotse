@@ -1025,12 +1025,14 @@ Außerdem ändern sich:
 | Deckblatt | Titel, Untertitel, Versionszeile, Hinweis A.0 grau hinterlegt, Seitenumbruch |
 | Gliederung | Liste der Kapitel ohne Seitenzahlen, Seitenumbruch |
 | `ueberschrift` 1–3 | Formatvorlagen Überschrift 1–3, damit Navigation und Inhaltsverzeichnis in Word funktionieren |
-| `absatz`, `liste` | Standardabsatz, Aufzählung |
-| `tabelle` | Tabelle über die volle Breite, Kopfzeile wiederholt sich auf jeder Seite |
+| `absatz`, `liste` | Standardabsatz mit 6 pt Abstand danach, Aufzählung (Abstand nach dem letzten Punkt); Überschriften 2 und 3 mit Abstand davor |
+| `tabelle` | Tabelle über die volle Breite in 9 pt mit festen Spaltenbreiten nach dem Inhalt: Jede Spalte fasst ihr breitestes Wort, Daten, Zahlen und Prüfsummen brechen nie mitten im Zeichen um. Nur wenn ein Wort aus Buchstaben sonst nicht passt, schaltet die Datei die Silbentrennung ein. Kopfzeile wiederholt sich auf jeder Seite |
 | `hinweis` | Absatz grau hinterlegt |
 | `diagramm` | Absatz „Das Ablaufdiagramm liegt als BPMN-Datei bei und ist in der Druckfassung enthalten.“ |
 | Seite | A4 hoch (11 906 × 16 838 Twips), Ränder 2 cm (1 134 Twips) |
 | Fußzeile | „Vorlage – vor Verwendung prüfen lassen · {Titel} · {Version} · Seite X von Y“ |
+| Sprache, Eigenschaften | Dokumentsprache Deutsch (`de-DE` im Standardformat); Autor und letzter Bearbeiter „Prozesslotse“ |
+| Satz | Nach §, §§, Abs., Nr., Art., Rz., lit. und Ziff. steht ein geschütztes Leerzeichen (`festeLeerzeichen`), ebenso in der Druckansicht. Das gilt nur für die Ausgabe; der Dokumenttext für Prüfsumme und Versionsvergleich bleibt unverändert |
 
 Dateinamen über `dateiname(ist.name, …)`: `-verfahrensdokumentation-entwurf.docx` bzw. `-verfahrensdokumentation-v1-0.docx`, ebenso `-verarbeitungsverzeichnis-…`. MIME-Typ `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. Im Web lädt `ladeHerunter(name, blob)` die Datei herunter.
 
