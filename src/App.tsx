@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { beispielMitCompliance } from './compliance/beispiel'
 import { neuesProjekt } from './modell/bausteine'
-import { beispielOnlineProjekt, beispielProjekt } from './modell/beispiel'
-import { ladeAusBrowser, ladeDokumentInfo, ladeEinstellungen, speichereDokumentInfo, speichereEinstellungen, speichereImBrowser } from './modell/speicher'
+import { beispielOnlineProjekt } from './modell/beispiel'
+import { ladeAusBrowser, ladeDokumentInfo, ladeEinstellungen, loescheBrowserDaten, speichereDokumentInfo, speichereEinstellungen, speichereImBrowser } from './modell/speicher'
 import type { Id, Prozess } from './modell/typen'
 import { plattform, type MenueBefehl, type Zuletzt } from './plattform'
 import { aktiverProzess, istGeaendert, reduziere, SCHRITTE, startZustand } from './zustand'
@@ -60,6 +61,7 @@ function Hauptfenster() {
 
   const datei = useDateiBefehle({ z, dispatch, melde, zeigeFremd: setFremd })
   const aendere = useCallback<AppApi['aendere']>((aenderung, optionen = {}) => dispatch({ typ: 'prozess', aenderung, zeit: Date.now(), ...optionen }), [])
+  const aendereCompliance = useCallback<AppApi['aendereCompliance']>((aenderung, gruppe) => dispatch({ typ: 'compliance', aenderung, gruppe, zeit: Date.now() }), [])
 
   // Öffnen: im Programm der Dialog des Systems, im Browser das Dateifeld
   const oeffnen = useCallback(() => {
@@ -70,9 +72,11 @@ function Hauptfenster() {
   // Sofort speichern: Ein Projekt ist nur wenige Kilobyte groß, und ein verzögertes
   // Speichern ginge verloren, wenn der Tab direkt nach einer Änderung geschlossen wird.
   useEffect(() => {
-    speichereImBrowser(z.projekt)
+    // Mit freigegebenen Versionen kann der Speicher des Browsers voll werden; die Kopfzeile meldet das bei jeder Änderung
+    // (nach dem Zeichnen, damit die Meldung keinen zweiten Durchlauf im selben Effekt auslöst)
+    if (!speichereImBrowser(z.projekt)) window.setTimeout(() => melde('Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.'))
     speichereDokumentInfo({ pfad: z.dokument.pfad, name: z.dokument.name, ungespeichert: geaendert })
-  }, [z.projekt, z.dokument, geaendert])
+  }, [z.projekt, z.dokument, geaendert, melde])
 
   useEffect(() => speichereEinstellungen({ lernmodus: z.lernmodus }), [z.lernmodus])
 
@@ -119,7 +123,7 @@ function Hauptfenster() {
         case 'lernmodus':
           return dispatch({ typ: 'lernmodus', an: !z.lernmodus })
         case 'beispielLieferdienst':
-          return void datei.ladeBeispiel(beispielProjekt(), 'pruefen')
+          return void datei.ladeBeispiel(beispielMitCompliance(), 'pruefen')
         case 'beispielOnline':
           return void datei.ladeBeispiel(beispielOnlineProjekt(), 'ablauf')
         case 'ueber':
@@ -196,7 +200,23 @@ function Hauptfenster() {
     if (f) await datei.oeffneDatei({ pfad: null, name: f.name, inhalt: await f.text() })
   }
 
-  const api = useMemo<AppApi>(() => ({ z, p, dispatch, aendere, setHervorhebung, datei, melde }), [z, p, aendere, datei, melde])
+  const api = useMemo<AppApi>(() => ({ z, p, dispatch, aendere, aendereCompliance, setHervorhebung, datei, melde }), [z, p, aendere, aendereCompliance, datei, melde])
+
+  const browserDatenLoeschen = useCallback(async () => {
+    const ok = await frage({
+      titel: 'Daten im Browser löschen?',
+      text: 'Entfernt das Projekt, freigegebene Versionen und Einstellungen aus diesem Browser. Der Browser-Speicher ist unverschlüsselt; auf gemeinsam genutzten Rechnern sollte nichts darin bleiben. Wer das Projekt noch braucht, speichert es vorher als Datei.',
+      knoepfe: [
+        { wert: 'ja', text: 'Löschen', art: 'gefahr' },
+        { wert: 'nein', text: 'Abbrechen' },
+      ],
+      abbrechen: 'nein',
+    })
+    if (ok !== 'ja') return
+    loescheBrowserDaten()
+    dispatch({ typ: 'laden', projekt: neuesProjekt() })
+    melde('Daten im Browser gelöscht.')
+  }, [frage, melde])
 
   return (
     <AppKontext.Provider value={api}>
@@ -204,7 +224,7 @@ function Hauptfenster() {
         <a className="sprungmarke" href="#inhalt">
           Zum Inhalt springen
         </a>
-        <Kopfzeile meldung={meldung} onOeffnen={oeffnen} befehl={befehl} />
+        <Kopfzeile meldung={meldung} onOeffnen={oeffnen} befehl={befehl} onBrowserDatenLoeschen={() => void browserDatenLoeschen()} />
         <input
           ref={dateiFeld}
           type="file"
@@ -240,7 +260,7 @@ function Hauptfenster() {
   )
 }
 
-function Kopfzeile({ meldung, onOeffnen, befehl }: { meldung: string; onOeffnen: () => void; befehl: (b: MenueBefehl) => void }) {
+function Kopfzeile({ meldung, onOeffnen, befehl, onBrowserDatenLoeschen }: { meldung: string; onOeffnen: () => void; befehl: (b: MenueBefehl) => void; onBrowserDatenLoeschen: () => void }) {
   const { z, dispatch, datei } = useApp()
   const menue = useRef<HTMLDetailsElement>(null)
   const [zuletzt, setZuletzt] = useState<Zuletzt[]>([])
@@ -319,6 +339,9 @@ function Kopfzeile({ meldung, onOeffnen, befehl }: { meldung: string; onOeffnen:
             </MenuePunkt>
             <MenuePunkt onClick={() => befehl('beispielOnline')} schliesse={schliesse}>
               Beispiel „Onlinebestellung“ laden
+            </MenuePunkt>
+            <MenuePunkt onClick={onBrowserDatenLoeschen} schliesse={schliesse}>
+              Daten im Browser löschen …
             </MenuePunkt>
           </div>
         </details>

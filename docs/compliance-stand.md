@@ -12,12 +12,12 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Phase 1 – Datenmodell, Speichern, Testdaten
 
-- [ ] 1.1 `typen.ts` und `standard.ts`
-- [ ] 1.2 `unterlagen.ts` und `quelle.ts`
-- [ ] 1.3 `validiereCompliance` beim Laden, eingefrorene Prozesse migrieren
-- [ ] 1.4 Reducer-Aktionen `compliance` und `teilschritt`, Bereinigung
-- [ ] 1.5 Testdaten `beispiel.ts`
-- [ ] 1.6 Versionen unter eigenem Schlüssel, Meldung bei vollem Speicher, „Daten im Browser löschen“
+- [x] 1.1 `typen.ts` und `standard.ts`
+- [x] 1.2 `unterlagen.ts` und `quelle.ts`
+- [x] 1.3 `validiereCompliance` beim Laden, eingefrorene Prozesse migrieren
+- [x] 1.4 Reducer-Aktionen `compliance` und `teilschritt`, Bereinigung
+- [x] 1.5 Testdaten `beispiel.ts`
+- [x] 1.6 Versionen unter eigenem Schlüssel, Meldung bei vollem Speicher, „Daten im Browser löschen“
 
 ## Phase 2 – Fristen und Lückenprüfung
 
