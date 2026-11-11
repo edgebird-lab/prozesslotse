@@ -27,20 +27,30 @@ import { Nachladegrenze } from './ui/Nachladegrenze'
 import { FrageDialog } from './ui/FrageDialog'
 import { useVerzoegert } from './ui/hilfen'
 import { AppKontext, useApp, type AppApi } from './ui/kontext'
-import { AblaufSchritt } from './ui/schritte/AblaufSchritt'
-import { BerichtSchritt } from './ui/schritte/BerichtSchritt'
 import { BeteiligteSchritt } from './ui/schritte/BeteiligteSchritt'
 import { useComplianceMarkierungen } from './ui/compliance/nachladen'
 import { useMeldeFalschePruefsummen } from './ui/compliance/pruefsummen'
 import { PruefenSchritt } from './ui/schritte/PruefenSchritt'
 import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
-import { VerbessernSchritt } from './ui/schritte/VerbessernSchritt'
 import './styles.css'
 
 const VERSION = '0.2.0'
 
-// „Dokumentieren“ mit Lückenprüfung und Generatoren ist groß; der Schritt lädt erst, wenn er gebraucht wird
+// „Dokumentieren“ mit Lückenprüfung und Generatoren ist groß; der Schritt lädt erst, wenn er gebraucht wird.
+// Ebenso „Ablauf“ (Formulare aller Bausteine), „Verbessern“ und „Bericht“: So bleibt der Hauptteil unter 500 kB.
 const DokumentierenSchritt = lazy(() => import('./ui/schritte/DokumentierenSchritt').then((m) => ({ default: m.DokumentierenSchritt })))
+const AblaufSchritt = lazy(() => import('./ui/schritte/AblaufSchritt').then((m) => ({ default: m.AblaufSchritt })))
+const VerbessernSchritt = lazy(() => import('./ui/schritte/VerbessernSchritt').then((m) => ({ default: m.VerbessernSchritt })))
+const BerichtSchritt = lazy(() => import('./ui/schritte/BerichtSchritt').then((m) => ({ default: m.BerichtSchritt })))
+
+/** Nachgeladener Schritt mit Platzhalter und Fehlergrenze */
+function Nachgeladen({ was, children }: { was: string; children: ReactNode }) {
+  return (
+    <Nachladegrenze was={was}>
+      <Suspense fallback={<p className="leise">{was} wird geladen …</p>}>{children}</Suspense>
+    </Nachladegrenze>
+  )
+}
 
 /** Hinweis zum Browser-Speicher; bleibt stehen, bis er erledigt ist. */
 interface BrowserHinweis {
@@ -318,7 +328,9 @@ function Hauptfenster() {
             <Schrittleiste />
             {z.schritt === 'bericht' ? (
               <main id="inhalt" className="bericht-flaeche">
-                <BerichtSchritt />
+                <Nachgeladen was="Bericht">
+                  <BerichtSchritt />
+                </Nachgeladen>
               </main>
             ) : (
               // Im Teilschritt „Dokumente“ nutzt der Inhalt die volle Breite; das Panel bleibt dasselbe, damit der Fokus erhalten bleibt
@@ -326,15 +338,21 @@ function Hauptfenster() {
                 <section className="panel" aria-label="Assistent">
                   {z.schritt === 'rahmen' && <RahmenSchritt />}
                   {z.schritt === 'beteiligte' && <BeteiligteSchritt />}
-                  {z.schritt === 'ablauf' && <AblaufSchritt />}
+                  {z.schritt === 'ablauf' && (
+                    <Nachgeladen was="Ablauf">
+                      <AblaufSchritt />
+                    </Nachgeladen>
+                  )}
                   {z.schritt === 'pruefen' && <PruefenSchritt />}
-                  {z.schritt === 'verbessern' && <VerbessernSchritt />}
+                  {z.schritt === 'verbessern' && (
+                    <Nachgeladen was="Verbessern">
+                      <VerbessernSchritt />
+                    </Nachgeladen>
+                  )}
                   {z.schritt === 'dokumentieren' && (
-                    <Nachladegrenze was="Dokumentieren">
-                      <Suspense fallback={<p className="leise">Dokumentieren wird geladen …</p>}>
-                        <DokumentierenSchritt />
-                      </Suspense>
-                    </Nachladegrenze>
+                    <Nachgeladen was="Dokumentieren">
+                      <DokumentierenSchritt />
+                    </Nachgeladen>
                   )}
                 </section>
                 {!(z.schritt === 'dokumentieren' && z.teilschritt === 'dokumente') && <Buehne p={p} hervorhebung={hervorhebung} />}

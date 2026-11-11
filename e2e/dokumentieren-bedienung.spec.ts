@@ -376,7 +376,7 @@ test('Ablageorte: keine Klammer, wenn System und Name gleich sind', async ({ pag
   await expect(karte.getByText('Warenwirtschaft (Warenwirtschaft)')).toHaveCount(0)
 })
 
-test('„Dokumentieren“ lädt erst im Schritt; der Hauptteil bleibt unter 500 kB', async ({ page, request }) => {
+test('„Dokumentieren“ lädt erst im Schritt; der Hauptteil samt mitgeladener Teile bleibt unter 500 kB', async ({ page, request }) => {
   const skripte: string[] = []
   page.on('request', (r) => {
     if (r.resourceType() === 'script') skripte.push(new URL(r.url()).pathname)
@@ -388,8 +388,13 @@ test('„Dokumentieren“ lädt erst im Schritt; der Hauptteil bleibt unter 500 
   const lueckenpruefung = (u: string) => /\/(DokumentierenSchritt|analyse)-[\w-]+\.js$/.test(u)
   expect(skripte.filter(lueckenpruefung)).toEqual([])
 
-  const haupt = await page.locator('script[type="module"]').getAttribute('src')
-  const groesse = (await (await request.get(haupt!)).body()).length
+  // Hauptteil samt der Teile, die index.html sofort mitlädt (modulepreload); „Ablauf“, „Verbessern“ und „Bericht“ laden seit Format 4 auch nach
+  const html = await (await request.get('/')).text()
+  const haupt = /<script type="module"[^>]*src="([^"]+)"/.exec(html)![1]
+  const mit = [...html.matchAll(/<link rel="modulepreload"[^>]*href="([^"]+)"/g)].map((m) => m[1])
+  expect(mit.length).toBeGreaterThan(0)
+  let groesse = 0
+  for (const pfad of [haupt, ...mit]) groesse += (await (await request.get(pfad)).body()).length
   expect(groesse).toBeLessThan(500_000)
 
   // Im Schritt „Dokumentieren“ laden Schritt und Lückenprüfung nach; die Bühne zeigt dann die Markierungen
