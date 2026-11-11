@@ -892,6 +892,19 @@ fieldset {
 .frage-dialog .knopfreihe {
   justify-content: flex-end;
 }
+/* Fehler in Dialogen: Meldung rot direkt am Feld, das Feld rot umrandet (sonst grau wie jeder Absatz im Dialog) */
+.frage-dialog .feld-meldung {
+  color: var(--schlecht-text);
+}
+.frage-dialog input[aria-invalid='true'],
+.frage-dialog textarea[aria-invalid='true'] {
+  border-color: var(--schlecht-text);
+  box-shadow: 0 0 0 1px var(--schlecht-text);
+}
+.frage-dialog input[type='checkbox'][aria-invalid='true'] {
+  outline: 2px solid var(--schlecht-text);
+  outline-offset: 1px;
+}
 
 /* Fremde BPMN-Datei: nur ansehen */
 .fremd-flaeche {

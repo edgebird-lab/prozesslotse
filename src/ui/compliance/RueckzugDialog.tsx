@@ -46,12 +46,18 @@ export function RueckzugDialog({ version, onZurueckziehen, onSchliessen }: { ver
           Version {version.bezeichnung} ist freigegeben, gilt aber erst ab dem {formatiereDatum(version.gueltigAb)}. Nach dem Rückzug bleibt sie mit Datum und Grund in der Liste und in der Änderungshistorie sichtbar, gilt aber
           nie. Ihre Nummer wird nicht wieder vergeben.
         </p>
-        <TextFeld label="Grund" id={grundId} mehrzeilig wert={grund} platzhalter="z. B. Tippfehler bei „Gültig ab“" onAendern={setGrund} />
-        {meldung && (
-          <p className="feld-meldung" role="alert">
-            {meldung}
-          </p>
-        )}
+        <TextFeld
+          label="Grund"
+          id={grundId}
+          mehrzeilig
+          wert={grund}
+          platzhalter="z. B. Tippfehler bei „Gültig ab“"
+          fehler={meldung}
+          onAendern={(g) => {
+            setGrund(g)
+            setMeldung(null)
+          }}
+        />
         <div className="knopfreihe">
           <button type="submit" className="knopf knopf-gefahr">
             Zurückziehen
