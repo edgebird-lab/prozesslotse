@@ -3,13 +3,14 @@
  * Teilschritt-Leiste, Lücken und Diagramm gemeinsam genutzt.
  */
 import { useMemo } from 'react'
-import { kontext, objekteVon, vorigeAufgabe, type Kontext } from '../../compliance/ableitung'
+import { entstehtIn, kontext, objekteVon, vorigeAufgabe, type Kontext } from '../../compliance/ableitung'
 import { heuteIso } from '../../compliance/datum'
 import { KURZ_REGEL, pruefeCompliance, pruefsummenBefunde, sortiereComplianceBefunde } from '../../compliance/regeln'
 import { neueCompliance } from '../../compliance/standard'
 import type { ComplianceBefund, ComplianceProjekt, IsoDatum } from '../../compliance/typen'
 import type { BpmnErgebnis } from '../../bpmn/export'
-import type { Aufgabe, Projekt, Prozess } from '../../modell/typen'
+import type { Schwere } from '../../modell/pruefung'
+import type { Aufgabe, Id, Projekt, Prozess } from '../../modell/typen'
 import { formatiereZahl } from '../../modell/zeit'
 import { hauptElement, type Markierung } from '../analyse'
 import { useApp } from '../kontext'
@@ -65,25 +66,36 @@ export function useCompliance(): ComplianceApi {
 
 const RANG = { fehler: 0, warnung: 1, hinweis: 2 } as const
 
-/** Abzeichen im Diagramm für Befunde, die an einer Aufgabe hängen. */
-export function complianceMarkierungen(befunde: ComplianceBefund[], bpmn: BpmnErgebnis): Map<string, Markierung> {
+/**
+ * Abzeichen im Diagramm für Befunde, die an einer Aufgabe hängen. Befunde zu einer Unterlage
+ * (Ziel „datenobjekt“ oder „frist“) stehen als Hinweis „Unterlage“ an der Aufgabe, in der sie
+ * entsteht (abnahme-5); `entstehtIn` liefert diese Aufgabe. Die Befunde selbst bleiben, wie sie sind.
+ */
+export function complianceMarkierungen(befunde: ComplianceBefund[], bpmn: BpmnErgebnis, entstehtInAufgabe: (unterlageId: Id) => Id | null = () => null): Map<string, Markierung> {
   const ergebnis = new Map<string, Markierung>()
-  for (const b of befunde) {
-    if (!b.blockId) continue
-    const e = hauptElement(bpmn, b.blockId)
-    if (!e) continue
-    const kurz = KURZ_REGEL[b.regel] ?? 'Prüfen'
+  const markiere = (blockId: Id, art: Schwere, kurz: string) => {
+    const e = hauptElement(bpmn, blockId)
+    if (!e) return
     const alt = ergebnis.get(e)
-    if (!alt) ergebnis.set(e, { art: b.schwere, kurz, anzahl: 1 })
-    else if (RANG[b.schwere] < RANG[alt.art]) ergebnis.set(e, { art: b.schwere, kurz, anzahl: alt.anzahl + 1 })
+    if (!alt) ergebnis.set(e, { art, kurz, anzahl: 1 })
+    else if (RANG[art] < RANG[alt.art]) ergebnis.set(e, { art, kurz, anzahl: alt.anzahl + 1 })
     else alt.anzahl += 1
+  }
+  for (const b of befunde) {
+    if (b.blockId) markiere(b.blockId, b.schwere, KURZ_REGEL[b.regel] ?? 'Prüfen')
+    else if ((b.ziel?.art === 'datenobjekt' || b.ziel?.art === 'frist') && b.ziel.id) {
+      const aufgabe = entstehtInAufgabe(b.ziel.id)
+      if (aufgabe) markiere(aufgabe, 'hinweis', 'Unterlage')
+    }
   }
   return ergebnis
 }
 
 /** Markierungen für die Bühne im Schritt „Dokumentieren“ (lädt nach, siehe `nachladen.ts`). */
 export function markierungenFuer(ist: Prozess, compliance: ComplianceProjekt | undefined, heute: IsoDatum, bpmn: BpmnErgebnis): Map<string, Markierung> {
-  return complianceMarkierungen(complianceBefunde(ist, compliance ?? LEER, heute), bpmn)
+  const c = compliance ?? LEER
+  const k = kontext(ist, c)
+  return complianceMarkierungen(complianceBefunde(ist, c, heute), bpmn, (id) => entstehtIn(k, id)?.id ?? null)
 }
 
 /** Gefiltert nach einer Aufgabe, die im Diagramm angeklickt wurde */

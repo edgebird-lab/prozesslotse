@@ -187,3 +187,26 @@ test('bedienung-17: einheitliche Wörter für Unterlage, Datenkategorien, besond
   await expect(karte.getByRole('group', { name: 'Welche besonders geschützten Daten?' })).toBeVisible()
   await expect(karte.locator('legend').filter({ hasText: /^(Welche Daten\?|Besondere Kategorien)$/ })).toHaveCount(0)
 })
+
+test('abnahme-5: Befunde zu Unterlagen stehen als Hinweis an der Aufgabe, in der die Unterlage entsteht; die Kopfzeile zählt sie mit', async ({ page }) => {
+  await start(page)
+  await schritt(page, 'Dokumentieren').click()
+  const buehne = page.getByRole('region', { name: 'Diagramm' })
+  // K2 an „Kommissionierung kontrollieren“, B1 zur Bestellnotiz (entsteht in 4.1), D6 zur Tourenliste (entsteht in 4.8)
+  await expect(buehne.locator('.pl-abzeichen')).toHaveCount(3)
+  await expect(buehne.getByRole('button', { name: '3 markiert – zeigen' })).toBeVisible()
+  const ohneLeerraum = (t: string) => t.replace(/\s+/g, '')
+  const unterlagen = await buehne.locator('.pl-abzeichen', { hasText: 'Unterlage' }).evaluateAll((liste) =>
+    liste.map((a) => {
+      const id = a.closest('.djs-overlays')?.getAttribute('data-container-id')
+      return { hinweis: a.classList.contains('pl-abzeichen-hinweis'), aufgabe: document.querySelector(`.djs-element[data-element-id="${id}"]`)?.textContent ?? '' }
+    }),
+  )
+  expect(unterlagen.map((u) => ({ ...u, aufgabe: ohneLeerraum(u.aufgabe) }))).toEqual([
+    { hinweis: true, aufgabe: ohneLeerraum('Bestellung telefonisch annehmen') },
+    { hinweis: true, aufgabe: ohneLeerraum('Tour planen') },
+  ])
+  // Die Regeln bleiben: Lücken zählt weiter dieselben Befunde
+  await teil(page, 'Lücken').click()
+  await expect(page.getByText('keine Fehler · 4 Warnungen · 3 Hinweise')).toBeVisible()
+})

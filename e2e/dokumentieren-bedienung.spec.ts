@@ -108,18 +108,24 @@ test('„Beheben“ klappt eine Unterlage mit nur Hinweisen auf und führt zur o
   expect(await imBild(frage)).toBe(true)
 })
 
-test('Bühne: „1 markiert – zeigen“ holt den markierten Schritt ins Bild', async ({ page }) => {
+test('Bühne: „3 markiert – zeigen“ holt den ersten markierten Schritt ins Bild', async ({ page }) => {
   await start(page)
   const buehne = page.getByRole('region', { name: 'Diagramm' })
-  const abzeichen = buehne.locator('.pl-abzeichen')
-  await expect(abzeichen).toHaveCount(1)
+  // K2 an der Kontrolle, dazu seit abnahme-5 je ein Hinweis an der Aufgabe, in der eine Unterlage mit Befund entsteht
+  await expect(buehne.locator('.pl-abzeichen')).toHaveCount(3)
+  // der erste markierte Schritt: „Bestellung telefonisch annehmen“ (Bestellnotiz)
+  const abzeichen = buehne.locator('.pl-abzeichen').first()
   const imAusschnitt = () =>
     abzeichen.evaluate((a) => {
       const f = a.closest('.diagramm-flaeche')!.getBoundingClientRect()
       const r = a.getBoundingClientRect()
       return r.left >= f.left && r.right <= f.right && r.top >= f.top && r.bottom <= f.bottom
     })
-  await buehne.getByRole('button', { name: '1 markiert – zeigen' }).click()
+  // erst weg vom Anfang schieben, damit der Knopf etwas zu tun hat
+  await buehne.locator('.djs-container').hover()
+  for (let i = 0; i < 6; i++) await page.mouse.wheel(600, 0)
+  await expect.poll(imAusschnitt).toBe(false)
+  await buehne.getByRole('button', { name: '3 markiert – zeigen' }).click()
   await expect.poll(imAusschnitt).toBe(true)
   // lesbar: mindestens Originalgröße
   expect((await abzeichen.boundingBox())!.height).toBeGreaterThanOrEqual(16)
@@ -386,9 +392,9 @@ test('„Dokumentieren“ lädt erst im Schritt; der Hauptteil bleibt unter 500 
   const groesse = (await (await request.get(haupt!)).body()).length
   expect(groesse).toBeLessThan(500_000)
 
-  // Im Schritt „Dokumentieren“ laden Schritt und Lückenprüfung nach; die Bühne zeigt dann die Markierung
+  // Im Schritt „Dokumentieren“ laden Schritt und Lückenprüfung nach; die Bühne zeigt dann die Markierungen
   await schritt(page, 'Dokumentieren').click()
   await expect(leiste(page)).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Diagramm' }).locator('.pl-abzeichen')).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'Diagramm' }).locator('.pl-abzeichen')).toHaveCount(3)
   expect(skripte.filter(lueckenpruefung).length).toBeGreaterThan(0)
 })
