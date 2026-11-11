@@ -108,7 +108,12 @@ export function UnternehmenTeil() {
           <p className="leer-hinweis">Noch keine Rollen. Rollen legst du im Schritt „Beteiligte“ an.</p>
         ) : (
           <div className="tabelle-wrap">
-            <table className="eingabe-tabelle">
+            <table className="eingabe-tabelle rollen-tabelle">
+              <colgroup>
+                <col className="spalte-rolle" />
+                <col className="spalte-extern" />
+                <col />
+              </colgroup>
               <thead>
                 <tr>
                   <th scope="col">Rolle</th>
@@ -125,7 +130,8 @@ export function UnternehmenTeil() {
                       <th scope="row">{name}</th>
                       <td>
                         <Schalter an={ra.extern} onAendern={(extern) => setzeRolle(r.id, { extern }, 'extern')}>
-                          <span className="sr">{name}: </span>extern
+                          {/* sichtbar steht „Extern“ schon im Spaltenkopf */}
+                          <span className="sr">{name}: extern</span>
                         </Schalter>
                       </td>
                       <td>

@@ -1630,6 +1630,22 @@ fieldset {
 .eingabe-tabelle .zahl input {
   width: 70px;
 }
+/* „Rollen im Ablauf“: feste Aufteilung, damit die Spalten beim Umschalten nicht springen; Organisation hat immer Platz */
+.rollen-tabelle {
+  table-layout: fixed;
+}
+.rollen-tabelle .spalte-rolle {
+  width: 32%;
+}
+.rollen-tabelle .spalte-extern {
+  width: 4rem;
+}
+.rollen-tabelle th[scope='row'] {
+  font-size: inherit;
+  font-weight: 400;
+  color: inherit;
+  overflow-wrap: break-word;
+}
 
 /* Bericht --------------------------------------------------------------------- */
 
@@ -1973,7 +1989,8 @@ input[type='date'] {
 .fristen-tabelle .umbrechen {
   overflow-wrap: anywhere;
 }
-.versionsliste td {
+.versionsliste td,
+.versionsliste th[scope='row'] {
   text-align: left;
   vertical-align: top;
 }
