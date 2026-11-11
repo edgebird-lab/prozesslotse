@@ -97,7 +97,7 @@ Hinweise für Schritt 4 und später:
 
 ## Schritt 4 – Gleichzeitig: erster und nacheinander
 
-Fertig am 2026-11-11, Commit „Gleichzeitig: weiter beim ersten und in beliebiger Reihenfolge“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 4)“.
+Fertig am 2026-11-11, Commit 3c1d07f „Gleichzeitig: weiter beim ersten und in beliebiger Reihenfolge“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 4)“.
 
 - [x] `ParallelArt = 'alle' | 'erster' | 'nacheinander'`, `neueParallel(n, art)`, `pruefeBlock`; erschöpfende Unterscheidung in Operationen, Kennzahlen (Fluss und Dauer), Verteilung, Simulation, Layout, Prüfung; `istRahmen`/`rahmenInhalt`/`ParallelRahmen`, `parallelName`, `einzelneAktivitaet`
 - [x] erster: Rahmen mit Raute und Terminierung je Zweig, Minimum mit Gleichstandsregel (`ersterAusgang`, schon allgemein mit Enden), P(i zuerst) am Endereignis und in `Kennzahlen.zuerstFertig`, Übergaben vom Gewinner, TCT als Minimum der Bearbeitungszeiten, Hinweis `erstergleich`
@@ -139,4 +139,4 @@ Hinweise für Schritt 5:
 | Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
 | Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
 | Schritt 3, Unterbrechung (Commits 5d73e28 und addb89b) | 210 in 20 Dateien | 23 |
-| Schritt 4, Gleichzeitig-Arten | 231 in 21 Dateien | 25 |
+| Schritt 4, Gleichzeitig-Arten (Commit 3c1d07f) | 231 in 21 Dateien | 25 |
