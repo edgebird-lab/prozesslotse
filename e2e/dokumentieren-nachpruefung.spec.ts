@@ -116,3 +116,30 @@ test('sicht 5: „Rollen im Ablauf“: feste Aufteilung, normale Zellschrift, Sp
   })
   expect(sichtbar).not.toMatch(/extern/i)
 })
+
+test('sicht 6: bei falscher Prüfsumme warnen Zustandszeile, Lücken und Teilschritt', async ({ page }, info) => {
+  await start(page)
+  await schritt(page, 'Dokumentieren').click()
+  await freigeben(page)
+  await expect(page.locator('.status-zeile')).toHaveText('Gültige Version 1.0 seit 11.11.2026')
+  await expect(teil(page, 'Dokumente')).toHaveAccessibleName(/keine offenen Punkte/)
+  // Einen Absatz der Version in der Datei verändern
+  const d = await alsDatei(page)
+  const abschnitte = d.compliance.versionen[0].verfahrensdoku.abschnitte
+  abschnitte[abschnitte.findIndex((a: { art: string }) => a.art === 'absatz')].text = 'Nachträglich geändert.'
+  const pfad = info.outputPath('veraendert.prozesslotse')
+  await writeFile(pfad, JSON.stringify(d))
+  await page.locator('input[type="file"][accept*="application/json"]').setInputFiles(pfad)
+  await expect(page.getByRole('status')).toContainText('Prüfsumme stimmt nicht – Version 1.0 wurde verändert oder ist beschädigt.')
+  await schritt(page, 'Dokumentieren').click()
+  await teil(page, 'Dokumente').click()
+  await expect(page.locator('.status-zeile')).toHaveText('Gültige Version 1.0 seit 11.11.2026 – Prüfsumme stimmt nicht')
+  // Warnsymbol (Zahl offener Punkte) statt Häkchen am Teilschritt
+  await expect(teil(page, 'Dokumente')).toHaveAccessibleName(/1 offener Punkt/)
+  await expect(teil(page, 'Dokumente').locator('.teilschritt-zahl')).toHaveText('1')
+  await teil(page, 'Lücken').click()
+  const befund = page.locator('.befunde li').filter({ hasText: 'Prüfsumme stimmt nicht' })
+  await expect(befund).toHaveCount(1)
+  await expect(befund).toContainText('Version 1.0 passt nicht mehr zu ihrer Prüfsumme')
+  await expect(befund.getByRole('button', { name: 'Beheben: Prüfsumme stimmt nicht – Version 1.0' })).toBeVisible()
+})

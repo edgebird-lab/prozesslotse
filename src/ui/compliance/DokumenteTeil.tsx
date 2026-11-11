@@ -54,6 +54,8 @@ export function DokumenteTeil() {
   const gueltig = [...c.versionen].reverse().find((v) => !v.zurueckgezogen && v.gueltigAb <= heute) ?? null
   const fehler = befunde.filter((b) => b.schwere === 'fehler').length
   const pruefsummeVon = usePruefsummen(c.versionen)
+  // Eine veränderte oder beschädigte Version ist keine gültige Fassung ohne Warnung
+  const pruefsummeWarnung = (v: DokuVersion) => (pruefsummeVon(v) === 'falsch' ? ' – Prüfsumme stimmt nicht' : '')
   const [rueckzug, setRueckzug] = useState<DokuVersion | null>(null)
 
   // Nach dem Drucken den Fenstertitel zurücksetzen
@@ -116,9 +118,9 @@ export function DokumenteTeil() {
         {letzte === null
           ? 'Entwurf, nicht freigegeben'
           : gueltig
-            ? `Gültige Version ${gueltig.bezeichnung} seit ${formatiereDatum(gueltig.gueltigAb)}`
-            : `Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}`}
-        {letzte && gueltig && letzte !== gueltig && ` · Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}`}
+            ? `Gültige Version ${gueltig.bezeichnung} seit ${formatiereDatum(gueltig.gueltigAb)}${pruefsummeWarnung(gueltig)}`
+            : `Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}${pruefsummeWarnung(letzte)}`}
+        {letzte && gueltig && letzte !== gueltig && ` · Version ${letzte.bezeichnung} gilt ab ${formatiereDatum(letzte.gueltigAb)}${pruefsummeWarnung(letzte)}`}
         {geaendert.length > 0 && ` · geändert seit der Freigabe: ${kapitelText(geaendert)}`}
       </p>
       <p className="hinweis-band" role="note">

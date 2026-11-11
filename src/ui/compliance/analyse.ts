@@ -5,7 +5,7 @@
 import { useMemo } from 'react'
 import { kontext, objekteVon, vorigeAufgabe, type Kontext } from '../../compliance/ableitung'
 import { heuteIso } from '../../compliance/datum'
-import { KURZ_REGEL, pruefeCompliance } from '../../compliance/regeln'
+import { KURZ_REGEL, pruefeCompliance, pruefsummenBefunde, sortiereComplianceBefunde } from '../../compliance/regeln'
 import { neueCompliance } from '../../compliance/standard'
 import type { ComplianceBefund, ComplianceProjekt, IsoDatum } from '../../compliance/typen'
 import type { BpmnErgebnis } from '../../bpmn/export'
@@ -13,6 +13,7 @@ import type { Aufgabe, Projekt, Prozess } from '../../modell/typen'
 import { formatiereZahl } from '../../modell/zeit'
 import { hauptElement, type Markierung } from '../analyse'
 import { useApp } from '../kontext'
+import { usePruefsummen } from './pruefsummen'
 
 /** Leere Angaben für Projekte ohne Compliance-Angaben; wird nie verändert. */
 const LEER: ComplianceProjekt = neueCompliance()
@@ -46,7 +47,18 @@ export function useCompliance(): ComplianceApi {
   const c = angabenVon(z.projekt)
   const ist = z.projekt.ist
   const heute = heuteIso()
-  const befunde = useMemo(() => complianceBefunde(ist, c, heute), [ist, c, heute])
+  // V4: Versionen, deren Prüfsumme nach dem Laden nicht stimmt (Nachprüfung „sicht“, Mangel 6)
+  const pruefsummeVon = usePruefsummen(c.versionen)
+  const falsch = c.versionen
+    .filter((v) => pruefsummeVon(v) === 'falsch')
+    .map((v) => v.nummer)
+    .join(',')
+  const befunde = useMemo(() => {
+    const basis = complianceBefunde(ist, c, heute)
+    if (!falsch) return basis
+    const nummern = new Set(falsch.split(','))
+    return sortiereComplianceBefunde([...basis, ...pruefsummenBefunde(c.versionen.filter((v) => nummern.has(String(v.nummer))))])
+  }, [ist, c, heute, falsch])
   const k = useMemo(() => kontext(ist, c), [ist, c])
   return { c, ist, heute, befunde, k, aendere: aendereCompliance }
 }

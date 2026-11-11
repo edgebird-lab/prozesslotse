@@ -1,5 +1,6 @@
 /**
- * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 42 Regeln.
+ * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 43 Regeln. V4 (Prüfsumme)
+ * liefert `pruefsummenBefunde`, weil die Prüfsummen erst nach dem Laden asynchron nachgerechnet werden.
  * Die App prüft nicht, ob die Angaben stimmen, sondern ob sie vollständig und
  * widerspruchsfrei sind. Befunde sind Hinweise zum Prüfen und Klären, keine
  * Rechtsauskunft. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7).
@@ -32,7 +33,7 @@ import { formatiereDatum, tageZwischen } from './datum'
 import { kapitelText } from './dokument'
 import { aufbewahrungText, HANDELSBRIEF_JAHRE, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb, mindestJahre } from './fristen'
 import { BESONDERE_KATEGORIEN, istPflichtig, STRAFRECHTLICH_TEXT, TOM_BEREICHE } from './standard'
-import type { Aufbewahrungsart, ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt } from './typen'
+import type { Aufbewahrungsart, ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt, VersionKopf } from './typen'
 import { geaenderteKapitel, letzteWirksame } from './versionen'
 
 const ELEKTRONISCH = new Set(['bild', 'strukturiert', 'datensatz'])
@@ -817,6 +818,23 @@ function pruefeVersionen(p: Prozess, c: ComplianceProjekt, heute: IsoDatum, add:
       ziel: { art: 'version' },
     })
   }
+}
+
+/**
+ * V4: Versionen, deren nachgerechnete Prüfsumme nicht stimmt (6.8). Das Nachrechnen läuft nach dem
+ * Laden asynchron (Web Crypto); die Oberfläche übergibt die Versionen, bei denen es „falsch“ ergab.
+ */
+export function pruefsummenBefunde(falsch: readonly Pick<VersionKopf, 'nummer' | 'bezeichnung'>[]): ComplianceBefund[] {
+  return falsch.map((v) => ({
+    schluessel: `compliance:V4:${v.nummer}`,
+    regel: 'V4',
+    teilschritt: 'dokumente',
+    schwere: 'warnung',
+    titel: 'Prüfsumme stimmt nicht',
+    text: `Version ${v.bezeichnung} passt nicht mehr zu ihrer Prüfsumme: Sie wurde außerhalb der App verändert oder ist beschädigt. Öffne eine unveränderte Projektdatei, etwa aus einer Sicherung.`,
+    quelle: 'GoBD Rz. 154',
+    ziel: { art: 'version' },
+  }))
 }
 
 /** Kurzer Text für Abzeichen im Diagramm. */

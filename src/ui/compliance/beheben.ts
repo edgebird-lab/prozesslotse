@@ -20,6 +20,10 @@ export function befundObjekt(b: ComplianceBefund): string | null {
 export function befundObjektName(b: ComplianceBefund, k: Kontext): string | null {
   const id = befundObjekt(b)
   if (!id) return null
+  if (b.regel === 'V4') {
+    const v = k.c.versionen.find((x) => String(x.nummer) === id)
+    return v ? `Version ${v.bezeichnung}` : null
+  }
   const tom = TOM_BEREICHE.find((t) => t.wert === id)
   if (tom) return tom.name
   if (k.sicht.objekte.some((o) => o.id === id)) return objektName(k, id)

@@ -10,7 +10,7 @@ Die Erweiterung erzeugt aus dem modellierten Ablauf die **GoBD-Verfahrensdokumen
 | --- | --- | --- |
 | Gliederung „des Musters von BStBK und DStV“ | Das gemeinsame Muster gilt nur für das **ersetzende Scannen** (Version 2.1, Stand 27.02.2026). Das Muster zur Belegablage stammt von der AWV (Muster, Ziff. 0.3). | Die Gliederung der Kapitel 1–3 und 6–9 ist allgemein und wird übernommen, die Texte nicht (3.4). Kapitel 4 beschreibt den modellierten Ablauf statt des Scannens. Das Muster sieht solche Ergänzungen vor (Ziff. 0.1 [9]). |
 | Aufbewahrung „nach BEG IV 8 Jahre“ (steht bei Idee 1, gilt hier ebenso) | Gilt für Buchungsbelege. Bücher und Organisationsunterlagen: 10 Jahre, Geschäftsbriefe und sonstige Unterlagen: 6 Jahre (§ 147 Abs. 3 AO). Das Muster empfiehlt einheitlich mindestens 10 Jahre (Ziff. 2.3 [2]). | Frist je Unterlagenart. Längere Aufbewahrung personenbezogener Daten braucht eine Begründung (Regel D7). |
-| Aufwand „S“ | Zwei Dokumente, Versionen, 42 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
+| Aufwand „S“ | Zwei Dokumente, Versionen, 43 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
 | (nicht in der Idee) Das Prozessmodell wächst parallel auf Dateiformat 3 (`docs/modellierung-v3.md`). ODER und externe Teilnehmer sind umgesetzt (Commits `4f8ee69`, `915e957`); Teilprozess, für jede Position, Unterbrechung und Abbruch folgen. | Kapitel 4 muss alle Bausteine beschreiben können. Datenobjekte gehören nicht zu Format 3 und sind auch sonst nirgends spezifiziert oder geplant. | Satzbausteine für alle Bausteine aus Format 3 (6.6.1); externe Teilnehmer erscheinen in Kapitel 2.6 und als Vorschläge für Empfänger. Unterlagen und Ablageorte führt die Erweiterung selbst (4.1). |
 | Angaben „über BPMN-`extensionElements`“ | Das ganze Projekt reist schon heute im BPMN-Export mit (`src/bpmn/einbettung.ts`). Damit stecken auch Compliance-Angaben und Versionen in jeder BPMN-Datei. | keine eigenen BPMN-Erweiterungen; BPMN-Export wahlweise ohne Compliance-Angaben (Abschnitt 8) |
 | Lokales LLM zum Formulieren | Widerspricht „ohne KI“ und macht Ausgaben schwer testbar | feste Satzbausteine, kein LLM |
@@ -30,7 +30,7 @@ In vielen Kleinbetrieben fehlen zwei Pflichtdokumente: die Verfahrensdokumentati
 3. **Unterlagen und Ablageorte** (fachlich Datenobjekte und Datenspeicher) mit „entsteht in“ und „genutzt in“ als eigene Tabellen in den Compliance-Angaben. Das BPMN-Diagramm zeigt sie im MVP nicht (4.1).
 4. **Verfahrensdokumentation** in der Gliederung des Musters von BStBK und DStV (Version 2.1); Kapitel 4 entsteht aus dem Ablauf.
 5. **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 lit. a–g im Aufbau des DSK-Musters, mit TOM-Übersicht in den sechs Bereichen nach Art. 32 Abs. 1 DSGVO.
-6. **Lückenprüfung** mit 42 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
+6. **Lückenprüfung** mit 43 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
 7. **Fristberechnung:** gesetzliche Mindestfrist je Unterlagenart, Fristende, frühestes Vernichtungs- bzw. Löschdatum.
 8. **Versionen:** Eine Freigabe friert beide Dokumente ein (gültig ab, freigegeben am und von, Änderung, geänderte Kapitel, SHA-256-Prüfsumme). Befunde, wenn sich seit der Freigabe etwas geändert hat oder sie älter als 365 Tage ist.
 9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Jede Ausgabe trägt den Hinweis „Vorlage zur Prüfung …“, nicht freigegebene Stände zusätzlich „Entwurf“.
@@ -732,7 +732,7 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 
 ### 5.4 Teilschritt „Dokumente“
 
-- Statuszeile: „Entwurf, nicht freigegeben“ oder „Gültige Version 1.0 seit 11.11.2026“; bei Regel V2 zusätzlich „geändert seit der Freigabe: Verfahrensdokumentation 3.2 und 4“ (Kapitel ausgeschrieben mit `kapitelText`, 6.8).
+- Statuszeile: „Entwurf, nicht freigegeben“ oder „Gültige Version 1.0 seit 11.11.2026“; stimmt die Prüfsumme der genannten Version nicht, folgt „ – Prüfsumme stimmt nicht“ (Regel V4); bei Regel V2 zusätzlich „geändert seit der Freigabe: Verfahrensdokumentation 3.2 und 4“ (Kapitel ausgeschrieben mit `kapitelText`, 6.8).
 - Hinweisband (`role="note"`): „Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten. Keine Rechts- oder Steuerberatung. Rechtsstand 11.11.2026.“ Zweiter Satz: „Die Dokumente nennen Schutzmaßnahmen und Lücken. Vertraulich behandeln.“
 - Umschalter (`role="tablist"`): Verfahrensdokumentation · Verarbeitungsverzeichnis.
 - Knöpfe: „Drucken oder als PDF speichern“ (Hauptknopf), „Als Word-Datei (DOCX)“, „Version freigeben …“, „Geprüft, keine Änderung“ (nur mit Versionen und ohne V2; setzt `zuletztGeprueft`).
@@ -889,8 +889,9 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | V1 | Noch nicht freigegeben | Hinweis | keine Version | „Die Dokumente sind ein Entwurf. Erst eine Freigabe mit Gültig-ab-Datum macht sie zur gültigen Fassung.“ | Muster Kap. 1; GoBD Rz. 154 | dokumente |
 | V2 | Geändert seit der letzten Freigabe | Warnung | `geaenderteKapitel` gegenüber der letzten Version nicht leer (6.8) | „Seit Version {x} geändert: {Kapitel}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.“ | GoBD Rz. 154 | dokumente |
 | V3 | Überprüfung fällig | Hinweis | Versionen vorhanden, V2 trifft nicht zu, `tageZwischen(max(letzte freigegebenAm, zuletztGeprueft), heute) > 365` | „Die letzte Prüfung ist {n} Tage her. Einmal im Jahr prüfen, ob alles noch stimmt.“ | Art. 32 Abs. 1 lit. d DSGVO; 365 Tage als Annahme | dokumente |
+| V4 | Prüfsumme stimmt nicht | Warnung | je Version (auch zurückgezogen), deren nachgerechnete Prüfsumme nicht stimmt (6.8). Das Nachrechnen läuft nach dem Laden asynchron; deshalb liefert die Regel die eigene Funktion `pruefsummenBefunde`, und die Oberfläche fügt ihre Befunde zu denen aus `pruefeCompliance` | „Version {x} passt nicht mehr zu ihrer Prüfsumme: Sie wurde außerhalb der App verändert oder ist beschädigt. Öffne eine unveränderte Projektdatei, etwa aus einer Sicherung.“ | GoBD Rz. 154 | dokumente |
 
-Zusammen 42 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
+Zusammen 43 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
 
 ### 6.6 Verfahrensdokumentation erzeugen
 
@@ -978,7 +979,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 - **Vergleich:** `geaenderteKapitel(v, projekt)` erzeugt beide Dokumente neu, und zwar mit dem Kontext von v: `version = v`, Historie bis v, `bezugsjahr = Jahr(v.gueltigAb)`, `heute = v.freigegebenAm`. Dann vergleicht es je Schlüssel die JSON-Darstellung der Abschnitte mit dem eingefrorenen Stand. So zählen nur fachliche Änderungen.
 - **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. Gespeichert wird sie als Hex.
 - **Rohstand:** Die Prüfsumme gilt für den eingefrorenen Stand, wie er bei der Freigabe entstand. Laden migriert oder normalisiert eingefrorene Prozesse deshalb nie an Ort und Stelle, sondern nur eine Kopie für Anzeige und Vergleich (`eingefrorenerProzess`, 4.4); nachgerechnet wird über den Rohstand vor jeder Migration, und Speichern schreibt ihn unverändert zurück. So ändern Laden, Prüfen und Speichern die Prüfsumme nie, auch wenn eine spätere Fassung beim Laden mehr anpasst (z. B. ein Sprung auf Format 4 oder das Entfernen von `von` an Zeit-Ereignissen).
-- **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile. Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
+- **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile, die Statuszeile („– Prüfsumme stimmt nicht“) und „Lücken“ (Regel V4, Warnung, also Zahl statt Häkchen am Teilschritt „Dokumente“). Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
 - Die Prüfsumme erkennt so Beschädigungen und Änderungen außerhalb der App. Sie schützt nicht vor gezielter Änderung, weil sie sich neu berechnen lässt; so steht es auch in der App.
 - Freigaben entstehen im aktuellen Format 3. Eine künftige Formatmigration braucht für eingefrorene Prozesse nichts Eigenes: Sie wirkt nur auf die Kopie, die Prüfsumme bleibt gültig.
 - Nach einem App-Update mit geänderten Textbausteinen kann V2 erscheinen. Der Befund nennt die Kapitel; eine neue Freigabe löst ihn.
@@ -1046,7 +1047,7 @@ src/compliance/            Fachlogik ohne React, vollständig getestet
   fristen.ts               Mindestfrist, Fristende, Texte, Kaufmannseigenschaft (§ 257 HGB)
   mitgeltend.ts            mitgeltende Unterlagen (Kapitel 6), auch ältere Einträge ohne Ablageort
   ableitung.ts             Ersteller, Nutzer, Systeme mit Daten, vorigeAufgabe
-  regeln.ts                pruefeCompliance: Lückenprüfung (42 Regeln)
+  regeln.ts                pruefeCompliance: Lückenprüfung (43 Regeln; V4 in pruefsummenBefunde)
   fortschritt.ts           hatAngaben: Stand der Teilschritte (6.10)
   dokument.ts              Kapitelschlüssel, Vergleich
   ablauftext.ts            Kapitel 4 aus dem Baum
@@ -1258,6 +1259,7 @@ Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentit
 | `auftragsverarbeitung = false` | kein S2 |
 | Rücksicherung vor genau 365 / 366 Tagen getestet | kein S6 / S6 |
 | letzte Prüfung vor 365 / 366 Tagen | kein V3 / V3 |
+| Version mit falscher Prüfsumme (`pruefsummenBefunde`) | V4 als Warnung im Teilschritt „Dokumente“, zählt als offener Punkt |
 | TOM Pseudonymisierung leer / Verschlüsselung leer | T1 Hinweis / T1 Warnung |
 | `personenMitDaten` 19 / 20 ohne Datenschutzbeauftragten | kein U3 / U3 |
 | Datenschutzbeauftragter benannt, ohne Namen und Kontakt | U1 „Name und Kontaktdaten des Datenschutzbeauftragten“, kein U3 |

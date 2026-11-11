@@ -10,13 +10,26 @@ import type { DokuVersion } from '../../compliance/typen'
 export type PruefsummenStand = 'stimmt' | 'falsch' | 'offen' | 'unbekannt'
 
 const ergebnisse = new WeakMap<DokuVersion, Promise<boolean>>()
+/** Schon nachgerechnete Versionen: true/false, null = nicht nachrechenbar. So sehen später gezeichnete Teile das Ergebnis sofort. */
+const bekannt = new WeakMap<DokuVersion, boolean | null>()
 
 /** Ergebnis je Version; Versionen sind unveränderlich, also wird jede nur einmal gerechnet. */
 function pruefeVersion(v: DokuVersion): Promise<boolean> {
   let ergebnis = ergebnisse.get(v)
   if (!ergebnis) {
     // Versionen samt Generatoren laden erst hier: Die Kopfzeile nutzt das Modul, der Hauptteil bleibt klein (abnahme-11)
-    ergebnis = import('../../compliance/versionen').then((m) => m.pruefsummeStimmt(v))
+    ergebnis = import('../../compliance/versionen')
+      .then((m) => m.pruefsummeStimmt(v))
+      .then(
+        (ok) => {
+          bekannt.set(v, ok)
+          return ok
+        },
+        (e: unknown) => {
+          bekannt.set(v, null)
+          throw e
+        },
+      )
     ergebnisse.set(v, ergebnis)
   }
   return ergebnis
@@ -29,25 +42,23 @@ export const PRUEFSUMME_TEXT: Record<PruefsummenStand, string> = {
   unbekannt: 'Prüfsumme nicht nachgerechnet',
 }
 
-/** Stand der Prüfsumme je Version. */
+function standVon(v: DokuVersion): PruefsummenStand {
+  const ok = bekannt.get(v)
+  return ok === undefined ? 'offen' : ok === null ? 'unbekannt' : ok ? 'stimmt' : 'falsch'
+}
+
+/** Stand der Prüfsumme je Version; zeichnet neu, sobald ein Ergebnis kommt. */
 export function usePruefsummen(versionen: DokuVersion[]): (v: DokuVersion) => PruefsummenStand {
-  const [stand, setStand] = useState<ReadonlyMap<DokuVersion, boolean | null>>(() => new Map())
+  const [, setErgebnisse] = useState(0)
   useEffect(() => {
     let aktiv = true
-    const setze = (v: DokuVersion, ok: boolean | null) => aktiv && setStand((s) => (s.get(v) === ok ? s : new Map(s).set(v, ok)))
-    for (const v of versionen)
-      pruefeVersion(v).then(
-        (ok) => setze(v, ok),
-        () => setze(v, null),
-      )
+    const neu = () => aktiv && setErgebnisse((n) => n + 1)
+    for (const v of versionen) if (!bekannt.has(v)) pruefeVersion(v).then(neu, neu)
     return () => {
       aktiv = false
     }
   }, [versionen])
-  return (v) => {
-    const ok = stand.get(v)
-    return ok === undefined ? 'offen' : ok === null ? 'unbekannt' : ok ? 'stimmt' : 'falsch'
-  }
+  return standVon
 }
 
 /** Meldet nach dem Laden in der Kopfzeile, wenn eine Version nicht mehr zu ihrer Prüfsumme passt; jede Version nur einmal. */
