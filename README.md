@@ -1,8 +1,22 @@
 # Prozesslotse
 
-Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zeichnen, mit Kennzahlen prüfen und mit begründeten Vorschlägen verbessern. Läuft als Windows-Programm oder im Browser, ohne KI und ohne Server.
+Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zeichnen, mit Kennzahlen prüfen und mit begründeten Vorschlägen verbessern. Aus dem Ablauf entstehen auf Wunsch die Verfahrensdokumentation nach GoBD und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO. Ein Windows-Programm, ohne KI, ohne Server und ohne Konto; Projekte bleiben auf dem eigenen Rechner.
+
+**[Für Windows herunterladen: Prozesslotse-Setup.exe](https://github.com/edgebird-lab/prozesslotse/releases/latest/download/Prozesslotse-Setup.exe)** · [alle Versionen](https://github.com/edgebird-lab/prozesslotse/releases) · [Projektseite](https://olbricht-digital.de/software/prozesslotse)
 
 ![Schritt „Prüfen“: Kennzahlen links, Diagramm mit markierten Schwachstellen rechts](docs/bilder/pruefen.png)
+
+## Herunterladen und installieren
+
+1. [Prozesslotse-Setup.exe](https://github.com/edgebird-lab/prozesslotse/releases/latest/download/Prozesslotse-Setup.exe) herunterladen (rund 1,5 MB, immer die neueste Version).
+2. Die Datei starten. Der Installer richtet den Prozesslotsen nur für den angemeldeten Benutzer ein (in `%LOCALAPPDATA%\Prozesslotse`) und braucht dafür **keine Admin-Rechte**. Danach steht er im Startmenü; `.prozesslotse`-Projekte öffnen sich per Doppelklick, `.bpmn`-Dateien über „Öffnen mit“.
+3. Entfernen lässt er sich wie jedes Programm in den Windows-Einstellungen unter „Apps“.
+
+**Systemanforderungen:** Windows 10 oder 11 (64 Bit) mit der Microsoft Edge WebView2 Runtime. Unter Windows 11 und einem aktuellen Windows 10 ist sie schon vorhanden; fehlt sie, lädt der Installer sie von Microsoft nach (dafür braucht es einmal eine Internetverbindung).
+
+**Hinweis zu SmartScreen:** Der Installer ist noch nicht signiert. Windows SmartScreen kann deshalb beim ersten Start „Der Computer wurde durch Windows geschützt“ melden. Über „Weitere Informationen“ und „Trotzdem ausführen“ geht es weiter. Wer das nicht möchte, kann das Programm aus dem Quelltext selbst bauen (siehe [Entwickeln](#entwickeln)).
+
+Zum Ausprobieren enthält das Menü zwei Beispiele, einen Lieferdienst und eine Onlinebestellung (siehe [Fallbeispiel](#fallbeispiel)).
 
 ## Was es kann
 
@@ -20,9 +34,9 @@ Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zei
 - **Windows-Programm (Tauri 2):** Installer mit 1,5 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog, auch für Verfahrensdokumentation und Verzeichnis; deren Word-Dateien gehen über den Speichern-Dialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
 - **Lernmodus:** Zu jeder Auswahl erklärt ein Hinweis das passende BPMN-Element.
 
-| Ablauf beschreiben | Verbessern |
-| --- | --- |
-| ![Assistent mit Einfügeposition im Ausgang „Nein“ und Gliederung](docs/bilder/ablauf.png) | ![Vorschlag mit berechneter Wirkung, betroffene Schritte im Soll-Diagramm hervorgehoben](docs/bilder/verbessern.png) |
+| Ablauf beschreiben | Verbessern | Bericht |
+| --- | --- | --- |
+| ![Assistent mit Einfügeposition im Ausgang „Nein“ und Gliederung](docs/bilder/ablauf.png) | ![Vorschlag mit berechneter Wirkung, betroffene Schritte im Soll-Diagramm hervorgehoben](docs/bilder/verbessern.png) | ![Bericht mit Kennzahlen im Ist-Soll-Vergleich, Maßnahmen und Befunden](docs/bilder/bericht.png) |
 
 ## Fallbeispiel
 
@@ -139,6 +153,8 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build (and
 
 `node scripts/readme-bilder.mjs` erzeugt die Bilder dieser README neu (bei laufendem `npx vite preview --port 4173`).
 
+**Neue Version:** Versionsnummer in `package.json`, `src-tauri/Cargo.toml`, `src/App.tsx` und `src/bpmn/export.ts` anheben, Notizen in `.github/release-notizen.md` schreiben, dann einen Tag wie `v0.3.0` pushen. Der Workflow „Version veröffentlichen“ baut und prüft den Installer und legt einen Release-Entwurf an, mit dem Installer zusätzlich unter dem festen Namen `Prozesslotse-Setup.exe`. Veröffentlicht wird der Entwurf von Hand (`gh release edit v0.3.0 --draft=false --latest`).
+
 ## Grenzen
 
 - Zeiten und Anteile sind Schätzungen; alle Werte sind Erwartungswerte.
@@ -158,6 +174,23 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build (and
 - Auf eine Raute passen je Richtung höchstens etwa sechs Wege mit 20 px Abstand. Führen mehr Wege einer Verzweigung in dieselbe Richtung (etwa acht Fälle in derselben Bahn), liegen ihre Linien an der Raute dichter; sie teilen sich aber nie eine Strecke.
 - Compliance-Doku: je Projekt ein Prozess; eine Gesamtdokumentation aller Systeme eines Betriebs (GoBD Rz. 151) entsteht erst mit einer Firmenmappe. Die Ablaufhemmung (§ 147 Abs. 3 AO) wird nicht berechnet, nur genannt. Ersetzendes Scannen, Kassenführung und Lohn sind nicht abgedeckt. Rechtsstand 11.11.2026; keine Gewähr für Vollständigkeit.
 
-## Lizenz
+## Haftungshinweis
 
-Noch nicht festgelegt. bpmn-js steht unter der bpmn.io-Lizenz, die das bpmn.io-Logo im angezeigten Diagramm vorschreibt. Die Word-Datei erzeugt `docx` (MIT) mit `fflate` und `nanoid` (beide MIT).
+Verfahrensdokumentation und Verzeichnis von Verarbeitungstätigkeiten sind Vorlagen zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten. Keine Rechts- oder Steuerberatung. Rechtsstand 11.11.2026. Der Prozesslotse prüft, ob die Angaben vollständig und widerspruchsfrei sind, nicht, ob sie stimmen. Kennzahlen und Vorschläge beruhen auf geschätzten Zeiten und Anteilen (siehe [Grenzen](#grenzen)).
+
+## Rechte
+
+© 2026 Robin Olbricht – olbricht-digital. Alle Rechte vorbehalten. Die Programme dürfen kostenlos genutzt werden; eine offene Lizenz ist noch nicht gewählt. Fremdbestandteile stehen unter ihren eigenen Lizenzen, siehe [Fremdbestandteile](#fremdbestandteile).
+
+### Fremdbestandteile
+
+| Bestandteil | Lizenz | Zweck |
+| --- | --- | --- |
+| [bpmn-js](https://github.com/bpmn-io/bpmn-js) | bpmn.io-Lizenz; sie verlangt das bpmn.io-Logo im angezeigten Diagramm | Anzeige der Diagramme |
+| diagram-js, bpmn-moddle und weitere Pakete von bpmn.io, Preact, htm | MIT, htm Apache-2.0 | von bpmn-js genutzt |
+| React, React DOM | MIT | Oberfläche |
+| `docx` mit `fflate` und `nanoid` | MIT | Word-Dateien |
+| Tauri 2 und die Rust-Bibliotheken des Windows-Programms | überwiegend MIT oder Apache-2.0, einzelne unter Unicode-3.0, BSD-3-Clause, Zlib oder MPL-2.0 (unverändert genutzt) | Windows-Programm |
+| Microsoft Edge WebView2 Runtime | Lizenz von Microsoft; nicht im Installer enthalten, bei Bedarf von Microsoft nachgeladen | Anzeige im Windows-Programm |
+
+Alle Pakete mit Version stehen in `package-lock.json` und `src-tauri/Cargo.lock`. Die Verfahrensdokumentation übernimmt von der Muster-Verfahrensdokumentation von BStBK und DStV nur Gliederung und Kapitelnamen; alle Texte sind eigene Formulierungen.

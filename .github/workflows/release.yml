@@ -1,7 +1,10 @@
 name: Version veröffentlichen
 
-# Bei einem Tag wie v0.2.0 entsteht ein Release-Entwurf mit Installer.
-# Veröffentlicht wird er erst von Hand; das Repo bleibt privat, bis Robin es freigibt.
+# Bei einem Tag wie v0.2.0 entsteht ein Release-Entwurf mit dem Installer, einmal mit Versionsnummer
+# im Namen und einmal als Prozesslotse-Setup.exe. Den festen Namen verlinkt die Website:
+# https://github.com/edgebird-lab/prozesslotse/releases/latest/download/Prozesslotse-Setup.exe
+# Die Notizen kommen aus .github/release-notizen.md. Veröffentlicht wird der Entwurf von Hand:
+# gh release edit <tag> --draft=false --latest
 on:
   push:
     tags: ['v*']
@@ -15,6 +18,20 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+      - name: Tag passt zu allen Versionsangaben
+        shell: pwsh
+        run: |
+          $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          $stellen = @{
+            'package.json'         = '"version": "' + $v + '"'
+            'src-tauri/Cargo.toml' = 'version = "' + $v + '"'
+            'src/App.tsx'          = "const VERSION = '" + $v + "'"
+            'src/bpmn/export.ts'   = 'exporterVersion="' + $v + '"'
+            '.github/release-notizen.md' = $v
+          }
+          foreach ($datei in $stellen.Keys) {
+            if (-not (Select-String -Path $datei -SimpleMatch $stellen[$datei] -Quiet)) { throw "$datei nennt nicht Version $v" }
+          }
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -31,6 +48,22 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Prozesslotse ${{ github.ref_name }}
-          releaseBody: Installer für Windows (pro Benutzer, ohne Admin-Rechte). Noch nicht signiert; SmartScreen fragt beim ersten Start nach.
+          releaseBody: Installer für Windows; die Notizen setzt der nächste Schritt.
           releaseDraft: true
           prerelease: false
+      - name: Installer prüfen (still installieren, Zuordnungen prüfen, deinstallieren)
+        shell: pwsh
+        run: ./src-tauri/windows/installer-test.ps1
+      - name: Installer als Prozesslotse-Setup.exe anhängen, Notizen setzen
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $setup = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe')
+          if ($setup.Count -ne 1) { throw "Genau ein Installer erwartet, gefunden: $($setup.Count)" }
+          Copy-Item $setup[0].FullName Prozesslotse-Setup.exe
+          gh release upload $env:GITHUB_REF_NAME Prozesslotse-Setup.exe --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Hochladen von Prozesslotse-Setup.exe gescheitert' }
+          gh release edit $env:GITHUB_REF_NAME --notes-file .github/release-notizen.md --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Setzen der Release-Notizen gescheitert' }
+          gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --json isDraft,assets --jq '{isDraft, assets: [.assets[] | {name, size}]}'

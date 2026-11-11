@@ -1,6 +1,6 @@
 name: Windows-Programm
 
-# Windows-Läufe kosten im privaten Repo mehr Minuten. Deshalb nur, wenn sich der
+# Windows-Läufe dauern lange. Deshalb nur, wenn sich der
 # Programmteil ändert, bei Versionen (Tags) oder von Hand.
 on:
   push:

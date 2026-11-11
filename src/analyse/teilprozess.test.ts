@@ -515,8 +515,10 @@ describe('Dateiformat 4', () => {
     // Dasselbe BPMN vor und nach dem Lesen. Die Prüfsummen hielten bis zur Trennung langer Parallelen den Stand von Format 3
     // fest (Commit 71820c2: fe7d9917 und eab2a465); seitdem liegen lange parallele Linien weiter auseinander, sonst ist alles gleich.
     expect(erzeugeBpmn(neu.ist).xml).toBe(erzeugeBpmn(projekt.ist).xml)
-    expect(pruefsumme(erzeugeBpmn(beispielLieferdienst()).xml)).toBe('5a85386d')
-    expect(pruefsumme(erzeugeBpmn(beispielOnlinebestellung()).xml)).toBe('7dc759c0')
+    // Die Programmversion im Attribut exporterVersion wechselt mit jeder Version; gerechnet wird wie bei 0.1.0.
+    const ohneVersion = (xml: string) => xml.replace(/exporterVersion="[^"]*"/, 'exporterVersion="0.1.0"')
+    expect(pruefsumme(ohneVersion(erzeugeBpmn(beispielLieferdienst()).xml))).toBe('5a85386d')
+    expect(pruefsumme(ohneVersion(erzeugeBpmn(beispielOnlinebestellung()).xml))).toBe('7dc759c0')
   })
 
   it('speichert Abschnitte und lädt sie unverändert', () => {

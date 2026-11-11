@@ -203,7 +203,7 @@ export function erzeugeBpmn(p: Prozess, einbettung?: Einbettung): BpmnErgebnis {
     '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" ' +
     'xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" ' +
     'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitionen" targetNamespace="https://olbricht-digital.de/prozesslotse" ' +
-    'exporter="Prozesslotse" exporterVersion="0.1.0">\n'
+    'exporter="Prozesslotse" exporterVersion="0.2.0">\n'
   x += '  <bpmn:collaboration id="Kollaboration">\n'
   x += `    <bpmn:participant id="Teilnehmer"${attrName(p.name || 'Prozess')} processRef="Prozess" />\n`
   // Externe Teilnehmer als Pools ohne Inhalt (Black Box); sichtbar sind nur ihre Nachrichten.
