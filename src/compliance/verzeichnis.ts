@@ -83,7 +83,7 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
   if (grundlagen.length > 0) {
     liste(
       grundlagen.map((r) => {
-        const interessen = r.wert === 'interesse' ? [...new Set(personen.map((o) => o.d.berechtigtesInteresse.trim()).filter(Boolean))] : []
+        const interessen = r.wert === 'interesse' ? [...new Set(personen.filter((o) => o.d.rechtsgrundlagen.includes('interesse')).map((o) => o.d.berechtigtesInteresse.trim()).filter(Boolean))] : []
         return `Art. 6 Abs. 1 lit. ${r.lit} DSGVO: ${r.dok ?? r.text}${interessen.length > 0 ? ` (${interessen.join('; ')})` : ''}`
       }),
     )

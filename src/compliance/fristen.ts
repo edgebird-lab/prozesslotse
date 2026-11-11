@@ -17,8 +17,10 @@ export function mindestJahre(art: Aufbewahrungsart): number | null {
   return AUFBEWAHRUNGSARTEN.find((a) => a.wert === art)?.jahre ?? null
 }
 
-/** Gewählte Frist oder, wenn keine gewählt ist, die gesetzliche Mindestfrist. */
+/** Gewählte Frist oder, wenn keine gewählt ist, die gesetzliche Mindestfrist; nur bei aufbewahrungspflichtigen Unterlagen. */
 export function wirksameJahre(d: DatenobjektAngaben): number | null {
+  // Nach einem Wechsel auf „keine“ oder „unklar“ bleibt eine früher gewählte Zahl stehen; sie gilt dann nicht mehr
+  if (!istPflichtig(d.aufbewahrungsart)) return null
   return d.aufbewahrungJahre ?? mindestJahre(d.aufbewahrungsart)
 }
 

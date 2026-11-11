@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { beispielMitCompliance } from './compliance/beispiel'
+import { freigeben } from './compliance/versionen'
 import { loescheUnterlage } from './compliance/unterlagen'
 import { beispielProjekt } from './modell/beispiel'
 import { entferneBlock, entferneMedium } from './modell/operationen'
@@ -76,5 +77,19 @@ describe('Zustand: Compliance-Angaben', () => {
     z = reduziere(z, { typ: 'teilschritt', teilschritt: 'luecken' })
     expect(z.teilschritt).toBe('luecken')
     expect(z.vergangenheit).toHaveLength(verlauf)
+  })
+
+  it('macht eine Freigabe nicht rückgängig', async () => {
+    let z = start()
+    z = reduziere(z, { typ: 'compliance', aenderung: (c) => ({ ...c, mitgeltend: ['Berechtigungskonzept'] }), zeit: 1 })
+    const v = await freigeben(z.projekt.ist, z.projekt.compliance!, { bezeichnung: '1.0', gueltigAb: '2026-11-11', freigegebenVon: 'Erika Mustermann', aenderung: 'Erstfassung' }, '2026-11-11')
+    z = reduziere(z, { typ: 'compliance', aenderung: (c) => ({ ...c, versionen: [...c.versionen, v] }), zeit: 2 })
+    expect(z.vergangenheit).toHaveLength(0)
+    expect(reduziere(z, { typ: 'rueckgaengig' }).projekt.compliance?.versionen).toHaveLength(1)
+    // Änderungen danach sind wieder rückgängig zu machen
+    z = reduziere(z, { typ: 'compliance', aenderung: (c) => ({ ...c, mitgeltend: [] }), zeit: 3 })
+    z = reduziere(z, { typ: 'rueckgaengig' })
+    expect(z.projekt.compliance?.mitgeltend).toEqual(['Berechtigungskonzept'])
+    expect(z.projekt.compliance?.versionen).toHaveLength(1)
   })
 })

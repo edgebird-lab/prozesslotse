@@ -7,6 +7,7 @@
  * werden als Ganzes verglichen. Was vor der ersten Überschrift steht, ist das
  * Deckblatt.
  */
+import { kanonischesJson } from './speicher'
 import type { Abschnitt, Dokument, DokumentArt } from './typen'
 
 export const DECKBLATT = 'Deckblatt'
@@ -63,7 +64,8 @@ export function geaenderteKapitelIn(alt: Dokument, neu: Dokument): string[] {
   const a = kapitel(alt)
   const n = kapitel(neu)
   const schluessel = [...n.keys(), ...[...a.keys()].filter((k) => !n.has(k))]
-  return schluessel.filter((k) => !regeln.ausgenommen.has(k) && JSON.stringify(a.get(k) ?? null) !== JSON.stringify(n.get(k) ?? null)).map((k) => `${regeln.praefix}${k}`)
+  // kanonisch: Die Reihenfolge der Schlüssel in einer gespeicherten Datei zählt nicht als Änderung
+  return schluessel.filter((k) => !regeln.ausgenommen.has(k) && kanonischesJson(a.get(k) ?? null) !== kanonischesJson(n.get(k) ?? null)).map((k) => `${regeln.praefix}${k}`)
 }
 
 /** Gliederung für Druck und DOCX: Überschriften der Ebenen 1 und 2. */

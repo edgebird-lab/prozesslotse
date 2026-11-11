@@ -71,3 +71,8 @@ Wo die Spezifikation offen war oder ein Detail nicht passte, gilt Folgendes. Auc
 | „Verbessern“ | „Weiter“ führt jetzt zu „Dokumentieren“ statt zum Bericht | neue Reihenfolge der Schritte |
 | BPMN-Export | Menüpunkt „Als BPMN ohne Compliance-Angaben exportieren“ und Knopf im Teilschritt „Dokumente“; nach dem normalen Export ein Hinweis in der Kopfzeile | keine zusätzliche Rückfrage bei jedem Export (Frage 12) |
 | Speicher voll | Meldung in der Kopfzeile bei jeder Änderung, solange das Speichern scheitert | Die bestehende Meldezeile verschwindet nach 6 Sekunden. |
+| Dienstleister | zählt nur bei Betrieb „Cloud“ oder „eigener Server“ (`mitDienstleister`); ein ausgeblendeter Name bei „Auf eigenen Geräten“ zählt nicht | wie bei D4, D5, D8: ausgeblendete Altangaben lösen keine Befunde und keinen Dokumenttext aus |
+| Gewählte Frist | gilt nur bei aufbewahrungspflichtigen Unterlagen; nach einem Wechsel auf „keine“ oder „unklar“ bleibt die Zahl gespeichert, wird aber nicht mehr gewertet | sonst widersprächen sich Kapitel 2.4 und Verzeichnis B.6 |
+| Datumseingaben | übernommen werden nur gültige Daten zwischen 1900 und 2199; Zwischenstände beim Tippen bleiben in der Eingabe | Chromium lässt im Jahresfeld bis zu sechs Ziffern zu |
+| Rückgängig | eine Freigabe leert den Rückgängig-Verlauf | Versionen dürfen weder geändert noch gelöscht werden (5.4) |
+| Kapitelvergleich | über kanonisches JSON | Eine Datei mit anders sortierten Schlüsseln ist keine fachliche Änderung. |

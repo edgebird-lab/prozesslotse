@@ -200,11 +200,10 @@ function pruefeSystem(x: unknown, pfad: string): void {
 }
 
 const ABSCHNITT_ARTEN = ['ueberschrift', 'absatz', 'liste', 'tabelle', 'hinweis', 'diagramm']
-const DOKUMENT_ARTEN = ['verfahrensdokumentation', 'verarbeitungsverzeichnis']
 
-function pruefeDokument(x: unknown, pfad: string): void {
+function pruefeDokument(x: unknown, pfad: string, art: 'verfahrensdokumentation' | 'verarbeitungsverzeichnis'): void {
   const d = obj(x, pfad)
-  if (!DOKUMENT_ARTEN.includes(d.art as string)) fehler(`${pfad}.art`, `hat den unbekannten Wert „${String(d.art)}“`)
+  if (d.art !== art) fehler(`${pfad}.art`, `muss „${art}“ sein, nicht „${String(d.art)}“`)
   texte(d, ['titel', 'untertitel', 'versionText'], pfad)
   datum(d, 'stand', pfad, false)
   datum(d, 'rechtsstand', pfad, false)
@@ -266,8 +265,8 @@ function pruefeVersionen(x: unknown[]): void {
     textListe(o, 'geaenderteKapitel', p)
     if (!/^[0-9a-f]{64}$/.test(o.pruefsumme as string)) fehler(`${p}.pruefsumme`, 'ist keine SHA-256-Prüfsumme')
     pruefeEingefrorenenProzess(o.prozess, `${p}.prozess`)
-    pruefeDokument(o.verfahrensdoku, `${p}.verfahrensdoku`)
-    pruefeDokument(o.verzeichnis, `${p}.verzeichnis`)
+    pruefeDokument(o.verfahrensdoku, `${p}.verfahrensdoku`, 'verfahrensdokumentation')
+    pruefeDokument(o.verzeichnis, `${p}.verzeichnis`, 'verarbeitungsverzeichnis')
   })
 }
 

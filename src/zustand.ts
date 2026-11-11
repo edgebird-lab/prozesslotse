@@ -181,7 +181,9 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
       const alt = z.projekt.compliance ?? neueCompliance()
       const neu = a.aenderung(alt)
       if (neu === alt) return z
-      return mitVerlauf(z, { ...z.projekt, compliance: neu }, a.zeit, a.gruppe)
+      const danach = mitVerlauf(z, { ...z.projekt, compliance: neu }, a.zeit, a.gruppe)
+      // Eine Freigabe lässt sich nicht rückgängig machen: freigegebene Versionen werden weder geändert noch gelöscht
+      return neu.versionen.length > alt.versionen.length ? { ...danach, vergangenheit: [], zukunft: [] } : danach
     }
     case 'teilschritt':
       return { ...z, teilschritt: a.teilschritt, gruppe: null }

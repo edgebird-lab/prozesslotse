@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addiereJahre, addiereMonate, addiereTage, formatiereDatum, heuteIso, istIsoDatum, tageZwischen } from './datum'
+import { addiereJahre, addiereMonate, addiereTage, formatiereDatum, heuteIso, istIsoDatum, istPlausiblesDatum, tageZwischen } from './datum'
 import {
   aufbewahrenBis,
   aufbewahrenBisText,
@@ -141,5 +141,40 @@ describe('Fristen der Dokumentation (6.2, Versionen)', () => {
     expect(aufbewahrenBisText(null)).toBe('10 Jahre nach Ende der Gültigkeit')
     // Gültig ab 1. Januar: gültig bis am 31.12. des Vorjahres
     expect(gueltigBisIn([{ gueltigAb: '2026-11-11' }, { gueltigAb: '2028-01-01' }], 0)).toBe('2027-12-31')
+  })
+})
+
+describe('Datum: Grenzfälle aus der Durchsicht', () => {
+  it('rechnet auch Jahre unter 100 richtig (ohne Sonderbehandlung durch Date)', () => {
+    expect(addiereTage('0060-01-01', -1)).toBe('0059-12-31')
+    expect(tageZwischen('0099-12-31', '0100-01-01')).toBe(1)
+    expect(addiereTage('0004-02-28', 1)).toBe('0004-02-29')
+  })
+
+  it('stimmt über 200 Jahre Tag für Tag mit der Zeitrechnung von Date überein', () => {
+    const start = Date.UTC(1900, 0, 1)
+    for (let i = 0; i < 73_000; i += 17) {
+      const d = new Date(start + i * 86_400_000)
+      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+      expect(tageZwischen('1900-01-01', iso)).toBe(i)
+      expect(addiereTage('1900-01-01', i)).toBe(iso)
+    }
+  })
+
+  it('lässt in Eingaben nur plausible Jahre zu', () => {
+    expect(istPlausiblesDatum('2026-11-11')).toBe(true)
+    expect(istPlausiblesDatum('2199-12-31')).toBe(true)
+    expect(istPlausiblesDatum('2200-01-01')).toBe(false)
+    expect(istPlausiblesDatum('0026-11-11')).toBe(false)
+    expect(istPlausiblesDatum('20266-06-30')).toBe(false)
+    expect(istPlausiblesDatum('2026-02-30')).toBe(false)
+  })
+
+  it('wertet eine früher gewählte Frist nach einem Wechsel auf „keine“ oder „unklar“ nicht mehr', () => {
+    const keine = objekt({ aufbewahrungsart: 'keine', aufbewahrungJahre: 10, loeschfrist: neueFrist() })
+    expect(wirksameJahre(keine)).toBeNull()
+    expect(aufbewahrungText(keine)).toBe('–')
+    expect(beispielBis(keine, 2026)).toBe('–')
+    expect(aufbewahrungText(objekt({ aufbewahrungsart: 'unklar', aufbewahrungJahre: 10 }))).toBe('offen')
   })
 })

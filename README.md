@@ -116,7 +116,7 @@ Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur 
 - Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
-- Compliance-Doku: 38 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft. 13 Browsertests decken Lücken und „Beheben“, Freigabe, Word-Datei, Druck, Tastatur und axe hell und dunkel ab.
+- Compliance-Doku: 38 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft. 14 Browsertests decken Lücken und „Beheben“, Freigabe, Word-Datei, Druck, Tastatur und axe hell und dunkel ab.
 
 ## Entwickeln
 

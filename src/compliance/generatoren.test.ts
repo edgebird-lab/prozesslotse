@@ -327,3 +327,23 @@ describe('Allgemein', () => {
     expect(alleTexte(verzeichnis)).toContain('Eine Übermittlung in Drittländer findet nicht statt und ist nicht geplant.')
   })
 })
+
+describe('Durchsicht: ausgeblendete Altangaben', () => {
+  it('nennt unter lit. f nur Interessen von Unterlagen mit dieser Rechtsgrundlage', () => {
+    const c = complianceLieferdienst()
+    c.datenobjekte.dob_bestellung.berechtigtesInteresse = 'Werbung (alt, abgewählt)'
+    c.datenobjekte.dob_rechnung.rechtsgrundlagen = ['vertrag', 'rechtspflicht', 'interesse']
+    c.datenobjekte.dob_rechnung.berechtigtesInteresse = 'Forderungen durchsetzen'
+    const punkte = abschnitteVon(dokumente(beispielLieferdienst(), c).verzeichnis, 'B.2').flatMap(texte)
+    expect(punkte).toContain('Art. 6 Abs. 1 lit. f DSGVO: berechtigtes Interesse (Forderungen durchsetzen)')
+    expect(punkte.join(' ')).not.toContain('Werbung')
+  })
+
+  it('zählt einen Dienstleister nicht, wenn das System auf eigenen Geräten läuft', () => {
+    const c = complianceLieferdienst()
+    Object.assign(c.systeme.med_erp, { betrieb: 'lokal', dienstleister: 'WaWi-Cloud (Beispielanbieter)' })
+    const { verfahrensdoku, verzeichnis } = dokumente(beispielLieferdienst(), c)
+    expect(tabelleIn(verfahrensdoku, '3.1').zeilen[1][6]).toBe('–')
+    expect(abschnitteVon(verzeichnis, 'B.4').flatMap(texte).join(' ')).not.toContain('WaWi-Cloud')
+  })
+})

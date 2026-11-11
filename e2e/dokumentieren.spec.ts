@@ -272,3 +272,14 @@ test('filtert nach einem Klick ins Diagramm auf diesen Schritt (5.1)', async ({ 
   await page.getByRole('button', { name: 'Alle zeigen' }).click()
   await expect(page.locator('#ziel-kontrolle-auf_kontrollieren')).toBeVisible()
 })
+
+test('übernimmt ein Datum und zeigt es im Verzeichnis', async ({ page }) => {
+  await start(page)
+  await page.getByLabel('Eingeführt am').fill('2024-03-01')
+  await teil(page, 'Belege und Daten').click()
+  await teil(page, 'Unternehmen').click()
+  await expect(page.getByLabel('Eingeführt am')).toHaveValue('2024-03-01')
+  await teil(page, 'Dokumente').click()
+  await page.getByRole('tab', { name: 'Verarbeitungsverzeichnis' }).click()
+  await expect(page.getByRole('tabpanel').getByRole('row', { name: /Eingeführt am/ })).toContainText('01.03.2024')
+})

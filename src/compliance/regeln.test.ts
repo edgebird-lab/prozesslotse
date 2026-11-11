@@ -419,3 +419,12 @@ describe('Versionen V1–V3', () => {
     expect(regeln(pruefe(await mitVersion('2024-01-01')), 'V2')).toEqual([])
   })
 })
+
+describe('Durchsicht: ausgeblendeter Dienstleister', () => {
+  it('meldet S2 und S3 nicht für ein System auf eigenen Geräten mit altem Dienstleister', () => {
+    const c = mitAngaben((x) => Object.assign(x.systeme.med_erp, { betrieb: 'lokal', standort: 'unbekannt' }))
+    const befunde = pruefe(c)
+    expect(regeln(befunde, 'S2')).toEqual([])
+    expect(regeln(befunde, 'S3')).toEqual([])
+  })
+})

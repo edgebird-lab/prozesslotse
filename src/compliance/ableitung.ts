@@ -55,8 +55,9 @@ export function vorigeAufgabe(p: Prozess, aufgabeId: Id): Aufgabe | null {
   return null
 }
 
+/** Cloud-Dienst oder benannter Betreiber; auf eigenen Geräten zählt ein (ausgeblendeter) Name nicht. */
 export function mitDienstleister(s: SystemAngaben): boolean {
-  return s.betrieb === 'cloud' || s.dienstleister.trim() !== ''
+  return s.betrieb === 'cloud' || (s.betrieb !== 'lokal' && s.dienstleister.trim() !== '')
 }
 
 export interface Kontext {

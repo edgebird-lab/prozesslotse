@@ -60,3 +60,10 @@ describe('Gliederung', () => {
     expect(gliederung(dok(BASIS)).map((g) => g.nummer)).toEqual(['1', '2', '2.1', '2.2', '4', '4.1', '4.2', '7'])
   })
 })
+
+describe('Vergleich: Reihenfolge der Schlüssel', () => {
+  it('meldet nichts, wenn eine Datei die Schlüssel anders sortiert', () => {
+    const umgedreht = BASIS.map((a) => Object.fromEntries(Object.entries(a).reverse()) as Abschnitt)
+    expect(geaenderteKapitelIn(dok(BASIS), dok(umgedreht))).toEqual([])
+  })
+})

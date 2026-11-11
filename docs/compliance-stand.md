@@ -65,7 +65,7 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Phase 7 – Browsertests, Doku, Abnahme
 
-- [x] 7.1 Browsertests 1 bis 8 aus 9.10 und weitere in `e2e/dokumentieren.spec.ts` (13 Tests, axe hell und dunkel)
+- [x] 7.1 Browsertests 1 bis 8 aus 9.10 und weitere in `e2e/dokumentieren.spec.ts` (14 Tests, axe hell und dunkel)
 - [x] 7.2 README, `datenmodell.md`, `fragenkatalog.md`, Bild `docs/bilder/dokumente.png` (die übrigen README-Bilder zeigen noch sechs Schritte, siehe unten)
 - [ ] 7.3 Ausgabe an Steuerberatung und Datenschutz (Robin)
 - [ ] 7.4 Rückmeldungen einarbeiten (Robin)

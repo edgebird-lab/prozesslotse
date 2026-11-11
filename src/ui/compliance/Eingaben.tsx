@@ -4,6 +4,7 @@
  * Mehrfachauswahl, Datum, optionale Zahl und Ja/Nein/Weiß nicht.
  */
 import { useId, useState, type ReactNode } from 'react'
+import { istPlausiblesDatum } from '../../compliance/datum'
 import type { Eintrag } from '../../compliance/standard'
 import { Auswahl } from '../Eingaben'
 import { useApp } from '../kontext'
@@ -89,8 +90,31 @@ export function OptionaleZahl({ wert, onAendern, id, ariaLabel, min = 0, max = 1
   )
 }
 
+/**
+ * Datum; übernommen werden nur gültige Daten zwischen 1900 und 2199. Beim Tippen des Jahres entstehen
+ * Zwischenstände (z. B. 0002) oder fünfstellige Jahre; sie bleiben in der Eingabe und gelangen nicht in die Angaben.
+ */
 export function DatumEingabe({ wert, onAendern, id, ariaLabel }: { wert: string | null; onAendern: (d: string | null) => void; id?: string; ariaLabel?: string }) {
-  return <input id={id} type="date" className="datum" aria-label={ariaLabel} value={wert ?? ''} onChange={(e) => onAendern(e.target.value || null)} />
+  const [text, setText] = useState<string | null>(null)
+  return (
+    <input
+      id={id}
+      type="date"
+      className="datum"
+      min="1900-01-01"
+      max="2199-12-31"
+      aria-label={ariaLabel}
+      value={text ?? wert ?? ''}
+      onFocus={() => setText(wert ?? '')}
+      onBlur={() => setText(null)}
+      onChange={(e) => {
+        const d = e.target.value
+        setText(d)
+        if (d === '') onAendern(null)
+        else if (istPlausiblesDatum(d)) onAendern(d)
+      }}
+    />
+  )
 }
 
 export function DatumFeld({ label, wert, onAendern, id }: { label: ReactNode; wert: string | null; onAendern: (d: string | null) => void; id?: string }) {

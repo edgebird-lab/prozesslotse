@@ -72,7 +72,7 @@ export function FreigabeDialog({
     >
       <form className="felder" onSubmit={(ev) => void absenden(ev)}>
         <h2 id={titelId}>Version freigeben</h2>
-        <p className="leise">Die Freigabe friert beide Dokumente und den Ist-Prozess ein. Freigegebene Versionen lassen sich nicht mehr ändern oder löschen.</p>
+        <p className="leise">Die Freigabe friert beide Dokumente und den Ist-Prozess ein. Freigegebene Versionen lassen sich nicht mehr ändern oder löschen; auch „Rückgängig“ nimmt eine Freigabe nicht zurück.</p>
         <div className="feldreihe">
           <TextFeld label="Bezeichnung" wert={e.bezeichnung} onAendern={(bezeichnung) => setE({ ...e, bezeichnung })} />
           <CFeld label="Gültig ab">{(id) => <DatumEingabe id={id} wert={e.gueltigAb} onAendern={(d) => setE({ ...e, gueltigAb: d ?? '' })} />}</CFeld>

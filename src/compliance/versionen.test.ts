@@ -132,3 +132,13 @@ describe('Laden von Versionen (9.9)', () => {
     expect(() => leseProjekt(abschnitt)).toThrow('‚versionen.0.verzeichnis.abschnitte.2.art‘')
   })
 })
+
+describe('Durchsicht: Dokumentarten in Versionen', () => {
+  it('lehnt vertauschte Dokumente ab', async () => {
+    const { c } = await mitErsterVersion()
+    const d = JSON.parse(alsJson({ ...beispielMitCompliance(), compliance: c }))
+    const v = d.compliance.versionen[0]
+    ;[v.verfahrensdoku, v.verzeichnis] = [v.verzeichnis, v.verfahrensdoku]
+    expect(() => leseProjekt(d)).toThrow('‚versionen.0.verfahrensdoku.art‘ muss „verfahrensdokumentation“ sein')
+  })
+})
