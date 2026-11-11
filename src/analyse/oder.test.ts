@@ -7,7 +7,7 @@ import { BpmnModdle } from 'bpmn-moddle'
 import { erzeugeBpmn } from '../bpmn/export'
 import { graphAusLayout, pruefeSoundness, zaehleAusfuehrungen } from '../bpmn/tokenspiel'
 import { neueAufgabe, neueOder, neuerOderZweig, neuerProzess, neueRolle } from '../modell/bausteine'
-import { durchlaufe } from '../modell/operationen'
+import { durchlaufe, oderZiehung } from '../modell/operationen'
 import { pruefeProzess } from '../modell/pruefung'
 import type { Aufgabe, Block, Oder, Prozess } from '../modell/typen'
 import { graphAusXml } from '../testhilfen/bpmn-graph'
@@ -69,13 +69,51 @@ describe('ODER-Verzweigung', () => {
   it('meldet fehlende Standardwege und typische Bedienfehler', () => {
     const arten = (o: Oder) => pruefeProzess(prozess([o])).map((x) => x.schluessel.split(':')[0])
     const zwei = (a: number, b: number) => [neuerOderZweig('A', a, { schritte: [aufgabe('A prüfen', 1)] }), neuerOderZweig('B', b, { schritte: [aufgabe('B prüfen', 1)] })]
-    const ohneStandard = neueOder({ frage: 'Welche?', zweige: zwei(0.5, 0.5), standard: null })
-    expect(arten(ohneStandard)).toContain('keiner')
-    expect(arten(ohneStandard)).toContain('wie-entweder')
+    // ohne Standardweg heißt es „mindestens einer“: zusammen unter 100 % ist ein Fehler, genau 100 % wie Entweder-oder
+    const zuWenig = neueOder({ frage: 'Welche?', zweige: zwei(0.4, 0.5), standard: null })
+    expect(arten(zuWenig)).toContain('keiner')
+    const genau = neueOder({ frage: 'Welche?', zweige: zwei(0.5, 0.5), standard: null })
+    expect(arten(genau)).not.toContain('keiner')
+    expect(arten(genau)).toContain('wie-entweder')
+    expect(arten(neueOder({ frage: 'Welche?', zweige: zwei(0.7, 0.6), standard: null }))).not.toContain('keiner')
     const immer = neueOder({ frage: 'Welche?', zweige: zwei(1, 1), standard: null })
     expect(arten(immer)).toContain('immer-alle')
     expect(arten(immer)).not.toContain('keiner')
     expect(pruefeProzess(prozess([unterlagen().o])).filter((x) => x.schwere === 'fehler')).toEqual([])
+  })
+
+  it('rechnet „mindestens einer“ ohne Standardweg mit den eingegebenen Häufigkeiten', () => {
+    // A 70 %, B 60 %, nie keiner: beide zugleich in 0,7 + 0,6 − 1 = 30 %, nur A 40 %, nur B 30 %
+    const a = aufgabe('Gehaltsnachweis anfordern', 30)
+    const b = aufgabe('Ausweis anfordern', 60)
+    const o = neueOder({ frage: 'Welche Unterlagen fehlen?', zweige: [neuerOderZweig('Gehalt', 0.7, { schritte: [a] }), neuerOderZweig('Ausweis', 0.6, { schritte: [b] })], standard: null })
+    const zug = oderZiehung(o)
+    expect(zug.ausschliessend).toBe(false)
+    expect(zug.z).toBeCloseTo(0.3 / 0.42, 9)
+    expect(zug.r[0]).toBeCloseTo(0.5, 9)
+    const p = prozess([o])
+    const k = berechneKennzahlen(p)
+    expect(k.schritte.get(a.id)?.haeufigkeit).toBeCloseTo(0.7, 9)
+    expect(k.schritte.get(b.id)?.haeufigkeit).toBeCloseTo(0.6, 9)
+    expect(k.durchlaufzeitMin).toBeCloseTo(0.4 * 30 + 0.3 * 60 + 0.3 * 60, 6)
+    const sim = simuliere(p, 40_000, 3)
+    expect(Math.abs(sim.mittelMin - 48)).toBeLessThan(4 * standardfehler(sim.zeiten) + 0.1)
+    // Tokenspiel würfelt genauso: leere Auswahl wird neu gewürfelt
+    const { layout } = erzeugeBpmn(p)
+    const anteil = new Map(layout.kanten.filter((e) => e.anteil !== undefined).map((e) => [e.id, e.anteil!]))
+    const n = zaehleAusfuehrungen(graphAusLayout(layout), anteil, 20_000, zufallMitStartwert(4))
+    expect(n.get(a.id)).toBeCloseTo(0.7, 1)
+    expect(n.get(b.id)).toBeCloseTo(0.6, 1)
+  })
+
+  it('behandelt zusammen höchstens 100 % ohne Standardweg als „genau einer“', () => {
+    const a = aufgabe('A', 30)
+    const b = aufgabe('B', 60)
+    const o = neueOder({ frage: 'Welche?', zweige: [neuerOderZweig('A', 0.5, { schritte: [a] }), neuerOderZweig('B', 0.5, { schritte: [b] })], standard: null })
+    expect(oderZiehung(o).ausschliessend).toBe(true)
+    const p = prozess([o])
+    expect(berechneKennzahlen(p).durchlaufzeitMin).toBeCloseTo(45, 6)
+    expect(simuliere(p, 20_000, 8).mittelMin).toBeCloseTo(45, 0)
   })
 
   it('exportiert ein inklusives Gateway mit Standardfluss, das bpmn-moddle liest', async () => {

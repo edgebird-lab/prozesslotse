@@ -8,7 +8,7 @@
  * bleiben, werden sie zusammengefasst; das geschieht mittelwerttreu, so dass
  * Erwartungswerte von Summen exakt bleiben.
  */
-import { oderWahrscheinlichkeiten } from '../modell/operationen'
+import { oderZiehung } from '../modell/operationen'
 import type { Block, Id, Oder } from '../modell/typen'
 
 export interface Verteilung {
@@ -195,29 +195,54 @@ function verteilungBlock(b: Block, art: Zeitart): Ergebnis {
  * gewählten. Läuft keiner, nimmt der Standardweg die Masse bei 0 ein.
  */
 export function verteilungOder(b: Oder, art: Zeitart): Verteilung {
-  const p = oderWahrscheinlichkeiten(b)
+  const zug = oderZiehung(b)
   const iStandard = b.zweige.findIndex((z) => z.id === b.standard)
-  const mischungen: Verteilung[] = []
-  b.zweige.forEach((z, i) => {
-    if (i === iStandard) return
-    const d = verteilungSequenz(z.schritte, art).weiter
+  const vollstaendig = (i: number): Verteilung => {
+    const d = verteilungSequenz(b.zweige[i].schritte, art).weiter
     const m = masse(d)
-    // vollständige Verteilung des Wegs (Masse 1), dann mit „läuft nicht“ bei 0 mischen
-    mischungen.push(addiere(skaliere(d, m > 0 ? p[i] / m : 0), punkt(0, 1 - p[i])))
-  })
-  let ergebnis = mischungen.length > 0 ? maximum(mischungen) : punkt(0)
-  if (iStandard >= 0 && p[iStandard] > 0) {
-    // „Keiner läuft“ liegt bei 0 mit Masse q; dort läuft stattdessen der Standardweg
-    const q = p[iStandard]
-    const wert = [...ergebnis.wert]
-    const masseListe = [...ergebnis.masse]
-    const null0 = wert.findIndex((w) => Math.abs(w) < 1e-9)
-    if (null0 >= 0) masseListe[null0] = Math.max(0, masseListe[null0] - q)
-    const d = verteilungSequenz(b.zweige[iStandard].schritte, art).weiter
-    const m = masse(d)
-    ergebnis = addiere({ wert, masse: masseListe }, skaliere(d, m > 0 ? q / m : 0))
+    return m > 0 ? skaliere(d, 1 / m) : punkt(0)
   }
-  return ergebnis
+  if (zug.ausschliessend) {
+    // Grenzfall: genau ein Weg läuft
+    let ergebnis = leer()
+    b.zweige.forEach((_, i) => {
+      if (zug.r[i] > 0) ergebnis = addiere(ergebnis, skaliere(vollstaendig(i), zug.r[i]))
+    })
+    return ergebnis
+  }
+  const mischungen: Verteilung[] = []
+  b.zweige.forEach((_, i) => {
+    if (i === iStandard) return
+    // jeder Weg unabhängig: mit rᵢ seine Dauer, sonst 0
+    mischungen.push(addiere(skaliere(vollstaendig(i), zug.r[i]), punkt(0, 1 - zug.r[i])))
+  })
+  const roh = mischungen.length > 0 ? maximum(mischungen) : punkt(0)
+  // „Keiner läuft“ liegt bei 0 mit Masse 1 − Z
+  const ohneLeer = entferneNullmasse(roh, 1 - zug.z)
+  if (iStandard >= 0) return addiere(ohneLeer, skaliere(vollstaendig(iStandard), 1 - zug.z))
+  // ohne Standardweg: auf „mindestens einer“ bedingen
+  return zug.z > 0 ? skaliere(ohneLeer, 1 / zug.z) : ohneLeer
+}
+
+/**
+ * Nimmt Masse q beim Wert 0 heraus. Hat das Zusammenfassen den Wert 0 mit
+ * kleinen Werten verschmolzen, wird der Wert so verschoben, dass der
+ * Erwartungswert exakt bleibt.
+ */
+function entferneNullmasse(v: Verteilung, q: number): Verteilung {
+  if (q <= 0 || v.wert.length === 0) return v
+  const wert = [...v.wert]
+  const masseListe = [...v.masse]
+  const m0 = masseListe[0]
+  const rest = m0 - q
+  if (rest <= 1e-12) {
+    wert.shift()
+    masseListe.shift()
+  } else {
+    wert[0] = (wert[0] * m0) / rest
+    masseListe[0] = rest
+  }
+  return { wert, masse: masseListe }
 }
 
 export function erwartungOder(b: Oder, art: Zeitart): number {

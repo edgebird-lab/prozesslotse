@@ -11,11 +11,14 @@
  *   Breite seines Blocks reserviert ist.
  *
  * Kanten verlaufen waagerecht in der Spur ihres Startknotens und senkrecht
- * nur in den Lücken zwischen Spalten. Weil Bänder reserviert sind und Lücken
- * frei bleiben, kreuzt eine Kante keinen fremden Knoten. Rückflüsse von
- * Wiederholungen laufen über eine schmale Extraspur unter dem Körper.
+ * nur in den Lücken zwischen Spalten oder unter der eigenen Raute. Weil
+ * Bänder reserviert sind und Lücken frei bleiben, kreuzt eine Kante keinen
+ * fremden Knoten. Rückflüsse von Wiederholungen laufen über schmale
+ * Extraspuren unter dem Körper. Wie die Linien genau laufen, damit sich keine
+ * zwei eine Strecke teilen, legt `linien.ts` fest.
  */
-import { durchlaufe, oderWahrscheinlichkeiten } from '../modell/operationen'
+import { durchlaufe, oderWahrscheinlichkeiten, oderZiehung } from '../modell/operationen'
+import { fuehreLinien, type NachrichtAuftrag } from './linien'
 import { type Aufgabe, type Block, type EntscheidungsZweig, type Id, type OderZweig, type Prozess, type Sequenz, type Wiederholung } from '../modell/typen'
 import { formatiereProzent } from '../modell/zeit'
 
@@ -54,6 +57,8 @@ export interface LayoutKnoten extends Rechteck {
   spalte: number
   spur: number
   richtung?: 'auf' | 'zu'
+  /** ODER-Verzweigung ohne Standardweg: Eine leere Auswahl kommt nicht vor (für das Tokenspiel). */
+  mindestensEiner?: boolean
   aufgabe?: Aufgabe
   ereignis?: 'nachricht' | 'zeit' | 'bedingung' | null
   beschriftung?: Rechteck
@@ -63,7 +68,7 @@ export interface LayoutKnoten extends Rechteck {
   von?: Id | null
 }
 
-interface Spur {
+export interface Spur {
   bahn: string
   spur: number
 }
@@ -314,6 +319,9 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
   t.knoten.push(knoten({ id: aufId, art: artAuf, name: b.typ === 'parallel' ? '' : b.frage, blockId: b.id, bahn, spalte: 0, spur: 0, richtung: 'auf' }))
   t.eintritt = aufId
   const oderAnteile = b.typ === 'oder' ? oderWahrscheinlichkeiten(b) : []
+  // Am Fluss steht die Wahrscheinlichkeit des unabhängigen Wurfs; das Tokenspiel würfelt damit wie die Simulation.
+  const oderWurf = b.typ === 'oder' ? oderZiehung(b).r : []
+  if (b.typ === 'oder' && b.standard === null) t.knoten[0].mindestensEiner = true
 
   // Der Standardweg einer ODER-Verzweigung steht oben auf der geraden Linie; so gehört sein Querstrich eindeutig zu ihm.
   const reihenfolge = (b.zweige as (Sequenz | EntscheidungsZweig | OderZweig)[]).map((z, zi) => ({ z, zi }))
@@ -348,9 +356,9 @@ function layoutVerzweigung(b: Extract<Block, { typ: 'entscheidung' | 'parallel' 
         : oz
           ? standard
             ? `Wenn keiner der anderen Wege zutrifft (${formatiereProzent(oderAnteile[zi], 1)} der Fälle)`
-            : `Kommt in ${formatiereProzent(oz.anteil, 1)} der Fälle vor, unabhängig von den anderen Wegen`
+            : `Kommt in ${formatiereProzent(oz.anteil, 1)} der Fälle vor`
           : '',
-      anteil: ez?.anteil ?? (oz && !standard ? oderAnteile[zi] : undefined),
+      anteil: ez?.anteil ?? (oz && !standard ? oderWurf[zi] : undefined),
       standard: standard || undefined,
       leer,
       endet: ez?.ende != null,
@@ -435,7 +443,15 @@ function layoutWiederholung(b: Wiederholung, bahn: string, ctx: Kontext): Teil {
     if (koerper.eintritt) t.kanten.push(kante(ctx, einId, koerper.eintritt))
     const eigene = t.spruenge.filter((s) => s.ziel === b.id)
     t.spruenge = t.spruenge.filter((s) => s.ziel !== b.id)
-    for (const s of eigene) t.kanten.push(kante(ctx, s.von, einId, { name: s.name, doku: s.doku, anteil: s.anteil, sprung: { bahn, spur: rueckSpur } }))
+    // Jeder Rücksprung bekommt eine eigene Extraspur, damit sich keine zwei eine Strecke teilen.
+    // Der weiteste liegt am tiefsten; so schachteln sich die Linien, ohne sich zu kreuzen.
+    const lage = (id: string) => t.knoten.find((k) => k.id === id) ?? { spalte: 0, spur: 0 }
+    const sortiert = [...eigene].sort((x, y) => lage(x.von).spalte - lage(y.von).spalte || lage(y.von).spur - lage(x.von).spur)
+    for (const s of eigene) {
+      const spur = rueckSpur + sortiert.indexOf(s)
+      t.kanten.push(kante(ctx, s.von, einId, { name: s.name, doku: s.doku, anteil: s.anteil, sprung: { bahn, spur } }))
+    }
+    belege(t, bahn, rueckSpur + Math.max(1, eigene.length))
     t.austritt = koerper.eintritt ? koerper.austritt : { knoten: einId, name: '', doku: '' }
     t.austrittsBahn = koerper.eintritt ? koerper.austrittsBahn : bahn
     t.breite = breite + 1
@@ -533,18 +549,16 @@ export function berechneLayout(p: Prozess): Layout {
 
   const maxSpalte = Math.max(0, ...t.knoten.map((k) => k.spalte))
   const inhaltX = 2 * MASSE.kopf + MASSE.rand
-  const poolBreite = inhaltX + (maxSpalte + 1) * MASSE.spalte + MASSE.rand
   const bahnen: LayoutBahn[] = []
   const bahnOben = new Map<string, number>()
   let y = 0
   for (const bahn of reihenfolge) {
     const hoehe = 2 * MASSE.bahnPolster + (spurHoehen.get(bahn) ?? []).reduce((s, h) => s + h, 0)
     const rolle = p.rollen.find((r) => r.id === bahn)
-    bahnen.push({ schluessel: bahn, name: rolle ? rolle.name || 'Unbenannte Rolle' : 'Ohne Rolle', rolleId: rolle?.id ?? null, x: MASSE.kopf, y, breite: poolBreite - MASSE.kopf, hoehe })
+    bahnen.push({ schluessel: bahn, name: rolle ? rolle.name || 'Unbenannte Rolle' : 'Ohne Rolle', rolleId: rolle?.id ?? null, x: MASSE.kopf, y, breite: 0, hoehe })
     bahnOben.set(bahn, y)
     y += hoehe
   }
-  const pool: Rechteck = { x: 0, y: 0, breite: poolBreite, hoehe: y }
 
   const spurMitte = (s: Spur): number => {
     const hoehen = spurHoehen.get(s.bahn) ?? []
@@ -552,14 +566,54 @@ export function berechneLayout(p: Prozess): Layout {
     for (let i = 0; i < s.spur; i++) oben += hoehen[i] ?? MASSE.spurDuenn
     return oben + (hoehen[s.spur] ?? MASSE.spurDuenn) / 2
   }
-  const spalteMitte = (spalte: number): number => inhaltX + spalte * MASSE.spalte + MASSE.spalte / 2
+  const spalteBasis = (spalte: number): number => inhaltX + spalte * MASSE.spalte + MASSE.spalte / 2
+
+  // Höhe und Größe der Knoten; die x-Lage folgt aus der Linienführung (volle Lücken werden breiter)
+  const belegt = new Map<number, number>()
+  for (const k of t.knoten) {
+    const g = groesse(k.art)
+    const cy = spurMitte({ bahn: k.bahn, spur: k.spur })
+    Object.assign(k, { y: cy - g.hoehe / 2, breite: g.breite, hoehe: g.hoehe })
+    const beschriftungHalb = k.name && k.art !== 'aufgabe' ? Math.min(MASSE.beschriftungBreite, textBreite(k.name)) / 2 : 0
+    belegt.set(k.spalte, Math.max(belegt.get(k.spalte) ?? 0, g.breite / 2, beschriftungHalb))
+  }
+  // senkrechte Ausdehnung je Knoten samt Beschriftung (Gateways oben, Ereignisse unten)
+  const ausdehnung = new Map(
+    t.knoten.map((k) => {
+      const h = k.name && k.art !== 'aufgabe' ? zeilen(k.name) * MASSE.zeile + 6 : 0
+      return [k.id, istGateway(k.art) ? [k.y - h, k.y + k.hoehe] : [k.y, k.y + k.hoehe + h]] as const
+    }),
+  )
+  const spalteFrei = (spalte: number, y1: number, y2: number, ausser: string[]): boolean =>
+    t.knoten.every((k) => {
+      if (k.spalte !== spalte || ausser.includes(k.id)) return true
+      const [oben, unten] = ausdehnung.get(k.id)!
+      return unten + 4 <= y1 || oben - 4 >= y2
+    })
+  const pools = externePools(p, { x: 0, y: 0, breite: 0, hoehe: y })
+  const auftraege = nachrichtAuftraege(t.knoten, pools)
+  const linien = fuehreLinien({
+    knoten: t.knoten,
+    kanten: t.kanten,
+    nachrichten: auftraege,
+    spurMitte,
+    belegt,
+    maxSpalte,
+    spalteMitte: spalteBasis,
+    linkerRand: 2 * MASSE.kopf,
+    rechterRand: MASSE.spalte / 2 + MASSE.rand,
+    spalteFrei,
+  })
+
+  const poolBreite = linien.spalteMitte(maxSpalte) + MASSE.spalte / 2 + MASSE.rand + linien.zusatzRechts
+  for (const b of bahnen) b.breite = poolBreite - MASSE.kopf
+  for (const pl of pools) pl.breite = poolBreite
+  const pool: Rechteck = { x: 0, y: 0, breite: poolBreite, hoehe: y }
 
   const nachId = new Map<string, LayoutKnoten>()
   for (const k of t.knoten) {
-    const g = groesse(k.art)
-    const cx = spalteMitte(k.spalte)
-    const cy = spurMitte({ bahn: k.bahn, spur: k.spur })
-    Object.assign(k, { x: cx - g.breite / 2, y: cy - g.hoehe / 2, breite: g.breite, hoehe: g.hoehe })
+    const cx = linien.spalteMitte(k.spalte)
+    k.x = cx - k.breite / 2
     if (k.name && k.art !== 'aufgabe') {
       const oben = istGateway(k.art)
       const h = zeilen(k.name) * MASSE.zeile
@@ -568,15 +622,14 @@ export function berechneLayout(p: Prozess): Layout {
     nachId.set(k.id, k)
   }
 
-  for (const e of t.kanten) {
-    const a = nachId.get(e.von)!
-    const z = nachId.get(e.nach)!
-    e.punkte = wegpunkte(e, a, z, spurMitte)
-    if (e.name) e.beschriftung = beschriftungFuer(e, a, e.ueber ? spurMitte(e.ueber) : null)
-  }
+  for (const e of t.kanten) e.punkte = linien.kanten.get(e.id) ?? []
 
-  const pools = externePools(p, pool)
-  return { knoten: t.knoten, kanten: t.kanten, bahnen, pool, pools, nachrichten: nachrichtenfluesse(t.knoten, pools) }
+  const nachrichten: LayoutNachricht[] = auftraege.map((n) => {
+    const pl = pools.find((x) => x.teilnehmerId === (n.richtung === 'an' ? n.knoten.an : n.knoten.von))!
+    return { id: n.id, von: n.richtung === 'an' ? n.knoten.id : pl.id, nach: n.richtung === 'an' ? pl.id : n.knoten.id, punkte: linien.nachrichten.get(n.id) ?? [] }
+  })
+  platziereBeschriftungen(t.knoten, t.kanten, nachrichten, pools, spurMitte)
+  return { knoten: t.knoten, kanten: t.kanten, bahnen, pool, pools, nachrichten }
 }
 
 const POOL_HOEHE = 60
@@ -596,129 +649,129 @@ function externePools(p: Prozess, haupt: Rechteck): LayoutPool[] {
   return pools
 }
 
-/**
- * Nachrichtenflüsse: vom Element ein kurzes Stück zum Pool hin, dann waagerecht
- * in die Spaltenlücke (ausgehend rechts, eingehend links) und dort senkrecht zum
- * Pool. In Spaltenlücken stehen nie Knoten, deshalb kreuzt die Linie keinen.
- */
-function nachrichtenfluesse(knotenListe: LayoutKnoten[], pools: LayoutPool[]): LayoutNachricht[] {
-  const liste: LayoutNachricht[] = []
+/** Nachrichtenflüsse je Knoten und Richtung; die Linien legt `fuehreLinien` fest. */
+function nachrichtAuftraege(knotenListe: LayoutKnoten[], pools: LayoutPool[]): NachrichtAuftrag[] {
+  const liste: NachrichtAuftrag[] = []
   for (const k of knotenListe) {
     const beide = !!k.an && !!k.von
     for (const richtung of ['von', 'an'] as const) {
       const tn = richtung === 'an' ? k.an : k.von
       const pl = tn ? pools.find((x) => x.teilnehmerId === tn) : undefined
       if (!pl) continue
-      const m = mitte(k)
-      const x = beide ? m.x + (richtung === 'an' ? 15 : -15) : m.x
       const oben = pl.lage === 'oben'
-      const rand = oben ? k.y : k.y + k.hoehe
-      const stummel = oben ? rand - 8 : rand + 8
-      const lueckeX = m.x + (richtung === 'an' ? MASSE.spalte / 2 : -MASSE.spalte / 2)
-      const poolRand = oben ? pl.y + pl.hoehe : pl.y
-      const weg: Punkt[] = [
-        { x, y: rand },
-        { x, y: stummel },
-        { x: lueckeX, y: stummel },
-        { x: lueckeX, y: poolRand },
-      ]
       liste.push({
         id: `Nachricht_${liste.length + 1}`,
-        von: richtung === 'an' ? k.id : pl.id,
-        nach: richtung === 'an' ? pl.id : k.id,
-        punkte: richtung === 'an' ? weg : weg.reverse(),
+        knoten: k,
+        poolRand: oben ? pl.y + pl.hoehe : pl.y,
+        oben,
+        richtung,
+        dx: beide ? (richtung === 'an' ? 15 : -15) : 0,
       })
     }
   }
   return liste
 }
 
-function mitte(r: Rechteck): Punkt {
-  return { x: r.x + r.breite / 2, y: r.y + r.hoehe / 2 }
-}
-
 function gleich(a: number, b: number): boolean {
   return Math.abs(a - b) < 0.5
 }
 
-/** Verzweigendes Gateway: untere Wege treten unten aus der Raute aus (übliche BPMN-Darstellung). */
-function istVerzweigung(k: LayoutKnoten): boolean {
-  return istGateway(k.art) && k.richtung === 'auf'
+function ueberlappt(a: Rechteck, b: Rechteck): boolean {
+  return a.x < b.x + b.breite - 1 && b.x < a.x + a.breite - 1 && a.y < b.y + b.hoehe - 1 && b.y < a.y + a.hoehe - 1
 }
 
-function istZusammenfuehrung(k: LayoutKnoten): boolean {
-  return istGateway(k.art) && k.richtung === 'zu'
+function stueckSchneidet(p: Punkt, q: Punkt, r: Rechteck): boolean {
+  return Math.min(p.x, q.x) < r.x + r.breite - 1 && Math.max(p.x, q.x) > r.x + 1 && Math.min(p.y, q.y) < r.y + r.hoehe - 1 && Math.max(p.y, q.y) > r.y + 1
 }
 
-function wegpunkte(e: LayoutKante, a: LayoutKnoten, z: LayoutKnoten, spurMitte: (s: Spur) => number): Punkt[] {
-  const ma = mitte(a)
-  const mz = mitte(z)
-  if (e.sprung) {
-    // aus dem Zweig nach rechts in die Spaltenlücke, hinunter zur Extraspur, zurück und von unten in die Zusammenführung
-    const y = spurMitte(e.sprung)
-    const g = ma.x + MASSE.spalte / 2
-    return [
-      { x: a.x + a.breite, y: ma.y },
-      { x: g, y: ma.y },
-      { x: g, y },
-      { x: mz.x, y },
-      { x: mz.x, y: z.y + z.hoehe },
-    ]
-  }
-  if (e.rueck) {
-    const y = spurMitte(e.rueck)
-    return [
-      { x: ma.x, y: a.y + a.hoehe },
-      { x: ma.x, y },
-      { x: mz.x, y },
-      { x: mz.x, y: z.y + z.hoehe },
-    ]
-  }
-  const ax = a.x + a.breite
-  const zx = z.x
-  // Innerhalb einer Bahn gehören die Spuren unter Verzweigung und Zusammenführung dem Block;
-  // dort darf eine Kante senkrecht unter der Raute laufen, ohne fremde Knoten zu kreuzen.
-  const untenAus = istVerzweigung(a) && (e.ueber ? e.ueber.bahn === a.bahn && spurMitte(e.ueber) > ma.y + 1 : z.bahn === a.bahn && mz.y > ma.y + 1)
-  const untenRein = istZusammenfuehrung(z) && (e.ueber ? e.ueber.bahn === z.bahn && spurMitte(e.ueber) > mz.y + 1 : a.bahn === z.bahn && ma.y > mz.y + 1)
-  if (untenAus || untenRein) {
-    const y = e.ueber ? spurMitte(e.ueber) : untenAus ? mz.y : ma.y
-    const punkte: Punkt[] = untenAus ? [{ x: ma.x, y: a.y + a.hoehe }, { x: ma.x, y }] : [{ x: ax, y: ma.y }]
-    if (untenRein) {
-      if (!gleich(punkte[punkte.length - 1].y, y)) {
-        const g = ma.x + MASSE.spalte / 2
-        punkte.push({ x: g, y: punkte[punkte.length - 1].y }, { x: g, y })
+/** Mögliche Plätze für die Beschriftung einer Kante, entlang ihrer eigenen Linie vom Start an. */
+function plaetzeEntlang(e: LayoutKante): Rechteck[] {
+  const breite = Math.min(MASSE.beschriftungBreite, textBreite(e.name))
+  const hoehe = zeilen(e.name) * MASSE.zeile
+  const feld = (x: number, y: number): Rechteck => ({ x, y, breite, hoehe })
+  const plaetze: Rechteck[] = []
+  for (let i = 0; i + 1 < e.punkte.length; i++) {
+    const p = e.punkte[i]
+    const q = e.punkte[i + 1]
+    if (gleich(p.y, q.y)) {
+      const rechts = q.x > p.x
+      const amStart = rechts ? p.x + 4 : p.x - 4 - breite
+      const amEnde = rechts ? q.x - 4 - breite : q.x + 4
+      plaetze.push(feld(amStart, p.y - 3 - hoehe), feld(amStart, p.y + 3), feld(amEnde, p.y - 3 - hoehe), feld(amEnde, p.y + 3))
+      // weiter entlang des Stücks
+      for (const t of [0.25, 0.5, 0.75]) {
+        const x = amStart + (amEnde - amStart) * t
+        plaetze.push(feld(x, p.y - 3 - hoehe), feld(x, p.y + 3))
       }
-      punkte.push({ x: mz.x, y }, { x: mz.x, y: z.y + z.hoehe })
-    } else if (gleich(y, mz.y)) {
-      punkte.push({ x: zx, y: mz.y })
     } else {
-      const g = mz.x - MASSE.spalte / 2
-      punkte.push({ x: g, y }, { x: g, y: mz.y }, { x: zx, y: mz.y })
+      const oben = Math.min(p.y, q.y)
+      const unten = Math.max(p.y, q.y)
+      plaetze.push(feld(p.x + 4, oben + 3), feld(p.x - 4 - breite, oben + 3), feld(p.x + 4, unten - 3 - hoehe), feld(p.x - 4 - breite, unten - 3 - hoehe))
+      for (const t of [0.25, 0.5, 0.75]) {
+        const y = oben + 3 + (unten - oben - 6 - hoehe) * t
+        plaetze.push(feld(p.x + 4, y), feld(p.x - 4 - breite, y))
+      }
     }
-    return punkte
   }
-  if (e.ueber) {
-    const y = spurMitte(e.ueber)
-    const punkte: Punkt[] = [{ x: ax, y: ma.y }]
-    if (!gleich(y, ma.y)) {
-      const g = ma.x + MASSE.spalte / 2
-      punkte.push({ x: g, y: ma.y }, { x: g, y })
-    }
-    if (!gleich(y, mz.y)) {
-      const g = mz.x - MASSE.spalte / 2
-      punkte.push({ x: g, y }, { x: g, y: mz.y })
-    }
-    punkte.push({ x: zx, y: mz.y })
-    return punkte
+  return plaetze
+}
+
+/**
+ * Beschriftungen der Flüsse: Bevorzugt steht sie am gewohnten Platz (über dem
+ * ersten waagerechten Stück, rechts der Ecke). Liegt dort eine Linie, ein Knoten
+ * oder eine andere Beschriftung, nimmt sie den ersten freien Platz entlang ihrer
+ * eigenen Linie.
+ */
+function platziereBeschriftungen(knoten: LayoutKnoten[], kanten: LayoutKante[], nachrichten: LayoutNachricht[], pools: LayoutPool[], spurMitte: (s: Spur) => number): void {
+  const nachId = new Map(knoten.map((k) => [k.id, k]))
+  const feste: Rechteck[] = [...knoten, ...pools]
+  const linien = [...kanten.map((e) => e.punkte), ...nachrichten.map((n) => n.punkte)]
+  const platziert: Rechteck[] = []
+  const waehle = (plaetze: Rechteck[], eigen: Rechteck | null): Rechteck => {
+    let bester = plaetze[0]
+    let besteKosten = Infinity
+    plaetze.forEach((r, i) => {
+      let kosten = i * 0.001
+      if (r.x < 2 * MASSE.kopf) kosten += 1000
+      for (const h of feste) if (h !== eigen && ueberlappt(r, h)) kosten += 1000
+      for (const h of platziert) if (ueberlappt(r, h)) kosten += 100
+      for (const punkte of linien) {
+        for (let j = 1; j < punkte.length; j++) {
+          if (stueckSchneidet(punkte[j - 1], punkte[j], r)) {
+            kosten += 10
+            break
+          }
+        }
+      }
+      if (kosten < besteKosten) {
+        besteKosten = kosten
+        bester = r
+      }
+    })
+    platziert.push(bester)
+    return bester
   }
-  if (gleich(ma.y, mz.y)) return [{ x: ax, y: ma.y }, { x: zx, y: mz.y }]
-  const g = mz.x - MASSE.spalte / 2
-  return [
-    { x: ax, y: ma.y },
-    { x: g, y: ma.y },
-    { x: g, y: mz.y },
-    { x: zx, y: mz.y },
-  ]
+  // zuerst die Knoten (Frage über dem Gateway, Name unter dem Ereignis), dann die Flüsse
+  for (const k of knoten) if (k.beschriftung) k.beschriftung = waehle(plaetzeUm(k, k.beschriftung), k)
+  for (const e of kanten) {
+    if (!e.name) continue
+    const a = nachId.get(e.von)!
+    e.beschriftung = waehle([beschriftungFuer(e, a, e.ueber ? spurMitte(e.ueber) : null), ...plaetzeEntlang(e)], null)
+  }
+}
+
+/** Plätze für die Beschriftung eines Knotens: zuerst der gewohnte, dann links und rechts davon oder auf der anderen Seite. */
+function plaetzeUm(k: LayoutKnoten, gewohnt: Rechteck): Rechteck[] {
+  const { breite, hoehe } = gewohnt
+  const cx = k.x + k.breite / 2
+  const cy = k.y + k.hoehe / 2
+  const feld = (x: number, y: number): Rechteck => ({ x, y, breite, hoehe })
+  if (istGateway(k.art)) {
+    // über der Raute mittig, links oben, rechts oben, darunter
+    return [gewohnt, feld(cx - 8 - breite, k.y + 2 - hoehe), feld(cx + 8, k.y + 2 - hoehe), feld(cx - breite / 2, k.y + k.hoehe + 6), feld(cx - 8 - breite, k.y + k.hoehe - 2), feld(cx + 8, k.y + k.hoehe - 2)]
+  }
+  // Ereignis: darunter, darüber, rechts oder links unterhalb bzw. oberhalb der durchgehenden Linie
+  return [gewohnt, feld(cx - breite / 2, k.y - 6 - hoehe), feld(k.x + k.breite + 2, cy + 4), feld(k.x - 2 - breite, cy + 4), feld(k.x + k.breite + 2, cy - 4 - hoehe), feld(k.x - 2 - breite, cy - 4 - hoehe)]
 }
 
 function beschriftungFuer(e: LayoutKante, a: LayoutKnoten, ueberY: number | null): Rechteck {
@@ -727,9 +780,13 @@ function beschriftungFuer(e: LayoutKante, a: LayoutKnoten, ueberY: number | null
   const hoehe = zeilen(e.name) * MASSE.zeile
   const ueber = (p: Punkt) => feldUm(p.x + 4 + breite / 2, p.y - 3 - hoehe / 2, e.name)
   if (e.rueck) return feldUm(pts[0].x + 6 + breite / 2, a.y + a.hoehe + 4 + hoehe / 2, e.name)
-  if (e.sprung) return ueber(pts[0])
-  // unten aus der Raute: rechts der Ecke über dem waagerechten Stück
-  if (pts.length > 2 && gleich(pts[0].x, pts[1].x) && gleich(pts[0].y, a.y + a.hoehe)) return ueber(pts[1])
+  if (e.sprung) {
+    // aus einer Raute: über der Extraspur links der senkrechten Linie, sonst über dem ersten Stück
+    if (istGateway(a.art) && pts.length >= 4) return feldUm(pts[1].x - 4 - breite / 2, pts[2].y - 3 - hoehe / 2, e.name)
+    return ueber(pts[0])
+  }
+  // senkrecht unten aus der Raute: rechts der Ecke über dem waagerechten Stück
+  if (pts.length > 2 && istGateway(a.art) && gleich(pts[0].x, pts[1].x) && pts[1].y > pts[0].y) return ueber(pts[1])
   // leerer Zweig: über dem waagerechten Stück auf der reservierten Spur
   if (ueberY !== null && pts.length > 2 && !gleich(pts[0].y, ueberY)) return ueber(pts[2])
   if (pts.length === 2 || ueberY !== null) return ueber(pts[0])

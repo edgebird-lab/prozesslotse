@@ -7,6 +7,7 @@
  * Bearbeitungszeiten. Das 90-%-Quantil ist deshalb eher zu niedrig. Mit
  * festem Startwert ist das Ergebnis reproduzierbar.
  */
+import { oderZiehung } from '../modell/operationen'
 import type { Block, Id, Prozess } from '../modell/typen'
 
 export interface ErgebnisDauer {
@@ -86,22 +87,26 @@ function laufeBlock(b: Block, zufall: () => number): Lauf {
       return { zeit: warten + r.zeit, ende: gewaehlt.ende, rueck: gewaehlt.ende === null ? gewaehlt.zurueckZu : null }
     }
     case 'oder': {
-      // Jeder Weg unabhängig nach seinem Anteil; der Standardweg nur, wenn keiner gewählt wurde
+      // Wie in der Rechnung: unabhängige Würfe; ohne Standardweg wird eine leere Auswahl verworfen
+      const zug = oderZiehung(b)
+      let gewaehlt: number[] = []
+      if (zug.ausschliessend) {
+        let wurf = zufall()
+        const i = zug.r.findIndex((r) => (wurf -= r) < 0)
+        gewaehlt = [i >= 0 ? i : zug.r.length - 1]
+      } else {
+        for (let versuch = 0; versuch < 10_000; versuch++) {
+          gewaehlt = zug.r.map((r, i) => (zufall() < r ? i : -1)).filter((i) => i >= 0)
+          if (gewaehlt.length > 0 || b.standard !== null) break
+        }
+        if (gewaehlt.length === 0 && b.standard !== null) gewaehlt = [b.zweige.findIndex((z) => z.id === b.standard)]
+      }
       let zeit = 0
       let ende: string | null = null
-      let keiner = true
-      for (const z of b.zweige) {
-        if (z.id === b.standard || zufall() >= z.anteil) continue
-        keiner = false
-        const r = laufeSequenz(z.schritte, zufall)
+      for (const i of gewaehlt) {
+        const r = laufeSequenz(b.zweige[i].schritte, zufall)
         zeit = Math.max(zeit, r.zeit)
         ende ??= r.ende
-      }
-      const standard = keiner ? b.zweige.find((z) => z.id === b.standard) : undefined
-      if (standard) {
-        const r = laufeSequenz(standard.schritte, zufall)
-        zeit = r.zeit
-        ende = r.ende
       }
       return { zeit, ende, rueck: null }
     }

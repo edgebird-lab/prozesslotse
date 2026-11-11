@@ -250,9 +250,7 @@ function flussBlock(b: Block, f: Fluss, z: Zaehler, ctx: Kontext): Ergebnis {
           else plus(letzte, k, w)
         }
       })
-      // Kein Weg gewählt (nur ohne Standardweg möglich): der Vorgänger geht direkt weiter.
-      const keiner = p.reduce((q, x) => q * (1 - x), 1)
-      if (b.standard === null) for (const [k, w] of f.letzte) letzte.set(k, Math.max(letzte.get(k) ?? 0, w * keiner))
+      // Es läuft immer mindestens ein Weg (Standardweg oder „mindestens einer“).
       return { aus: { anteil: f.anteil * weiter, letzte }, rueck }
     }
     case 'wiederholung': {

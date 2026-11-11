@@ -70,8 +70,10 @@ export function zufallsProzess(startwert: number, optionen: { auchUngueltig?: bo
         const keiner = neuerOderZweig('Keiner davon', 0, { schritte: sequenz(tiefe + 1, true) })
         return neueOder({ frage: 'Welche Wege?', zweige: [...zweige, keiner], standard: keiner.id })
       }
-      zweige[0] = { ...zweige[0], anteil: 1 }
-      return neueOder({ frage: 'Welche Wege?', zweige, standard: null })
+      // „mindestens einer“: Anteile zusammen über 100 %
+      const summe = zweige.reduce((s, z) => s + z.anteil, 0)
+      const faktor = summe < 1.15 ? 1.15 / summe : 1
+      return neueOder({ frage: 'Welche Wege?', zweige: zweige.map((z) => ({ ...z, anteil: Math.min(0.95, z.anteil * faktor) })), standard: null })
     }
     return neueWiederholung({ frage: 'Nochmal?', koerper: { id: `k${++nr}`, schritte: sequenz(tiefe + 1, inParallel, 1) } })
   }

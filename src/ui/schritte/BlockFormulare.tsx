@@ -446,6 +446,7 @@ function OderFormular({ block: o, onAendern, kontext }: Props<Oder>) {
   const andere = o.zweige.filter((z) => z.id !== o.standard)
   const standard = o.zweige.find((z) => z.id === o.standard) ?? null
   const keiner = andere.reduce((q, z) => q * (1 - Math.min(1, Math.max(0, z.anteil))), 1)
+  const summeAndere = andere.reduce((s, z) => s + z.anteil, 0)
   const entferne = async (z: OderZweig, name: string) => {
     if (z.schritte.length > 0 && !(await bestaetige('Weg entfernen?', `Der Weg „${name}“ enthält ${z.schritte.length} Schritte. Sie werden mit entfernt.`, 'Mit Schritten entfernen'))) return
     onAendern({ ...o, zweige: o.zweige.filter((x) => x.id !== z.id), standard: o.standard === z.id ? null : o.standard })
@@ -460,7 +461,8 @@ function OderFormular({ block: o, onAendern, kontext }: Props<Oder>) {
       <fieldset className="zweige">
         <legend>Welche Wege kommen in Frage, und wie oft kommt jeder vor?</legend>
         <p className="feld-hilfe">
-          Jeder Anteil gilt für sich: 30 % heißt, in 30 von 100 Fällen läuft dieser Weg, egal was mit den anderen ist. Zusammen dürfen es mehr oder weniger als 100 % sein.
+          Jeder Anteil gilt für sich: 30 % heißt, in 30 von 100 Fällen läuft dieser Weg, egal was mit den anderen ist. Weil mehrere Wege zugleich laufen können, dürfen es zusammen
+          mehr als 100 % sein.
         </p>
         {andere.map((z, i) => {
           const name = z.bezeichnung || `Weg ${i + 1}`
@@ -503,9 +505,14 @@ function OderFormular({ block: o, onAendern, kontext }: Props<Oder>) {
           {(id) => <input id={id} type="text" value={standard.bezeichnung} placeholder="z. B. Nichts fehlt" onChange={(ev) => setzeZweig(standard.id, { bezeichnung: ev.target.value })} />}
         </Feld>
       )}
-      {!standard && keiner > 1e-6 && (
-        <p className="feld-hilfe summe-falsch" role="status">
-          In {formatiereProzent(keiner)} der Fälle trifft keiner der Wege zu. Lege dafür einen eigenen Weg an oder prüfe die Anteile.
+      {!standard && (
+        <p className={`summe${summeAndere < 1 - 1e-6 ? ' summe-falsch' : ''}`} role="status">
+          Zusammen: {formatiereProzent(summeAndere, 1)}
+          {summeAndere < 1 - 1e-6
+            ? '. Wenn immer mindestens einer zutrifft, sind es mindestens 100 %.'
+            : Math.abs(summeAndere - 1) < 1e-6
+              ? '. Genau 100 %: Dann läuft immer nur einer, das ist eine Entscheidung (Entweder-oder).'
+              : `. Mehrere Wege zugleich in etwa ${formatiereProzent(Math.min(1, summeAndere - 1))} der Fälle oder mehr.`}
         </p>
       )}
     </>

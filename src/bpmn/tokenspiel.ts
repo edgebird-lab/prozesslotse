@@ -20,6 +20,8 @@ export interface TokenKnoten {
   raus: string[]
   /** Nur ODER-Verzweigung: Fluss, der genommen wird, wenn kein anderer gewählt ist. */
   standard?: string
+  /** Nur ODER-Verzweigung ohne Standardfluss: mindestens ein Weg (leere Auswahl wird neu gewürfelt). */
+  mindestensEiner?: boolean
   /**
    * Nur ODER-Zusammenführung: Flüsse zwischen der zugehörigen Verzweigung und
    * ihr. Sie schaltet erst, wenn dort keine Marke mehr unterwegs ist (BPMN-Regel
@@ -47,7 +49,7 @@ const TYP_AUS_LAYOUT: Record<KnotenArt, KnotenTyp> = {
 
 /** Graph direkt aus dem Layout, aus dem auch das BPMN-XML entsteht. */
 export function graphAusLayout(l: Layout): TokenGraph {
-  const knoten = new Map<string, TokenKnoten>(l.knoten.map((k) => [k.id, { id: k.id, typ: TYP_AUS_LAYOUT[k.art], rein: [], raus: [] }]))
+  const knoten = new Map<string, TokenKnoten>(l.knoten.map((k) => [k.id, { id: k.id, typ: TYP_AUS_LAYOUT[k.art], rein: [], raus: [], ...(k.mindestensEiner ? { mindestensEiner: true } : {}) }]))
   const ziel = new Map<string, string>()
   for (const e of l.kanten) {
     knoten.get(e.von)?.raus.push(e.id)
@@ -327,8 +329,12 @@ export function zaehleMitFehler(g: TokenGraph, anteil: Map<string, number>, laeu
             k.raus,
           )
         } else if (k.typ === 'oder') {
-          // jeder Weg unabhängig nach seinem Anteil, der Standardweg nur, wenn keiner gewählt wurde
-          const wahl = k.raus.filter((o) => o !== k.standard && zufall() < (anteil.get(o) ?? 0.5))
+          // jeder Weg unabhängig nach seinem Wurf; ohne Standard wird eine leere Auswahl neu gewürfelt
+          let wahl: string[] = []
+          for (let versuch = 0; versuch < 10_000; versuch++) {
+            wahl = k.raus.filter((o) => o !== k.standard && zufall() < (anteil.get(o) ?? 0.5))
+            if (wahl.length > 0 || !k.mindestensEiner) break
+          }
           if (wahl.length === 0 && k.standard) wahl.push(k.standard)
           m = mit(m, [f], wahl)
         } else if (k.typ === 'xor' || k.typ === 'ereignisgateway') {

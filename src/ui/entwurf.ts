@@ -19,8 +19,8 @@ export function fehltNoch(b: Block): string | null {
     case 'oder': {
       if (!b.frage.trim()) return 'Schreib zuerst, worum es geht, z. B. „Welche Unterlagen fehlen?“.'
       if (b.zweige.some((z) => z.id !== b.standard && !z.bezeichnung.trim())) return 'Jeder Weg braucht eine Bezeichnung.'
-      const keiner = b.zweige.reduce((q, z) => (z.id === b.standard ? q : q * (1 - Math.min(1, Math.max(0, z.anteil)))), 1)
-      return b.standard === null && keiner > 1e-6 ? 'Lege fest, was passiert, wenn keiner der Wege zutrifft.' : null
+      const summe = b.zweige.reduce((s, z) => (z.id === b.standard ? s : s + z.anteil), 0)
+      return b.standard === null && summe < 1 - 1e-6 ? 'Wenn immer mindestens einer zutrifft, ergeben die Anteile zusammen mindestens 100 %.' : null
     }
     case 'parallel':
       return null

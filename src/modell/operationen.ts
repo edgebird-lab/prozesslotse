@@ -84,14 +84,54 @@ export function liegtInParallele(vorfahren: Block[]): boolean {
   return vorfahren.some(istNebenlaeufig)
 }
 
+const klemme01 = (x: number) => Math.min(1, Math.max(0, x))
+
 /**
- * Wahrscheinlichkeit je Weg einer ODER-Verzweigung. Die Wege sind unabhängig;
- * der Standardweg läuft genau dann, wenn keiner der anderen zutrifft.
+ * Wahrscheinlichkeit je Weg einer ODER-Verzweigung (wie oft er vorkommt).
+ * Mit Standardweg sind die Wege unabhängig, und der Standardweg läuft genau
+ * dann, wenn keiner der anderen zutrifft. Ohne Standardweg trifft immer
+ * mindestens einer zu; die Anteile sind dann direkt die Häufigkeiten.
  */
 export function oderWahrscheinlichkeiten(b: Oder): number[] {
-  const klemme = (x: number) => Math.min(1, Math.max(0, x))
-  const keiner = b.zweige.reduce((q, z) => (z.id === b.standard ? q : q * (1 - klemme(z.anteil))), 1)
-  return b.zweige.map((z) => (z.id === b.standard ? keiner : klemme(z.anteil)))
+  const keiner = b.zweige.reduce((q, z) => (z.id === b.standard ? q : q * (1 - klemme01(z.anteil))), 1)
+  return b.zweige.map((z) => (z.id === b.standard ? keiner : klemme01(z.anteil)))
+}
+
+/**
+ * Wie die Wege gezogen werden. Mit Standardweg: unabhängig mit ihrem Anteil.
+ * Ohne Standardweg („mindestens einer“): unabhängig mit rᵢ = pᵢ · Z, eine
+ * leere Auswahl wird verworfen. Z löst Z = 1 − Π(1 − pᵢ · Z); dann kommt Weg i
+ * genau mit pᵢ vor. Das ist die Verteilung mit der größten Entropie unter
+ * diesen Häufigkeiten; bei zwei Wegen laufen beide mit p₁ + p₂ − 1.
+ * Ergeben die Anteile zusammen höchstens 100 %, schließen sich die Wege aus
+ * (Grenzfall Z → 0): Dann läuft genau einer, mit Anteil pᵢ / Σp.
+ */
+export interface OderZiehung {
+  /** Wahrscheinlichkeit des unabhängigen Wurfs je Weg (Standardweg: 0, er läuft nur, wenn keiner trifft) */
+  r: number[]
+  /** Wahrscheinlichkeit, dass der Wurf nicht leer ist; ohne Standardweg wird auf diese Fälle bedingt */
+  z: number
+  /** true: Die Wege schließen sich aus (Anteile zusammen höchstens 100 %, kein Standardweg) */
+  ausschliessend: boolean
+}
+
+export function oderZiehung(b: Oder): OderZiehung {
+  const p = b.zweige.map((z) => (z.id === b.standard ? 0 : klemme01(z.anteil)))
+  if (b.standard !== null) return { r: p, z: 1 - p.reduce((q, x) => q * (1 - x), 1), ausschliessend: false }
+  const summe = p.reduce((s, x) => s + x, 0)
+  if (p.some((x) => x >= 1)) return { r: p, z: 1, ausschliessend: false }
+  if (summe <= 1 + 1e-9) return { r: p.map((x) => (summe > 0 ? x / summe : 0)), z: 1, ausschliessend: true }
+  // Bisektion: g(Z) = 1 − Π(1 − pᵢ Z) − Z ist positiv knapp über 0 und höchstens 0 bei Z = 1
+  let unten = 1e-9
+  let oben = 1
+  for (let i = 0; i < 80; i++) {
+    const mitte = (unten + oben) / 2
+    const g = 1 - p.reduce((q, x) => q * (1 - x * mitte), 1) - mitte
+    if (g > 0) unten = mitte
+    else oben = mitte
+  }
+  const z = (unten + oben) / 2
+  return { r: p.map((x) => x * z), z, ausschliessend: false }
 }
 
 // ---------------------------------------------------------------------------

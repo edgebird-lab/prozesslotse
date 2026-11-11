@@ -197,13 +197,13 @@ export function pruefeProzess(p: Prozess): Befund[] {
           }
         })
         const wahrscheinlich = oderWahrscheinlichkeiten(b)
-        const keiner = andere.reduce((q, z) => q * (1 - Math.min(1, Math.max(0, z.anteil))), 1)
-        if (b.standard === null && keiner > TOLERANZ) {
+        const summe = andere.reduce((s, z) => s + z.anteil, 0)
+        if (b.standard === null && andere.length >= 1 && summe < 1 - TOLERANZ) {
           add({
             schluessel: `keiner:${b.id}`,
             schwere: 'fehler',
             titel: 'Manchmal trifft kein Weg zu',
-            text: `Bei „${titel}“ trifft in ${Math.round(keiner * 1000) / 10} % der Fälle keiner der Wege zu. Einen Weg „wenn keiner zutrifft“ festlegen oder die Anteile prüfen.`,
+            text: `Bei „${titel}“ ergeben die Anteile zusammen nur ${Math.round(summe * 1000) / 10} %. Wenn immer mindestens einer der Wege zutrifft, sind es zusammen mindestens 100 %. Sonst einen Weg „wenn keiner zutrifft“ festlegen.`,
             blockId: b.id,
           })
         }
@@ -215,7 +215,7 @@ export function pruefeProzess(p: Prozess): Befund[] {
             schluessel: `wie-entweder:${b.id}`,
             schwere: 'hinweis',
             titel: 'Schließen sich die Wege aus?',
-            text: `Die Anteile von „${titel}“ ergeben zusammen genau 100 %. Kommt immer nur einer der Wege vor, ist es eine Entscheidung (Entweder-oder). Bei ODER gibt jeder Anteil an, wie oft dieser Weg vorkommt, unabhängig von den anderen.`,
+            text: `Die Anteile von „${titel}“ ergeben zusammen genau 100 %. Kommt immer nur einer der Wege vor, ist es eine Entscheidung (Entweder-oder). Bei ODER gibt jeder Anteil an, wie oft dieser Weg vorkommt; weil mehrere zugleich laufen können, sind es zusammen meist mehr als 100 %.`,
             blockId: b.id,
           })
         }
