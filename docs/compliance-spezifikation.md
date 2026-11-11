@@ -30,7 +30,7 @@ In vielen Kleinbetrieben fehlen zwei Pflichtdokumente: die Verfahrensdokumentati
 3. **Unterlagen und Ablageorte** (fachlich Datenobjekte und Datenspeicher) mit „entsteht in“ und „genutzt in“ als eigene Tabellen in den Compliance-Angaben. Das BPMN-Diagramm zeigt sie im MVP nicht (4.1).
 4. **Verfahrensdokumentation** in der Gliederung des Musters von BStBK und DStV (Version 2.1); Kapitel 4 entsteht aus dem Ablauf.
 5. **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 lit. a–g im Aufbau des DSK-Musters, mit TOM-Übersicht in den sechs Bereichen nach Art. 32 Abs. 1 DSGVO.
-6. **Lückenprüfung** mit 38 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
+6. **Lückenprüfung** mit 40 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
 7. **Fristberechnung:** gesetzliche Mindestfrist je Unterlagenart, Fristende, frühestes Vernichtungs- bzw. Löschdatum.
 8. **Versionen:** Eine Freigabe friert beide Dokumente ein (gültig ab, freigegeben am und von, Änderung, geänderte Kapitel, SHA-256-Prüfsumme). Befunde, wenn sich seit der Freigabe etwas geändert hat oder sie älter als 365 Tage ist.
 9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Jede Ausgabe trägt den Hinweis „Vorlage zur Prüfung …“, nicht freigegebene Stände zusätzlich „Entwurf“.
@@ -61,10 +61,11 @@ Die App archiviert keine Belege und ist kein Archivsystem. Sie prüft nicht, ob 
 
 | Quelle | Stand | Was die App daraus nutzt |
 | --- | --- | --- |
-| GoBD, BMF-Schreiben vom 28.11.2019 (BStBl I S. 1269), geändert am 11.03.2024 (BStBl I S. 374) und am 14.07.2025 (GZ IV D 2 - S 0316/00128/005/088) | Fassung vom 14.07.2025, anzuwenden ab 14.07.2025 (Rz. 185); Volltext im Amtlichen AO-Handbuch 2026, Anhang 33 | Rz. 100–102 IKS, 103–106 Datensicherheit, 107–111 Unveränderbarkeit, 119–121, 131, 135 elektronische Aufbewahrung, 136 Scannen, 151–155 Verfahrensdokumentation |
-| § 147 AO | abgerufen 10.11.2026 | Unterlagenarten (Abs. 1), Fristen und Ablaufhemmung (Abs. 3), Fristbeginn (Abs. 4) |
+| GoBD, BMF-Schreiben vom 28.11.2019 (BStBl I S. 1269), geändert am 11.03.2024 (BStBl I S. 374) und am 14.07.2025 (GZ IV D 2 - S 0316/00128/005/088) | Fassung vom 14.07.2025, anzuwenden ab 14.07.2025 (Rz. 185); Volltext im Amtlichen AO-Handbuch 2026, Anhang 33 | Rz. 100–102 IKS, 103–106 Datensicherheit, 107–111 Unveränderbarkeit, 119–121, 131, 135 elektronische Aufbewahrung, 136 Scannen, 151–155 Verfahrensdokumentation, 156–159 Lesbarmachung und Datenzugriff |
+| § 147 AO | abgerufen 10.11.2026, Abs. 2, 5, 6 am 11.11.2026 | Unterlagenarten (Abs. 1), Lesbarmachung und maschinelle Auswertbarkeit (Abs. 2, 5), Fristen und Ablaufhemmung (Abs. 3), Fristbeginn (Abs. 4), Datenzugriff auch bei Dritten (Abs. 6) |
+| § 257 HGB; Art. 97 § 19a EGAO | abgerufen 11.11.2026 | Handelsbriefe 6 Jahre bei Kaufleuten (§ 257 Abs. 1, 2, 4 Satz 1 HGB); 10 Jahre für Buchungsbelege bei Kredit-, Versicherungs- und Wertpapierinstituten (§ 257 Abs. 4 Satz 2 HGB, Art. 97 § 19a Abs. 3 EGAO) |
 | Muster-Verfahrensdokumentation zum ersetzenden Scannen, BStBK und DStV | Version 2.1, Stand 27.02.2026 | Gliederung, Freigabe- und Versionsangaben (Kap. 1), 13 Ordnungsmäßigkeitskriterien (2.3), Hard- und Software mit „seit“ und Version (3.1), Zuständigkeiten (3.2), IKS (3.3), Änderungshistorie (7) |
-| DSGVO, Verordnung (EU) 2016/679 (EUR-Lex, CELEX 32016R0679) | abgerufen 11.11.2026 | Art. 5 Abs. 1 lit. e, Art. 6 Abs. 1, Art. 9 Abs. 1, Art. 10, Art. 17 Abs. 3 lit. b, Art. 28 Abs. 3, Art. 30, Art. 32 Abs. 1, Art. 44–46 |
+| DSGVO, Verordnung (EU) 2016/679 (EUR-Lex, CELEX 32016R0679) | abgerufen 11.11.2026 | Art. 5 Abs. 1 lit. e, Art. 6 Abs. 1, Art. 9 Abs. 1 und 2, Art. 10, Art. 17 Abs. 3 lit. b, Art. 28 Abs. 3, Art. 30, Art. 32 Abs. 1, Art. 44–46 |
 | DSK: Hinweise zum Verzeichnis von Verarbeitungstätigkeiten | Februar 2018 | Ausnahme nach Art. 30 Abs. 5 greift selten (Ziff. 5); Rechtsgrundlage als sinnvolle Zusatzangabe (Ziff. 1); interne Empfänger als Rollen (Ziff. 6.4); Aussage zu Drittländern immer (Ziff. 6.4); Empfänger im Drittland konkret benennen (Ziff. 6.5); präzise Löschfristen (Ziff. 6.6); TOM in sechs Bereichen (Ziff. 6.7, 6.8) |
 | DSK: Muster Verzeichnis Verantwortlicher | Februar 2018 | Aufbau: Vorblatt, je Tätigkeit Zwecke, Betroffene, Datenkategorien, Empfänger, Drittland, Löschfristen, TOM, Unterschrift |
 | § 38 BDSG | abgerufen 11.11.2026 | Datenschutzbeauftragter ab in der Regel 20 Personen, die ständig mit automatisierter Verarbeitung beschäftigt sind |
@@ -80,10 +81,12 @@ Die App hält den Rechtsstand als Konstante `RECHTSSTAND = '2026-11-11'` und dru
 | Buchungsbelege, Rechnungen (auch § 14b UStG) | Nr. 4 | 8 Jahre | `buchungsbeleg` |
 | empfangene Handels- oder Geschäftsbriefe, Wiedergaben abgesandter | Nr. 2, 3 | 6 Jahre | `geschaeftsbrief` |
 | sonstige steuerlich bedeutsame Unterlagen | Nr. 5 | 6 Jahre | `sonstige` |
-| Lieferscheine, die keine Buchungsbelege sind | Abs. 3 | bis Erhalt (empfangen) bzw. Versand (abgesandt) der Rechnung | `lieferschein` |
+| Lieferscheine, die keine Buchungsbelege sind | Abs. 3 | bis Erhalt (empfangen) bzw. Versand (abgesandt) der Rechnung; bei Kaufleuten ggf. 6 Jahre als Handelsbrief (§ 257 HGB) | `lieferschein` |
 
 - **Fristbeginn:** Schluss des Kalenderjahres, in dem die Unterlage entstanden, empfangen oder abgesandt wurde (§ 147 Abs. 4 AO). Bei Büchern zählt die letzte Eintragung, bei Inventar und Abschlüssen die Aufstellung. Beispiel: Jahresabschluss 2025, aufgestellt 2026, Frist beginnt am 31.12.2026.
 - **Ablaufhemmung:** Die Frist läuft nicht ab, solange die Unterlagen für Steuern mit offener Festsetzungsfrist von Bedeutung sind (§ 147 Abs. 3 AO). Die App rechnet sie nicht aus, sondern weist im Dokument darauf hin.
+- **Lieferscheine bei Kaufleuten:** § 257 HGB kennt die Ausnahme des § 147 Abs. 3 AO nicht. Ist ein Lieferschein ein Handelsbrief (Schriftstück, das ein Handelsgeschäft betrifft, § 257 Abs. 2 HGB), gelten 6 Jahre. Als Kaufleute gelten in der App die Rechtsformen e. K., OHG, KG, GmbH, UG, GmbH & Co. KG und eG sowie, als Annahme, jede Gewinnermittlung durch Bilanz. Die App ergänzt dann „handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären“ und meldet B11, bis mindestens 6 Jahre gewählt sind. Verweist die Rechnung auf den Lieferschein, gehört er zur Rechnung (§ 31 Abs. 1 UStDV, im Lernhinweis).
+- **Institute:** Für Kredit- und Finanzdienstleistungsinstitute, Versicherungsunternehmen und Wertpapierinstitute gelten für Buchungsbelege weiter 10 Jahre (Art. 97 § 19a Abs. 3 EGAO, § 257 Abs. 4 Satz 2 HGB). Die App rechnet mit 8 Jahren und nennt die Ausnahme unter der Fristentabelle in Kapitel 2.3.
 - **Verfahrensdokumentation selbst:** Organisationsunterlage, also 10 Jahre. Sie läuft nicht ab, solange Unterlagen aufbewahrt werden, zu deren Verständnis sie nötig ist (GoBD Rz. 154).
 - **Elektronisch entstanden oder eingegangen:** in dieser Form aufbewahren, nicht nur ausgedruckt (GoBD Rz. 119); Eingänge im Eingangsformat (Rz. 131). Eine Umwandlung ist nur unter den Voraussetzungen der Rz. 135 zulässig. Bei E-Rechnungen genügt der strukturierte Teil (Rz. 119, 131 i. d. F. vom 14.07.2025).
 - **Ausnahme Papierversand:** Elektronisch erstellte, auf Papier versandte Handels- und Geschäftsbriefe dürfen nur auf Papier aufbewahrt werden. Das gilt nicht, wenn die Datei tatsächlich aufbewahrt wird oder ein Fakturierungssystem sie erzeugt hat (Rz. 119, 120).
@@ -95,8 +98,8 @@ Die App hält den Rechtsstand als Konstante `RECHTSSTAND = '2026-11-11'` und dru
 
 - Übersichtlich gegliedert; Inhalt, Aufbau, Ablauf und Ergebnisse vollständig und schlüssig; für sachverständige Dritte in angemessener Zeit nachprüfbar (Rz. 151).
 - Rz. 151 verlangt die Dokumentation **für jedes DV-System**. Die App dokumentiert je Prozess und führt dessen Systeme in Kapitel 3.1. Die Abdeckung aller Systeme eines Betriebs leistet erst die Firmenmappe (2.2); der Hinweis A.0 sagt das.
-- Beschreibt den gewollten Prozess von der Entstehung über Verarbeitung und Speicherung bis zur Reproduktion (Rz. 152).
-- Besteht in der Regel aus allgemeiner Beschreibung, Anwenderdokumentation, technischer Systemdokumentation und Betriebsdokumentation (Rz. 153). Zuordnung in der App: allgemeine Beschreibung = Kapitel 2, Anwenderdokumentation = Kapitel 4, technische Systemdokumentation = Kapitel 3.1, Betriebsdokumentation = Kapitel 3.2–3.4.
+- Beschreibt den gewollten Prozess von der Entstehung über Verarbeitung und Speicherung bis zur Reproduktion (Rz. 152), auch wie Unterlagen eindeutig wiedergefunden, lesbar gemacht und maschinell ausgewertet werden und wie die Finanzverwaltung Datenzugriff erhält (Rz. 156–159; § 147 Abs. 2, 5, 6 AO). Die App fragt das je System mit Ablage ab und gibt es in Kapitel 3.5 aus.
+- Besteht in der Regel aus allgemeiner Beschreibung, Anwenderdokumentation, technischer Systemdokumentation und Betriebsdokumentation (Rz. 153). Zuordnung in der App: allgemeine Beschreibung = Kapitel 2, Anwenderdokumentation = Kapitel 4, technische Systemdokumentation = Kapitel 3.1, Betriebsdokumentation = Kapitel 3.2–3.5.
 - Muss der Praxis voll entsprechen, auch bei Programmversionen (Programmidentität). Änderungen werden versioniert, mit nachvollziehbarer Änderungshistorie (Rz. 154).
 - Die Beschreibung des IKS (Rz. 102) und der Datensicherung (Rz. 106) gehört dazu.
 - Ein Mangel ist kein formeller Mangel mit sachlichem Gewicht, solange die Nachvollziehbarkeit nicht leidet (Rz. 155).
@@ -108,10 +111,10 @@ Die App hält den Rechtsstand als Konstante `RECHTSSTAND = '2026-11-11'` und dru
 | 0 Hinweise zur Muster-Verfahrensdokumentation | entfällt; ersetzt durch den Hinweis „Vorlage zur Prüfung“ auf dem Deckblatt |
 | 1 Vorbemerkungen zur Verfahrensdokumentation | übernommen: Genehmigung, Freigabe, Version, gültig ab, ersetzte Version |
 | 2 Zielsetzung und Überblick (2.1–2.6) | übernommen, gefüllt aus Prozess und Angaben |
-| 3 Organisation und Sicherheit des IT-gestützten Verfahrens (3.1–3.4) | übernommen, gefüllt aus Systemen, Rollen, Kontrollen |
+| 3 Organisation und Sicherheit des IT-gestützten Verfahrens (3.1–3.4) | übernommen, gefüllt aus Systemen, Rollen, Kontrollen; ergänzt um 3.5 „Wiederfinden, Lesbarmachung und Datenzugriff“ (GoBD Rz. 152, 156–159) |
 | 4 Verfahren und Maßnahmen zum zentralen Scannen | **4 Verfahren und Maßnahmen: {Prozessname}**, erzeugt aus dem Ablauf |
 | 5 Verfahren und Maßnahmen zum mobilen Scannen | **5 Ersetzendes Scannen**: Verweis auf eigene Dokumentation oder „Entfällt“ |
-| 6 Mitgeltende Unterlagen | übernommen |
+| 6 Mitgeltende Unterlagen | übernommen; eigene Einträge mit Ablageort aus dem Teilschritt „Dokumente“ |
 | 7 Änderungshistorie | übernommen, aus den Versionen |
 | 8 Glossar | übernommen, eigene Begriffe |
 | 9 Anlage | 9.1 Ablaufdiagramm, 9.2 Nachweis der Einweisung |
@@ -126,12 +129,12 @@ Die App hält den Rechtsstand als Konstante `RECHTSSTAND = '2026-11-11'` und dru
 | lit. b | Zwecke | B | `Verarbeitungstaetigkeit.zwecke` |
 | lit. c | Kategorien betroffener Personen und personenbezogener Daten | B | Vereinigung über alle personenbezogenen Datenobjekte |
 | lit. d | Kategorien von Empfängern, auch in Drittländern | B | interne Rollen mit Zugriff; extern: externe Rollen mit Zugriff, Dienstleister, externe Empfänger |
-| lit. e | Übermittlungen in Drittländer mit Garantien | B | Standort und Garantie von Systemen und Empfängern |
+| lit. e | Übermittlungen in Drittländer mit Garantien | B | Standort und Garantie von Systemen und Empfängern; offene Standorte und Systeme mit offenem Betrieb als „offen“ |
 | lit. f | vorgesehene Löschfristen, wenn möglich | B | Aufbewahrungsfrist bzw. Löschfrist je Datenobjekt |
 | lit. g | allgemeine Beschreibung der TOM nach Art. 32 Abs. 1, wenn möglich | C | `toms` |
-| – | Rechtsgrundlage (freiwillig, laut DSK sinnvoll) | B | `rechtsgrundlagen` |
+| – | Rechtsgrundlage (freiwillig, laut DSK sinnvoll) | B | `rechtsgrundlagen`; bei besonderen Kategorien zusätzlich `ausnahmeArt9` (Art. 9 Abs. 2 DSGVO) |
 
-Hinweise der DSK, die die App umsetzt: Die Ausnahme nach Art. 30 Abs. 5 greift selten, weil fast jede Verarbeitung nicht nur gelegentlich erfolgt. Ein allgemeiner Verweis auf Aufbewahrungspflichten genügt nicht; Löschfristen sind präzise anzugeben. Zu Drittländern gehört immer eine Aussage, auch „findet nicht statt“. Liegt der Server im Drittland oder läuft der Mailversand darüber, ist das eine Übermittlung; Support aus dem Drittland kann eine sein (Ziff. 6.4). Empfänger im Drittland sind keine Kategorie, sondern konkret zu benennen (Ziff. 6.5). Die TOM-Beschreibung ist trotz „wenn möglich“ der Regelfall.
+Hinweise der DSK, die die App umsetzt: Die Ausnahme nach Art. 30 Abs. 5 greift selten, weil fast jede Verarbeitung nicht nur gelegentlich erfolgt. Ein allgemeiner Verweis auf Aufbewahrungspflichten genügt nicht; Löschfristen sind präzise anzugeben. Zu Drittländern gehört immer eine Aussage, auch „findet nicht statt“; die App schreibt das nur, wenn alle Standorte bekannt sind, sonst „ist noch offen bei …“. Liegt der Server im Drittland oder läuft der Mailversand darüber, ist das eine Übermittlung; Support aus dem Drittland kann eine sein (Ziff. 6.4). Empfänger im Drittland sind keine Kategorie, sondern konkret zu benennen (Ziff. 6.5). Die TOM-Beschreibung ist trotz „wenn möglich“ der Regelfall.
 
 ### 3.6 Technische und organisatorische Maßnahmen
 
@@ -275,6 +278,8 @@ export type Datenkategorie = 'identifikation' | 'kontakt' | 'vertrag' | 'zahlung
 export type BesondereKategorie = 'herkunft' | 'politik' | 'religion' | 'gewerkschaft' | 'genetik' | 'biometrie' | 'gesundheit' | 'sexualleben'
 /** Art. 6 Abs. 1 lit. a bis f DSGVO, in dieser Reihenfolge */
 export type Rechtsgrundlage = 'einwilligung' | 'vertrag' | 'rechtspflicht' | 'lebenswichtig' | 'oeffentlich' | 'interesse'
+/** Ausnahme vom Verbot nach Art. 9 Abs. 2 lit. a bis j DSGVO, in dieser Reihenfolge */
+export type AusnahmeArt9 = 'einwilligung' | 'arbeitsrecht' | 'lebenswichtig' | 'organisation' | 'oeffentlich_gemacht' | 'rechtsansprueche' | 'oeffentliches_interesse' | 'gesundheitsversorgung' | 'oeffentliche_gesundheit' | 'forschung'
 
 export type Standort = 'deutschland' | 'eu_ewr' | 'drittland' | 'unbekannt'
 export type Garantie = 'angemessenheitsbeschluss' | 'standardvertragsklauseln' | 'andere' | 'keine'
@@ -323,6 +328,8 @@ export interface DatenobjektAngaben {
   rechtsgrundlagen: Rechtsgrundlage[]
   /** bei lit. f: welches Interesse */
   berechtigtesInteresse: string
+  /** nur bei besonderen Kategorien: Ausnahme nach Art. 9 Abs. 2 DSGVO; null oder fehlend (ältere Dateien) = offen */
+  ausnahmeArt9?: AusnahmeArt9 | null
   /** nur für personenbezogene Daten ohne steuerliche Aufbewahrungspflicht */
   loeschfrist: Frist | null
   externeEmpfaenger: Empfaenger[]
@@ -355,6 +362,10 @@ export interface SystemAngaben {
   wiederherstellungGetestet: IsoDatum | null
   /** Kurzbeschreibung, z. B. „eigenes Konto je Person, Zwei-Faktor-Anmeldung“ */
   zugriffsschutz: string
+  /** nur bei Ablage aufbewahrungspflichtiger Unterlagen: wie eine Unterlage wiedergefunden wird (Ordnungsmerkmal, GoBD Rz. 152); fehlt in älteren Dateien */
+  wiederfinden?: string
+  /** nur bei Ablage: wie die Finanzverwaltung bei einer Außenprüfung Zugriff erhält, auch nach Vertragsende oder Systemwechsel (§ 147 Abs. 6 AO); fehlt in älteren Dateien */
+  datenzugriff?: string
 }
 
 export interface RollenAngaben {
@@ -415,6 +426,14 @@ export interface TomAngaben {
 }
 
 // ---------- Dokumente und Versionen ----------
+
+/** Weitere Unterlage, die zur Verfahrensdokumentation gehört (Kapitel 6), z. B. ein Berechtigungskonzept */
+export interface MitgeltendeUnterlage {
+  id: Id
+  name: string
+  /** wo sie liegt, z. B. „Ordner Organisation, Büro“ */
+  ablageort: string
+}
 
 export type Abschnitt =
   | { art: 'ueberschrift'; ebene: 1 | 2 | 3; nummer: string; text: string }
@@ -478,8 +497,10 @@ export interface ComplianceProjekt {
   /** gilt für alle Unterlagen, die länger als gesetzlich aufbewahrt werden */
   begruendungLaengereAufbewahrung: string
   toms: Record<TomBereich, TomAngaben>
-  /** zusätzliche mitgeltende Unterlagen, z. B. „Berechtigungskonzept“ */
+  /** zusätzliche mitgeltende Unterlagen in der älteren Form ohne Ablageort, z. B. „Berechtigungskonzept“; die Oberfläche überträgt sie bei der ersten Änderung nach `mitgeltendeUnterlagen` */
   mitgeltend: string[]
+  /** mitgeltende Unterlagen mit Ablageort aus dem Teilschritt „Dokumente“ (Kapitel 6); fehlt in älteren Dateien */
+  mitgeltendeUnterlagen?: MitgeltendeUnterlage[]
   versionen: DokuVersion[]
   /** „Geprüft, keine Änderung“ ohne neue Version */
   zuletztGeprueft: IsoDatum | null
@@ -519,8 +540,10 @@ export type Schritt = 'rahmen' | 'beteiligte' | 'ablauf' | 'pruefen' | 'verbesse
 ### 4.3 Standardwerte und Kataloge (`standard.ts`)
 
 - Fehlt ein Eintrag in `datenobjekte`, `systeme`, `rollen` oder `kontrollen`, gilt der Standardwert. Geschrieben wird erst bei der ersten Änderung.
+- Neuere optionale Felder (`ausnahmeArt9`, `wiederfinden`, `datenzugriff`, `mitgeltendeUnterlagen`) dürfen in älteren Dateien fehlen; sie gelten dann als leer bzw. offen. `COMPLIANCE_VERSION` und `FORMAT_VERSION` bleiben unverändert. Sind sie vorhanden, prüft `validiereCompliance` sie streng (Katalogwert bzw. Text, eindeutige Ids).
 - `neueCompliance()`: alle Texte leer, Listen leer, `null` wo erlaubt, `einweisung = { turnus: null, protokoll: false }`, `loeschung = { freigabe: '', durchfuehrung: '', turnus: null }`, je TOM-Bereich `{ massnahmen: [], nichtZutreffend: '' }`, `verarbeitung.laufendeNummer = '1'`.
 - `DatenobjektAngaben`: `aufbewahrungsart 'unklar'`, sonst `null`, leere Listen, `strafrechtlich false`.
+- `Empfaenger` (neu angelegt): `standort 'unbekannt'` wie bei Systemen, bis der Standort angegeben ist; sonst stünde in B.5 ungeprüft „findet nicht statt“.
 - `SystemAngaben`: `standort 'unbekannt'`, `avVertrag 'unklar'`, `unveraenderbarkeit 'unklar'`, `sicherung 'unklar'`, sonst leer bzw. `null`.
 - `RollenAngaben`: `{ extern: false, organisation: '' }`.
 
@@ -532,9 +555,10 @@ export type Schritt = 'rahmen' | 'beteiligte' | 'ablauf' | 'pruefen' | 'verbesse
 | Richtung | `eingang` „Kommt von außen“ · `ausgang` „Geht nach außen“ · `intern` „Bleibt intern“ |
 | Ablageform | `original` „Im Original“ · `scan` „Als Scan des Papiers“ · `ausdruck` „Als Ausdruck“ · `umgewandelt` „Umgewandelt, z. B. PDF statt XML“ |
 | Betroffene | Kunden · Interessenten · Lieferanten und Dienstleister · Beschäftigte · Bewerber · Patienten · Sonstige |
-| Datenkategorie | `identifikation` „Name, Kundennummer“ · `kontakt` „Anschrift, Telefon, E-Mail“ · `vertrag` „Vertrags- und Bestelldaten“ · `zahlung` „Rechnungs- und Zahlungsdaten“ · `bank` „Bankverbindung“ · `korrespondenz` „Korrespondenz“ · `personal` „Personaldaten“ · `nutzung` „Nutzungs- und Protokolldaten“ · `sonstige` |
+| Datenkategorie | `identifikation` „Name, Kundennummer“ (im Verzeichnis „Identifikationsdaten (z. B. Name, Kunden- oder Personalnummer)“) · `kontakt` „Anschrift, Telefon, E-Mail“ · `vertrag` „Vertrags- und Bestelldaten“ · `zahlung` „Rechnungs- und Zahlungsdaten“ · `bank` „Bankverbindung“ · `korrespondenz` „Korrespondenz“ · `personal` „Personaldaten“ · `nutzung` „Nutzungs- und Protokolldaten“ · `sonstige` |
 | Besondere Kategorie | Herkunft · politische Meinungen · religiöse oder weltanschauliche Überzeugungen · Gewerkschaft · genetische Daten · biometrische Daten zur Identifizierung · Gesundheit · Sexualleben oder sexuelle Orientierung |
 | Rechtsgrundlage | `einwilligung` „Einwilligung (Art. 6 Abs. 1 lit. a)“ · `vertrag` „Für einen Vertrag oder eine Anfrage der Person nötig (lit. b)“ · `rechtspflicht` „Gesetzliche Pflicht, z. B. Aufbewahrung (lit. c)“ · `lebenswichtig` (lit. d) · `oeffentlich` (lit. e) · `interesse` „Berechtigtes Interesse (lit. f)“ |
+| Ausnahme nach Art. 9 Abs. 2 | `einwilligung` „Ausdrückliche Einwilligung (lit. a)“ · `arbeitsrecht` „Arbeitsrecht und soziale Sicherheit (lit. b)“ · `lebenswichtig` (lit. c) · `organisation` (lit. d) · `oeffentlich_gemacht` (lit. e) · `rechtsansprueche` (lit. f) · `oeffentliches_interesse` (lit. g) · `gesundheitsversorgung` „Gesundheitsvorsorge, Arbeitsmedizin, Behandlung (lit. h)“ · `oeffentliche_gesundheit` (lit. i) · `forschung` (lit. j); leer „offen“. Nationale Grundlagen (BDSG) nennt die App nicht; die Hilfe verweist auf den Datenschutz. |
 | Standort | Deutschland · EU oder EWR · Anderes Land (Drittland) · Weiß nicht |
 | Garantie | Angemessenheitsbeschluss (Art. 45) · Standardvertragsklauseln (Art. 46) · andere Garantie · keine |
 | Unveränderbarkeit | „Revisionssicheres Archiv“ · „Änderungen werden protokolliert“ · „Keine, z. B. einfache Dateiablage“ · „Weiß nicht“ |
@@ -606,6 +630,7 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 | Ist ein Datenschutzbeauftragter benannt? | Nein · Ja (Name, Anschrift, Telefon, E-Mail, intern oder extern) | Nein | VVT A |
 | Gemeinsam Verantwortlicher, Vertreter (aufklappbar „selten nötig“) | Kontakt | – | VVT A |
 | Steuerberatung | Text | – | VD 2.6, 6 |
+| Rollen im Ablauf: je Rolle aus dem Schritt „Beteiligte“ Schalter „extern“ und bei extern „Organisation“ | Schalter, Text | intern | VD 2.2.2, 2.6, VVT B.4, Regel K5 |
 | Verarbeitungstätigkeit: Benennung, laufende Nummer, eingeführt am, Fachabteilung, Ansprechpartner mit Telefon und E-Mail | Text, Datum | Benennung = Prozessname, Nummer „1“ | VVT B |
 
 Knopf „Aus anderer Projektdatei übernehmen …“: lädt eine `.prozesslotse`- oder `.json`-Datei und übernimmt `unternehmen`, `toms`, `einweisung`, `loeschung` und `begruendungLaengereAufbewahrung`. Vorher fragt ein Bestätigungsdialog.
@@ -623,6 +648,7 @@ Oben steht „Wozu werden die Daten in diesem Prozess verarbeitet?“ (Liste der
 | Enthält es Angaben zu Personen? | Ja · Nein · Weiß nicht |
 | Wer ist betroffen? Welche Daten? | Chips Betroffene, Chips Datenkategorien, aufklappbar besondere Kategorien und Art. 10 |
 | Warum dürfen die Daten verarbeitet werden? | Chips Rechtsgrundlage; bei lit. f Textfeld „Welches Interesse?“ |
+| Welche Ausnahme nach Art. 9 Abs. 2 DSGVO gilt? (nur bei besonderen Kategorien) | Auswahl lit. a bis j, leer „offen“; Hilfe: zusätzlich zur Rechtsgrundlage, ob daneben eine Vorschrift des BDSG gilt, mit dem Datenschutz klären |
 | Wer bekommt die Daten außerhalb des Unternehmens? | Liste: Kategorie, Name, Standort, bei Drittland Land und Garantie. Bei Drittland ist der Name Pflicht. Externe Teilnehmer des Prozesses (Format 3) stehen als Vorschlag bereit; die betroffene Person selbst ist kein Empfänger. |
 
 Leerer Zustand: „Noch keine Belege oder Daten. Lege an, welche Unterlagen im Prozess entstehen.“
@@ -644,8 +670,10 @@ Eine Karte je digitalem Medium, das im Prozess vorkommt. Papier und Telefon ersc
 | Verarbeitet der Anbieter personenbezogene Daten in Ihrem Auftrag? | Ja · Nein · Weiß nicht | Dienstleister oder Cloud und Personenbezug |
 | Gibt es einen Vertrag zur Auftragsverarbeitung? | Ja (Datum) · Nein · Weiß nicht | Auftragsverarbeitung nicht „Nein“ |
 | Wie sind aufbewahrte Unterlagen vor Änderung geschützt? | Unveränderbarkeit | System ist Ablage einer aufbewahrungspflichtigen Unterlage |
+| Wie findet man eine Unterlage wieder? | Kurztext (Ordnungsmerkmal, z. B. Rechnungsnummer) | wie oben |
+| Wie bekommt die Finanzverwaltung bei einer Außenprüfung Zugriff auf die Daten, auch nach Vertragsende oder Systemwechsel? | Text (z. B. Export in maschinell auswertbarem Format) | wie oben |
 | Wie werden die Daten gesichert? | Sicherung, Intervall, „Rücksicherung zuletzt getestet am“ | – |
-| Zugriffsschutz | Kurztext | – |
+| Zugriffsschutz | Kurztext | – (VD 3.4, VVT C.3) |
 
 Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Ausgangsrechnung“.
 
@@ -682,6 +710,7 @@ Sechs Abschnitte in der Reihenfolge von `TomBereich`. Jeder hat Kontrollkästche
 - Vorschau: `DokumentAnsicht` rendert das gewählte Dokument als HTML. Beim Ansehen einer alten Version führt „Zurück zum aktuellen Entwurf“ zurück.
 - Versionsliste mit den Spalten Version, gültig ab, gültig bis, freigegeben am und von, geänderte Kapitel, aufbewahren bis, Prüfsumme (12 Zeichen). Je Zeile die Knöpfe „Ansehen“ und „DOCX“.
 - Versionen lassen sich nicht ändern oder löschen.
+- Abschnitt „Mitgeltende Unterlagen“: Tabelle Unterlage · Ablageort mit Knopf „Entfernen“ je Zeile und „+ Mitgeltende Unterlage“ (Fokus ins neue Namensfeld, nach dem Entfernen auf den Knopf). Einträge stehen in Kapitel 6 als „{Name} (Ablage: {Ablageort})“. Ältere Einträge aus `mitgeltend` erscheinen mit leerem Ablageort und gehen bei der ersten Änderung in `mitgeltendeUnterlagen` über.
 
 **Freigabe-Dialog** (`<dialog>` mit `aria-labelledby`):
 
@@ -797,21 +826,23 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | B7 | Elektronisches Original nicht aufbewahrt | Fehler bei Form `strukturiert`, sonst Hinweis | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, Ablageform `umgewandelt` | `strukturiert`: „Bei „{d}“ muss der strukturierte Teil aufbewahrt werden, z. B. die XML-Datei. Nur ein PDF genügt nicht.“ Sonst: „„{d}“ liegt nur umgewandelt vor. Prüfen, ob die Voraussetzungen der GoBD Rz. 135 erfüllt sind; sonst das Original zusätzlich aufbewahren.“ | GoBD Rz. 119, 131, 135 (Fassung 14.07.2025) | belege |
 | B8 | Ersetzendes Scannen dokumentieren | Hinweis | Form `papier`, Ablageform `scan`, `originalVernichtet = true` | „„{d}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.“ | GoBD Rz. 136 | belege |
 | B9 | Abtippen ohne Erfassungskontrolle | Hinweis | Aufgabe A mit Übertragung schreibt ein Objekt d mit Art `buchungsbeleg` oder `buecher`; keine Prüfung oder Freigabe liest d; keine weitere Kontrolle mit `bezugAufgabeId = A.id` | „In „{A}“ wird „{d}“ von Hand übertragen, und keine Kontrolle prüft das Ergebnis.“ | GoBD Rz. 100 | kontrollen |
+| B11 | Lieferschein: Frist nach HGB klären | Hinweis | Unternehmen ist Kaufmann (Rechtsform e. K., OHG, KG, GmbH, UG, GmbH & Co. KG, eG oder Gewinnermittlung Bilanz), Art `lieferschein`, `aufbewahrungJahre` `null` oder unter 6 | „„{d}“ ist als Lieferschein ohne Buchungsfunktion eingeordnet. Für Kaufleute kann er als Handelsbrief 6 Jahre aufzubewahren sein (§ 257 HGB). Kläre das mit der Steuerberatung und wähle dann 6 Jahre oder ordne die Unterlage als Geschäftsbrief ein.“ | § 257 Abs. 1, 2 und 4 HGB; § 147 Abs. 3 AO | fristen |
 | D1 | Personenbezug ungeklärt | Hinweis | `personenbezogen = null` | „Enthält „{d}“ Angaben zu Personen, z. B. Name, Anschrift oder Telefonnummer?“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D2 | Betroffene oder Datenarten fehlen | Warnung | personenbezogen und (Betroffene leer oder Datenkategorien leer) | „Für „{d}“ fehlen {betroffene Personen / Datenkategorien}.“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D3 | Rechtsgrundlage fehlt | Warnung | personenbezogen und keine Rechtsgrundlage | „Auf welcher Grundlage werden die Daten in „{d}“ verarbeitet?“ | Art. 6 Abs. 1 DSGVO | belege |
 | D4 | Berechtigtes Interesse nicht benannt | Hinweis | `interesse` gewählt und Text leer | „Welches berechtigte Interesse gilt für „{d}“? Interesse und Abwägung kurz festhalten.“ | Art. 6 Abs. 1 lit. f DSGVO | belege |
-| D5 | Besonders geschützte Daten | Warnung | besondere Kategorien nicht leer oder `strafrechtlich` | „„{d}“ enthält {Kategorien}. Dafür gelten strengere Regeln; den Datenschutzbeauftragten oder eine fachkundige Person einbeziehen.“ | Art. 9 Abs. 1, Art. 10 DSGVO | belege |
+| D5 | Besonders geschützte Daten | Warnung; Hinweis, wenn nur besondere Kategorien mit gewählter Ausnahme nach Art. 9 Abs. 2 | besondere Kategorien nicht leer oder `strafrechtlich` | „„{d}“ enthält {Kategorien}. Dafür gelten strengere Regeln; den Datenschutzbeauftragten oder eine fachkundige Person einbeziehen.“ Bei besonderen Kategorien ohne `ausnahmeArt9` zusätzlich: „Gib an, welche Ausnahme nach Art. 9 Abs. 2 DSGVO die Verarbeitung erlaubt; ob daneben eine Vorschrift des BDSG gilt, klärst du mit dem Datenschutz.“ | Art. 9 Abs. 1 und 2, Art. 10 DSGVO | belege |
 | D6 | Löschfrist fehlt | Warnung | personenbezogen, Art `keine`, `loeschfrist = null` | „„{d}“ enthält personenbezogene Daten ohne Aufbewahrungspflicht und ohne Löschfrist. Lege fest, wann gelöscht wird, z. B. 30 Tage nach Erledigung.“ | Art. 5 Abs. 1 lit. e, Art. 30 Abs. 1 lit. f DSGVO; DSK-Hinweise | fristen |
-| D7 | Längere Aufbewahrung ohne Grund | Warnung | personenbezogen, `aufbewahrungJahre > mindestJahre` (bei Lieferschein zählt jede gewählte Frist als länger), Begründung leer | „„{d}“ wird {x} statt {y} Jahre aufbewahrt. Personenbezogene Daten nur so lange speichern wie nötig: Grund angeben.“ | Art. 5 Abs. 1 lit. e DSGVO | fristen |
+| D7 | Längere Aufbewahrung ohne Grund | Warnung | personenbezogen, `aufbewahrungJahre > mindestJahre` (bei Lieferschein zählt jede gewählte Frist als länger, bei Kaufleuten erst eine über 6 Jahren, Vergleichswert dann 6 Jahre), Begründung leer | „„{d}“ wird {x} statt {y} Jahre aufbewahrt. Personenbezogene Daten nur so lange speichern wie nötig: Grund angeben.“ | Art. 5 Abs. 1 lit. e DSGVO | fristen |
 | D8 | Empfänger ohne gesicherten Standort | Warnung | ein externer Empfänger mit Standort `unbekannt`, oder `drittland` und (Garantie `null` oder `keine` oder Name leer) | „Für „{Kategorie}“ ist {nicht bekannt, wo die Daten verarbeitet werden / keine Garantie für die Übermittlung nach {Land} eingetragen / der Empfänger in {Land} nicht benannt}.“ | Art. 30 Abs. 1 lit. e, Art. 44–46 DSGVO; DSK-Hinweise Ziff. 6.5 | belege |
 | D9 | Zweck fehlt | Warnung | ein Objekt personenbezogen, kein nicht leerer Zweck | „Wozu werden die Daten in diesem Prozess verarbeitet?“ | Art. 30 Abs. 1 lit. b DSGVO | belege |
-| S1 | Betrieb des Systems unklar | Hinweis | digital, im Einsatz, `betrieb = null` | „Wo läuft „{s}“: auf eigenen Geräten, auf eigenem Server oder als Cloud-Dienst?“ | Muster, Kap. 3.1 | systeme |
+| S1 | Betrieb des Systems unklar | Hinweis; Warnung bei `hatPersonenbezug` | digital, im Einsatz, `betrieb = null` | „Wo läuft „{s}“: auf eigenen Geräten, auf eigenem Server oder als Cloud-Dienst?“ Mit Personenbezug zusätzlich: „Davon hängen die Angaben zu Empfängern und Drittländern im Verzeichnis ab.“ | Muster, Kap. 3.1; mit Personenbezug zusätzlich Art. 30 Abs. 1 lit. d, e DSGVO | systeme |
 | S2 | Dienstleister ohne AV-Vertrag | Warnung | `mitDienstleister`, `hatPersonenbezug`, `auftragsverarbeitung ≠ false`, `avVertrag ≠ 'ja'` | „{Dienstleister} verarbeitet in „{s}“ personenbezogene Daten. Dafür ist ein Vertrag zur Auftragsverarbeitung nötig.“ Bei `auftragsverarbeitung = null` zusätzlich: „Prüfe zuerst, ob im Auftrag verarbeitet wird.“ | Art. 28 Abs. 3 DSGVO | systeme |
 | S3 | Speicherort unklar oder ohne Garantie | Warnung | `mitDienstleister`, `hatPersonenbezug`, Standort `unbekannt` oder (`drittland` und Garantie `null` oder `keine`) | „Wo verarbeitet „{s}“ die Daten? Liegt der Server im Drittland oder läuft der Mailversand darüber, ist das eine Übermittlung; Support von dort kann eine sein.“ | Art. 44–46 DSGVO; DSK-Hinweise Ziff. 6.4 | systeme |
 | S4 | Programmversion fehlt | Hinweis | digital, im Einsatz, Version leer oder `seit = null` | „Für „{s}“ fehlen Version oder Einsatzbeginn. Die Dokumentation muss zu den eingesetzten Programmversionen passen.“ | GoBD Rz. 154; Muster 3.1 | systeme |
 | S5 | Datensicherung ungeklärt | Warnung | digital, `ablageVon` nicht leer, Sicherung `keine` oder `unklar` | „„{s}“ bewahrt {Liste} auf, eine Datensicherung ist {nicht eingerichtet / nicht bekannt}.“ | GoBD Rz. 103–106; Art. 32 Abs. 1 lit. c DSGVO | systeme |
 | S6 | Rücksicherung nicht getestet | Hinweis | Sicherung `manuell` oder `automatisch` und (`wiederherstellungGetestet = null` oder `tageZwischen(getestet, heute) > 365`) | „Für „{s}“ wurde {noch nie / seit {Datum} nicht} geprüft, ob sich die Sicherung zurückspielen lässt.“ | Art. 32 Abs. 1 lit. c, d DSGVO | systeme |
+| S8 | Wiederfinden und Datenzugriff offen | Hinweis | digital, im Einsatz, `ablageVon` nicht leer, `wiederfinden` oder `datenzugriff` leer | „Für „{s}“ ist offen, {wie eine Unterlage wiedergefunden wird / wie die Finanzverwaltung bei einer Außenprüfung auf die Daten zugreift, auch nach Vertragsende oder Systemwechsel}.“ | GoBD Rz. 152, 156–159; § 147 Abs. 2, 5 und 6 AO | systeme |
 | K1 | Freigabe ohne Vier-Augen-Prinzip | Warnung oder Hinweis | Abschnitt 6.4 | Abschnitt 6.4 | GoBD Rz. 100; Muster 3.2 | kontrollen |
 | K2 | Kontrolle ohne Nachweis | Hinweis | Nachweis `keiner` oder `unklar` (Aufgabe oder weitere Kontrolle) | „„{k}“ wird nicht nachgewiesen. Kontrollen sind einzurichten, auszuüben und zu protokollieren, z. B. mit Kürzel und Datum.“ | GoBD Rz. 100 | kontrollen |
 | K3 | Kontrolle ohne Angaben | Hinweis | Aufgabe der Art Prüfung oder Freigabe ohne Eintrag in `kontrollen` | „Was prüft „{A}“, und wie wird es nachgewiesen?“ | GoBD Rz. 102 | kontrollen |
@@ -823,7 +854,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | V2 | Geändert seit der letzten Freigabe | Warnung | `geaenderteKapitel` gegenüber der letzten Version nicht leer (6.8) | „Seit Version {x} geändert: {Kapitel}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.“ | GoBD Rz. 154 | dokumente |
 | V3 | Überprüfung fällig | Hinweis | Versionen vorhanden, V2 trifft nicht zu, `tageZwischen(max(letzte freigegebenAm, zuletztGeprueft), heute) > 365` | „Die letzte Prüfung ist {n} Tage her. Einmal im Jahr prüfen, ob alles noch stimmt.“ | Art. 32 Abs. 1 lit. d DSGVO; 365 Tage als Annahme | dokumente |
 
-Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
+Zusammen 40 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
 
 ### 6.6 Verfahrensdokumentation erzeugen
 
@@ -840,18 +871,19 @@ Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 2.2.1 Unternehmensportrait | Tabelle: Name, Sitz, Rechtsform, Branche, Geschäftszweck, Gewinnermittlung | Unternehmen |
 | 2.2.2 Aufbau- und Ablauforganisation | Tabelle Rolle · Personen · intern oder extern (Organisation) + „Den Ablauf zeigt das Diagramm in Kapitel 9.1.“ | Rollen |
 | 2.2.3 Einsatzorte | Standorte als Liste; Papierablagen (Ablageorte mit Medium Papier) | Unternehmen, Ablageorte |
-| 2.3 Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien | Textbaustein A.2, Fristentabelle aus 3.2, Kriterientabelle A.3; bei längerer Aufbewahrung: „Länger als vorgeschrieben werden aufbewahrt: {Liste}. Grund: {Begründung}.“ | fest, Angaben |
-| 2.4 Relevante Dokumente | Tabelle Unterlage · Einordnung · Form · Entsteht in · Ablage · Aufbewahrung · Beispiel {Bezugsjahr}; Zeilen nach Nummer von `entstehtIn`, Objekte ohne Ersteller am Ende nach Name | Datenobjekte |
+| 2.3 Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien | Textbaustein A.2, Fristentabelle aus 3.2 (bei Kaufleuten beim Lieferschein mit „; handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären“), darunter der Absatz zu Instituten (A.7), Kriterientabelle A.3; bei längerer Aufbewahrung: „Länger als vorgeschrieben werden aufbewahrt: {Liste}. Grund: {Begründung}.“ | fest, Angaben |
+| 2.4 Relevante Dokumente | Tabelle Unterlage · Einordnung · Form · Entsteht in · Ablage · Aufbewahrung · Beispiel {Bezugsjahr}; Zeilen nach Nummer von `entstehtIn`, Objekte ohne Ersteller am Ende nach Name; Lieferschein bei Kaufleuten ohne gewählte 6 Jahre mit dem Zusatz nach § 257 HGB | Datenobjekte |
 | 2.5 Einweisung in das Verfahren | einmalig: „Wer mitarbeitet, wird vor Beginn eingewiesen.“ · jährlich: „… vor Beginn und danach jährlich eingewiesen.“ · keine bzw. null: „Eine Einweisung ist nicht festgelegt.“ · Protokoll: „Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).“ | Einweisung |
-| 2.6 Abgrenzung der Bearbeitungsbereiche | externe Rollen, Dienstleister und externe Teilnehmer (Format 3) als Liste, sonst „Alle Schritte finden im Unternehmen statt.“; dazu „Mit externen Stellen ist diese Dokumentation abzustimmen.“ | Rollen, Systeme, Teilnehmer |
+| 2.6 Abgrenzung der Bearbeitungsbereiche | externe Rollen, Dienstleister und externe Teilnehmer (Format 3) als Liste, sonst „Alle Schritte finden im Unternehmen statt.“; dazu „Mit externen Stellen ist diese Dokumentation abzustimmen.“ Ist der Betrieb eines Systems offen (`betrieb = null`, kein Dienstleister), steht „Wer {Systeme} betreibt, ist offen.“, ohne externe Stellen statt „Alle Schritte finden im Unternehmen statt.“ | Rollen, Systeme, Teilnehmer |
 | 3 Organisation und Sicherheit des IT-gestützten Verfahrens | – | – |
 | 3.1 Eingesetzte Hard- und Software | Tabelle System · Art · Hersteller · Version · im Einsatz seit · Betrieb · Dienstleister und Standort; Satz „Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.“ | digitale Medien im Einsatz, Reihenfolge wie `p.medien` |
 | 3.2 Zuständigkeiten | Tabelle Schritt (4.k Name) · Rolle · System; zwei Zeilen „Freigabe der Löschung nach Fristablauf“ und „Durchführung der Löschung“ | Aufgaben, Löschorganisation |
 | 3.3 Organisation und Internes Kontrollsystem | Textbaustein A.4; Tabelle Kontrolle · Art · Wer · Was geprüft wird · Nachweis · Häufigkeit (Aufgaben: „bei jedem Vorgang“) | Kontrollen |
-| 3.4 Datenschutz und Datensicherheit | Textbaustein A.5; Tabelle System · Schutz vor Änderung · Datensicherung · Intervall · Rücksicherung getestet („ja“ oder „nein“). Das Datum des letzten Tests steht nicht im Dokument, sonst löst jeder neue Test V2 aus; es dient nur Regel S6. | Systeme |
+| 3.4 Datenschutz und Datensicherheit | Textbaustein A.5; Tabelle System · Schutz vor Änderung · Datensicherung · Intervall · Rücksicherung getestet („ja“ oder „nein“) · Zugriffsschutz (leer „offen“). Das Datum des letzten Tests steht nicht im Dokument, sonst löst jeder neue Test V2 aus; es dient nur Regel S6. | Systeme |
+| 3.5 Wiederfinden, Lesbarmachung und Datenzugriff | je System mit `ablageVon` nicht leer: Textbaustein A.8 und Tabelle System · Aufbewahrte Unterlagen · Wiederfinden über · Datenzugriff, auch nach Vertragsende oder Systemwechsel (leer „offen“, Regel S8); ohne solche Systeme „Im Prozess werden keine aufbewahrungspflichtigen Unterlagen in IT-Systemen abgelegt.“ | Systeme, Ablage |
 | 4 Verfahren und Maßnahmen: {Prozess} | Ablaufbeschreibung 6.6.1; letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“ | Prozessbaum, Angaben |
 | 5 Ersetzendes Scannen | mit B8-Objekten: „Für {Liste} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.“ · sonst: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte |
-| 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` | Systeme, Angaben |
+| 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` (ältere Dateien) und `mitgeltendeUnterlagen` als „{Name} (Ablage: {Ablageort})“ bzw. nur „{Name}“ | Systeme, Angaben |
 | 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“) | Historie |
 | 8 Glossar | Tabelle aus A.6 | fest |
 | 9 Anlage | 9.1 Ablaufdiagramm (Abschnitt `diagramm`); 9.2 Nachweis der Einweisung nur bei Protokoll: Tabelle Datum · Name · Rolle · Unterschrift mit 8 leeren Zeilen | Prozess |
@@ -881,7 +913,7 @@ Rekursiver Gang durch den Baum mit einer Liste der Bedingungen. Zuerst werden al
 
 Zeiten, Anteile und Anzahlen erscheinen nicht; sie sind für die Dokumentation unerheblich. Kommt ein Baustein aus Format 3 erst nach dieser Erweiterung hinzu, braucht er hier einen Satzbaustein und einen Test.
 
-Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je Objekt mit Art in PFLICHTIG der Satz „„{d}“: aufbewahren {aufbewahrungText}; Ablage: {Speicher}.“ Dazu: „Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Die Löschung gibt {freigabe} frei, durchgeführt wird sie von {durchfuehrung}, {jährlich/halbjährlich/ohne festen Turnus}.“ Leere Angaben erscheinen als „offen“.
+Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je Objekt mit Art in PFLICHTIG der Satz „„{d}“: aufbewahren {aufbewahrungText}; Ablage: {Speicher}.“, beim Lieferschein von Kaufleuten ohne gewählte 6 Jahre ergänzt um „Handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären.“ Dazu: „Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Die Löschung gibt {freigabe} frei, durchgeführt wird sie von {durchfuehrung}, {jährlich/halbjährlich/ohne festen Turnus}.“ Leere Angaben erscheinen als „offen“.
 
 ### 6.7 Verzeichnis erzeugen
 
@@ -893,13 +925,13 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 | A Angaben zum Verantwortlichen | Tabelle Name, Anschrift, Telefon, E-Mail, Internet; gemeinsam Verantwortlicher und Vertreter nur wenn vorhanden; Datenschutzbeauftragter oder „nicht benannt“ |
 | B Verarbeitungstätigkeit {Nr.}: {Benennung} | Tabelle Benennung · laufende Nummer · eingeführt am · letzte Änderung (`gueltigAb` der Version bzw. „Entwurf“) · Fachabteilung · Ansprechpartner · Telefon · E-Mail |
 | B.1 Zwecke (lit. b) | Liste |
-| B.2 Rechtsgrundlagen | Liste „Art. 6 Abs. 1 lit. {x} DSGVO: {Text}“, bei lit. f mit Interesse |
-| B.3 Betroffene Personen und Daten (lit. c) | Listen Betroffene und Datenkategorien; besondere Kategorien und Art. 10 nur wenn vorhanden; Tabelle je personenbezogenem Objekt: Unterlage · Betroffene · Daten · Rechtsgrundlage · Löschung |
+| B.2 Rechtsgrundlagen | Liste „Art. 6 Abs. 1 lit. {x} DSGVO: {Text}“, bei lit. f mit Interesse; bei besonderen Kategorien zusätzlich „Art. 9 Abs. 2 lit. {x} DSGVO: {Text} (für {Unterlagen})“ bzw. „Art. 9 Abs. 2 DSGVO: offen (für {Unterlagen})“; fehlt Art. 6 dann ganz: „Art. 6 Abs. 1 DSGVO: offen“ |
+| B.3 Betroffene Personen und Daten (lit. c) | Listen Betroffene und Datenkategorien; besondere Kategorien und Art. 10 nur wenn vorhanden; Tabelle je personenbezogenem Objekt: Unterlage · Betroffene · Daten (mit „{besondere Kategorien} (Art. 9 DSGVO)“ und „{Art. 10} (Art. 10 DSGVO)“) · Rechtsgrundlage (bei besonderen Kategorien mit „; Art. 9 Abs. 2 lit. {x}“ bzw. „; Art. 9 Abs. 2: offen“) · Löschung (`loeschText`) |
 | B.4 Empfänger (lit. d) | intern: interne Rollen mit Zugriff; extern: externe Rollen mit Zugriff („{Organisation} ({Rolle})“), Dienstleister personenbezogener Systeme („{Name} (Auftragsverarbeiter, „{System}“)“ bzw. ohne Zusatz), dann externe Empfänger nach Kategorie |
-| B.5 Übermittlung in Drittländer (lit. e) | ohne Drittland: „Eine Übermittlung in Drittländer findet nicht statt und ist nicht geplant.“; sonst Tabelle konkreter Empfänger (Name bzw. Dienstleister) · Land · Garantie |
-| B.6 Löschfristen (lit. f) | Tabelle Unterlage · Frist (`loeschText`) |
+| B.5 Übermittlung in Drittländer (lit. e) | Tabelle konkreter Empfänger im Drittland (Name bzw. Dienstleister) · Land · Garantie, darunter bei offenen Standorten „Ort der Verarbeitung offen bei: {Liste}.“; ohne Drittland und ohne Offenes: „Eine Übermittlung in Drittländer findet nicht statt und ist nicht geplant.“; ohne Drittland, aber mit Offenem: „Ob personenbezogene Daten in Drittländer übermittelt werden, ist noch offen bei: {Liste}.“ Offen sind Dienstleister und Empfänger mit Standort `unbekannt` sowie Systeme mit Personenbezug, deren Betrieb offen ist („„{s}“ (Betrieb offen)“). |
+| B.6 Löschfristen (lit. f) | Tabelle Unterlage · Frist (`loeschText`; beim Lieferschein „{aufbewahrungText} (§ 147 Abs. 3 AO)“, bei gewählter Frist „nach Ablauf der Aufbewahrung: {aufbewahrungText}“ ohne diese Fundstelle; bei Kaufleuten unter 6 Jahren mit dem Zusatz nach § 257 HGB) |
 | B.7 Technische und organisatorische Maßnahmen (lit. g) | „Siehe Abschnitt C.“ |
-| C Technische und organisatorische Maßnahmen (Art. 32 Abs. 1) | sechs Unterabschnitte; je Bereich Liste der Maßnahmen, „Trifft nicht zu: {Begründung}“ oder „Keine Maßnahme eingetragen.“ |
+| C Technische und organisatorische Maßnahmen (Art. 32 Abs. 1) | sechs Unterabschnitte; je Bereich Liste der Maßnahmen, „Trifft nicht zu: {Begründung}“ oder „Keine Maßnahme eingetragen.“; unter C.3 (Vertraulichkeit) zusätzlich „Zugriffsschutz je System:“ mit „{System}: {Zugriffsschutz}“ (leer „offen“) je System mit Personenbezug |
 | D Änderungen | Tabelle Version · gültig ab · Änderung |
 | Schluss | Zeile „Ort, Datum · Unterschrift des Verantwortlichen“ |
 
@@ -914,7 +946,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 ### 6.9 Feste Textbausteine (eigene Formulierungen)
 
 - **A.0 Hinweis:** „Vorlage, erstellt mit dem Prozesslotsen am {Stand}. Rechtsstand {Rechtsstand}. Vor Verwendung von der Steuerberatung prüfen lassen. Beschreibt nur den Prozess „{Prozess}“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen.“ Im Verzeichnis: „… vom Datenschutzbeauftragten oder einer fachkundigen Person prüfen lassen. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018).“
-- **A.1 Kapitel 1:** „Gegenstand dieser Dokumentation ist der Prozess „{Prozess}“ bei {Unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung von {Name} (Geschäftsleitung).“ Freigegeben: „Version {x}, freigegeben von {von} am {am}. Sie gilt für das Verfahren, wie es seit dem {gültig ab} angewandt wird.“ Entwurf: „Entwurf, noch nicht freigegeben.“ Mit Vorgänger: „Vorgängerversion: {y}. Was sich geändert hat, zeigt Kapitel 7.“ Immer: „Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.4.“
+- **A.1 Kapitel 1:** „Gegenstand dieser Dokumentation ist der Prozess „{Prozess}“ bei {Unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung von {Name} (Geschäftsleitung).“ Freigegeben: „Version {x}, freigegeben von {von} am {am}. Sie gilt für das Verfahren, wie es seit dem {gültig ab} angewandt wird.“ Entwurf: „Entwurf, noch nicht freigegeben.“ Mit Vorgänger: „Vorgängerversion: {y}. Was sich geändert hat, zeigt Kapitel 7.“ Immer: „Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.5.“
 - **A.2 Kapitel 2.3:** „Maßgeblich sind die Abgabenordnung (§§ 145 bis 147 AO), § 14b UStG und die GoBD (BMF-Schreiben vom 28.11.2019 in der Fassung vom 14.07.2025). Für Kaufleute gelten zusätzlich §§ 238, 239 und 257 HGB.“ Fristenregel: „Die Frist beginnt mit dem Ende des Kalenderjahres, in dem die Unterlage entstanden, eingegangen oder abgesandt wurde; bei Büchern zählt die letzte Eintragung. Sie läuft nicht ab, solange die Unterlagen für Steuern mit noch offener Festsetzungsfrist von Bedeutung sind (§ 147 Abs. 3 und 4 AO).“
 - **A.3 Ordnungsmäßigkeitskriterien:** Tabelle mit den Spalten Nr., Anforderung, Bedeutung. Die 13 Anforderungen und ihre Reihenfolge folgen dem Muster (Ziff. 2.3 [10]), die Erklärungen sind eigene Kurzfassungen:
 
@@ -936,6 +968,8 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 - **A.4 Kapitel 3.3:** „Nur eingewiesene Personen arbeiten in den Schritten aus Kapitel 4, und zwar stets so, wie dort beschrieben. Für jede Kontrolle ist festgelegt, wer sie ausübt und wie sie belegt wird (GoBD Rz. 100). Weicht die Praxis von dieser Beschreibung ab, erfährt es die Geschäftsleitung; Anlass und Maßnahme werden schriftlich festgehalten.“
 - **A.5 Kapitel 3.4:** „Zugriff auf die Unterlagen haben nur berechtigte Personen, vom Entstehen bis zur Vernichtung. Wann vernichtet und gelöscht wird, regelt das letzte Unterkapitel von Kapitel 4. Die Schutzmaßnahmen im Einzelnen nennt das Verzeichnis von Verarbeitungstätigkeiten in Abschnitt C.“
 - **A.6 Glossar:** zehn Begriffe, je ein Satz mit Fundstelle. Begriffe: Aufbewahrungsfrist, Auftragsverarbeiter, Beleg, E-Rechnung, Geschäftsbrief, GoBD, Internes Kontrollsystem, Unveränderbarkeit, Verfahrensdokumentation, Vier-Augen-Prinzip. Beispiel: „Unveränderbarkeit: Einmal erfasste Informationen dürfen nicht ohne Kenntlichmachung geändert oder gelöscht werden (§ 146 Abs. 4 AO, GoBD Rz. 107 ff.).“
+- **A.7 Kapitel 2.3, unter der Fristentabelle:** „Ausnahme: Für Kredit- und Finanzdienstleistungsinstitute, Versicherungsunternehmen und Wertpapierinstitute gelten für Buchungsbelege weiter 10 Jahre (Art. 97 § 19a Abs. 3 EGAO, § 257 Abs. 4 Satz 2 HGB).“
+- **A.8 Kapitel 3.5:** „Aufbewahrte Unterlagen müssen bis zum Ende der Frist eindeutig wiederzufinden, unverzüglich lesbar zu machen und maschinell auswertbar sein. Bei einer Außenprüfung kann die Finanzverwaltung die Daten im System einsehen, Auswertungen nach ihren Vorgaben verlangen oder die Daten in einem maschinell auswertbaren Format anfordern, auch wenn sie bei einem Dienstleister liegen (§ 147 Abs. 2, 5 und 6 AO; GoBD Rz. 152, 156–159).“ Der Satz beschreibt, was verlangt ist, und sichert nicht zu, dass es erfüllt ist.
 
 ### 6.10 Weitere Funktionen
 
@@ -969,9 +1003,10 @@ src/compliance/            Fachlogik ohne React, vollständig getestet
   unterlagen.ts            Unterlagen, Ablageorte, Zugriffe: Operationen (4.1)
   quelle.ts                Adapter datenSicht (heute aus compliance, später aus dem Modell)
   datum.ts                 ISO-Datum: prüfen, formatieren, addieren
-  fristen.ts               Mindestfrist, Fristende, Texte
+  fristen.ts               Mindestfrist, Fristende, Texte, Kaufmannseigenschaft (§ 257 HGB)
+  mitgeltend.ts            mitgeltende Unterlagen (Kapitel 6), auch ältere Einträge ohne Ablageort
   ableitung.ts             Ersteller, Nutzer, Systeme mit Daten, vorigeAufgabe
-  regeln.ts                pruefeCompliance: Lückenprüfung (38 Regeln)
+  regeln.ts                pruefeCompliance: Lückenprüfung (40 Regeln)
   dokument.ts              Kapitelschlüssel, Vergleich
   ablauftext.ts            Kapitel 4 aus dem Baum
   verfahrensdoku.ts        Generator Verfahrensdokumentation
@@ -1100,14 +1135,16 @@ Das Programm ist seit Commit `90aaba0` umgesetzt (`src-tauri`, `src/plattform`).
 | `dob_tourenliste` | Tourenliste | keine | datensatz | intern | – | ja | Kunden; kontakt | vertrag | auf_tour | auf_ausliefern |
 | `dob_rechnung` | Ausgangsrechnung | buchungsbeleg | bild | ausgang | Warenwirtschaft, original | ja | Kunden; kontakt, vertrag, zahlung | vertrag, rechtspflicht | auf_rechnung | auf_freigeben, auf_versenden |
 
-Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen Empfänger „Steuerberatung“, Name „Kanzlei Beispiel“, Deutschland.
+Alle ohne Löschfrist und ohne gewählte Jahre, außer `dob_lieferschein` mit 6 Jahren: Die GmbH ist Kaufmann und bewahrt den quittierten Lieferschein als möglichen Handelsbrief 6 Jahre auf (§ 257 HGB); deshalb meldet B11 im Beispiel nichts. `dob_rechnung` hat den externen Empfänger „Steuerberatung“, Name „Kanzlei Beispiel“, Deutschland.
 
 **Systeme:**
 
 | Medium | Hersteller | Version | seit | Betrieb | Dienstleister | Standort | AV | Unveränderbarkeit | Sicherung |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `med_erp` Warenwirtschaft | WaWi-Cloud (Beispielanbieter) | – | – | cloud | WaWi-Cloud (Beispielanbieter) | eu_ewr | Auftragsverarbeitung ja, Vertrag nein | protokolliert | anbieter |
-| `med_excel` Excel-Tourenliste | Microsoft | Microsoft 365 | 2023-01-01 | lokal | – | – | – | unklar | automatisch, täglich, getestet 2026-06-30 |
+| `med_excel` Excel-Tourenliste | Microsoft | Excel 2024 (Kaufversion) | 2025-01-01 | lokal | – | – | – | unklar | automatisch, täglich, getestet 2026-06-30 |
+
+Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentität eindeutig sind (GoBD Rz. 154) und keine Fragen nach Auftragsverarbeitung oder Drittland offen bleiben. Zugriffsschutz: Warenwirtschaft „eigenes Konto je Person, Rechte nach Rolle“, Excel-Tourenliste „eigenes Windows-Konto, Ordner nur für die Disposition“. Warenwirtschaft: Wiederfinden „Suche nach Rechnungs-, Bestell- oder Kundennummer“, Datenzugriff „Export aller Rechnungen und Buchungsdaten als CSV und PDF; bei Vertragsende Gesamtexport nach Vertrag“. Alle Rollen sind intern.
 
 **Kontrollen:** `auf_kontrollieren`: Plausibilität, „Ware vollständig und richtig“, Nachweis keiner. `auf_freigeben`: Vier-Augen-Prinzip, „Rechnung sachlich und rechnerisch richtig“, Nachweis System. Keine weiteren Kontrollen.
 
@@ -1160,7 +1197,11 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | Form `bild`, Richtung `ausgang`, Ablage nur Papier, erzeugt mit Medium `tabelle` / `erp` | B6 Hinweis / B6 Fehler |
 | Form `bild`, Ablageform `umgewandelt` / Form `strukturiert`, `umgewandelt` | B7 Hinweis / B7 Fehler |
 | Empfänger im Drittland mit Standardvertragsklauseln, ohne Name / mit Name | D8 / kein D8 |
-| Lieferschein mit gewählten 2 Jahren, personenbezogen, ohne Begründung | D7 |
+| Lieferschein mit gewählten 2 Jahren, personenbezogen, ohne Begründung, Einzelunternehmen mit Einnahmen-Überschuss-Rechnung / GmbH | D7 / kein D7, aber B11 |
+| Lieferschein der GmbH mit gesetzlicher Frist / 6 Jahren / 8 Jahren ohne Begründung | B11 / weder B11 noch D7 / D7 „8 Jahre statt 6 Jahre“ |
+| System mit Ablage, `wiederfinden` oder `datenzugriff` leer / beide ausgefüllt / System ohne aufbewahrungspflichtige Ablage | S8 / kein S8 / kein S8 |
+| Unterlage mit Gesundheitsdaten ohne / mit `ausnahmeArt9` | D5 Warnung / D5 Hinweis (mit `strafrechtlich` weiter Warnung) |
+| neues System mit Personenbezug, `betrieb = null` | S1 Warnung; B.5 „ist noch offen bei: „{s}“ (Betrieb offen)“ |
 | neue Aufgabe einer Rolle „Steuerberatung“ (`extern = true`, Organisation „Kanzlei Beispiel“) liest `dob_rechnung` | Verzeichnis B.4 nennt „Kanzlei Beispiel (Steuerberatung)“ extern, nicht intern |
 | Art `unklar`, personenbezogen, ohne Löschfrist | B1, aber kein D6 |
 | `aufbewahrungJahre` = Mindestfrist / 10 statt 8 mit Begründung | kein D7 / kein D7 |
@@ -1235,6 +1276,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | `compliance.version = 2` | Formatfehler „Compliance-Angaben in Version 2 werden nicht unterstützt.“ |
 | `systeme.med_erp.seit = '2026-13-01'` | Formatfehler mit Feldnamen |
 | unbekannter Katalogwert | Formatfehler |
+| Datei ohne `ausnahmeArt9`, `wiederfinden`, `datenzugriff`, `mitgeltendeUnterlagen` / mit unbekanntem `ausnahmeArt9`, `datenzugriff` als Zahl, doppelter Id in `mitgeltendeUnterlagen` | lädt, Angaben gelten als offen / Formatfehler mit Feldnamen |
 | Unterlage löschen | Eintrag in `compliance.datenobjekte` und ihre Zugriffe entfernt; Rückgängig stellt beides wieder her |
 | Aufgabe `auf_rechnung` im Ist löschen | Zugriffe auf sie entfernt, Unterlage „Ausgangsrechnung“ bleibt; Rückgängig stellt alles wieder her |
 | Medium `med_papier` im Ist löschen | `dsp_ordner.mediumId` wird `null` |

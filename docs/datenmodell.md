@@ -73,14 +73,15 @@ Für die Compliance-Doku trägt das Projekt das optionale Feld `compliance` (Que
 | --- | --- | --- |
 | `unternehmen`, `verarbeitung` | Verantwortlicher, Geschäftsleitung, Datenschutzbeauftragter; Benennung, Nummer und Zwecke der Verarbeitungstätigkeit | – |
 | `unterlagen`, `ablageorte`, `zugriffe` | Datenobjekte („Ausgangsrechnung“), Datenspeicher („Belegarchiv“, mit System) und welcher Schritt eine Unterlage liest oder schreibt | eigene Ids (`unt_…`, `abl_…`) |
-| `datenobjekte` | je Unterlage: Einordnung nach § 147 AO, Form, Richtung, Ablage, gewählte Frist, Personenbezug, Betroffene, Datenkategorien, Rechtsgrundlagen, Löschfrist, externe Empfänger | Unterlage |
-| `systeme` | je digitalem System: Hersteller, Version, seit, Betrieb, Dienstleister, Standort, Auftragsverarbeitung, Schutz vor Änderung, Datensicherung | Medium |
+| `datenobjekte` | je Unterlage: Einordnung nach § 147 AO, Form, Richtung, Ablage, gewählte Frist, Personenbezug, Betroffene, Datenkategorien, Rechtsgrundlagen, bei besonderen Kategorien die Ausnahme nach Art. 9 Abs. 2 DSGVO, Löschfrist, externe Empfänger | Unterlage |
+| `systeme` | je digitalem System: Hersteller, Version, seit, Betrieb, Dienstleister, Standort, Auftragsverarbeitung, Schutz vor Änderung, Datensicherung, Zugriffsschutz; bei Ablage: wie eine Unterlage wiedergefunden wird und wie die Finanzverwaltung Datenzugriff erhält | Medium |
 | `rollen` | intern oder extern, Organisation | Rolle |
 | `kontrollen`, `weitereKontrollen` | Art, Ziel und Nachweis je Prüfung oder Freigabe; Kontrollen außerhalb des Ablaufs | Aufgabe bzw. eigene Id |
 | `einweisung`, `loeschung`, `toms`, `mitgeltend` | Einweisung, Löschorganisation, Schutzmaßnahmen in sechs Bereichen, weitere Unterlagen | – |
 | `versionen`, `zuletztGeprueft` | freigegebene Stände mit eingefrorenem Prozess, beiden Dokumenten und SHA-256-Prüfsumme | Nummer |
 
 - Fehlt ein Eintrag in `datenobjekte`, `systeme`, `rollen` oder `kontrollen`, gilt ein Standardwert; geschrieben wird erst bei der ersten Änderung.
+- Neuere optionale Felder dürfen in älteren Dateien fehlen und gelten dann als offen: `ausnahmeArt9` (je Unterlage), `wiederfinden` und `datenzugriff` (je System) sowie `mitgeltendeUnterlagen` (mitgeltende Unterlagen mit Ablageort; die ältere Liste `mitgeltend` ohne Ablageort geht bei der ersten Änderung darin auf).
 - Ändert sich der Ist-Prozess, entfernt der Reducer im selben Rückgängig-Schritt Angaben zu Systemen, Rollen und Aufgaben, die es nicht mehr gibt (`bereinigeCompliance`). Unterlagen und ihre Angaben bleiben.
 - Beim Laden prüft [`validiereCompliance`](../src/compliance/speicher.ts) jedes Feld und nennt bei einem Fehler das Feld. Eingefrorene Prozesse laufen durch dieselbe Formatmigration wie der Ist-Prozess.
 - Im Browser liegen die Versionen unter einem eigenen Schlüssel und werden nur geschrieben, wenn sich die Liste ändert.
