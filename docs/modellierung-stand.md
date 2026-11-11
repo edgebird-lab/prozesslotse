@@ -15,6 +15,7 @@
 6. Oberfläche, Doku, Bezeichner und Commits auf Deutsch; jede Commit-Nachricht endet mit `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 7. **Diagramme ansehen:** `node C:\Users\Robin\AppData\Local\Temp\claude\2827d1680c0a081d\20159d77-8dab-4ce3-8759-1692f787eb67\scratchpad\render.mjs <datei.bpmn>` (Umgebungsvariablen `SKALA`, `CLIP=x,y,b,h`, `NAME`), das PNG mit dem Read-Werkzeug ansehen; bei jeder neuen Form mindestens ein Beispiel. Fehlt das Skript, ein gleichwertiges mit bpmn-js und Playwright anlegen.
 8. Recherche nur kurz und gezielt.
+9. Laufen nachts andere Agenten gleichzeitig ihre Tests (dutzende node- und Edge-Prozesse), scheitern Browsertests an der 30-s-Grenze. Dann mit `PL_PORT=4176 npx playwright test --workers=3` wiederholen; das ist kein Fehler im Code.
 
 ## Erledigt
 
@@ -51,7 +52,7 @@ Hinweise für Schritt 2 und später:
 
 ## Schritt 2 – Für jede Position
 
-Fertig am 2026-11-11, Commit 1d799c0 „Für jedes Stück einer Liste (Mehrfachinstanz) mit Umwandlungshinweisen“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 2)“.
+Fertig am 2026-11-11, Commit 1d799c0 „Für jedes Stück einer Liste (Mehrfachinstanz) mit Umwandlungshinweisen“ auf `modellierung`, dazu daea105 (Anzahl auf 10.000 begrenzt). Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 2)“.
 
 - [x] Typ `Mehrfach`, `neuerMehrfach`, `pruefeBlock`; Ziehung von N (fest, schwankt) an einer Stelle für alle Nutzer (`src/modell/anzahl.ts`)
 - [x] Operationen, Rücksprungziele (nicht aus dem Körper heraus), Führung („je Stück in …“); `istRahmen` gilt für Mehrfach, `alsMarkierteAufgabe` entscheidet Aufgabe oder Rahmen
