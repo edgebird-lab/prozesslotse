@@ -436,8 +436,15 @@ export interface Dokument {
   abschnitte: Abschnitt[]
 }
 
+/** Rückzug einer Freigabe, bevor die Version in Kraft trat (5.4) */
+export interface Rueckzug {
+  /** Tag des Rückzugs; liegt vor `gueltigAb` der Version */
+  am: IsoDatum
+  grund: string
+}
+
 export interface DokuVersion {
-  /** 1, 2, 3 … fortlaufend */
+  /** 1, 2, 3 … fortlaufend; auch zurückgezogene Versionen behalten ihre Nummer */
   nummer: number
   /** z. B. „1.0“; eindeutig */
   bezeichnung: string
@@ -447,11 +454,13 @@ export interface DokuVersion {
   aenderung: string
   /** automatisch, z. B. ['VD 3.2', 'VD 4', 'VVT B'] */
   geaenderteKapitel: string[]
+  /** Gesetzt, wenn die Freigabe zurückgezogen wurde: Die Version bleibt sichtbar, zählt aber für Reihenfolge und Gültigkeit nicht mehr. */
+  zurueckgezogen?: Rueckzug
   /** Ist-Prozess bei der Freigabe, für Diagramm und Vergleich */
   prozess: Prozess
   verfahrensdoku: Dokument
   verzeichnis: Dokument
-  /** SHA-256 als Hex (64 Zeichen) über kanonisches JSON von [verfahrensdoku, verzeichnis] (6.8) */
+  /** SHA-256 als Hex (64 Zeichen) über kanonisches JSON von [prozess, verfahrensdoku, verzeichnis] (6.8) */
   pruefsumme: string
 }
 
@@ -558,7 +567,9 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 - `compliance` ist optional. Ältere Dateien laden unverändert; `compliance` bleibt dann `undefined`. Version 0.2.0 lädt Dateien mit `compliance` und behält das Feld beim Speichern, weil `leseProjekt` unbekannte Felder nicht entfernt.
 - `FORMAT_VERSION` ist schon 3 (Modellierung v3). Die Compliance-Doku braucht keinen eigenen Sprung, prüft aber `compliance.version === 1`.
 - `validiereCompliance(x)` in `src/compliance/speicher.ts` prüft beim Laden: Typen aller Felder, Werte aus den Katalogen, Datumsfelder als gültiges `JJJJ-MM-TT` oder `null`, Zahlen endlich und ganzzahlig (`personenMitDaten` ≥ 0, `aufbewahrungJahre` 0–30, `Frist.anzahl` 0–100). Ids in `unterlagen` und `ablageorte` sind eindeutig; `zugriffe`, `datenobjekte` und `ablageSpeicherIds` verweisen auf vorhandene Einträge. Fehler werfen `Formatfehler` mit Feldnamen, z. B. „Compliance-Angaben: ‚systeme.med_erp.seit‘ ist kein gültiges Datum.“
-- Versionen: `nummer` aufsteigend ab 1, `gueltigAb` streng aufsteigend, Dokumente mit gültigen Abschnittsarten. Der eingefrorene `prozess` durchläuft dieselbe Migration und Strukturprüfung wie `ist` (private Funktion `pruefeProzess` in `src/modell/speicher.ts`, dafür exportieren). Damit gilt jede künftige Formatmigration auch für alte Versionen.
+- Datumsfelder liegen wie bei der Eingabe zwischen 1900 und 2199 („… liegt nicht zwischen 1900 und 2199.“); mit Jahren wie 9995 rechneten die Fristen sonst fünfstellige Jahre aus. Eine Prüfsumme in Großbuchstaben wird still klein geschrieben; das ist die einzige stille Korrektur.
+- Ist nur der Compliance-Teil fehlerhaft, wirft `leseProjekt` einen `ComplianceFormatfehler` (Unterklasse von `Formatfehler`) mit `detail` („Feld: Fehler“) und dem geprüften Projekt ohne Compliance-Teil. Beim Öffnen fragt die App: „Die Compliance-Angaben in „{Datei}“ sind beschädigt ({Feld}: {Fehler}). Nur den Prozess öffnen?“ „Nur den Prozess öffnen“ lädt ihn als neues, ungespeichertes Dokument ohne Pfad, damit Speichern die Originaldatei nie überschreibt, und meldet das. Die Datei bleibt unverändert.
+- Versionen: `nummer` aufsteigend ab 1, `gueltigAb` unter den nicht zurückgezogenen Versionen streng aufsteigend, Dokumente mit gültigen Abschnittsarten. Bei einer zurückgezogenen Version ist `zurueckgezogen.grund` nicht leer, und `zurueckgezogen.am` liegt zwischen `freigegebenAm` und dem Tag vor `gueltigAb` (sie war nie in Kraft). Der eingefrorene `prozess` durchläuft dieselbe Migration und Strukturprüfung wie `ist` (private Funktion `pruefeProzess` in `src/modell/speicher.ts`, dafür exportieren). Damit gilt jede künftige Formatmigration auch für alte Versionen.
 - `bereinigeCompliance(c, ist)`: entfernt Einträge in `systeme`, `rollen`, `kontrollen` und `zugriffe`, deren Medium, Rolle oder Aufgabe im Ist-Prozess fehlt. `Ablageort.mediumId` wird dann `null`; Unterlagen und ihre Angaben bleiben. Der Reducer ruft sie nach jeder Aktion auf, die den Ist-Prozess ändert (`prozess`, `projekt`), im selben Rückgängig-Schritt. Änderungen am Soll-Prozess bereinigen nichts.
 - Ein Eintrag in `kontrollen` bleibt erhalten, wenn die Aufgabe nur ihre Art wechselt; die Generatoren lesen ihn dann nicht.
 
@@ -680,20 +691,20 @@ Sechs Abschnitte in der Reihenfolge von `TomBereich`. Jeder hat Kontrollkästche
 - Umschalter (`role="tablist"`): Verfahrensdokumentation · Verarbeitungsverzeichnis.
 - Knöpfe: „Drucken oder als PDF speichern“ (Hauptknopf), „Als Word-Datei (DOCX)“, „Version freigeben …“, „Geprüft, keine Änderung“ (nur mit Versionen und ohne V2; setzt `zuletztGeprueft`).
 - Vorschau: `DokumentAnsicht` rendert das gewählte Dokument als HTML. Beim Ansehen einer alten Version führt „Zurück zum aktuellen Entwurf“ zurück.
-- Versionsliste mit den Spalten Version, gültig ab, gültig bis, freigegeben am und von, geänderte Kapitel, aufbewahren bis, Prüfsumme (12 Zeichen). Je Zeile die Knöpfe „Ansehen“ und „DOCX“.
-- Versionen lassen sich nicht ändern oder löschen.
+- Versionsliste mit den Spalten Version, gültig ab, gültig bis, freigegeben am und von, geänderte Kapitel, aufbewahren bis, Prüfsumme (12 Zeichen und Ergebnis des Nachrechnens, 6.8). Je Zeile die Knöpfe „Ansehen“ und „DOCX“.
+- Versionen lassen sich nicht ändern oder löschen. Einzige Ausnahme: „Zurückziehen …“ bei der letzten Version, deren Freigabe nicht zurückgezogen ist, solange ihr „Gültig ab“ in der Zukunft liegt (sie war nie in Kraft). Ein eigener Dialog verlangt einen Grund. Die Version bleibt in der Liste und in der Änderungshistorie als „zurückgezogen am {Datum}: {Grund}“ sichtbar, zählt aber für Reihenfolge, Gültigkeit, Statuszeile und Regel V1 bis V3 nicht mehr. Nummer und Bezeichnung werden nicht wieder vergeben. Wie eine Freigabe lässt sich der Rückzug nicht rückgängig machen. So lässt sich ein vertipptes „Gültig ab“ in der App berichtigen.
 
 **Freigabe-Dialog** (`<dialog>` mit `aria-labelledby`):
 
 | Feld | Standard | Prüfung |
 | --- | --- | --- |
 | Bezeichnung | „{nummer}.0“ | nicht leer, eindeutig |
-| Gültig ab | heute | gültiges Datum, später als `gueltigAb` der letzten Version |
+| Gültig ab | heute oder, wenn das später ist, der Tag nach `gueltigAb` der letzten nicht zurückgezogenen Version; die Vorgabe besteht immer die eigene Prüfung | gültiges Datum, später als `gueltigAb` der letzten nicht zurückgezogenen Version, höchstens ein Jahr nach dem Freigabetag. Ein Datum in der Vergangenheit ist erlaubt (bestehende Praxis dokumentieren). Mehr als 30 Tage nach dem Freigabetag: Rückfrage „Version {x} soll erst ab dem {Datum} gelten, {n} Tage nach dem Freigabetag. Stimmt das Datum?“ Unter dem Feld steht „Frühestens …, spätestens …“. |
 | Freigegeben von | `unternehmen.geschaeftsleitung` | nicht leer |
-| Inhalt der Änderung | Version 1: „Erstfassung“; sonst „Geändert: {Kapitelliste}“ | ab Version 2 nicht leer |
+| Inhalt der Änderung | ohne Vorgänger: „Erstfassung“; sonst leer mit dem Platzhalter „z. B. Rechnung wird jetzt zusätzlich von der Buchhaltung geprüft“. Darunter stehen die geänderten Kapitel ausgeschrieben („Geänderte Kapitel: Verfahrensdokumentation 3.2, 3.3, 4 (werden automatisch eingetragen)“); sie kommen in die Spalte „geänderte Kapitel“ | ab Version 2 nicht leer |
 | Freigegeben am | heute, nicht änderbar | – |
 
-Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem Kontrollkästchen „Trotzdem freigeben“. „Freigeben“ berechnet die Prüfsumme asynchron und schickt dann eine Aktion `compliance`.
+Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem Kontrollkästchen „Trotzdem freigeben“. „Freigeben“ berechnet die Prüfsumme asynchron und schickt dann eine Aktion `compliance`. Bei einem Fehler in den Eingaben setzt der Dialog den Fokus in das betroffene Feld.
 
 ### 5.5 Barrierefreiheit und Darstellung
 
@@ -745,7 +756,7 @@ Texte:
 
 Versionen:
 
-- `gueltigBis(v_i) = gueltigAb(v_{i+1}) − 1 Tag`; die letzte Version hat `null` („laufend“).
+- `gueltigBis(v_i) = gueltigAb(v_j) − 1 Tag` mit `v_j` der nächsten nicht zurückgezogenen Version; die letzte hat `null` („laufend“). Eine zurückgezogene Version galt nie: Statt „gültig bis“ steht „zurückgezogen am {Datum}“, statt „aufbewahren bis“ „mit der Änderungshistorie“.
 - `aufbewahrenBis(v) = "{Jahr(gueltigBis) + 10}-12-31"`; ohne `gueltigBis` der Text „10 Jahre nach Ende der Gültigkeit“. Die Oberfläche schreibt „mindestens bis“, weil die Frist nicht abläuft, solange Unterlagen aus der Gültigkeit noch aufbewahrt werden (GoBD Rz. 154).
 
 ### 6.3 Ableitungen (`ableitung.ts`)
@@ -852,7 +863,7 @@ Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 4 Verfahren und Maßnahmen: {Prozess} | Ablaufbeschreibung 6.6.1; letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“ | Prozessbaum, Angaben |
 | 5 Ersetzendes Scannen | mit B8-Objekten: „Für {Liste} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.“ · sonst: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte |
 | 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` | Systeme, Angaben |
-| 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“) | Historie |
+| 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“). Eine zurückgezogene Version: „zurückgezogen am {Datum}“ und im Inhalt „{Inhalt}; zurückgezogen: {Grund}“ | Historie |
 | 8 Glossar | Tabelle aus A.6 | fest |
 | 9 Anlage | 9.1 Ablaufdiagramm (Abschnitt `diagramm`); 9.2 Nachweis der Einweisung nur bei Protokoll: Tabelle Datum · Name · Rolle · Unterschrift mit 8 leeren Zeilen | Prozess |
 
@@ -900,21 +911,23 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 | B.6 Löschfristen (lit. f) | Tabelle Unterlage · Frist (`loeschText`) |
 | B.7 Technische und organisatorische Maßnahmen (lit. g) | „Siehe Abschnitt C.“ |
 | C Technische und organisatorische Maßnahmen (Art. 32 Abs. 1) | sechs Unterabschnitte; je Bereich Liste der Maßnahmen, „Trifft nicht zu: {Begründung}“ oder „Keine Maßnahme eingetragen.“ |
-| D Änderungen | Tabelle Version · gültig ab · Änderung |
+| D Änderungen | Tabelle Version · gültig ab · Änderung; bei einer zurückgezogenen Version „{Änderung}; zurückgezogen am {Datum}: {Grund}“ |
 | Schluss | Zeile „Ort, Datum · Unterschrift des Verantwortlichen“ |
 
 ### 6.8 Versionen, geänderte Kapitel, Prüfsumme
 
 - **Kapitelschlüssel:** Nummer der nächsten Überschrift der Ebene 1 oder 2; Ebene 3 zählt zu ihrer Ebene 2. Ausnahme: alles in Kapitel 4 zählt zu „4“, weil sich sonst Nummern verschieben. Ausgenommen vom Vergleich sind Deckblatt, Gliederung und Kapitel 7 sowie im Verzeichnis Abschnitt D. Kapitel 1 wird verglichen, damit ein Wechsel der Geschäftsleitung V2 auslöst; seine Versionsangaben sind beim Vergleich gleich, weil der Kontext von v gilt. Präfixe: „VD “ und „VVT “.
 - **Vergleich:** `geaenderteKapitel(v, projekt)` erzeugt beide Dokumente neu, und zwar mit dem Kontext von v: `version = v`, Historie bis v, `bezugsjahr = Jahr(v.gueltigAb)`, `heute = v.freigegebenAm`. Dann vergleicht es je Schlüssel die JSON-Darstellung der Abschnitte mit dem eingefrorenen Stand. So zählen nur fachliche Änderungen.
-- **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. So ändern Laden, Prüfen und Speichern die Prüfsumme nie. Gespeichert wird sie als Hex.
-- Die Prüfsumme erkennt Beschädigungen und ordnet Ausdrucke einer Version zu. Sie schützt nicht vor gezielter Änderung; so steht es auch in der App.
+- **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. So ändern Laden, Prüfen und Speichern die Prüfsumme nie. Gespeichert wird sie als Hex.
+- **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile. Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
+- Die Prüfsumme erkennt so Beschädigungen und Änderungen außerhalb der App. Sie schützt nicht vor gezielter Änderung, weil sie sich neu berechnen lässt; so steht es auch in der App.
+- Freigaben entstehen im aktuellen Format 3; die Migration aus Format 1 und 2 betrifft nur von Hand erzeugte Dateien. Eine künftige Formatmigration eingefrorener Prozesse ändert deren JSON und damit die nachgerechnete Prüfsumme. Sie muss deshalb die Prüfsumme vor der Umstellung nachrechnen oder den Stand vor der Migration bewahren.
 - Nach einem App-Update mit geänderten Textbausteinen kann V2 erscheinen. Der Befund nennt die Kapitel; eine neue Freigabe löst ihn.
 
 ### 6.9 Feste Textbausteine (eigene Formulierungen)
 
 - **A.0 Hinweis:** „Vorlage, erstellt mit dem Prozesslotsen am {Stand}. Rechtsstand {Rechtsstand}. Vor Verwendung von der Steuerberatung prüfen lassen. Beschreibt nur den Prozess „{Prozess}“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen.“ Im Verzeichnis: „… vom Datenschutzbeauftragten oder einer fachkundigen Person prüfen lassen. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018).“
-- **A.1 Kapitel 1:** „Gegenstand dieser Dokumentation ist der Prozess „{Prozess}“ bei {Unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung von {Name} (Geschäftsleitung).“ Freigegeben: „Version {x}, freigegeben von {von} am {am}. Sie gilt für das Verfahren, wie es seit dem {gültig ab} angewandt wird.“ Entwurf: „Entwurf, noch nicht freigegeben.“ Mit Vorgänger: „Vorgängerversion: {y}. Was sich geändert hat, zeigt Kapitel 7.“ Immer: „Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.4.“
+- **A.1 Kapitel 1:** „Gegenstand dieser Dokumentation ist der Prozess „{Prozess}“ bei {Unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung von {Name} (Geschäftsleitung).“ Freigegeben: „Version {x}, freigegeben von {von} am {am}. Sie gilt für das Verfahren, wie es seit dem {gültig ab} angewandt wird.“ Entwurf: „Entwurf, noch nicht freigegeben.“ Mit Vorgänger (zurückgezogene Versionen zählen nicht): „Vorgängerversion: {y}. Was sich geändert hat, zeigt Kapitel 7.“ Immer: „Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.4.“
 - **A.2 Kapitel 2.3:** „Maßgeblich sind die Abgabenordnung (§§ 145 bis 147 AO), § 14b UStG und die GoBD (BMF-Schreiben vom 28.11.2019 in der Fassung vom 14.07.2025). Für Kaufleute gelten zusätzlich §§ 238, 239 und 257 HGB.“ Fristenregel: „Die Frist beginnt mit dem Ende des Kalenderjahres, in dem die Unterlage entstanden, eingegangen oder abgesandt wurde; bei Büchern zählt die letzte Eintragung. Sie läuft nicht ab, solange die Unterlagen für Steuern mit noch offener Festsetzungsfrist von Bedeutung sind (§ 147 Abs. 3 und 4 AO).“
 - **A.3 Ordnungsmäßigkeitskriterien:** Tabelle mit den Spalten Nr., Anforderung, Bedeutung. Die 13 Anforderungen und ihre Reihenfolge folgen dem Muster (Ziff. 2.3 [10]), die Erklärungen sind eigene Kurzfassungen:
 
@@ -1011,10 +1024,13 @@ Außerdem ändern sich:
 
 - Das Projekt mit `compliance` liegt wie bisher im `localStorage` (Schlüssel `prozesslotse:projekt`) und in der Projektdatei.
 - Versionen enthalten Prozess und beide Dokumente. Ziel: unter 150 KB je Version beim Lieferdienst; Phase 3 misst das.
-- `App.tsx` schreibt das ganze Projekt bei jeder Änderung sofort in den `localStorage`, auch im Windows-Programm (WebView2). Mit Versionen würde jeder Tastendruck Hunderte KB schreiben. Deshalb liegen die Versionen unter einem eigenen Schlüssel `prozesslotse:versionen`. `speichereImBrowser` schreibt ihn nur, wenn sich das Array `versionen` geändert hat (Referenzvergleich). `ladeAusBrowser` setzt beides wieder zusammen.
-- `speichereImBrowser` liefert schon `false` bei einem Fehler. Neu: Die Kopfzeile meldet dann „Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.“
-- Menüpunkt „Daten im Browser löschen“ entfernt Projekt, Versionen und Einstellungen nach Bestätigung.
-- Im Windows-Programm liest der Rust-Teil Dateien bis 20 MB (`MAX_GROESSE` in `src-tauri/src/lib.rs`). Das reicht für rund 100 Versionen; die README nennt die Grenze.
+- `App.tsx` schreibt das ganze Projekt bei jeder Änderung sofort in den `localStorage`, auch im Windows-Programm (WebView2). Mit Versionen würde jeder Tastendruck Hunderte KB schreiben. Deshalb liegen die Versionen unter einem eigenen Schlüssel `prozesslotse:versionen`, als `{ merkmal, versionen }`.
+- Den Speicher teilen sich alle Tabs derselben Herkunft und im Windows-Programm alle installierten Fassungen. Deshalb bindet ein Merkmal (Anzahl und Streuwert des Inhalts) die Versionen an das Projekt: Es steht im gespeicherten Projekt (Feld `versionenMerkmal`, gelangt nie in eine Datei) und klein unter `prozesslotse:versionen-merkmal`. `speichereImBrowser` schreibt die Versionen nur, wenn das gespeicherte Merkmal nicht passt. Verglichen wird mit dem tatsächlich gespeicherten Merkmal, nicht mit dem zuletzt selbst geschriebenen; so stellt ein Tab seine Versionen wieder her, wenn ein anderer sie ersetzt oder entfernt hat. `ladeBrowserStand` hängt Versionen nur an, wenn ihr Merkmal zum Projekt passt. Ein Projekt ohne Merkmal stammt aus einer anderen Fassung; seine Versionen stehen dann im Projekt selbst.
+- Lässt sich der gespeicherte Stand nicht vollständig übernehmen (ungültiges Feld, unlesbarer Text, Versionen, die nicht zum Projekt passen), geht nichts still verloren: Die Rohdaten bleiben unverändert, bis der Nutzer entscheidet, und bis dahin sichert die App nichts im Browser. Eine Leiste unter der Kopfzeile nennt den Grund und bietet „Rohdaten herunterladen“ und „Rohdaten verwerfen …“. Sind nur die Compliance-Angaben beschädigt, öffnet die App den Prozess allein (4.4). Ein Stand, der nicht vollständig übernommen wurde, gilt als neues, ungespeichertes Dokument ohne Pfad.
+- `speichereImBrowser` liefert `false`, wenn das Projekt nicht hineinpasst; die Kopfzeile meldet dann bei jeder Änderung „Das Projekt passt nicht mehr in den Browser-Speicher. Bitte als Datei speichern.“ Passen neue Versionen nicht, bleibt das vorige Paar aus Projekt und Versionen stehen. Die Dateiangaben (`prozesslotse:dokument`) gehören nur zu einem Stand, der wirklich im Browser liegt; sonst werden sie als veraltet markiert. Beim nächsten Start kommt der ältere Stand dann mit einem Hinweis als neues, ungespeichertes Dokument, nie unter dem Namen der Datei. Im Browser fragt das Schließen des Tabs nach, solange der Browser-Speicher ungespeicherte Änderungen nicht sichert.
+- Menüpunkt „Daten im Browser löschen“ entfernt Projekt, Versionen, Merkmal, Dateiangaben und Einstellungen nach Bestätigung, auch nicht geladene Rohdaten.
+- Im Windows-Programm liest der Rust-Teil Dateien bis 20 MiB (`MAX_GROESSE` in `src-tauri/src/lib.rs`).
+- **Wachstum und Grenzen** (gemessen beim Lieferdienst, eine Freigabe im Monat): Version 1 hat rund 33 000 Zeichen. Jede Version enthält die ganze Änderungshistorie (Kapitel 7, Abschnitt D) und wird deshalb je Vorgänger um rund 200 Zeichen größer; der Gesamtbedarf wächst leicht quadratisch. Versionsschlüssel und Projektdatei: 10 Versionen 0,34 Mio. Zeichen und 0,7 MiB, 50 Versionen 1,9 Mio. und 3,8 MiB, 100 Versionen 4,3 Mio. und 8,8 MiB. Der Browser-Speicher (Edge und Chrome: rund 5 Mio. Zeichen je Herkunft, auch im Windows-Programm) ist bei rund 115 Versionen voll, bei größeren Prozessen früher; dann gilt der Absatz zu `speichereImBrowser` oben. Die Projektdatei erreicht die 20 MiB des Rust-Teils bei rund 185 Versionen. Die README nennt beide Grenzen. `speichergrenzen.test.ts` prüft Grundgröße und Zuwachs; ändern sie sich deutlich, sind diese Zahlen neu zu messen.
 
 ### 7.4 Export
 
@@ -1061,9 +1077,9 @@ Das Programm ist seit Commit `90aaba0` umgesetzt (`src-tauri`, `src/plattform`).
 - **Vertraulich:** Die Angaben beschreiben Schwachstellen, etwa fehlende Sicherung oder fehlende Zwei-Faktor-Anmeldung. Hinweisband und README raten, Projektdatei und Ausgaben vertraulich zu behandeln.
 - **BPMN-Export:** Das eingebettete Projekt enthält heute alles, also auch Compliance-Angaben und Versionen. Wer das BPMN an Dritte gibt, gibt diese mit. Der Export bekommt deshalb die Option „ohne Compliance-Angaben“. Dann fehlt `compliance` nur in der Datei, das Projekt in der App bleibt unverändert.
 - **Browser-Speicher:** `localStorage` ist unverschlüsselt. Die App weist im Menüpunkt „Daten im Browser löschen“ auf gemeinsam genutzte Rechner hin.
-- **Laden:** `validiereCompliance` prüft jede Datei streng (4.4). Unbekannte Werte lösen einen `Formatfehler` aus, keinen Absturz.
+- **Laden:** `validiereCompliance` prüft jede Datei streng (4.4). Unbekannte Werte lösen einen `Formatfehler` aus, keinen Absturz. Ist nur der Compliance-Teil fehlerhaft, lässt sich der Prozess allein öffnen (4.4).
 - **Ausgabe:** React maskiert alle Texte, kein `dangerouslySetInnerHTML`. `docx` erzeugt XML mit Maskierung. Der BPMN-Export maskiert wie bisher mit `esc`.
-- **Integrität:** Die Prüfsumme erkennt Beschädigung, nicht Manipulation; der Text in der App sagt das.
+- **Integrität:** Die Prüfsumme über eingefrorenen Prozess und beide Dokumente wird nach dem Laden nachgerechnet (6.8). Sie erkennt Beschädigung, nicht Manipulation; der Text in der App sagt das.
 - **Rechtlicher Rahmen:** Hinweis A.0 auf Deckblatt, Fußzeile und Hinweisband; „Entwurf“ bis zur Freigabe; Rechtsstand in jedem Dokument; nirgends „GoBD-konform“, „DSGVO-konform“ oder „rechtssicher“ (Test in 9.6). Befunde sind als Hinweise formuliert („prüfen“, „klären“), nicht als Rechtsauskunft. Die README nennt Grenzen und schließt eine Gewähr für Vollständigkeit aus.
 - **Abhängigkeiten:** ein neues Paket (`docx`, exakt gepinnt) mit zwei Abhängigkeiten, alle MIT, im Lockfile festgehalten. Lizenzen stehen in der README.
 - **Windows-Programm:** Dateibefehle nur für vom Nutzer gewählte Pfade (wie `speichern_unter`), CSP unverändert.
@@ -1214,10 +1230,15 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | --- | --- |
 | `freigeben(9.1, { '1.0', gültig ab '2026-11-11', von 'Erika Mustermann' }, '2026-11-11')` | Nummer 1, `geaenderteKapitel` leer, Prüfsumme 64 Hex-Zeichen; zweiter Aufruf gleiche Prüfsumme |
 | Version speichern, laden, Schlüssel der Dokumente in anderer Reihenfolge | Prüfsumme neu berechnet gleich der gespeicherten |
+| Absatz einer gespeicherten Version oder ihr eingefrorener Prozess in der Datei geändert | lädt; `pruefsummeStimmt` ist false, die Versionsliste zeigt „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, die Kopfzeile nennt die Version |
 | zweite Freigabe mit gültig ab `'2026-11-11'` | Fehler „Gültig ab muss nach dem 11.11.2026 liegen.“ |
 | nach Freigabe „Rechnung freigeben“ in „Rechnung prüfen und freigeben“ umbenennen | `geaenderteKapitel` = `['VD 3.2', 'VD 3.3', 'VD 4']`, Verzeichnis unverändert; Befund V2 |
 | Version 2 gültig ab `'2027-04-01'` | Version 1: gültig bis `'2027-03-31'`, aufbewahren bis `'2037-12-31'` |
 | Bezeichnung doppelt | Fehler „Die Bezeichnung 1.0 gibt es schon.“ |
+| gültig ab `'2126-11-11'` am 11.11.2026 | Fehler „Gültig ab darf höchstens ein Jahr nach dem Freigabetag liegen, also spätestens am 11.11.2027.“ |
+| gültig ab `'2026-12-12'` am 11.11.2026 | Rückfrage (31 Tage); `'2026-12-11'` ohne Rückfrage |
+| Vorgabe für gültig ab: ohne Version, zweite Freigabe am selben Tag, Vorgänger ab `'2027-01-01'` | `'2026-11-11'`, `'2026-11-12'`, `'2027-01-02'`; jede besteht `pruefeFreigabe` |
+| Version 2 ab `'2027-11-10'` zurückziehen, dann Version 3 ab `'2026-11-12'` | Version 2 „zurückgezogen“, Nummer 3, Version 1 gültig bis `'2026-11-11'`; Vorgänger in Kapitel 1 ist 1.0; Rückgängig leer |
 
 ### 9.8 DOCX
 
@@ -1235,6 +1256,9 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | `compliance.version = 2` | Formatfehler „Compliance-Angaben in Version 2 werden nicht unterstützt.“ |
 | `systeme.med_erp.seit = '2026-13-01'` | Formatfehler mit Feldnamen |
 | unbekannter Katalogwert | Formatfehler |
+| Compliance-Teil fehlerhaft, Prozess gültig | `ComplianceFormatfehler` mit `detail` „systeme.med_erp.seit: ist kein gültiges Datum“ und dem Projekt ohne `compliance` |
+| `versionen.0.gueltigAb = '9995-01-01'` | Formatfehler „… liegt nicht zwischen 1900 und 2199.“ |
+| Prüfsumme in Großbuchstaben | lädt, Prüfsumme klein geschrieben |
 | Unterlage löschen | Eintrag in `compliance.datenobjekte` und ihre Zugriffe entfernt; Rückgängig stellt beides wieder her |
 | Aufgabe `auf_rechnung` im Ist löschen | Zugriffe auf sie entfernt, Unterlage „Ausgangsrechnung“ bleibt; Rückgängig stellt alles wieder her |
 | Medium `med_papier` im Ist löschen | `dsp_ordner.mediumId` wird `null` |
@@ -1243,6 +1267,10 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | Änderung am Soll-Prozess | `compliance` unverändert |
 | `localStorage.setItem` wirft | Meldung in der Kopfzeile |
 | Tippen in einem Feld bei 3 Versionen | Schlüssel `prozesslotse:versionen` wird nicht neu geschrieben |
+| zwei Tabs: B legt ein neues Projekt an oder öffnet eines mit eigenen Versionen, danach tippt A | nach dem Neuladen hat A genau seine Versionen |
+| ältere Fassung schreibt ein Projekt mit Versionen im Projekt; alter Schlüssel `prozesslotse:versionen` | Versionen aus dem Projekt; der fremde Schlüssel bleibt unverändert, Hinweis |
+| ungültiges Feld im gespeicherten Projekt | nur der Prozess, Hinweis mit Feld; Rohdaten unverändert, bis verworfen |
+| Versionen passen nicht mehr in den Speicher, danach Neustart | älterer Stand als neues, ungespeichertes Dokument mit Hinweis |
 | `uebernimmFirmenangaben` | 5 Felder übernommen, Unterlagen und Versionen unverändert |
 | `gestricheneKontrollen(9.1, Ergebnis der Regel `freigabe`, Vorschlag „Freigabe „Rechnung freigeben“ streichen“)` | `['auf_freigeben']` |
 | `bpmnFuerExport` mit Option „ohne Compliance-Angaben“ | eingebettetes Projekt ohne `compliance`; Projekt in der App unverändert |
@@ -1278,7 +1306,8 @@ Die Ausgabe des Beispiels geht als PDF an eine Steuerberatung und, falls möglic
 | `docx` erscheint fast wöchentlich neu, eine Version könnte fehlerhaft oder kompromittiert sein | defekte Dateien, Lieferkettenrisiko | exakt pinnen, Lockfile, Updates nur bewusst mit `npm audit` und Tests aus 9.8 |
 | Nutzungsrechte am Muster der BStBK/DStV unklar | Änderungsbedarf nach Veröffentlichung | nur Gliederung und Kapitelnamen, eigene Texte; offene Frage 4 |
 | Satzbausteine lesen sich holprig | geringe Akzeptanz | Muster ohne Beugung („Zuständig: …“), Testleser in Phase 7 |
-| Versionen füllen den Browser-Speicher | Datenverlust | Meldung bei Speicherfehler, Größe messen, Datei speichern |
+| Versionen füllen den Browser-Speicher | Datenverlust | Meldung bei Speicherfehler, Größe messen, Datei speichern; älterer Stand nie unter dem Namen der Datei, Nachfrage beim Schließen des Tabs (7.3) |
+| Mehrere Tabs oder Programmfassungen teilen den Browser-Speicher | fremde oder verlorene Versionen | Merkmal bindet die Versionen an das Projekt; was nicht passt, bleibt als Rohdaten erhalten (7.3) |
 | `docx` scheitert an der Tauri-CSP oder bläht das Bündel auf | kein DOCX im Programm | Test in Phase 0, dynamischer Import, Rückfall nur PDF |
 | Ein Projekt beschreibt nur einen Prozess | Firmenangaben mehrfach pflegen, Widersprüche | Übernahme aus anderer Datei; Firmenmappe später |
 | Kommerzielle Nutzung durch olbricht-digital berührt StBerG oder RDG | rechtliches Risiko | offene Frage 6, vor dem Angebot klären |

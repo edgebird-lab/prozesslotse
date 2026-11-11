@@ -904,6 +904,16 @@ fieldset {
   margin: 0;
   max-width: 80ch;
 }
+/* Hinweis zum Browser-Speicher unter der Kopfzeile */
+.browser-hinweis {
+  margin: 12px 20px 0;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.browser-hinweis p {
+  margin: 0;
+  max-width: 90ch;
+}
 .fremd-buehne {
   flex: 1;
   min-height: 60vh;
@@ -2086,6 +2096,18 @@ input[type='date'] {
 }
 .versionsliste code {
   font-size: 0.85rem;
+}
+/* Ergebnis des Nachrechnens der Prüfsumme */
+.pruefsumme-stand {
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.pruefsumme-falsch {
+  color: var(--schlecht-text);
+}
+/* Zurückgezogene Freigabe: bleibt sichtbar, galt aber nie */
+.version-zurueckgezogen > * {
+  color: var(--text-2);
 }
 .freigabe-dialog {
   max-width: min(560px, calc(100vw - 32px));
