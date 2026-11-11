@@ -16,7 +16,8 @@ Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zei
 - **Schwachstellen im Diagramm:** Medienbruch, Engpass, lange Liegezeit, Nacharbeit, Freigabe ohne erkennbaren Nutzen, Kontrolle ohne Folge, dieselbe Person in parallelen Zweigen, zu wenig Leute für Stücke, die zur selben Zeit laufen, viel abgebrochene Arbeit (auch in gleichzeitig laufenden Zweigen, die oft umsonst arbeiten, weil ein Zweig den Vorgang beendet), oft überschrittene Fristen und Hin und Her zwischen Rollen werden am betroffenen Element markiert. Nur Korrekturen zählen als Nacharbeit. Mehrere gleiche Durchgänge („je Position“) bildet „für jedes Stück einer Liste“ ab; ältere Mengenschleifen, Ausgänge wie „beides“ und Rollen wie „Kunde“ bietet die Prüfung zum Umwandeln an, ohne still umzubauen.
 - **Vorschläge mit berechneter Wirkung.** Sechs Regeln formen eine Kopie des Prozesses um, die Wirkung kommt aus denselben Formeln wie die Kennzahlen. Übernommene Vorschläge ergeben den Soll-Prozess.
 - **Bericht** mit Ist-Soll-Vergleich, Maßnahmen, Befunden und beiden Diagrammen. Export als BPMN, SVG und Projektdatei, Druck als PDF.
-- **Windows-Programm (Tauri 2):** Installer mit 1,3 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
+- **Compliance-Doku:** Aus dem Ist-Prozess entstehen die Verfahrensdokumentation nach GoBD und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO, mit Lückenprüfung, freigegebenen Versionen und Export als Word-Datei und PDF ([Abschnitt unten](#compliance-doku)).
+- **Windows-Programm (Tauri 2):** Installer mit 1,3 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog, auch für Verfahrensdokumentation und Verzeichnis; deren Word-Dateien gehen über den Speichern-Dialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
 - **Lernmodus:** Zu jeder Auswahl erklärt ein Hinweis das passende BPMN-Element.
 
 | Ablauf beschreiben | Verbessern |
@@ -63,16 +64,45 @@ Wiederholungen werden geschlossen gelöst, nicht ausgerollt. Ein Ausgang, der de
 
 Prüfungen und Freigaben werden nie mit anderen Schritten zusammengelegt (Vier-Augen-Prinzip).
 
+## Compliance-Doku
+
+![Teilschritt „Dokumente“: Hinweis, Freigabe und Vorschau der Verfahrensdokumentation](docs/bilder/dokumente.png)
+
+Der Schritt „Dokumentieren“ erzeugt aus dem Ist-Prozess zwei Dokumente, die in kleinen Betrieben oft fehlen:
+
+- die **Verfahrensdokumentation** nach GoBD Rz. 151–155 in der Gliederung der Muster-Verfahrensdokumentation von BStBK und DStV (Version 2.1). Kapitel 4 beschreibt den modellierten Ablauf Schritt für Schritt: Bedingungen, Zuständigkeit, System, Unterlagen, Medienbrüche, Kontrollen und Nachrichten an Externe, dazu Abschnitte, „für jedes Stück“, Unterbrechungen mit ihren Ausnahmewegen und Abbrüche;
+- das **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 DSGVO im Aufbau des Musters der Datenschutzkonferenz, mit den technischen und organisatorischen Maßnahmen in sechs Bereichen.
+
+| Teilschritt | Fragt nach |
+| --- | --- |
+| Unternehmen | Verantwortlicher, Geschäftsleitung, Datenschutzbeauftragter (§ 38 BDSG), Rollen im Ablauf (intern oder extern mit Organisation), Verarbeitungstätigkeit; Übernahme aus einer anderen Projektdatei |
+| Belege und Daten | je Unterlage: Einordnung nach § 147 AO, Form, Ablage, ersetzendes Scannen, Personenbezug, Rechtsgrundlage samt Ausnahme nach Art. 9 Abs. 2 DSGVO, Empfänger; Zweck der Verarbeitung |
+| Systeme und Dienstleister | Version, Betrieb, Standort (im Drittland mit Bewilligung des Finanzamts), Vertrag zur Auftragsverarbeitung, Schutz vor Änderung, Wiederfinden und Datenzugriff bei einer Außenprüfung, Datensicherung, Zugriffsschutz |
+| Aufbewahrung und Löschung | gesetzliche und gewählte Frist, frühestes Löschdatum, Löschfristen, wer löscht |
+| Kontrollen | Prüfungen und Freigaben mit Vier-Augen-Status, weitere Kontrollen, Einweisung |
+| Schutzmaßnahmen | sechs Bereiche nach Art. 32 Abs. 1 DSGVO mit Vorschlägen |
+| Lücken | 44 Regeln mit Quelle und „Beheben“ (springt auf die offene Frage), z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Vertrag zur Auftragsverarbeitung fehlt, Aufbewahrung im Drittland ohne Bewilligung |
+| Dokumente | Vorschau, Druck als PDF (im Programm auch ohne Druckdialog), Word-Datei, Freigabe mit optionaler fachlicher Prüfung, Versionsliste mit nachgerechneter Prüfsumme, Zurückziehen einer Freigabe, die noch nicht gilt, mitgeltende Unterlagen |
+
+- **Fristen** nach § 147 AO: Bücher und Organisationsunterlagen 10 Jahre, Buchungsbelege 8, Geschäftsbriefe und sonstige Unterlagen 6, jeweils ab Ende des Kalenderjahres; Lieferscheine ohne Buchungsfunktion bis zur Rechnung, bei Kaufleuten mit dem Hinweis auf 6 Jahre als möglicher Handelsbrief (§ 257 HGB).
+- **Versionen:** Eine Freigabe friert Ist-Prozess und beide Dokumente ein, mit Gültig-ab-Datum, Freigabe, Inhalt der Änderung, geänderten Kapiteln und SHA-256-Prüfsumme über kanonisches JSON von Prozess und Dokumenten. Nach dem Laden rechnet die App jede Prüfsumme nach und zeigt deutlich, wenn eine Version verändert wurde. Nur Entwürfe tragen den Hinweis „Vorlage – vor Verwendung prüfen lassen“; eine freigegebene Fassung nennt in der Fußzeile Version und Freigabetag, auf dem Deckblatt die Verantwortung des Unternehmens und auf Wunsch „Fachlich geprüft von … am …“. Ändert sich danach etwas Fachliches, nennt die Lückenprüfung die betroffenen Kapitel; nach 365 Tagen erinnert sie an die Überprüfung. Eine Freigabe, deren „Gültig ab“ noch in der Zukunft liegt, lässt sich mit Begründung zurückziehen; sie bleibt sichtbar.
+- **Speichergrenzen:** Jede Version enthält die ganze Änderungshistorie. Beim Beispiel (eine Freigabe im Monat) ist der Browser-Speicher bei rund 105 Versionen voll; dann meldet die App das, und nur die Projektdatei sichert weiter. Die Projektdatei erreicht die 20-MiB-Grenze des Windows-Programms bei rund 185 Versionen. Nichts geht dabei still verloren: Ein Stand, der nicht vollständig in den Browser-Speicher passt, öffnet beim nächsten Start als neues, ungespeichertes Dokument.
+- **Vertraulich behandeln:** Die Angaben beschreiben Schwachstellen wie eine fehlende Datensicherung. Projektdatei und Ausgaben gehören nicht an Dritte; die BPMN-Datei lässt sich ohne Compliance-Angaben exportieren, und „Daten im Browser löschen“ leert den Browser-Speicher.
+- **Keine Rechts- oder Steuerberatung:** Beide Dokumente sind Vorlagen zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten, keine Rechts- oder Steuerberatung. Die App prüft, ob die Angaben vollständig und widerspruchsfrei sind, nicht, ob sie stimmen.
+
+Spezifikation, Annahmen und Stand: [compliance-spezifikation.md](docs/compliance-spezifikation.md), [compliance-entscheidungen.md](docs/compliance-entscheidungen.md), [compliance-stand.md](docs/compliance-stand.md).
+
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
 | `src/modell` | Datenmodell, Operationen, Prüfregeln, Führung durch den Ablauf, Speichern, Fallbeispiel |
 | `src/analyse` | Kennzahlen, Simulation, Schwachstellen, Verbesserungsregeln |
+| `src/compliance` | Compliance-Doku: Angaben, Fristen, Lückenprüfung, Verfahrensdokumentation, Verzeichnis, Versionen, DOCX |
 | `src/bpmn` | eigenes Layout mit Bahnen und Spuren, Linienführung mit Kanälen, BPMN-XML mit DI, Tokenspiel |
 | `src/ui` | React-Oberfläche: Assistent, Diagramm (bpmn-js), Prüfen, Verbessern, Bericht |
 | `src/plattform` | Öffnen, Speichern und Fenster: im Browser per Download, im Programm über den Rust-Teil |
-| `src-tauri` | Windows-Programm: Dateibefehle nur für vom Benutzer gewählte Pfade, Menü, PDF über WebView2, Installer |
+| `src-tauri` | Windows-Programm: Dateibefehle nur für vom Benutzer gewählte Pfade (Word-Dateien als Rohdaten, ohne Base64), Menü, PDF über WebView2, Installer |
 | `e2e` | Browsertests mit Playwright und axe |
 | `docs` | [Datenmodell](docs/datenmodell.md) mit Zeichenregeln, [Fragenkatalog](docs/fragenkatalog.md), [Modellierung, Format 3](docs/modellierung-v3.md), [Modellierung, Format 4](docs/modellierung-v4.md) mit [Stand](docs/modellierung-stand.md), [Compliance-Doku](docs/compliance-spezifikation.md) |
 
@@ -82,13 +112,14 @@ Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur 
 
 ## Qualität
 
-- 258 Unit-Tests und 3 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen, Ereignis-Entscheidungen, ODER-Verzweigungen, Abschnitten, Mehrfachinstanzen, Unterbrechungen, „weiter beim ersten“, „in beliebiger Reihenfolge“, Abbrüchen neben gleichzeitig laufenden Schritten und Nachrichten): keine Überlappung, keine Kante durch fremde Elemente, keine zwei Linien auf derselben Strecke oder am selben Anschluss, keine zwei Linien länger als 100 px dichter als 20 px nebeneinander, kein Sequenzfluss über eine Rahmengrenze, Randereignisse auf dem Rand ihres Schritts, Beschriftungen frei, Schema-Prüfung mit bpmn-moddle.
+- 692 Unit-Tests (434 davon zur Compliance-Doku) und 6 Rust-Tests, darunter von Hand nachgerechnete Kennzahlen und ein Belastungstest mit 300 zufällig erzeugten, verschachtelten Prozessen (mit Rücksprüngen, Ereignis-Entscheidungen, ODER-Verzweigungen, Abschnitten, Mehrfachinstanzen, Unterbrechungen, „weiter beim ersten“, „in beliebiger Reihenfolge“, Abbrüchen neben gleichzeitig laufenden Schritten und Nachrichten): keine Überlappung, keine Kante durch fremde Elemente, keine zwei Linien auf derselben Strecke oder am selben Anschluss, keine zwei Linien länger als 100 px dichter als 20 px nebeneinander, kein Sequenzfluss über eine Rahmengrenze, Randereignisse auf dem Rand ihres Schritts, Beschriftungen frei, Schema-Prüfung mit bpmn-moddle.
 - Tokenspiel nach den Ausführungsregeln von BPMN 2.0, mit Teilprozessen als Bereichen, Fehler-Enden, Terminierungen, Ad-hoc-Teilprozessen, Randereignissen (unterbrechend und nebenher) und der Regel der Norm für die inklusive Zusammenführung: Für beide Beispiele und alle 300 Zufallsprozesse ist das exportierte Diagramm sound (keine Verklemmung, jeder Vorgang kann enden, kein toter Schritt), der aus dem XML gelesene Graph gleicht dem des Layouts, und die Häufigkeiten und Ergebnisanteile aus dem Tokenspiel stimmen mit den Formeln überein. Stehen mehrere Abbrüche an, entscheidet in der Zählung eine Uhr je Marke, welcher zuerst kommt.
-- 26 Browsertests: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, ODER-Verzweigung, Abschnitt mit Ende darin, Schritte zu einem Abschnitt zusammenfassen und auflösen, „für jede Position“ anlegen, Mengenschleife aus einer älteren Datei umwandeln, Unterbrechung mit Ende und Nebenweg anlegen, Frist über mehrere Schritte mit „noch einmal von vorn“, „weiter beim ersten“ und „in beliebiger Reihenfolge“ mit Ende in einem Zweig anlegen, Prozessende in einem Zweig von „Gleichzeitig“, Kunde als Pool mit Nachrichten, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen, BPMN wieder öffnen, Rückfrage bei ungespeicherten Änderungen.
-- Desktop-Test am echten Programm (`npm run desktop:test`): 16 Prüfungen von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4.
+- 111 Browsertests, davon 26 zum Prozess: Prozess vollständig über den Assistenten anlegen, Korrekturschleife mit Rücksprung, ODER-Verzweigung, Abschnitt mit Ende darin, Schritte zu einem Abschnitt zusammenfassen und auflösen, „für jede Position“ anlegen, Mengenschleife aus einer älteren Datei umwandeln, Unterbrechung mit Ende und Nebenweg anlegen, Frist über mehrere Schritte mit „noch einmal von vorn“, „weiter beim ersten“ und „in beliebiger Reihenfolge“ mit Ende in einem Zweig anlegen, Prozessende in einem Zweig von „Gleichzeitig“, Kunde als Pool mit Nachrichten, Tastaturbedienung, Vorschlag übernehmen, Exporte, Datei öffnen, BPMN wieder öffnen, Rückfrage bei ungespeicherten Änderungen.
+- Desktop-Test am echten Programm (`npm run desktop:test`): 48 Prüfungen in drei Programmstarts, von Speichern unter bis zur Rückfrage beim Schließen, PDF-Seite in A4; dazu die Compliance-Doku mit Freigabe, Word-Datei als Rohdaten (falsche Aufrufe werden abgelehnt), PDF der Verfahrensdokumentation, Nachladen des Schritts „Dokumentieren“ und Wiederöffnen nach Neustart; sicherer Kontext, Web Crypto und keine Meldung der Content Security Policy.
 - Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
+- Compliance-Doku: 44 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; Kapitel 4 beschreibt jeden Baustein aus Format 4 (Abschnitt, für jedes Stück, Unterbrechungen, „weiter beim ersten“, „in beliebiger Reihenfolge“, Ende neben gleichzeitig laufenden Schritten); eine echte Format-3-Datei mit Freigabe lädt mit stimmender Prüfsumme und ohne geänderte Kapitel; DOCX wird entpackt und geprüft; Speichern mit vollem oder beschädigtem Browser-Speicher, zwei Tabs und Prüfsummen. 85 Browsertests decken Lücken und „Beheben“, Freigabe und Rückzug, Speichern und Laden von Versionen, Word-Datei, Druck (alle Tabellen passen auf A4, neue Seiten nur vor großen Kapiteln, Anlage 9.1 in lesbaren Ausschnitten, jede Form in einem Ausschnitt ganz, auch mit Abschnitten und Randereignissen, Bahnnamen am Rand), Meldungen am Feld, Fokus und Sprünge, schmale Fenster, Tastatur und axe hell und dunkel ab. Die 82 Funde einer unabhängigen Durchsicht und die Mängel der Nachprüfung sind behoben, jeder mit einem Test ([Stand](docs/compliance-stand.md#durchsicht-vom-11112026)).
 
 ## Entwickeln
 
@@ -103,7 +134,7 @@ npm run build     # Typprüfung und Produktions-Build
 npm run desktop                        # Programm mit Entwicklungsserver
 npm run desktop:build                  # Programm und Installer (src-tauri/target/release/bundle/nsis)
 npx tauri build --debug --no-bundle    # Debug-Build für den Desktop-Test
-npm run desktop:test                   # Desktop-Test gegen den Debug-Build
+npm run desktop:test                   # Desktop-Test gegen den Debug-Build (andere exe: PROZESSLOTSE_EXE)
 ```
 
 `node scripts/readme-bilder.mjs` erzeugt die Bilder dieser README neu (bei laufendem `npx vite preview --port 4173`).
@@ -125,7 +156,8 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build
 - Endet ein ODER-Weg den Vorgang, rechnet der Prozesslotse die Schritte hinter der Zusammenführung nicht mehr. Nach BPMN darf die Zusammenführung schon schalten, sobald der beendende Weg sie nicht mehr erreichen kann; bis zur Terminierung könnten dahinter also noch Schritte anlaufen.
 - Externe Beteiligte sind leere Pools (Black Box); ihr innerer Ablauf wird nicht modelliert.
 - Auf eine Raute passen je Richtung höchstens etwa sechs Wege mit 20 px Abstand. Führen mehr Wege einer Verzweigung in dieselbe Richtung (etwa acht Fälle in derselben Bahn), liegen ihre Linien an der Raute dichter; sie teilen sich aber nie eine Strecke.
+- Compliance-Doku: je Projekt ein Prozess; eine Gesamtdokumentation aller Systeme eines Betriebs (GoBD Rz. 151) entsteht erst mit einer Firmenmappe. Die Ablaufhemmung (§ 147 Abs. 3 AO) wird nicht berechnet, nur genannt. Ersetzendes Scannen, Kassenführung und Lohn sind nicht abgedeckt. Rechtsstand 11.11.2026; keine Gewähr für Vollständigkeit.
 
 ## Lizenz
 
-Noch nicht festgelegt. bpmn-js steht unter der bpmn.io-Lizenz, die das bpmn.io-Logo im angezeigten Diagramm vorschreibt.
+Noch nicht festgelegt. bpmn-js steht unter der bpmn.io-Lizenz, die das bpmn.io-Logo im angezeigten Diagramm vorschreibt. Die Word-Datei erzeugt `docx` (MIT) mit `fflate` und `nanoid` (beide MIT).

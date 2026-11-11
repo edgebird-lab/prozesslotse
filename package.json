@@ -22,6 +22,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
     "bpmn-js": "^18.31.1",
+    "docx": "9.15.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
@@ -34,6 +35,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "bpmn-moddle": "^10.3.1",
+    "fflate": "0.8.3",
     "oxlint": "^1.90.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.7",

@@ -5,6 +5,7 @@ fn main() {
         "oeffnen",
         "speichern",
         "speichern_unter",
+        "speichern_unter_bytes",
         "zuletzt",
         "oeffne_zuletzt",
         "als_pdf",

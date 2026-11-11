@@ -11,6 +11,7 @@
     "allow-oeffnen",
     "allow-speichern",
     "allow-speichern-unter",
+    "allow-speichern-unter-bytes",
     "allow-zuletzt",
     "allow-oeffne-zuletzt",
     "allow-als-pdf"

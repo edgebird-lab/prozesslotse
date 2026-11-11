@@ -5,12 +5,14 @@ const MIME: Record<DateiArt, string> = {
   projekt: 'application/json',
   bpmn: 'application/xml',
   svg: 'image/svg+xml',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 }
 
 /**
  * Browser: Öffnen läuft über das Dateifeld der Oberfläche, Speichern über
  * einen Download. Das Projekt liegt zusätzlich im Browserspeicher, deshalb
- * fragt der Browser beim Schließen nicht nach.
+ * fragt der Browser beim Schließen nicht nach; nur solange der Browserspeicher
+ * ungespeicherte Änderungen nicht sichert, warnt die Oberfläche (App.tsx).
  */
 export const browserPlattform: Plattform = {
   desktop: false,
@@ -21,6 +23,10 @@ export const browserPlattform: Plattform = {
   },
   speichernUnter: async (vorschlag, inhalt, art) => {
     ladeHerunter(vorschlag, inhalt, MIME[art])
+    return { pfad: null, name: vorschlag }
+  },
+  speichereBytes: async (vorschlag, bytes, art) => {
+    ladeHerunter(vorschlag, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: MIME[art] }))
     return { pfad: null, name: vorschlag }
   },
   zuletzt: async () => [],

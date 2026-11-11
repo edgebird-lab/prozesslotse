@@ -1,8 +1,9 @@
 import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer'
 import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-js.css'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import type { Markierung } from './analyse'
+import { druckFormen, type DruckForm } from './druckausschnitte'
 
 interface Box {
   x: number
@@ -27,11 +28,14 @@ interface EventBus {
 }
 interface ElementRegistry {
   get(id: string): unknown
+  getAll(): unknown[]
 }
 
 export interface DiagrammApi {
   svg(): Promise<string>
   einpassen(): void
+  /** Holt das erste der Elemente (in Leserichtung) lesbar groß in die Mitte, z. B. den ersten markierten Schritt. */
+  zeige(ids: string[]): void
 }
 
 export interface DiagrammProps {
@@ -46,6 +50,8 @@ export interface DiagrammProps {
   uebersicht?: boolean
   /** Für den Druck ein Bild des ganzen Diagramms einsetzen, das sich der Seitenbreite anpasst. */
   druckbild?: boolean
+  /** Eigener Druckinhalt statt des einen Bilds, aus dem SVG des ganzen Diagramms und seinen Formen (z. B. Übersicht und Ausschnitte). */
+  druckInhalt?: (svg: string, formen: DruckForm[]) => ReactNode
 }
 
 const SYMBOL: Record<Markierung['art'], string> = {
@@ -83,6 +89,16 @@ function zeigeElemente(canvas: Canvas, registry: ElementRegistry, ids: string[])
   }
 }
 
+/** Das erste Element in Leserichtung (links, dann oben) mindestens in Originalgröße mittig zeigen. */
+function zeigeErstes(canvas: Canvas, registry: ElementRegistry, ids: string[]): void {
+  const formen = ids.map((id) => registry.get(id) as Partial<Form> | undefined).filter((f): f is Form => typeof f?.x === 'number' && typeof f.width === 'number')
+  if (formen.length === 0) return
+  const f = formen.reduce((a, b) => (b.x < a.x || (b.x === a.x && b.y < a.y) ? b : a))
+  if (canvas.zoom() < 1) canvas.zoom(1)
+  const box = canvas.viewbox()
+  canvas.viewbox({ x: f.x + f.width / 2 - box.width / 2, y: f.y + f.height / 2 - box.height / 2, width: box.width, height: box.height })
+}
+
 /** Ganzes Diagramm zeigen; ist es dafür zu klein, lesbar vergrößert am Anfang beginnen. */
 function zeigeAnfang(canvas: Canvas): void {
   const stufe = canvas.zoom('fit-viewport', 'auto')
@@ -92,7 +108,7 @@ function zeigeAnfang(canvas: Canvas): void {
   if (box.inner) canvas.viewbox({ x: box.inner.x - 24, y: box.inner.y - 24, width: box.width, height: box.height })
 }
 
-export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm({ xml, markierungen, ausgewaehlt, onKlick, beschriftung, klein, uebersicht, druckbild }, ref) {
+export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm({ xml, markierungen, ausgewaehlt, onKlick, beschriftung, klein, uebersicht, druckbild, druckInhalt }, ref) {
   const behaelter = useRef<HTMLDivElement>(null)
   const viewer = useRef<NavigatedViewer | null>(null)
   const klick = useRef(onKlick)
@@ -101,7 +117,8 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
   const letzteAuswahl = useRef<string>('')
   const [importNr, setImportNr] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
-  const [druckSvg, setDruckSvg] = useState('')
+  const [druck, setDruck] = useState<{ svg: string; formen: DruckForm[] }>({ svg: '', formen: [] })
+  const druckSvg = druck.svg
 
   useEffect(() => {
     klick.current = onKlick
@@ -144,7 +161,8 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         markiert.current = []
         setImportNr((n) => n + 1)
         // Bild für Druck und PDF: Die Ansicht im Browser passt sich der Papierbreite nicht an, ein SVG-Bild schon.
-        if (druckbild) void v.saveSVG().then(({ svg }) => aktiv && setDruckSvg(svg))
+        // Formen mit Lage und Größe, damit die Ausschnitte im Druck keine zerschneiden
+        if (druckbild) void v.saveSVG().then(({ svg }) => aktiv && setDruck({ svg, formen: druckFormen(v.get<ElementRegistry>('elementRegistry').getAll()) }))
       })
       .catch((e: unknown) => {
         if (aktiv) setFehler(e instanceof Error ? e.message : String(e))
@@ -201,6 +219,13 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
       return svg
     },
     einpassen,
+    zeige: (ids) => {
+      const v = viewer.current
+      if (!v) return
+      // Wie ein Zoom von Hand: Ein neues Zeichnen behält diesen Ausschnitt
+      benutzerZoom.current = true
+      zeigeErstes(v.get<Canvas>('canvas'), v.get<ElementRegistry>('elementRegistry'), ids)
+    },
   }))
 
   return (
@@ -217,7 +242,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         </button>
       </div>
       <div ref={behaelter} className="diagramm-flaeche" role="figure" aria-label={beschriftung} />
-      {druckbild && druckSvg && <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />}
+      {druckbild && druckSvg && (druckInhalt ? druckInhalt(druckSvg, druck.formen) : <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />)}
       {fehler && (
         <p className="diagramm-fehler" role="alert">
           Das Diagramm konnte nicht gezeichnet werden: {fehler}

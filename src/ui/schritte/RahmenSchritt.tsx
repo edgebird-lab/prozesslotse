@@ -1,4 +1,5 @@
-import { beispielOnlineProjekt, beispielProjekt } from '../../modell/beispiel'
+import { beispielMitCompliance } from '../../compliance/beispiel'
+import { beispielOnlineProjekt } from '../../modell/beispiel'
 import type { AusloeserArt } from '../../modell/typen'
 import { Auswahl, Feld, ZahlEingabe } from '../Eingaben'
 import { useApp } from '../kontext'
@@ -27,7 +28,7 @@ export function RahmenSchritt() {
             Schwachstellen und schlägt Verbesserungen mit ihrer Wirkung vor.
           </p>
           <div className="knopfreihe">
-            <button type="button" className="knopf knopf-haupt" onClick={() => void datei.ladeBeispiel(beispielProjekt(), 'pruefen')}>
+            <button type="button" className="knopf knopf-haupt" onClick={() => void datei.ladeBeispiel(beispielMitCompliance(), 'pruefen')}>
               Mit dem Beispiel „Lieferdienst“ starten
             </button>
             <button type="button" className="knopf" onClick={() => void datei.ladeBeispiel(beispielOnlineProjekt(), 'ablauf')}>

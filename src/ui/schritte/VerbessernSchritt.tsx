@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useBestaetigen } from '../frage'
 import { bewerteVorschlaege, type BewerteterVorschlag, type Wirkung } from '../../analyse/regeln'
+import { gestricheneKontrollen } from '../../compliance/verzahnung'
+import { alleAufgaben } from '../../modell/operationen'
 import type { Prozess } from '../../modell/typen'
 import { formatiereDauer, formatiereEuro, formatiereZahl } from '../../modell/zeit'
 import { useAnalyse } from '../analyse'
@@ -45,6 +47,11 @@ export function VerbessernSchritt() {
   const { projekt } = z
   const basis: Prozess = projekt.soll ?? projekt.ist
   const vorschlaege = useMemo(() => bewerteVorschlaege(basis, projekt.verworfen), [basis, projekt.verworfen])
+  // Streicht ein Vorschlag eine Kontrolle, die in der Verfahrensdokumentation steht, braucht es einen Ersatz
+  const gestrichen = useMemo(() => {
+    const namen = new Map(alleAufgaben(projekt.ist).map((a) => [a.id, a.name]))
+    return new Map(vorschlaege.map((v) => [v.schluessel, gestricheneKontrollen(projekt, v.anwenden(basis), basis).map((id) => namen.get(id) || 'Unbenannter Schritt')]))
+  }, [vorschlaege, projekt, basis])
   const ist = useAnalyse(projekt.ist).kennzahlen
   const soll = useAnalyse(basis).kennzahlen
   const std = basis.arbeitsstundenProTag
@@ -126,6 +133,11 @@ export function VerbessernSchritt() {
                   <strong>Annahme:</strong> {v.annahme.replace(/^Angenommen wird, dass /, '')}
                 </p>
               )}
+              {(gestrichen.get(v.schluessel) ?? []).map((name) => (
+                <p key={name} className="annahme kontroll-hinweis" role="note">
+                  „{name}“ ist in der Verfahrensdokumentation als Kontrolle eingetragen. Wird sie gestrichen, braucht es einen Ersatz, z. B. eine Stichprobe.
+                </p>
+              ))}
               <WirkungsChips w={v.wirkung} std={std} />
               <div className="knopfreihe">
                 <button type="button" className="knopf knopf-haupt" onClick={() => uebernehmen(v)}>
@@ -189,8 +201,8 @@ export function VerbessernSchritt() {
       </div>
 
       <div className="schritt-fuss">
-        <button type="button" className="knopf knopf-haupt" onClick={() => dispatch({ typ: 'schritt', schritt: 'bericht' })}>
-          Weiter: Bericht
+        <button type="button" className="knopf knopf-haupt" onClick={() => dispatch({ typ: 'schritt', schritt: 'dokumentieren' })}>
+          Weiter: Dokumentieren
         </button>
       </div>
     </div>

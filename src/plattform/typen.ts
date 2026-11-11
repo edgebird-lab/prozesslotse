@@ -17,7 +17,7 @@ export interface Zuletzt {
   name: string
 }
 
-export type DateiArt = 'projekt' | 'bpmn' | 'svg'
+export type DateiArt = 'projekt' | 'bpmn' | 'svg' | 'docx'
 
 /** Befehle aus dem Programmmenü. */
 export type MenueBefehl =
@@ -46,6 +46,8 @@ export interface Plattform {
   speichern(pfad: string, inhalt: string): Promise<void>
   /** Fragt nach Ort und Namen; im Browser ein Download. null bei Abbruch. */
   speichernUnter(vorschlag: string, inhalt: string, art: DateiArt): Promise<{ pfad: string | null; name: string } | null>
+  /** Wie `speichernUnter`, aber für Binärdateien (Word). Im Programm gehen die Bytes als Rohdaten an den Rust-Teil, ohne JSON und ohne Base64. */
+  speichereBytes(vorschlag: string, bytes: Uint8Array, art: 'docx'): Promise<{ pfad: string | null; name: string } | null>
   /** Zuletzt geöffnete Dateien, neueste zuerst. */
   zuletzt(): Promise<Zuletzt[]>
   oeffneZuletzt(pfad: string): Promise<Datei>

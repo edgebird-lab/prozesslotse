@@ -63,6 +63,20 @@ Zeiten werden als Zahl mit Einheit (Minuten, Stunden, Arbeitstage) eingegeben. E
 
 Jeder Schritt lässt sich später in der Gliederung auswählen, ändern, verschieben und löschen; Rückgängig und Wiederholen gelten für alle Änderungen. Bei jedem ausgewählten Schritt fasst „Ab hier zusammenfassen …“ ihn und die folgenden Schritte derselben Folge bis zu einem gewählten zu einem Abschnitt zusammen (Fragen: bis einschließlich welchem Schritt? Wie heißt der Abschnitt?). Angeboten werden nur Bereiche, aus denen kein Rücksprung hinausführt. Im Formular eines Abschnitts stellt „Abschnitt auflösen“ die Schritte zurück in die Folge.
 
+## Schritt 6 – Dokumentieren
+
+Acht Teilschritte sammeln die Angaben für Verfahrensdokumentation und Verzeichnis; die Fragen im Einzelnen stehen in der [Spezifikation, Abschnitt 5.3](compliance-spezifikation.md#53-fragen-je-teilschritt). Jede Antwort ist eine Auswahl, eine Zahl, ein Datum oder ein kurzer Text; Kundendaten werden nicht abgefragt, nur Arten von Daten.
+
+| Teilschritt | Kernfragen |
+| --- | --- |
+| Unternehmen | Wie heißt das Unternehmen, wer leitet es und gibt die Dokumentation frei? Wie viele Personen arbeiten ständig mit personenbezogenen Daten? Ist ein Datenschutzbeauftragter benannt? |
+| Belege und Daten | Wozu werden die Daten verarbeitet? Je Unterlage: Was ist sie (Buchungsbeleg, Geschäftsbrief …)? Wie kommt sie an, wo und in welcher Form wird sie aufbewahrt? Enthält sie Angaben zu Personen, zu wem, welche, warum zulässig, wer bekommt sie? |
+| Systeme und Dienstleister | Je System: Hersteller, Version, seit wann? Wo läuft es, wer betreibt es, wo werden die Daten verarbeitet? Gibt es einen Vertrag zur Auftragsverarbeitung? Wie sind Unterlagen vor Änderung geschützt, wie wird gesichert? |
+| Aufbewahrung und Löschung | Länger als vorgeschrieben aufbewahren, und warum? Wann werden Daten ohne Aufbewahrungspflicht gelöscht? Wer gibt die Löschung frei, wer führt sie durch, wie oft? |
+| Kontrollen | Je Prüfung oder Freigabe: Art, was geprüft wird, Nachweis. Weitere Kontrollen außerhalb des Ablaufs. Wie werden Beteiligte eingewiesen? |
+| Schutzmaßnahmen | Je Bereich nach Art. 32 DSGVO: welche Maßnahmen, oder warum trifft er nicht zu? |
+| Lücken, Dokumente | keine Fragen: Befunde mit „Beheben“; Vorschau, Export und Freigabe |
+
 ## Warum diese Fragen
 
 - **Bearbeitungs- und Liegezeit** trennen zeigt, wie viel der Durchlaufzeit tatsächlich gearbeitet wird (Flusseffizienz).

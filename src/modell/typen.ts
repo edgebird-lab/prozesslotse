@@ -7,6 +7,7 @@
  * Modell). Alle Zeiten sind Minuten Arbeitszeit; ein Arbeitstag hat
  * `arbeitsstundenProTag` Stunden.
  */
+import type { ComplianceProjekt } from '../compliance/typen'
 
 export type Id = string
 
@@ -354,6 +355,8 @@ export interface Projekt {
   soll: Prozess | null
   massnahmen: Massnahme[]
   verworfen: string[]
+  /** Compliance-Doku (src/compliance); fehlt bei Projekten ohne diese Angaben. */
+  compliance?: ComplianceProjekt
 }
 
 export const MEDIUM_ARTEN: { art: MediumArt; name: string; digital: boolean }[] = [

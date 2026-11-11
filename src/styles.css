@@ -151,6 +151,11 @@ textarea {
   outline: 2px solid var(--fokus);
   outline-offset: 2px;
 }
+/* „Beheben“: die angesteuerte Frage kurz umranden, auch nach einem Mausklick (ohne :focus-visible) */
+[data-sprungziel] {
+  outline: 3px solid var(--fokus);
+  outline-offset: 4px;
+}
 
 .sr {
   position: absolute;
@@ -887,6 +892,19 @@ fieldset {
 .frage-dialog .knopfreihe {
   justify-content: flex-end;
 }
+/* Fehler in Dialogen: Meldung rot direkt am Feld, das Feld rot umrandet (sonst grau wie jeder Absatz im Dialog) */
+.frage-dialog .feld-meldung {
+  color: var(--schlecht-text);
+}
+.frage-dialog input[aria-invalid='true'],
+.frage-dialog textarea[aria-invalid='true'] {
+  border-color: var(--schlecht-text);
+  box-shadow: 0 0 0 1px var(--schlecht-text);
+}
+.frage-dialog input[type='checkbox'][aria-invalid='true'] {
+  outline: 2px solid var(--schlecht-text);
+  outline-offset: 1px;
+}
 
 /* Fremde BPMN-Datei: nur ansehen */
 .fremd-flaeche {
@@ -903,6 +921,16 @@ fieldset {
 .fremd-banner p {
   margin: 0;
   max-width: 80ch;
+}
+/* Hinweis zum Browser-Speicher unter der Kopfzeile */
+.browser-hinweis {
+  margin: 12px 20px 0;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.browser-hinweis p {
+  margin: 0;
+  max-width: 90ch;
 }
 .fremd-buehne {
   flex: 1;
@@ -1226,6 +1254,15 @@ fieldset {
 .banner-fehler {
   border-color: var(--status-kritisch);
 }
+/* Nachladen gescheitert (Nachprüfung „regression“, Mangel 2): Meldung mit „Neu laden“ im Panel */
+.nachladefehler {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.nachladefehler p {
+  margin: 0;
+  max-width: 60ch;
+}
 
 /* Balkendiagramm „Wo die Zeit hingeht“ */
 .balkendiagramm {
@@ -1451,6 +1488,10 @@ fieldset {
 .status-symbol.status-gut {
   color: var(--status-gut);
 }
+/* Teilschritt ohne Angaben: neutral, weder Häkchen noch offener Punkt */
+.status-symbol.status-leer {
+  color: var(--text-3);
+}
 
 /* Befunde */
 .befunde {
@@ -1611,6 +1652,22 @@ fieldset {
 .eingabe-tabelle .zahl input {
   width: 70px;
 }
+/* „Rollen im Ablauf“: feste Aufteilung, damit die Spalten beim Umschalten nicht springen; Organisation hat immer Platz */
+.rollen-tabelle {
+  table-layout: fixed;
+}
+.rollen-tabelle .spalte-rolle {
+  width: 32%;
+}
+.rollen-tabelle .spalte-extern {
+  width: 4rem;
+}
+.rollen-tabelle th[scope='row'] {
+  font-size: inherit;
+  font-weight: 400;
+  color: inherit;
+  overflow-wrap: break-word;
+}
 
 /* Bericht --------------------------------------------------------------------- */
 
@@ -1756,4 +1813,492 @@ fieldset {
 .teilnehmer-liste input {
   flex: 1;
   max-width: 320px;
+}
+
+/* Compliance-Doku: Schritt „Dokumentieren“ ---------------------------------- */
+
+.arbeitsflaeche-voll {
+  grid-template-columns: minmax(0, 1fr);
+}
+.arbeitsflaeche-voll .panel {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+}
+.felder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.teil {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 12px;
+}
+.teil h3 {
+  margin: 0.4rem 0 0;
+}
+.teil-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.teil-kopf h3,
+.teil-kopf h4 {
+  margin: 0;
+}
+.karte:focus,
+.teil [tabindex='-1']:focus {
+  outline: 2px solid var(--fokus);
+  outline-offset: 2px;
+}
+.karte > .felder,
+.karte.felder > * + * {
+  margin-top: 0;
+}
+
+/* Teilschritt-Leiste */
+.teilschritte ol {
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+}
+/* Knöpfe so hoch wie ihre Rasterzeile, auch neben einem zweizeiligen Namen */
+.teilschritte li {
+  display: flex;
+}
+.teilschritte button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  background: var(--karte);
+  color: var(--text-2);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.88rem;
+}
+.teilschritte button:hover {
+  border-color: var(--linie-stark);
+  color: var(--text);
+}
+.teilschritte button[aria-current='step'] {
+  border-color: var(--akzent);
+  background: var(--akzent-hauch);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+.teilschritt-name {
+  flex: 1;
+  min-width: 0;
+  hyphens: auto;
+}
+.arbeitsflaeche-voll .teilschritte ol {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.teilschritt-zahl {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--status-warnung);
+  color: #0b0b0b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Hinweise und Zeilen */
+.hinweis-band {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--akzent-rand);
+  background: var(--akzent-hauch);
+  font-size: 0.9rem;
+}
+.status-zeile {
+  margin: 0;
+  font-weight: 600;
+}
+.filter-hinweis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--karte-2);
+}
+.zaehler {
+  margin: 0;
+  color: var(--text-2);
+}
+.feld-titel {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.93rem;
+}
+.lernhinweis-ohne-symbol {
+  margin-top: 0.6rem;
+}
+.aufklapp summary {
+  cursor: pointer;
+  color: var(--akzent-text);
+  font-size: 0.92rem;
+}
+.aufklapp[open] > summary {
+  margin-bottom: 8px;
+}
+.aufklapp > * + * {
+  margin-top: 10px;
+}
+.liste-schlicht {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.knopf-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--akzent-text);
+  text-decoration: underline;
+  cursor: pointer;
+  font-style: normal;
+}
+.kontrollkaestchen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+input[type='date'] {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--linie-stark);
+  border-radius: 7px;
+  background: var(--karte);
+  max-width: 220px;
+}
+.empfaenger > legend {
+  font-weight: 600;
+}
+.empfaenger {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fristen-tabelle th[scope='row'] {
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--text);
+}
+/* Zwei Ziffern brauchen keine 70 px; so passt die Tabelle samt Löschdatum ins Panel (520 px) */
+.fristen-tabelle .zahl input {
+  width: 4rem;
+}
+.fristen-tabelle .umbrechen {
+  overflow-wrap: anywhere;
+}
+.versionsliste td,
+.versionsliste th[scope='row'] {
+  text-align: left;
+  vertical-align: top;
+}
+.karte-umschalter {
+  align-self: flex-start;
+}
+
+/* Chips: Mehrfachauswahl */
+.chips-auswahl > legend {
+  margin-bottom: 6px;
+}
+.chips-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--linie-stark);
+  border-radius: 999px;
+  background: var(--karte);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+.chip-option.an {
+  border-color: var(--akzent);
+  background: var(--akzent-hauch);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+.chip-option input {
+  margin: 0;
+  accent-color: var(--knopf-haupt);
+}
+.chip-option:has(input:focus-visible) {
+  outline: 2px solid var(--fokus);
+  outline-offset: 2px;
+}
+
+/* Dokumente */
+.reiter {
+  display: inline-flex;
+  /* im schmalen Fenster untereinander statt breiter als die Seite */
+  flex-wrap: wrap;
+  max-width: 100%;
+  border: 1px solid var(--linie-stark);
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.reiter [role='tab'] {
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.reiter [role='tab'][aria-selected='true'] {
+  background: var(--knopf-haupt);
+  color: #fff;
+  font-weight: 600;
+}
+/* Die Leiste schneidet alles außerhalb ihrer runden Ecken ab; der Fokusring liegt deshalb innen,
+   auf dem gewählten (gefüllten) Reiter weiß */
+.reiter [role='tab']:focus-visible {
+  outline-offset: -4px;
+}
+.reiter [role='tab'][aria-selected='true']:focus-visible {
+  outline-color: #fff;
+}
+/* Lange Knopftexte brechen im schmalen Fenster um, statt die Seite zu verbreitern */
+.teil .knopfreihe .knopf {
+  white-space: normal;
+  text-align: center;
+}
+.version-banner {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.version-banner p {
+  margin: 0;
+}
+.dokument {
+  background: var(--papier);
+  color: #0b0b0b;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  line-height: 1.55;
+}
+.dokument p,
+.dokument li {
+  max-width: 78ch;
+}
+.dokument-titel {
+  font-size: 1.6rem;
+  margin: 0;
+}
+.dokument-untertitel {
+  font-size: 1.05rem;
+  color: #52514e;
+}
+.dokument-hinweis {
+  background: #edede9;
+  border-left: 3px solid #6b6a65;
+  padding: 8px 12px;
+}
+.dokument-gliederung {
+  margin: 1.2rem 0;
+  padding: 10px 14px;
+  border: 1px solid #e1e0d9;
+  border-radius: 8px;
+}
+.gliederung-titel {
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.dokument-gliederung ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2;
+  font-size: 0.9rem;
+}
+.dokument-gliederung .gliederung-2 {
+  padding-left: 1.2rem;
+}
+.dokument-h1 {
+  font-size: 1.3rem;
+  margin: 1.8rem 0 0.6rem;
+  border-bottom: 1px solid #c3c2b7;
+  padding-bottom: 4px;
+}
+.dokument-h2 {
+  font-size: 1.08rem;
+  margin: 1.2rem 0 0.4rem;
+}
+.dokument-h3 {
+  font-size: 1rem;
+  margin: 1rem 0 0.3rem;
+}
+.dokument-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 0.6rem 0;
+}
+.dokument-tabelle th,
+.dokument-tabelle td {
+  border: 1px solid #c3c2b7;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.dokument-tabelle thead th {
+  background: #f1f0ec;
+}
+.dokument-tabelle .leerzeile td {
+  height: 2.2em;
+}
+.dokument-diagramm {
+  margin: 0.6rem 0;
+}
+/* Anlage 9.1: Ausschnitte des Diagramms gibt es nur im Druck */
+.druck-ausschnitt {
+  display: none;
+}
+.versionsliste code {
+  font-size: 0.85rem;
+}
+/* Ergebnis des Nachrechnens der Prüfsumme */
+.pruefsumme-stand {
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.pruefsumme-falsch {
+  color: var(--schlecht-text);
+}
+/* Zurückgezogene Freigabe: bleibt sichtbar, galt aber nie */
+.version-zurueckgezogen > * {
+  color: var(--text-2);
+}
+.freigabe-dialog {
+  max-width: min(560px, calc(100vw - 32px));
+}
+.freigabe-dialog .banner {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.freigabe-dialog p {
+  margin: 0;
+}
+
+@media print {
+  /* Compliance-Dokumente: nur das Dokument drucken (andere Schritte drucken wie bisher) */
+  .dokumentieren > :not(.teil),
+  .dokumente > :not(.dokument-bereich),
+  .teilschritte {
+    display: none !important;
+  }
+  .arbeitsflaeche-voll {
+    display: block;
+    padding: 0;
+  }
+  .dokument {
+    border: 0;
+    padding: 0;
+    background: #fff;
+  }
+  /* Nur die großen Kapitel beginnen auf einer neuen Seite; kurze laufen weiter (typografie.ts, neueSeiteVor) */
+  .dokument-h1.neue-seite {
+    break-before: page;
+  }
+  .dokument-deckblatt {
+    break-after: page;
+  }
+  /* keine einzelne Zeile eines Absatzes allein am Seitenende oder -anfang. Edge beachtet orphans
+     und widows hier nicht (geprüft mit page.pdf: „§§ 238, 239 und 257 HGB.“ allein oben auf der
+     Seite); die Absätze sind kurz, deshalb werden sie gar nicht geteilt. */
+  .dokument p,
+  .dokument li {
+    orphans: 2;
+    widows: 2;
+    break-inside: avoid;
+  }
+  /* Formulare zum Ausfüllen (9.2 Nachweis der Einweisung, Unterschrift) nicht über zwei Seiten */
+  .dokument .tabelle-formular {
+    break-inside: avoid;
+  }
+  .dokument-gliederung {
+    border: 0;
+    padding: 0;
+  }
+  .dokument-gliederung ol {
+    columns: 1;
+  }
+  .dokument-tabelle tr {
+    break-inside: avoid;
+  }
+  .dokument-tabelle thead {
+    display: table-header-group;
+  }
+  /* Breite Tabellen (2.4 mit sieben Spalten) passen so auf 180 mm Satzbreite (A4, Rand 15 mm);
+     nie einen Scrollbalken drucken. Silbentrennung (hyphens) beherrscht Edge hier nicht zuverlässig. */
+  .dokument .tabelle-wrap {
+    overflow: visible;
+  }
+  .dokument-tabelle {
+    font-size: 8.5pt;
+  }
+  .dokument-tabelle th,
+  .dokument-tabelle td {
+    padding: 3px 5px;
+  }
+  .dokument-h1,
+  .dokument-h2,
+  .dokument-h3 {
+    break-after: avoid;
+  }
+  /* Anlage 9.1: Übersicht, dann je Ausschnitt eine Zeile „Ausschnitt n von m“ und das Bild; nichts abschneiden */
+  .dokument-diagramm .diagramm {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .dokument-diagramm .druck-bild,
+  .druck-ausschnitt img {
+    border: 1px solid #c3c2b7;
+  }
+  .druck-ausschnitt {
+    display: block;
+    margin: 0;
+    padding-top: 4mm;
+    break-inside: avoid;
+  }
+  .druck-ausschnitt figcaption {
+    font-size: 8.5pt;
+    color: #52514e;
+    margin-bottom: 1.5mm;
+  }
+  .druck-ausschnitt img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
 }

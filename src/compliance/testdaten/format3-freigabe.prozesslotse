@@ -1,0 +1,3081 @@
+{
+  "formatVersion": 3,
+  "ist": {
+    "formatVersion": 3,
+    "id": "pro_lieferdienst",
+    "name": "Bestellung bis Rechnung (Lieferdienst)",
+    "beschreibung": "Ein regionaler Lieferdienst nimmt Bestellungen telefonisch an, liefert am Folgetag aus und stellt danach die Rechnung.",
+    "ausloeser": {
+      "art": "nachricht",
+      "text": "Kunde bestellt telefonisch",
+      "von": "tln_kunde"
+    },
+    "ergebnis": "Ware zugestellt und berechnet",
+    "vorgaengeProTag": 120,
+    "arbeitsstundenProTag": 8,
+    "rollen": [
+      {
+        "id": "rol_innendienst",
+        "name": "Innendienst",
+        "stundensatz": 38,
+        "personen": 4,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_lager",
+        "name": "Lager",
+        "stundensatz": 34,
+        "personen": 5,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_disposition",
+        "name": "Disposition",
+        "stundensatz": 45,
+        "personen": 1,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_fahrer",
+        "name": "Fahrer",
+        "stundensatz": 32,
+        "personen": 6,
+        "verfuegbarProzent": 100
+      },
+      {
+        "id": "rol_buchhaltung",
+        "name": "Buchhaltung",
+        "stundensatz": 48,
+        "personen": 1,
+        "verfuegbarProzent": 60
+      },
+      {
+        "id": "rol_leitung",
+        "name": "Niederlassungsleitung",
+        "stundensatz": 65,
+        "personen": 1,
+        "verfuegbarProzent": 25
+      }
+    ],
+    "medien": [
+      {
+        "id": "med_papier",
+        "name": "Papier",
+        "art": "papier"
+      },
+      {
+        "id": "med_telefon",
+        "name": "Telefon",
+        "art": "telefon"
+      },
+      {
+        "id": "med_excel",
+        "name": "Excel-Tourenliste",
+        "art": "tabelle"
+      },
+      {
+        "id": "med_erp",
+        "name": "Warenwirtschaft",
+        "art": "erp"
+      }
+    ],
+    "teilnehmer": [
+      {
+        "id": "tln_kunde",
+        "name": "Kunde"
+      }
+    ],
+    "ablauf": {
+      "id": "haupt",
+      "schritte": [
+        {
+          "typ": "aufgabe",
+          "id": "auf_annehmen",
+          "name": "Bestellung telefonisch annehmen",
+          "rolleId": "rol_innendienst",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 6,
+          "liegezeitMin": 0,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": null,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_erfassen",
+          "name": "Bestellung in Warenwirtschaft erfassen",
+          "rolleId": "rol_innendienst",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 4,
+          "liegezeitMin": 90,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": {
+            "quelleMediumId": "med_papier",
+            "minuten": 3
+          }
+        },
+        {
+          "typ": "entscheidung",
+          "id": "ent_vorrat",
+          "art": "daten",
+          "frage": "Ware vorrätig?",
+          "zweige": [
+            {
+              "id": "zw_vorrat_ja",
+              "bezeichnung": "Ja",
+              "anteil": 0.92,
+              "schritte": [],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            },
+            {
+              "id": "zw_vorrat_nein",
+              "bezeichnung": "Nein",
+              "anteil": 0.08,
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_ersatz",
+                  "name": "Kunden anrufen und Ersatz anbieten",
+                  "rolleId": "rol_innendienst",
+                  "mediumId": "med_telefon",
+                  "bearbeitungMin": 5,
+                  "liegezeitMin": 60,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null
+                },
+                {
+                  "typ": "entscheidung",
+                  "id": "ent_ersatz",
+                  "art": "daten",
+                  "frage": "Ersatz angenommen?",
+                  "zweige": [
+                    {
+                      "id": "zw_ersatz_ja",
+                      "bezeichnung": "Ja",
+                      "anteil": 0.7,
+                      "schritte": [
+                        {
+                          "typ": "aufgabe",
+                          "id": "auf_aendern",
+                          "name": "Bestellung ändern",
+                          "rolleId": "rol_innendienst",
+                          "mediumId": "med_erp",
+                          "bearbeitungMin": 3,
+                          "liegezeitMin": 0,
+                          "art": "normal",
+                          "freigabeQuote": 0.9,
+                          "brauchtVorgaenger": true,
+                          "uebertragung": null
+                        }
+                      ],
+                      "ende": null,
+                      "zurueckZu": null,
+                      "ereignis": null
+                    },
+                    {
+                      "id": "zw_ersatz_nein",
+                      "bezeichnung": "Nein",
+                      "anteil": 0.3,
+                      "schritte": [
+                        {
+                          "typ": "aufgabe",
+                          "id": "auf_stornieren",
+                          "name": "Bestellung stornieren",
+                          "rolleId": "rol_innendienst",
+                          "mediumId": "med_erp",
+                          "bearbeitungMin": 2,
+                          "liegezeitMin": 0,
+                          "art": "normal",
+                          "freigabeQuote": 0.9,
+                          "brauchtVorgaenger": true,
+                          "uebertragung": null
+                        }
+                      ],
+                      "ende": "Bestellung storniert",
+                      "zurueckZu": null,
+                      "ereignis": null
+                    }
+                  ]
+                }
+              ],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            }
+          ]
+        },
+        {
+          "typ": "wiederholung",
+          "id": "wdh_kommission",
+          "modus": "anteil",
+          "frage": "Fehler gefunden?",
+          "anteilWiederholung": 0.2,
+          "koerper": {
+            "id": "seq_kommission",
+            "schritte": [
+              {
+                "typ": "aufgabe",
+                "id": "auf_kommissionieren",
+                "name": "Ware kommissionieren",
+                "rolleId": "rol_lager",
+                "mediumId": "med_papier",
+                "bearbeitungMin": 8,
+                "liegezeitMin": 120,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": null,
+                "uebertragung": null
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_kontrollieren",
+                "name": "Kommissionierung kontrollieren",
+                "rolleId": "rol_lager",
+                "mediumId": "med_papier",
+                "bearbeitungMin": 2,
+                "liegezeitMin": 15,
+                "art": "pruefung",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": null
+              }
+            ]
+          }
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_tour",
+          "name": "Tour planen",
+          "rolleId": "rol_disposition",
+          "mediumId": "med_excel",
+          "bearbeitungMin": 1.5,
+          "liegezeitMin": 240,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": false,
+          "uebertragung": {
+            "quelleMediumId": "med_erp",
+            "minuten": 1
+          }
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_verladen",
+          "name": "Ware verladen",
+          "rolleId": "rol_lager",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 3,
+          "liegezeitMin": 480,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_ausliefern",
+          "name": "Ware ausliefern",
+          "rolleId": "rol_fahrer",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 12,
+          "liegezeitMin": 180,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "entscheidung",
+          "id": "ent_angetroffen",
+          "art": "daten",
+          "frage": "Kunde angetroffen?",
+          "zweige": [
+            {
+              "id": "zw_angetroffen_ja",
+              "bezeichnung": "Ja",
+              "anteil": 0.9,
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_quittieren",
+                  "name": "Empfang quittieren lassen",
+                  "rolleId": "rol_fahrer",
+                  "mediumId": "med_papier",
+                  "bearbeitungMin": 2,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null
+                }
+              ],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            },
+            {
+              "id": "zw_angetroffen_nein",
+              "bezeichnung": "Nein",
+              "anteil": 0.1,
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_benachrichtigen",
+                  "name": "Benachrichtigung hinterlassen",
+                  "rolleId": "rol_fahrer",
+                  "mediumId": "med_papier",
+                  "bearbeitungMin": 1,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null,
+                  "nachrichtAn": "tln_kunde"
+                },
+                {
+                  "typ": "warten",
+                  "id": "wrt_termin",
+                  "name": "Neuen Liefertermin abwarten",
+                  "art": "nachricht",
+                  "dauerMin": 480,
+                  "von": "tln_kunde"
+                },
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_erneut",
+                  "name": "Ware erneut zustellen",
+                  "rolleId": "rol_fahrer",
+                  "mediumId": "med_papier",
+                  "bearbeitungMin": 12,
+                  "liegezeitMin": 120,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": true,
+                  "uebertragung": null
+                }
+              ],
+              "ende": null,
+              "zurueckZu": null,
+              "ereignis": null
+            }
+          ]
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_abgeben",
+          "name": "Lieferscheine abgeben",
+          "rolleId": "rol_fahrer",
+          "mediumId": "med_papier",
+          "bearbeitungMin": 1,
+          "liegezeitMin": 300,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_bestaetigen",
+          "name": "Zustellung im System bestätigen",
+          "rolleId": "rol_disposition",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 1.5,
+          "liegezeitMin": 240,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": {
+            "quelleMediumId": "med_papier",
+            "minuten": 1
+          }
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_rechnung",
+          "name": "Rechnung erstellen",
+          "rolleId": "rol_buchhaltung",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 1.5,
+          "liegezeitMin": 480,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_freigeben",
+          "name": "Rechnung freigeben",
+          "rolleId": "rol_leitung",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 1,
+          "liegezeitMin": 960,
+          "art": "freigabe",
+          "freigabeQuote": 0.98,
+          "brauchtVorgaenger": true,
+          "uebertragung": null
+        },
+        {
+          "typ": "aufgabe",
+          "id": "auf_versenden",
+          "name": "Rechnung versenden",
+          "rolleId": "rol_buchhaltung",
+          "mediumId": "med_erp",
+          "bearbeitungMin": 0.5,
+          "liegezeitMin": 60,
+          "art": "normal",
+          "freigabeQuote": 0.9,
+          "brauchtVorgaenger": true,
+          "uebertragung": null,
+          "nachrichtAn": "tln_kunde"
+        },
+        {
+          "typ": "warten",
+          "id": "wrt_zahlungsziel",
+          "name": "Zahlungsziel abwarten",
+          "art": "zeit",
+          "dauerMin": 4800
+        },
+        {
+          "typ": "parallel",
+          "id": "par_abschluss",
+          "zweige": [
+            {
+              "id": "seq_abschluss_1",
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_zahlung",
+                  "name": "Zahlungseingang prüfen",
+                  "rolleId": "rol_buchhaltung",
+                  "mediumId": null,
+                  "bearbeitungMin": 5,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": null,
+                  "uebertragung": null
+                }
+              ]
+            },
+            {
+              "id": "seq_abschluss_2",
+              "schritte": [
+                {
+                  "typ": "aufgabe",
+                  "id": "auf_ablegen",
+                  "name": "Lieferschein ablegen",
+                  "rolleId": "rol_buchhaltung",
+                  "mediumId": null,
+                  "bearbeitungMin": 3,
+                  "liegezeitMin": 0,
+                  "art": "normal",
+                  "freigabeQuote": 0.9,
+                  "brauchtVorgaenger": null,
+                  "uebertragung": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "soll": null,
+  "massnahmen": [],
+  "verworfen": [],
+  "compliance": {
+    "version": 1,
+    "unternehmen": {
+      "name": "Lieferdienst Muster GmbH",
+      "rechtsform": "gmbh",
+      "anschrift": {
+        "strasse": "Musterstraße 1",
+        "plz": "12345",
+        "ort": "Musterstadt"
+      },
+      "telefon": "01234 5678",
+      "email": "info@lieferdienst.example",
+      "internet": "",
+      "branche": "Lebensmittel-Lieferdienst",
+      "geschaeftszweck": "Lieferung von Lebensmitteln an Kunden in der Region",
+      "gewinnermittlung": "bilanz",
+      "geschaeftsleitung": "Erika Mustermann",
+      "standorte": [
+        "Musterstadt, Lager und Büro"
+      ],
+      "personenMitDaten": 8,
+      "datenschutzbeauftragter": null,
+      "gemeinsamVerantwortlicher": null,
+      "vertreter": null,
+      "steuerberatung": "Kanzlei Beispiel"
+    },
+    "verarbeitung": {
+      "benennung": "",
+      "laufendeNummer": "1",
+      "eingefuehrtAm": null,
+      "fachabteilung": "",
+      "ansprechpartner": "",
+      "telefon": "",
+      "email": "",
+      "zwecke": [
+        "Bestellungen annehmen, ausliefern und abrechnen"
+      ]
+    },
+    "unterlagen": [
+      {
+        "id": "dob_bestellnotiz",
+        "name": "Bestellnotiz"
+      },
+      {
+        "id": "dob_bestellung",
+        "name": "Bestellung"
+      },
+      {
+        "id": "dob_lieferschein",
+        "name": "Lieferschein"
+      },
+      {
+        "id": "dob_tourenliste",
+        "name": "Tourenliste"
+      },
+      {
+        "id": "dob_rechnung",
+        "name": "Ausgangsrechnung"
+      }
+    ],
+    "ablageorte": [
+      {
+        "id": "dsp_warenwirtschaft",
+        "name": "Warenwirtschaft",
+        "mediumId": "med_erp"
+      },
+      {
+        "id": "dsp_ordner",
+        "name": "Ordner Lieferscheine",
+        "mediumId": "med_papier"
+      }
+    ],
+    "zugriffe": [
+      {
+        "aufgabeId": "auf_annehmen",
+        "unterlageId": "dob_bestellnotiz",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_erfassen",
+        "unterlageId": "dob_bestellnotiz",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_erfassen",
+        "unterlageId": "dob_bestellung",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_kommissionieren",
+        "unterlageId": "dob_bestellung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_tour",
+        "unterlageId": "dob_bestellung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_rechnung",
+        "unterlageId": "dob_bestellung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_kommissionieren",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_quittieren",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_ausliefern",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_abgeben",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_bestaetigen",
+        "unterlageId": "dob_lieferschein",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_tour",
+        "unterlageId": "dob_tourenliste",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_ausliefern",
+        "unterlageId": "dob_tourenliste",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_rechnung",
+        "unterlageId": "dob_rechnung",
+        "richtung": "schreibt"
+      },
+      {
+        "aufgabeId": "auf_freigeben",
+        "unterlageId": "dob_rechnung",
+        "richtung": "liest"
+      },
+      {
+        "aufgabeId": "auf_versenden",
+        "unterlageId": "dob_rechnung",
+        "richtung": "liest"
+      }
+    ],
+    "datenobjekte": {
+      "dob_bestellnotiz": {
+        "aufbewahrungsart": "unklar",
+        "form": "papier",
+        "richtung": "intern",
+        "ablageSpeicherIds": [],
+        "ablageform": null,
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_bestellung": {
+        "aufbewahrungsart": "sonstige",
+        "form": "datensatz",
+        "richtung": "eingang",
+        "ablageSpeicherIds": [
+          "dsp_warenwirtschaft"
+        ],
+        "ablageform": "original",
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag",
+          "rechtspflicht"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_lieferschein": {
+        "aufbewahrungsart": "lieferschein",
+        "form": "papier",
+        "richtung": "ausgang",
+        "ablageSpeicherIds": [
+          "dsp_ordner"
+        ],
+        "ablageform": "original",
+        "originalVernichtet": null,
+        "aufbewahrungJahre": 6,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_tourenliste": {
+        "aufbewahrungsart": "keine",
+        "form": "datensatz",
+        "richtung": "intern",
+        "ablageSpeicherIds": [],
+        "ablageform": null,
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": []
+      },
+      "dob_rechnung": {
+        "aufbewahrungsart": "buchungsbeleg",
+        "form": "bild",
+        "richtung": "ausgang",
+        "ablageSpeicherIds": [
+          "dsp_warenwirtschaft"
+        ],
+        "ablageform": "original",
+        "originalVernichtet": null,
+        "aufbewahrungJahre": null,
+        "personenbezogen": true,
+        "betroffene": [
+          "kunden"
+        ],
+        "datenkategorien": [
+          "kontakt",
+          "vertrag",
+          "zahlung"
+        ],
+        "besondereKategorien": [],
+        "strafrechtlich": false,
+        "rechtsgrundlagen": [
+          "vertrag",
+          "rechtspflicht"
+        ],
+        "berechtigtesInteresse": "",
+        "ausnahmeArt9": null,
+        "loeschfrist": null,
+        "externeEmpfaenger": [
+          {
+            "id": "emp_steuerberatung",
+            "kategorie": "Steuerberatung",
+            "name": "Kanzlei Beispiel",
+            "standort": "deutschland",
+            "drittland": "",
+            "garantie": null
+          }
+        ]
+      }
+    },
+    "systeme": {
+      "med_erp": {
+        "hersteller": "WaWi-Cloud (Beispielanbieter)",
+        "version": "",
+        "seit": null,
+        "betrieb": "cloud",
+        "dienstleister": "WaWi-Cloud (Beispielanbieter)",
+        "standort": "eu_ewr",
+        "drittland": "",
+        "garantie": null,
+        "auftragsverarbeitung": true,
+        "avVertrag": "nein",
+        "avVertragVom": null,
+        "unveraenderbarkeit": "protokolliert",
+        "sicherung": "anbieter",
+        "sicherungIntervall": "",
+        "wiederherstellungGetestet": null,
+        "zugriffsschutz": "eigenes Konto je Person, Rechte nach Rolle",
+        "wiederfinden": "Suche nach Rechnungs-, Bestell- oder Kundennummer",
+        "datenzugriff": "Export aller Rechnungen und Buchungsdaten als CSV und PDF; bei Vertragsende Gesamtexport nach Vertrag"
+      },
+      "med_excel": {
+        "hersteller": "Microsoft",
+        "version": "Excel 2024 (Kaufversion)",
+        "seit": "2025-01-01",
+        "betrieb": "lokal",
+        "dienstleister": "",
+        "standort": "unbekannt",
+        "drittland": "",
+        "garantie": null,
+        "auftragsverarbeitung": null,
+        "avVertrag": "unklar",
+        "avVertragVom": null,
+        "unveraenderbarkeit": "unklar",
+        "sicherung": "automatisch",
+        "sicherungIntervall": "täglich",
+        "wiederherstellungGetestet": "2026-06-30",
+        "zugriffsschutz": "eigenes Windows-Konto, Ordner nur für die Disposition",
+        "wiederfinden": "",
+        "datenzugriff": ""
+      }
+    },
+    "rollen": {},
+    "kontrollen": {
+      "auf_kontrollieren": {
+        "art": "plausibilitaet",
+        "ziel": "Ware vollständig und richtig",
+        "nachweis": "keiner"
+      },
+      "auf_freigeben": {
+        "art": "vier_augen",
+        "ziel": "Rechnung sachlich und rechnerisch richtig",
+        "nachweis": "system"
+      }
+    },
+    "weitereKontrollen": [],
+    "einweisung": {
+      "turnus": "jaehrlich",
+      "protokoll": true
+    },
+    "loeschung": {
+      "freigabe": "Erika Mustermann",
+      "durchfuehrung": "Buchhaltung",
+      "turnus": "jaehrlich"
+    },
+    "begruendungLaengereAufbewahrung": "",
+    "toms": {
+      "pseudonymisierung": {
+        "massnahmen": [],
+        "nichtZutreffend": "Keine Auswertungen, die Pseudonyme brauchen"
+      },
+      "verschluesselung": {
+        "massnahmen": [
+          "Webzugriffe und E-Mail-Versand über TLS"
+        ],
+        "nichtZutreffend": ""
+      },
+      "vertraulichkeit": {
+        "massnahmen": [
+          "Eigenes Benutzerkonto je Person, keine geteilten Passwörter",
+          "Papierunterlagen in abschließbarem Schrank oder Raum"
+        ],
+        "nichtZutreffend": ""
+      },
+      "verfuegbarkeit": {
+        "massnahmen": [
+          "Tägliche automatische Datensicherung"
+        ],
+        "nichtZutreffend": ""
+      },
+      "wiederherstellung": {
+        "massnahmen": [
+          "Rücksicherung mindestens jährlich getestet"
+        ],
+        "nichtZutreffend": ""
+      },
+      "ueberpruefung": {
+        "massnahmen": [],
+        "nichtZutreffend": ""
+      }
+    },
+    "mitgeltend": [],
+    "mitgeltendeUnterlagen": [],
+    "ersetzendesScannen": {
+      "verfahrensdoku": null,
+      "stand": null
+    },
+    "versionen": [
+      {
+        "nummer": 1,
+        "bezeichnung": "1.0",
+        "gueltigAb": "2026-11-11",
+        "freigegebenAm": "2026-11-11",
+        "freigegebenVon": "Erika Mustermann",
+        "aenderung": "Erstfassung",
+        "geaenderteKapitel": [],
+        "prozess": {
+          "formatVersion": 3,
+          "id": "pro_lieferdienst",
+          "name": "Bestellung bis Rechnung (Lieferdienst)",
+          "beschreibung": "Ein regionaler Lieferdienst nimmt Bestellungen telefonisch an, liefert am Folgetag aus und stellt danach die Rechnung.",
+          "ausloeser": {
+            "art": "nachricht",
+            "text": "Kunde bestellt telefonisch",
+            "von": "tln_kunde"
+          },
+          "ergebnis": "Ware zugestellt und berechnet",
+          "vorgaengeProTag": 120,
+          "arbeitsstundenProTag": 8,
+          "rollen": [
+            {
+              "id": "rol_innendienst",
+              "name": "Innendienst",
+              "stundensatz": 38,
+              "personen": 4,
+              "verfuegbarProzent": 100
+            },
+            {
+              "id": "rol_lager",
+              "name": "Lager",
+              "stundensatz": 34,
+              "personen": 5,
+              "verfuegbarProzent": 100
+            },
+            {
+              "id": "rol_disposition",
+              "name": "Disposition",
+              "stundensatz": 45,
+              "personen": 1,
+              "verfuegbarProzent": 100
+            },
+            {
+              "id": "rol_fahrer",
+              "name": "Fahrer",
+              "stundensatz": 32,
+              "personen": 6,
+              "verfuegbarProzent": 100
+            },
+            {
+              "id": "rol_buchhaltung",
+              "name": "Buchhaltung",
+              "stundensatz": 48,
+              "personen": 1,
+              "verfuegbarProzent": 60
+            },
+            {
+              "id": "rol_leitung",
+              "name": "Niederlassungsleitung",
+              "stundensatz": 65,
+              "personen": 1,
+              "verfuegbarProzent": 25
+            }
+          ],
+          "medien": [
+            {
+              "id": "med_papier",
+              "name": "Papier",
+              "art": "papier"
+            },
+            {
+              "id": "med_telefon",
+              "name": "Telefon",
+              "art": "telefon"
+            },
+            {
+              "id": "med_excel",
+              "name": "Excel-Tourenliste",
+              "art": "tabelle"
+            },
+            {
+              "id": "med_erp",
+              "name": "Warenwirtschaft",
+              "art": "erp"
+            }
+          ],
+          "teilnehmer": [
+            {
+              "id": "tln_kunde",
+              "name": "Kunde"
+            }
+          ],
+          "ablauf": {
+            "id": "haupt",
+            "schritte": [
+              {
+                "typ": "aufgabe",
+                "id": "auf_annehmen",
+                "name": "Bestellung telefonisch annehmen",
+                "rolleId": "rol_innendienst",
+                "mediumId": "med_papier",
+                "bearbeitungMin": 6,
+                "liegezeitMin": 0,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": null,
+                "uebertragung": null
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_erfassen",
+                "name": "Bestellung in Warenwirtschaft erfassen",
+                "rolleId": "rol_innendienst",
+                "mediumId": "med_erp",
+                "bearbeitungMin": 4,
+                "liegezeitMin": 90,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": {
+                  "quelleMediumId": "med_papier",
+                  "minuten": 3
+                }
+              },
+              {
+                "typ": "entscheidung",
+                "id": "ent_vorrat",
+                "art": "daten",
+                "frage": "Ware vorrätig?",
+                "zweige": [
+                  {
+                    "id": "zw_vorrat_ja",
+                    "bezeichnung": "Ja",
+                    "anteil": 0.92,
+                    "schritte": [],
+                    "ende": null,
+                    "zurueckZu": null,
+                    "ereignis": null
+                  },
+                  {
+                    "id": "zw_vorrat_nein",
+                    "bezeichnung": "Nein",
+                    "anteil": 0.08,
+                    "schritte": [
+                      {
+                        "typ": "aufgabe",
+                        "id": "auf_ersatz",
+                        "name": "Kunden anrufen und Ersatz anbieten",
+                        "rolleId": "rol_innendienst",
+                        "mediumId": "med_telefon",
+                        "bearbeitungMin": 5,
+                        "liegezeitMin": 60,
+                        "art": "normal",
+                        "freigabeQuote": 0.9,
+                        "brauchtVorgaenger": true,
+                        "uebertragung": null
+                      },
+                      {
+                        "typ": "entscheidung",
+                        "id": "ent_ersatz",
+                        "art": "daten",
+                        "frage": "Ersatz angenommen?",
+                        "zweige": [
+                          {
+                            "id": "zw_ersatz_ja",
+                            "bezeichnung": "Ja",
+                            "anteil": 0.7,
+                            "schritte": [
+                              {
+                                "typ": "aufgabe",
+                                "id": "auf_aendern",
+                                "name": "Bestellung ändern",
+                                "rolleId": "rol_innendienst",
+                                "mediumId": "med_erp",
+                                "bearbeitungMin": 3,
+                                "liegezeitMin": 0,
+                                "art": "normal",
+                                "freigabeQuote": 0.9,
+                                "brauchtVorgaenger": true,
+                                "uebertragung": null
+                              }
+                            ],
+                            "ende": null,
+                            "zurueckZu": null,
+                            "ereignis": null
+                          },
+                          {
+                            "id": "zw_ersatz_nein",
+                            "bezeichnung": "Nein",
+                            "anteil": 0.3,
+                            "schritte": [
+                              {
+                                "typ": "aufgabe",
+                                "id": "auf_stornieren",
+                                "name": "Bestellung stornieren",
+                                "rolleId": "rol_innendienst",
+                                "mediumId": "med_erp",
+                                "bearbeitungMin": 2,
+                                "liegezeitMin": 0,
+                                "art": "normal",
+                                "freigabeQuote": 0.9,
+                                "brauchtVorgaenger": true,
+                                "uebertragung": null
+                              }
+                            ],
+                            "ende": "Bestellung storniert",
+                            "zurueckZu": null,
+                            "ereignis": null
+                          }
+                        ]
+                      }
+                    ],
+                    "ende": null,
+                    "zurueckZu": null,
+                    "ereignis": null
+                  }
+                ]
+              },
+              {
+                "typ": "wiederholung",
+                "id": "wdh_kommission",
+                "modus": "anteil",
+                "frage": "Fehler gefunden?",
+                "anteilWiederholung": 0.2,
+                "koerper": {
+                  "id": "seq_kommission",
+                  "schritte": [
+                    {
+                      "typ": "aufgabe",
+                      "id": "auf_kommissionieren",
+                      "name": "Ware kommissionieren",
+                      "rolleId": "rol_lager",
+                      "mediumId": "med_papier",
+                      "bearbeitungMin": 8,
+                      "liegezeitMin": 120,
+                      "art": "normal",
+                      "freigabeQuote": 0.9,
+                      "brauchtVorgaenger": null,
+                      "uebertragung": null
+                    },
+                    {
+                      "typ": "aufgabe",
+                      "id": "auf_kontrollieren",
+                      "name": "Kommissionierung kontrollieren",
+                      "rolleId": "rol_lager",
+                      "mediumId": "med_papier",
+                      "bearbeitungMin": 2,
+                      "liegezeitMin": 15,
+                      "art": "pruefung",
+                      "freigabeQuote": 0.9,
+                      "brauchtVorgaenger": true,
+                      "uebertragung": null
+                    }
+                  ]
+                }
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_tour",
+                "name": "Tour planen",
+                "rolleId": "rol_disposition",
+                "mediumId": "med_excel",
+                "bearbeitungMin": 1.5,
+                "liegezeitMin": 240,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": false,
+                "uebertragung": {
+                  "quelleMediumId": "med_erp",
+                  "minuten": 1
+                }
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_verladen",
+                "name": "Ware verladen",
+                "rolleId": "rol_lager",
+                "mediumId": "med_papier",
+                "bearbeitungMin": 3,
+                "liegezeitMin": 480,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": null
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_ausliefern",
+                "name": "Ware ausliefern",
+                "rolleId": "rol_fahrer",
+                "mediumId": "med_papier",
+                "bearbeitungMin": 12,
+                "liegezeitMin": 180,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": null
+              },
+              {
+                "typ": "entscheidung",
+                "id": "ent_angetroffen",
+                "art": "daten",
+                "frage": "Kunde angetroffen?",
+                "zweige": [
+                  {
+                    "id": "zw_angetroffen_ja",
+                    "bezeichnung": "Ja",
+                    "anteil": 0.9,
+                    "schritte": [
+                      {
+                        "typ": "aufgabe",
+                        "id": "auf_quittieren",
+                        "name": "Empfang quittieren lassen",
+                        "rolleId": "rol_fahrer",
+                        "mediumId": "med_papier",
+                        "bearbeitungMin": 2,
+                        "liegezeitMin": 0,
+                        "art": "normal",
+                        "freigabeQuote": 0.9,
+                        "brauchtVorgaenger": true,
+                        "uebertragung": null
+                      }
+                    ],
+                    "ende": null,
+                    "zurueckZu": null,
+                    "ereignis": null
+                  },
+                  {
+                    "id": "zw_angetroffen_nein",
+                    "bezeichnung": "Nein",
+                    "anteil": 0.1,
+                    "schritte": [
+                      {
+                        "typ": "aufgabe",
+                        "id": "auf_benachrichtigen",
+                        "name": "Benachrichtigung hinterlassen",
+                        "rolleId": "rol_fahrer",
+                        "mediumId": "med_papier",
+                        "bearbeitungMin": 1,
+                        "liegezeitMin": 0,
+                        "art": "normal",
+                        "freigabeQuote": 0.9,
+                        "brauchtVorgaenger": true,
+                        "uebertragung": null,
+                        "nachrichtAn": "tln_kunde"
+                      },
+                      {
+                        "typ": "warten",
+                        "id": "wrt_termin",
+                        "name": "Neuen Liefertermin abwarten",
+                        "art": "nachricht",
+                        "dauerMin": 480,
+                        "von": "tln_kunde"
+                      },
+                      {
+                        "typ": "aufgabe",
+                        "id": "auf_erneut",
+                        "name": "Ware erneut zustellen",
+                        "rolleId": "rol_fahrer",
+                        "mediumId": "med_papier",
+                        "bearbeitungMin": 12,
+                        "liegezeitMin": 120,
+                        "art": "normal",
+                        "freigabeQuote": 0.9,
+                        "brauchtVorgaenger": true,
+                        "uebertragung": null
+                      }
+                    ],
+                    "ende": null,
+                    "zurueckZu": null,
+                    "ereignis": null
+                  }
+                ]
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_abgeben",
+                "name": "Lieferscheine abgeben",
+                "rolleId": "rol_fahrer",
+                "mediumId": "med_papier",
+                "bearbeitungMin": 1,
+                "liegezeitMin": 300,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": null
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_bestaetigen",
+                "name": "Zustellung im System bestätigen",
+                "rolleId": "rol_disposition",
+                "mediumId": "med_erp",
+                "bearbeitungMin": 1.5,
+                "liegezeitMin": 240,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": {
+                  "quelleMediumId": "med_papier",
+                  "minuten": 1
+                }
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_rechnung",
+                "name": "Rechnung erstellen",
+                "rolleId": "rol_buchhaltung",
+                "mediumId": "med_erp",
+                "bearbeitungMin": 1.5,
+                "liegezeitMin": 480,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": null
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_freigeben",
+                "name": "Rechnung freigeben",
+                "rolleId": "rol_leitung",
+                "mediumId": "med_erp",
+                "bearbeitungMin": 1,
+                "liegezeitMin": 960,
+                "art": "freigabe",
+                "freigabeQuote": 0.98,
+                "brauchtVorgaenger": true,
+                "uebertragung": null
+              },
+              {
+                "typ": "aufgabe",
+                "id": "auf_versenden",
+                "name": "Rechnung versenden",
+                "rolleId": "rol_buchhaltung",
+                "mediumId": "med_erp",
+                "bearbeitungMin": 0.5,
+                "liegezeitMin": 60,
+                "art": "normal",
+                "freigabeQuote": 0.9,
+                "brauchtVorgaenger": true,
+                "uebertragung": null,
+                "nachrichtAn": "tln_kunde"
+              },
+              {
+                "typ": "warten",
+                "id": "wrt_zahlungsziel",
+                "name": "Zahlungsziel abwarten",
+                "art": "zeit",
+                "dauerMin": 4800
+              },
+              {
+                "typ": "parallel",
+                "id": "par_abschluss",
+                "zweige": [
+                  {
+                    "id": "seq_abschluss_1",
+                    "schritte": [
+                      {
+                        "typ": "aufgabe",
+                        "id": "auf_zahlung",
+                        "name": "Zahlungseingang prüfen",
+                        "rolleId": "rol_buchhaltung",
+                        "mediumId": null,
+                        "bearbeitungMin": 5,
+                        "liegezeitMin": 0,
+                        "art": "normal",
+                        "freigabeQuote": 0.9,
+                        "brauchtVorgaenger": null,
+                        "uebertragung": null
+                      }
+                    ]
+                  },
+                  {
+                    "id": "seq_abschluss_2",
+                    "schritte": [
+                      {
+                        "typ": "aufgabe",
+                        "id": "auf_ablegen",
+                        "name": "Lieferschein ablegen",
+                        "rolleId": "rol_buchhaltung",
+                        "mediumId": null,
+                        "bearbeitungMin": 3,
+                        "liegezeitMin": 0,
+                        "art": "normal",
+                        "freigabeQuote": 0.9,
+                        "brauchtVorgaenger": null,
+                        "uebertragung": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "verfahrensdoku": {
+          "art": "verfahrensdokumentation",
+          "titel": "Verfahrensdokumentation",
+          "untertitel": "Bestellung bis Rechnung (Lieferdienst) · Lieferdienst Muster GmbH",
+          "versionText": "1.0",
+          "stand": "2026-11-11",
+          "rechtsstand": "2026-11-11",
+          "abschnitte": [
+            {
+              "art": "absatz",
+              "text": "Version 1.0 · gültig ab 11.11.2026"
+            },
+            {
+              "art": "hinweis",
+              "text": "Aus einer Vorlage mit dem Prozesslotsen erstellt; die Verantwortung für den Inhalt liegt beim Unternehmen. Eine Prüfung durch die Steuerberatung wird empfohlen. Rechtsstand 11.11.2026. Beschreibt nur den Prozess „Bestellung bis Rechnung (Lieferdienst)“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "1",
+              "text": "Vorbemerkungen zur Verfahrensdokumentation"
+            },
+            {
+              "art": "absatz",
+              "text": "Gegenstand dieser Dokumentation ist der Prozess „Bestellung bis Rechnung (Lieferdienst)“ des Unternehmens Lieferdienst Muster GmbH. Inhalt und jede Änderung bedürfen der Zustimmung der Geschäftsleitung (Erika Mustermann)."
+            },
+            {
+              "art": "absatz",
+              "text": "Version 1.0, freigegeben von Erika Mustermann am 11.11.2026. Sie gilt für das Verfahren, wie es seit dem 11.11.2026 angewandt wird."
+            },
+            {
+              "art": "absatz",
+              "text": "Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.5."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "2",
+              "text": "Zielsetzung und Überblick"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "2.1",
+              "text": "Zielsetzung und Anwendungsbereich"
+            },
+            {
+              "art": "absatz",
+              "text": "Die Dokumentation gilt für den Prozess „Bestellung bis Rechnung (Lieferdienst)“. Er beginnt mit: Kunde bestellt telefonisch (Nachricht von Kunde). Er endet regulär mit: Ware zugestellt und berechnet."
+            },
+            {
+              "art": "absatz",
+              "text": "Ein regionaler Lieferdienst nimmt Bestellungen telefonisch an, liefert am Folgetag aus und stellt danach die Rechnung."
+            },
+            {
+              "art": "absatz",
+              "text": "Betroffene Unterlagen: siehe 2.4."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "2.2",
+              "text": "Unternehmen und organisatorisches Umfeld"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 3,
+              "nummer": "2.2.1",
+              "text": "Unternehmensportrait"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Angabe",
+                "Inhalt"
+              ],
+              "zeilen": [
+                [
+                  "Name",
+                  "Lieferdienst Muster GmbH"
+                ],
+                [
+                  "Sitz",
+                  "Musterstraße 1, 12345 Musterstadt"
+                ],
+                [
+                  "Rechtsform",
+                  "GmbH"
+                ],
+                [
+                  "Branche",
+                  "Lebensmittel-Lieferdienst"
+                ],
+                [
+                  "Geschäftszweck",
+                  "Lieferung von Lebensmitteln an Kunden in der Region"
+                ],
+                [
+                  "Gewinnermittlung",
+                  "Bilanz"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 3,
+              "nummer": "2.2.2",
+              "text": "Aufbau- und Ablauforganisation"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Rolle",
+                "Personen",
+                "intern oder extern"
+              ],
+              "zeilen": [
+                [
+                  "Innendienst",
+                  "4",
+                  "intern"
+                ],
+                [
+                  "Lager",
+                  "5",
+                  "intern"
+                ],
+                [
+                  "Disposition",
+                  "1",
+                  "intern"
+                ],
+                [
+                  "Fahrer",
+                  "6",
+                  "intern"
+                ],
+                [
+                  "Buchhaltung",
+                  "1",
+                  "intern"
+                ],
+                [
+                  "Niederlassungsleitung",
+                  "1",
+                  "intern"
+                ]
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Den Ablauf zeigt das Diagramm in Kapitel 9.1."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 3,
+              "nummer": "2.2.3",
+              "text": "Einsatzorte"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Musterstadt, Lager und Büro"
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Papierablagen: Ordner Lieferscheine."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "2.3",
+              "text": "Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien"
+            },
+            {
+              "art": "absatz",
+              "text": "Maßgeblich sind die Abgabenordnung (§§ 145 bis 147 AO), § 14b UStG und die GoBD (BMF-Schreiben vom 28.11.2019 in der Fassung vom 14.07.2025). Für Kaufleute gelten zusätzlich §§ 238, 239 und 257 HGB."
+            },
+            {
+              "art": "absatz",
+              "text": "Die Frist beginnt mit dem Ende des Kalenderjahres, in dem die Unterlage entstanden, eingegangen oder abgesandt wurde; bei Büchern zählt die letzte Eintragung. Sie läuft nicht ab, solange die Unterlagen für Steuern mit noch offener Festsetzungsfrist von Bedeutung sind (§ 147 Abs. 3 und 4 AO)."
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Unterlagen",
+                "Vorschrift",
+                "Frist"
+              ],
+              "zeilen": [
+                [
+                  "Bücher, Aufzeichnungen, Inventare, Jahresabschlüsse, Lageberichte, Eröffnungsbilanz, Arbeitsanweisungen und Organisationsunterlagen, auch diese Verfahrensdokumentation",
+                  "§ 147 Abs. 1 Nr. 1 AO",
+                  "10 Jahre"
+                ],
+                [
+                  "Buchungsbelege und Rechnungen (auch § 14b UStG)",
+                  "§ 147 Abs. 1 Nr. 4 AO",
+                  "8 Jahre"
+                ],
+                [
+                  "Empfangene Handels- oder Geschäftsbriefe und Kopien der versandten",
+                  "§ 147 Abs. 1 Nr. 2 und 3 AO",
+                  "6 Jahre"
+                ],
+                [
+                  "Sonstige Unterlagen, soweit sie für die Besteuerung von Bedeutung sind",
+                  "§ 147 Abs. 1 Nr. 5 AO",
+                  "6 Jahre"
+                ],
+                [
+                  "Lieferscheine, die keine Buchungsbelege sind",
+                  "§ 147 Abs. 3 AO",
+                  "bis zum Erhalt bzw. Versand der Rechnung; handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären"
+                ]
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Ausnahme: Für Kredit- und Finanzdienstleistungsinstitute, Versicherungsunternehmen und Wertpapierinstitute gelten für Buchungsbelege weiter 10 Jahre (Art. 97 § 19a Abs. 3 EGAO, § 257 Abs. 4 Satz 2 HGB)."
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Nr.",
+                "Anforderung",
+                "Bedeutung"
+              ],
+              "zeilen": [
+                [
+                  "1",
+                  "Nachvollziehbarkeit und Nachprüfbarkeit",
+                  "Jeder Vorgang lässt sich von der Entstehung bis zur Buchung und zurück verfolgen."
+                ],
+                [
+                  "2",
+                  "Einzelaufzeichnung",
+                  "Jeder Vorgang wird einzeln aufgezeichnet."
+                ],
+                [
+                  "3",
+                  "Vollständigkeit",
+                  "Jeder Vorgang ist erfasst, keiner fehlt."
+                ],
+                [
+                  "4",
+                  "Richtigkeit",
+                  "Belege stimmen mit dem tatsächlichen Geschehen überein."
+                ],
+                [
+                  "5",
+                  "Lesbarkeit",
+                  "Unterlagen lassen sich jederzeit lesbar machen; die Wiedergabe entspricht dem Original."
+                ],
+                [
+                  "6",
+                  "Maschinelle Auswertbarkeit",
+                  "Daten lassen sich elektronisch durchsuchen und auswerten."
+                ],
+                [
+                  "7",
+                  "Zeitgerechte Belegsicherung",
+                  "Belege sind kurz nach Entstehen oder Eingang erfasst und vor Verlust geschützt."
+                ],
+                [
+                  "8",
+                  "Ordnung",
+                  "Jede Unterlage hat einen festen Platz und ist schnell wiederzufinden."
+                ],
+                [
+                  "9",
+                  "Unveränderbarkeit",
+                  "Erfasstes wird nicht ohne Kenntlichmachung geändert oder gelöscht."
+                ],
+                [
+                  "10",
+                  "Verfügbarkeit",
+                  "Unterlagen sind bis zum Fristende vorhanden und abrufbar."
+                ],
+                [
+                  "11",
+                  "Integrität",
+                  "Inhalte bleiben vollständig und unverfälscht."
+                ],
+                [
+                  "12",
+                  "Authentizität",
+                  "Herkunft und Urheber einer Unterlage stehen eindeutig fest."
+                ],
+                [
+                  "13",
+                  "Vertraulichkeit",
+                  "Nur Berechtigte können lesen oder ändern."
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "2.4",
+              "text": "Relevante Dokumente"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Unterlage",
+                "Einordnung",
+                "Form",
+                "Entsteht in",
+                "Ablage",
+                "Aufbewahrung",
+                "Beispiel 2026"
+              ],
+              "zeilen": [
+                [
+                  "Bestellnotiz",
+                  "offen",
+                  "Papier",
+                  "4.1 Bestellung telefonisch annehmen",
+                  "–",
+                  "offen",
+                  "–"
+                ],
+                [
+                  "Bestellung",
+                  "Sonstige Unterlage",
+                  "Datensatz",
+                  "4.2 Bestellung in Warenwirtschaft erfassen",
+                  "Warenwirtschaft (Original)",
+                  "6 Jahre ab Ende des Kalenderjahres der Entstehung",
+                  "bis 31.12.2032"
+                ],
+                [
+                  "Lieferschein",
+                  "Lieferschein",
+                  "Papier",
+                  "4.6 Ware kommissionieren",
+                  "Ordner Lieferscheine (Original)",
+                  "6 Jahre ab Ende des Kalenderjahres der Entstehung",
+                  "bis 31.12.2032"
+                ],
+                [
+                  "Tourenliste",
+                  "keine steuerliche Aufbewahrungspflicht",
+                  "Datensatz",
+                  "4.8 Tour planen",
+                  "–",
+                  "–",
+                  "–"
+                ],
+                [
+                  "Ausgangsrechnung",
+                  "Buchungsbeleg",
+                  "PDF oder Bild",
+                  "4.16 Rechnung erstellen",
+                  "Warenwirtschaft (Original)",
+                  "8 Jahre ab Ende des Kalenderjahres der Entstehung",
+                  "bis 31.12.2034"
+                ]
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Die Spalte „Beispiel 2026“ nennt das Fristende für eine Unterlage aus dem Jahr 2026."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "2.5",
+              "text": "Einweisung in das Verfahren"
+            },
+            {
+              "art": "absatz",
+              "text": "Wer mitarbeitet, wird vor Beginn und danach jährlich eingewiesen."
+            },
+            {
+              "art": "absatz",
+              "text": "Die Einweisung wird schriftlich festgehalten (Kapitel 9.2)."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "2.6",
+              "text": "Abgrenzung der Bearbeitungsbereiche"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "WaWi-Cloud (Beispielanbieter): betreibt „Warenwirtschaft“ (EU oder EWR)",
+                "Kunde: tauscht Nachrichten mit dem Unternehmen aus",
+                "Kanzlei Beispiel: Steuerberatung"
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Mit externen Stellen ist diese Dokumentation abzustimmen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "3",
+              "text": "Organisation und Sicherheit des IT-gestützten Verfahrens"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "3.1",
+              "text": "Eingesetzte Hard- und Software"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "System",
+                "Art",
+                "Hersteller",
+                "Version",
+                "im Einsatz seit",
+                "Betrieb",
+                "Dienstleister und Standort"
+              ],
+              "zeilen": [
+                [
+                  "Excel-Tourenliste",
+                  "Tabelle (z. B. Excel)",
+                  "Microsoft",
+                  "Excel 2024 (Kaufversion)",
+                  "01.01.2025",
+                  "Auf eigenen Geräten",
+                  "–"
+                ],
+                [
+                  "Warenwirtschaft",
+                  "ERP-System",
+                  "WaWi-Cloud (Beispielanbieter)",
+                  "offen",
+                  "offen",
+                  "Als Cloud-Dienst",
+                  "WaWi-Cloud (Beispielanbieter), EU oder EWR"
+                ]
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Bei einem Systemwechsel ist die Lesbarkeit der aufbewahrten Unterlagen sicherzustellen; der Wechsel wird in Kapitel 7 festgehalten."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "3.2",
+              "text": "Zuständigkeiten"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Schritt",
+                "Rolle oder Person",
+                "System"
+              ],
+              "zeilen": [
+                [
+                  "4.1 Bestellung telefonisch annehmen",
+                  "Innendienst",
+                  "Papier"
+                ],
+                [
+                  "4.2 Bestellung in Warenwirtschaft erfassen",
+                  "Innendienst",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.3 Kunden anrufen und Ersatz anbieten",
+                  "Innendienst",
+                  "Telefon"
+                ],
+                [
+                  "4.4 Bestellung ändern",
+                  "Innendienst",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.5 Bestellung stornieren",
+                  "Innendienst",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.6 Ware kommissionieren",
+                  "Lager",
+                  "Papier"
+                ],
+                [
+                  "4.7 Kommissionierung kontrollieren",
+                  "Lager",
+                  "Papier"
+                ],
+                [
+                  "4.8 Tour planen",
+                  "Disposition",
+                  "Excel-Tourenliste"
+                ],
+                [
+                  "4.9 Ware verladen",
+                  "Lager",
+                  "Papier"
+                ],
+                [
+                  "4.10 Ware ausliefern",
+                  "Fahrer",
+                  "Papier"
+                ],
+                [
+                  "4.11 Empfang quittieren lassen",
+                  "Fahrer",
+                  "Papier"
+                ],
+                [
+                  "4.12 Benachrichtigung hinterlassen",
+                  "Fahrer",
+                  "Papier"
+                ],
+                [
+                  "4.13 Ware erneut zustellen",
+                  "Fahrer",
+                  "Papier"
+                ],
+                [
+                  "4.14 Lieferscheine abgeben",
+                  "Fahrer",
+                  "Papier"
+                ],
+                [
+                  "4.15 Zustellung im System bestätigen",
+                  "Disposition",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.16 Rechnung erstellen",
+                  "Buchhaltung",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.17 Rechnung freigeben",
+                  "Niederlassungsleitung",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.18 Rechnung versenden",
+                  "Buchhaltung",
+                  "Warenwirtschaft"
+                ],
+                [
+                  "4.19 Zahlungseingang prüfen",
+                  "Buchhaltung",
+                  "offen"
+                ],
+                [
+                  "4.20 Lieferschein ablegen",
+                  "Buchhaltung",
+                  "offen"
+                ],
+                [
+                  "Freigabe der Löschung nach Fristablauf",
+                  "Erika Mustermann",
+                  "–"
+                ],
+                [
+                  "Durchführung der Löschung",
+                  "Buchhaltung",
+                  "–"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "3.3",
+              "text": "Organisation und Internes Kontrollsystem"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur eingewiesene Personen arbeiten in den Schritten aus Kapitel 4, und zwar stets so, wie dort beschrieben. Kontrollen sind so auszuüben und zu belegen, wie in der Tabelle angegeben (GoBD Rz. 100). Nachweis offen bei: 4.7 Kommissionierung kontrollieren. Weicht die Praxis von dieser Beschreibung ab, erfährt es die Geschäftsleitung; Anlass und Maßnahme werden schriftlich festgehalten."
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Kontrolle",
+                "Art",
+                "Wer",
+                "Was geprüft wird",
+                "Nachweis",
+                "Häufigkeit"
+              ],
+              "zeilen": [
+                [
+                  "4.7 Kommissionierung kontrollieren",
+                  "Plausibilität und Vollständigkeit",
+                  "Lager",
+                  "Ware vollständig und richtig",
+                  "keiner",
+                  "bei jedem Vorgang"
+                ],
+                [
+                  "4.17 Rechnung freigeben",
+                  "Vier-Augen-Prinzip",
+                  "Niederlassungsleitung",
+                  "Rechnung sachlich und rechnerisch richtig",
+                  "im System protokolliert",
+                  "bei jedem Vorgang"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "3.4",
+              "text": "Datenschutz und Datensicherheit"
+            },
+            {
+              "art": "absatz",
+              "text": "Zugriff auf die Unterlagen haben nur berechtigte Personen, vom Entstehen bis zur Vernichtung. Wann vernichtet und gelöscht wird, regelt das letzte Unterkapitel von Kapitel 4. Die Schutzmaßnahmen im Einzelnen nennt das Verzeichnis von Verarbeitungstätigkeiten in Abschnitt C."
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "System",
+                "Schutz vor Änderung",
+                "Datensicherung",
+                "Intervall",
+                "Rücksicherung getestet",
+                "Zugriffsschutz"
+              ],
+              "zeilen": [
+                [
+                  "Excel-Tourenliste",
+                  "offen",
+                  "Automatisch",
+                  "täglich",
+                  "ja",
+                  "eigenes Windows-Konto, Ordner nur für die Disposition"
+                ],
+                [
+                  "Warenwirtschaft",
+                  "Änderungen werden protokolliert",
+                  "Durch den Anbieter",
+                  "–",
+                  "nein",
+                  "eigenes Konto je Person, Rechte nach Rolle"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "3.5",
+              "text": "Wiederfinden, Lesbarmachung und Datenzugriff"
+            },
+            {
+              "art": "absatz",
+              "text": "Aufbewahrte Unterlagen müssen bis zum Ende der Frist eindeutig wiederzufinden, unverzüglich lesbar zu machen und maschinell auswertbar sein. Bei einer Außenprüfung kann die Finanzverwaltung die Daten im System einsehen, Auswertungen nach ihren Vorgaben verlangen oder die Daten in einem maschinell auswertbaren Format anfordern, auch wenn sie bei einem Dienstleister liegen (§ 147 Abs. 2, 5 und 6 AO; GoBD Rz. 152, 156–159)."
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "System",
+                "Aufbewahrte Unterlagen",
+                "Wiederfinden über",
+                "Datenzugriff, auch nach Vertragsende oder Systemwechsel"
+              ],
+              "zeilen": [
+                [
+                  "Warenwirtschaft",
+                  "Bestellung, Ausgangsrechnung",
+                  "Suche nach Rechnungs-, Bestell- oder Kundennummer",
+                  "Export aller Rechnungen und Buchungsdaten als CSV und PDF; bei Vertragsende Gesamtexport nach Vertrag"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "4",
+              "text": "Verfahren und Maßnahmen: Bestellung bis Rechnung (Lieferdienst)"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.1",
+              "text": "Bestellung telefonisch annehmen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Innendienst. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Ergebnis: Bestellnotiz."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.2",
+              "text": "Bestellung in Warenwirtschaft erfassen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Innendienst. System: Warenwirtschaft."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Bestellnotiz."
+            },
+            {
+              "art": "absatz",
+              "text": "Ergebnis: Bestellung."
+            },
+            {
+              "art": "absatz",
+              "text": "Medienbruch: Daten aus Papier werden von Hand übertragen."
+            },
+            {
+              "art": "absatz",
+              "text": "Entscheidung „Ware vorrätig?“:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "„Ja“: weiter im Ablauf",
+                "„Nein“: weiter mit 4.3"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.3",
+              "text": "Kunden anrufen und Ersatz anbieten"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur wenn: „Ware vorrätig?“ = „Nein“."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Innendienst. System: Telefon."
+            },
+            {
+              "art": "absatz",
+              "text": "Entscheidung „Ersatz angenommen?“:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "„Ja“: weiter mit 4.4",
+                "„Nein“: weiter mit 4.5, danach endet der Vorgang mit „Bestellung storniert“"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.4",
+              "text": "Bestellung ändern"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur wenn: „Ware vorrätig?“ = „Nein“, „Ersatz angenommen?“ = „Ja“."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Innendienst. System: Warenwirtschaft."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.5",
+              "text": "Bestellung stornieren"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur wenn: „Ware vorrätig?“ = „Nein“, „Ersatz angenommen?“ = „Nein“."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Innendienst. System: Warenwirtschaft."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.6",
+              "text": "Ware kommissionieren"
+            },
+            {
+              "art": "absatz",
+              "text": "Wiederholung: 4.6 bis 4.7 laufen mindestens einmal und erneut, solange „Fehler gefunden?“ mit „Ja“ beantwortet wird."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Lager. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Bestellung."
+            },
+            {
+              "art": "absatz",
+              "text": "Ergebnis: Lieferschein."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.7",
+              "text": "Kommissionierung kontrollieren"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Lager. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Kontrolle: Plausibilität und Vollständigkeit; geprüft wird: Ware vollständig und richtig; Nachweis: keiner."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.8",
+              "text": "Tour planen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Disposition. System: Excel-Tourenliste."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Bestellung."
+            },
+            {
+              "art": "absatz",
+              "text": "Ergebnis: Tourenliste."
+            },
+            {
+              "art": "absatz",
+              "text": "Medienbruch: Daten aus Warenwirtschaft werden von Hand übertragen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.9",
+              "text": "Ware verladen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Lager. System: Papier."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.10",
+              "text": "Ware ausliefern"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Fahrer. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Lieferschein, Tourenliste."
+            },
+            {
+              "art": "absatz",
+              "text": "Entscheidung „Kunde angetroffen?“:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "„Ja“: weiter mit 4.11",
+                "„Nein“: weiter mit 4.12"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.11",
+              "text": "Empfang quittieren lassen"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur wenn: „Kunde angetroffen?“ = „Ja“."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Fahrer. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Ergebnis: Lieferschein."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.12",
+              "text": "Benachrichtigung hinterlassen"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur wenn: „Kunde angetroffen?“ = „Nein“."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Fahrer. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Nachricht an Kunde."
+            },
+            {
+              "art": "absatz",
+              "text": "Warten: Neuen Liefertermin abwarten (auf eine Nachricht von Kunde)."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.13",
+              "text": "Ware erneut zustellen"
+            },
+            {
+              "art": "absatz",
+              "text": "Nur wenn: „Kunde angetroffen?“ = „Nein“."
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Fahrer. System: Papier."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.14",
+              "text": "Lieferscheine abgeben"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Fahrer. System: Papier."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Lieferschein."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.15",
+              "text": "Zustellung im System bestätigen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Disposition. System: Warenwirtschaft."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Lieferschein."
+            },
+            {
+              "art": "absatz",
+              "text": "Medienbruch: Daten aus Papier werden von Hand übertragen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.16",
+              "text": "Rechnung erstellen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Buchhaltung. System: Warenwirtschaft."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Bestellung."
+            },
+            {
+              "art": "absatz",
+              "text": "Ergebnis: Ausgangsrechnung."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.17",
+              "text": "Rechnung freigeben"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Niederlassungsleitung. System: Warenwirtschaft."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Ausgangsrechnung."
+            },
+            {
+              "art": "absatz",
+              "text": "Kontrolle: Vier-Augen-Prinzip; geprüft wird: Rechnung sachlich und rechnerisch richtig; Nachweis: im System protokolliert."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.18",
+              "text": "Rechnung versenden"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Buchhaltung. System: Warenwirtschaft."
+            },
+            {
+              "art": "absatz",
+              "text": "Grundlage: Ausgangsrechnung."
+            },
+            {
+              "art": "absatz",
+              "text": "Nachricht an Kunde."
+            },
+            {
+              "art": "absatz",
+              "text": "Warten: Zahlungsziel abwarten (auf einen Zeitpunkt)."
+            },
+            {
+              "art": "absatz",
+              "text": "Die folgenden Zweige laufen gleichzeitig; weiter geht es, wenn alle fertig sind:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Zweig 1: 4.19",
+                "Zweig 2: 4.20"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.19",
+              "text": "Zahlungseingang prüfen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Buchhaltung. System: offen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.20",
+              "text": "Lieferschein ablegen"
+            },
+            {
+              "art": "absatz",
+              "text": "Zuständig: Buchhaltung. System: offen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "4.21",
+              "text": "Aufbewahrung, Vernichtung und Löschung"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "„Bestellung“: aufbewahren 6 Jahre ab Ende des Kalenderjahres der Entstehung; Ablage: Warenwirtschaft.",
+                "„Lieferschein“: aufbewahren 6 Jahre ab Ende des Kalenderjahres der Entstehung; Ablage: Ordner Lieferscheine.",
+                "„Ausgangsrechnung“: aufbewahren 8 Jahre ab Ende des Kalenderjahres der Entstehung; Ablage: Warenwirtschaft."
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Freigabe der Löschung: Erika Mustermann. Durchführung: Buchhaltung. Turnus: jährlich."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "5",
+              "text": "Ersetzendes Scannen"
+            },
+            {
+              "art": "absatz",
+              "text": "Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "6",
+              "text": "Mitgeltende Unterlagen"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Verzeichnis von Verarbeitungstätigkeiten, gleiche Version",
+                "BPMN-Datei des Ist-Prozesses"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "7",
+              "text": "Änderungshistorie"
+            },
+            {
+              "art": "absatz",
+              "text": "Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“."
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Version",
+                "gültig ab",
+                "gültig bis",
+                "freigegeben",
+                "geänderte Kapitel",
+                "Inhalt",
+                "aufbewahren bis",
+                "Prüfsumme"
+              ],
+              "zeilen": [
+                [
+                  "1.0",
+                  "11.11.2026",
+                  "laufend",
+                  "11.11.2026, Erika Mustermann",
+                  "–",
+                  "Erstfassung",
+                  "10 Jahre nach Ende der Gültigkeit",
+                  "–"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "8",
+              "text": "Glossar"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Begriff",
+                "Bedeutung"
+              ],
+              "zeilen": [
+                [
+                  "Aufbewahrungsfrist",
+                  "Zeitraum, in dem eine Unterlage vorhanden sein muss; er beginnt mit dem Ende des Kalenderjahres ihrer Entstehung (§ 147 Abs. 3 und 4 AO)."
+                ],
+                [
+                  "Auftragsverarbeiter",
+                  "Dienstleister, der personenbezogene Daten im Auftrag und nach Weisung des Unternehmens verarbeitet (Art. 4 Nr. 8, Art. 28 DSGVO)."
+                ],
+                [
+                  "Beleg",
+                  "Nachweis eines Geschäftsvorfalls, etwa eine Rechnung oder Quittung; er begründet die Buchung (GoBD Rz. 61 ff.)."
+                ],
+                [
+                  "E-Rechnung",
+                  "Rechnung in einem strukturierten elektronischen Format wie XRechnung oder ZUGFeRD, das sich maschinell auswerten lässt (§ 14 Abs. 1 UStG)."
+                ],
+                [
+                  "Geschäftsbrief",
+                  "Schreiben, mit dem ein Geschäft vorbereitet, abgeschlossen, abgewickelt oder rückgängig gemacht wird, etwa ein Angebot oder eine Auftragsbestätigung (§ 147 Abs. 1 Nr. 2 und 3 AO)."
+                ],
+                [
+                  "GoBD",
+                  "Verwaltungsanweisung des Bundesfinanzministeriums dazu, wie Bücher und Unterlagen elektronisch zu führen und aufzubewahren sind (BMF-Schreiben vom 28.11.2019, Fassung vom 14.07.2025)."
+                ],
+                [
+                  "Internes Kontrollsystem",
+                  "Gesamtheit der Regeln und Kontrollen, die dafür sorgen, dass Vorgänge vollständig und richtig erfasst werden (GoBD Rz. 100 bis 102)."
+                ],
+                [
+                  "Unveränderbarkeit",
+                  "Einmal erfasste Informationen dürfen nicht ohne Kenntlichmachung geändert oder gelöscht werden (§ 146 Abs. 4 AO, GoBD Rz. 107 ff.)."
+                ],
+                [
+                  "Verfahrensdokumentation",
+                  "Beschreibung, wie Unterlagen entstehen, verarbeitet, aufbewahrt und wiedergegeben werden, so dass sachverständige Dritte das Verfahren nachvollziehen können (GoBD Rz. 151 bis 155)."
+                ],
+                [
+                  "Vier-Augen-Prinzip",
+                  "Eine zweite Person prüft oder gibt frei, was eine erste erstellt hat; so fallen Fehler und Missbrauch eher auf (GoBD Rz. 100)."
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "9",
+              "text": "Anlage"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "9.1",
+              "text": "Ablaufdiagramm"
+            },
+            {
+              "art": "diagramm"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "9.2",
+              "text": "Nachweis der Einweisung"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Datum",
+                "Name",
+                "Rolle",
+                "Unterschrift"
+              ],
+              "zeilen": [
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ],
+                [
+                  "",
+                  "",
+                  "",
+                  ""
+                ]
+              ]
+            }
+          ]
+        },
+        "verzeichnis": {
+          "art": "verarbeitungsverzeichnis",
+          "titel": "Verzeichnis von Verarbeitungstätigkeiten",
+          "untertitel": "Verantwortlicher nach Art. 30 Abs. 1 DSGVO · Lieferdienst Muster GmbH",
+          "versionText": "1.0",
+          "stand": "2026-11-11",
+          "rechtsstand": "2026-11-11",
+          "abschnitte": [
+            {
+              "art": "absatz",
+              "text": "Version 1.0 · gültig ab 11.11.2026"
+            },
+            {
+              "art": "hinweis",
+              "text": "Aus einer Vorlage mit dem Prozesslotsen erstellt; die Verantwortung für den Inhalt liegt beim Unternehmen. Eine Prüfung durch den Datenschutzbeauftragten oder eine fachkundige Person wird empfohlen. Rechtsstand 11.11.2026. Beschreibt die Verarbeitung im Prozess „Bestellung bis Rechnung (Lieferdienst)“. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018)."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "A",
+              "text": "Angaben zum Verantwortlichen"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Angabe",
+                "Inhalt"
+              ],
+              "zeilen": [
+                [
+                  "Name",
+                  "Lieferdienst Muster GmbH"
+                ],
+                [
+                  "Anschrift",
+                  "Musterstraße 1, 12345 Musterstadt"
+                ],
+                [
+                  "Telefon",
+                  "01234 5678"
+                ],
+                [
+                  "E-Mail",
+                  "info@lieferdienst.example"
+                ],
+                [
+                  "Internet",
+                  "–"
+                ],
+                [
+                  "Datenschutzbeauftragter",
+                  "nicht benannt"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "B",
+              "text": "Verarbeitungstätigkeit 1: Bestellung bis Rechnung (Lieferdienst)"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Angabe",
+                "Inhalt"
+              ],
+              "zeilen": [
+                [
+                  "Benennung",
+                  "Bestellung bis Rechnung (Lieferdienst)"
+                ],
+                [
+                  "Laufende Nummer",
+                  "1"
+                ],
+                [
+                  "Eingeführt am",
+                  "offen"
+                ],
+                [
+                  "Letzte Änderung",
+                  "11.11.2026"
+                ],
+                [
+                  "Fachabteilung",
+                  "–"
+                ],
+                [
+                  "Ansprechpartner",
+                  "offen"
+                ],
+                [
+                  "Telefon",
+                  "–"
+                ],
+                [
+                  "E-Mail",
+                  "–"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.1",
+              "text": "Zwecke (Art. 30 Abs. 1 lit. b DSGVO)"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Bestellungen annehmen, ausliefern und abrechnen"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.2",
+              "text": "Rechtsgrundlagen"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Art. 6 Abs. 1 lit. b DSGVO: für einen Vertrag mit der Person oder ihre Anfrage nötig",
+                "Art. 6 Abs. 1 lit. c DSGVO: gesetzliche Pflicht, z. B. Aufbewahrung nach § 147 AO"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.3",
+              "text": "Betroffene Personen und Daten (lit. c)"
+            },
+            {
+              "art": "absatz",
+              "text": "Betroffene Personen:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Kunden"
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Kategorien personenbezogener Daten:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Kontaktdaten (Anschrift, Telefon, E-Mail)",
+                "Vertrags- und Bestelldaten",
+                "Rechnungs- und Zahlungsdaten"
+              ]
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Unterlage",
+                "Betroffene",
+                "Daten",
+                "Rechtsgrundlage",
+                "Löschung"
+              ],
+              "zeilen": [
+                [
+                  "Bestellnotiz",
+                  "Kunden",
+                  "Kontaktdaten (Anschrift, Telefon, E-Mail), Vertrags- und Bestelldaten",
+                  "lit. b",
+                  "offen"
+                ],
+                [
+                  "Bestellung",
+                  "Kunden",
+                  "Kontaktdaten (Anschrift, Telefon, E-Mail), Vertrags- und Bestelldaten",
+                  "lit. b, lit. c",
+                  "nach Ablauf der Aufbewahrung: 6 Jahre ab Ende des Kalenderjahres der Entstehung (§ 147 AO)"
+                ],
+                [
+                  "Lieferschein",
+                  "Kunden",
+                  "Kontaktdaten (Anschrift, Telefon, E-Mail), Vertrags- und Bestelldaten",
+                  "lit. b",
+                  "nach Ablauf der Aufbewahrung: 6 Jahre ab Ende des Kalenderjahres der Entstehung"
+                ],
+                [
+                  "Tourenliste",
+                  "Kunden",
+                  "Kontaktdaten (Anschrift, Telefon, E-Mail)",
+                  "lit. b",
+                  "offen"
+                ],
+                [
+                  "Ausgangsrechnung",
+                  "Kunden",
+                  "Kontaktdaten (Anschrift, Telefon, E-Mail), Vertrags- und Bestelldaten, Rechnungs- und Zahlungsdaten",
+                  "lit. b, lit. c",
+                  "nach Ablauf der Aufbewahrung: 8 Jahre ab Ende des Kalenderjahres der Entstehung (§ 147 AO)"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.4",
+              "text": "Empfänger (lit. d)"
+            },
+            {
+              "art": "absatz",
+              "text": "Intern (Rollen mit Zugriff):"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Innendienst",
+                "Lager",
+                "Disposition",
+                "Fahrer",
+                "Buchhaltung",
+                "Niederlassungsleitung"
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Extern:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "WaWi-Cloud (Beispielanbieter) (Auftragsverarbeiter, „Warenwirtschaft“)",
+                "Steuerberatung"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.5",
+              "text": "Übermittlung in Drittländer (lit. e)"
+            },
+            {
+              "art": "absatz",
+              "text": "Eine Übermittlung in Drittländer findet nicht statt und ist nicht geplant."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.6",
+              "text": "Löschfristen (lit. f)"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Unterlage",
+                "Löschfrist"
+              ],
+              "zeilen": [
+                [
+                  "Bestellnotiz",
+                  "offen"
+                ],
+                [
+                  "Bestellung",
+                  "nach Ablauf der Aufbewahrung: 6 Jahre ab Ende des Kalenderjahres der Entstehung (§ 147 AO)"
+                ],
+                [
+                  "Lieferschein",
+                  "nach Ablauf der Aufbewahrung: 6 Jahre ab Ende des Kalenderjahres der Entstehung"
+                ],
+                [
+                  "Tourenliste",
+                  "offen"
+                ],
+                [
+                  "Ausgangsrechnung",
+                  "nach Ablauf der Aufbewahrung: 8 Jahre ab Ende des Kalenderjahres der Entstehung (§ 147 AO)"
+                ]
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "B.7",
+              "text": "Technische und organisatorische Maßnahmen (lit. g)"
+            },
+            {
+              "art": "absatz",
+              "text": "Siehe Abschnitt C."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "C",
+              "text": "Technische und organisatorische Maßnahmen (Art. 32 Abs. 1 DSGVO)"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "C.1",
+              "text": "Pseudonymisierung"
+            },
+            {
+              "art": "absatz",
+              "text": "Trifft nicht zu: Keine Auswertungen, die Pseudonyme brauchen"
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "C.2",
+              "text": "Verschlüsselung"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Webzugriffe und E-Mail-Versand über TLS"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "C.3",
+              "text": "Vertraulichkeit und Integrität"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Eigenes Benutzerkonto je Person, keine geteilten Passwörter",
+                "Papierunterlagen in abschließbarem Schrank oder Raum"
+              ]
+            },
+            {
+              "art": "absatz",
+              "text": "Zugriffsschutz je System:"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Excel-Tourenliste: eigenes Windows-Konto, Ordner nur für die Disposition",
+                "Warenwirtschaft: eigenes Konto je Person, Rechte nach Rolle"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "C.4",
+              "text": "Verfügbarkeit und Belastbarkeit"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Tägliche automatische Datensicherung"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "C.5",
+              "text": "Wiederherstellung"
+            },
+            {
+              "art": "liste",
+              "punkte": [
+                "Rücksicherung mindestens jährlich getestet"
+              ]
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 2,
+              "nummer": "C.6",
+              "text": "Überprüfung"
+            },
+            {
+              "art": "absatz",
+              "text": "Keine Maßnahme eingetragen."
+            },
+            {
+              "art": "ueberschrift",
+              "ebene": 1,
+              "nummer": "D",
+              "text": "Änderungen"
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Version",
+                "gültig ab",
+                "Änderung"
+              ],
+              "zeilen": [
+                [
+                  "1.0",
+                  "11.11.2026",
+                  "Erstfassung"
+                ]
+              ]
+            },
+            {
+              "art": "tabelle",
+              "kopf": [
+                "Ort, Datum",
+                "Unterschrift des Verantwortlichen"
+              ],
+              "zeilen": [
+                [
+                  "",
+                  ""
+                ]
+              ]
+            }
+          ]
+        },
+        "pruefsumme": "84e50c4fcd1a646390f5192cbb7cc38765feb5d2fc9cf529f66c8051e60b1d70"
+      }
+    ],
+    "zuletztGeprueft": null
+  }
+}

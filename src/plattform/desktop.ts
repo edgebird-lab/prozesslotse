@@ -4,15 +4,16 @@
  * für Pfade, die der Benutzer selbst gewählt hat. Die Tauri-Bibliotheken werden
  * erst beim ersten Aufruf geladen, damit die Web-Version sie nie mitlädt.
  */
+import type { InvokeArgs, InvokeOptions } from '@tauri-apps/api/core'
 import type { Datei, MenueBefehl, Plattform, Zuletzt } from './typen'
 
 const kern = () => import('@tauri-apps/api/core')
 const ereignisse = () => import('@tauri-apps/api/event')
 const fenster = () => import('@tauri-apps/api/window')
 
-async function rufe<T>(befehl: string, args?: Record<string, unknown>): Promise<T> {
+async function rufe<T>(befehl: string, args?: InvokeArgs, optionen?: InvokeOptions): Promise<T> {
   const { invoke } = await kern()
-  return invoke<T>(befehl, args)
+  return invoke<T>(befehl, args, optionen)
 }
 
 /** Meldet einen Listener an, der sich auch abmelden lässt, bevor die Anmeldung fertig ist. */
@@ -35,6 +36,8 @@ export const desktopPlattform: Plattform = {
   startDatei: () => rufe<Datei | null>('start_datei'),
   speichern: (pfad, inhalt) => rufe<void>('speichern', { pfad, inhalt }),
   speichernUnter: (vorschlag, inhalt, art) => rufe<{ pfad: string; name: string } | null>('speichern_unter', { vorschlag, inhalt, art }),
+  // Bytes als Rohdaten (Uint8Array), nicht als JSON-Zahlenliste; Kopfwerte sind nur ASCII, deshalb ist der Name kodiert
+  speichereBytes: (vorschlag, bytes, art) => rufe<{ pfad: string; name: string } | null>('speichern_unter_bytes', bytes, { headers: { vorschlag: encodeURIComponent(vorschlag), art } }),
   zuletzt: () => rufe<Zuletzt[]>('zuletzt'),
   oeffneZuletzt: (pfad) => rufe<Datei>('oeffne_zuletzt', { pfad }),
   setzeTitel: (titel) => {

@@ -1,4 +1,5 @@
 import { createContext, useContext, type Dispatch } from 'react'
+import type { ComplianceProjekt } from '../compliance/typen'
 import type { Cursor, Id, Prozess } from '../modell/typen'
 import type { Aktion, Zustand } from '../zustand'
 import type { DateiBefehle } from './datei'
@@ -17,6 +18,8 @@ export interface AppApi {
   dispatch: Dispatch<Aktion>
   /** Ändert den aktiven Prozess; als Funktion bekommt sie immer den neuesten Stand. */
   aendere: (aenderung: Prozess | ((p: Prozess) => Prozess), optionen?: AenderungsOptionen) => void
+  /** Ändert die Compliance-Angaben (legt sie bei Bedarf an); `gruppe` fasst Tippen zu einem Rückgängig-Schritt zusammen. */
+  aendereCompliance: (aenderung: (c: ComplianceProjekt) => ComplianceProjekt, gruppe?: string) => void
   /** Bausteine, die im Diagramm vorübergehend hervorgehoben werden. */
   setHervorhebung: (ids: Id[]) => void
   /** Öffnen, Speichern, Exportieren */
