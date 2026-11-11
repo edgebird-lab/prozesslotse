@@ -61,18 +61,18 @@ test('Anlage 9.1: im Druck nach der Übersicht lesbare Ausschnitte mit Überlapp
     els.map((el) => {
       const r = el.querySelector('img')!.getBoundingClientRect()
       const d = (el as HTMLElement).dataset
-      return { x: Number(d.x), y: Number(d.y), breite: Number(d.breite), hoehe: Number(d.hoehe), gedreht: d.gedreht === 'ja', bildBreite: r.width, bildHoehe: r.height }
+      return { x: Number(d.x), y: Number(d.y), breite: Number(d.breite), kopf: Number(d.kopf), hoehe: Number(d.hoehe), gedreht: d.gedreht === 'ja', bildBreite: r.width, bildHoehe: r.height }
     }),
   )
   for (const a of masse) {
-    // Maßstab: Druckpixel je Diagrammpixel; 11-px-Beschriftungen von bpmn-js werden so mindestens etwa 5 pt groß
-    const massstab = (a.gedreht ? a.bildHoehe : a.bildBreite) / a.breite
+    // Maßstab: Druckpixel je Diagrammpixel (das Bild hat links den Kopf mit den Namen); 11-px-Beschriftungen von bpmn-js werden so mindestens etwa 5 pt groß
+    const massstab = (a.gedreht ? a.bildHoehe : a.bildBreite) / (a.breite + a.kopf)
     expect(11 * massstab * 0.75).toBeGreaterThanOrEqual(4.9)
     // passt auf eine Seite (180 × 264 mm abzüglich Unterschrift)
     expect(a.bildBreite).toBeLessThanOrEqual(681)
     expect(a.bildHoehe).toBeLessThanOrEqual(910)
   }
-  // Nachbarn in einer Zeile überlappen sich um etwa 40 px, nichts fällt zwischen zwei Ausschnitte
+  // Nachbarn in einer Zeile überlappen sich um etwa 40 px (mehr nur, wenn sonst eine Form zerschnitten würde), nichts fällt zwischen zwei Ausschnitte
   for (let i = 1; i < masse.length; i++) {
     if (masse[i].y !== masse[i - 1].y) continue
     const ueberlappung = masse[i - 1].x + masse[i - 1].breite - masse[i].x

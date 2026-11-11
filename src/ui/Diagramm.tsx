@@ -3,6 +3,7 @@ import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-js.css'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import type { Markierung } from './analyse'
+import { druckFormen, type DruckForm } from './druckausschnitte'
 
 interface Box {
   x: number
@@ -27,6 +28,7 @@ interface EventBus {
 }
 interface ElementRegistry {
   get(id: string): unknown
+  getAll(): unknown[]
 }
 
 export interface DiagrammApi {
@@ -48,8 +50,8 @@ export interface DiagrammProps {
   uebersicht?: boolean
   /** Für den Druck ein Bild des ganzen Diagramms einsetzen, das sich der Seitenbreite anpasst. */
   druckbild?: boolean
-  /** Eigener Druckinhalt statt des einen Bilds, aus dem SVG des ganzen Diagramms (z. B. Übersicht und Ausschnitte). */
-  druckInhalt?: (svg: string) => ReactNode
+  /** Eigener Druckinhalt statt des einen Bilds, aus dem SVG des ganzen Diagramms und seinen Formen (z. B. Übersicht und Ausschnitte). */
+  druckInhalt?: (svg: string, formen: DruckForm[]) => ReactNode
 }
 
 const SYMBOL: Record<Markierung['art'], string> = {
@@ -115,7 +117,8 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
   const letzteAuswahl = useRef<string>('')
   const [importNr, setImportNr] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
-  const [druckSvg, setDruckSvg] = useState('')
+  const [druck, setDruck] = useState<{ svg: string; formen: DruckForm[] }>({ svg: '', formen: [] })
+  const druckSvg = druck.svg
 
   useEffect(() => {
     klick.current = onKlick
@@ -158,7 +161,8 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         markiert.current = []
         setImportNr((n) => n + 1)
         // Bild für Druck und PDF: Die Ansicht im Browser passt sich der Papierbreite nicht an, ein SVG-Bild schon.
-        if (druckbild) void v.saveSVG().then(({ svg }) => aktiv && setDruckSvg(svg))
+        // Formen mit Lage und Größe, damit die Ausschnitte im Druck keine zerschneiden
+        if (druckbild) void v.saveSVG().then(({ svg }) => aktiv && setDruck({ svg, formen: druckFormen(v.get<ElementRegistry>('elementRegistry').getAll()) }))
       })
       .catch((e: unknown) => {
         if (aktiv) setFehler(e instanceof Error ? e.message : String(e))
@@ -238,7 +242,7 @@ export const Diagramm = forwardRef<DiagrammApi, DiagrammProps>(function Diagramm
         </button>
       </div>
       <div ref={behaelter} className="diagramm-flaeche" role="figure" aria-label={beschriftung} />
-      {druckbild && druckSvg && (druckInhalt ? druckInhalt(druckSvg) : <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />)}
+      {druckbild && druckSvg && (druckInhalt ? druckInhalt(druckSvg, druck.formen) : <img className="druck-bild" alt="" aria-hidden="true" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(druckSvg)}`} />)}
       {fehler && (
         <p className="diagramm-fehler" role="alert">
           Das Diagramm konnte nicht gezeichnet werden: {fehler}

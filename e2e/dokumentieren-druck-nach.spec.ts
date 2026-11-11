@@ -152,3 +152,55 @@ test('Seitensatz im Druck: neue Seite nur vor großen Kapiteln, 9.2 und Absätze
   expect(vvt).toContain('E‑Mail')
   expect(vvt).not.toContain('E-Mail')
 })
+
+test('Anlage 9.1: jede Form ganz in einem Ausschnitt, Pool- und Bahnnamen am linken Rand jedes Ausschnitts (Sichtprüfung Mangel 1)', async ({ page }) => {
+  await start(page)
+  const anlage = page.locator('.dokument-diagramm')
+  // Formen samt Beschriftung, wie bpmn-js sie zeichnet (Diagrammkoordinaten); Pools und Bahnen zählen nicht
+  await expect(anlage.locator('.djs-element.djs-shape').first()).toBeAttached()
+  const formen = await anlage.locator('.djs-element.djs-shape[data-element-id]').evaluateAll((els) => {
+    const m = new Map<string, { x1: number; y1: number; x2: number; y2: number }>()
+    for (const el of els as SVGGElement[]) {
+      const id = el.getAttribute('data-element-id')!
+      const basis = id.replace(/_label$/, '')
+      if (basis === 'Teilnehmer' || /^(Pool|Bahn)_/.test(basis)) continue
+      const sicht = el.querySelector('.djs-visual') as SVGGraphicsElement | null
+      const t = el.transform.baseVal.consolidate()?.matrix
+      if (!sicht || !t) continue
+      const b = sicht.getBBox()
+      if (b.width === 0 && b.height === 0) continue
+      const r = { x1: b.x + t.e, y1: b.y + t.f, x2: b.x + t.e + b.width, y2: b.y + t.f + b.height }
+      const alt = m.get(basis)
+      m.set(basis, alt ? { x1: Math.min(alt.x1, r.x1), y1: Math.min(alt.y1, r.y1), x2: Math.max(alt.x2, r.x2), y2: Math.max(alt.y2, r.y2) } : r)
+    }
+    return [...m.entries()].map(([id, r]) => ({ id, ...r }))
+  })
+  expect(formen.length).toBeGreaterThan(30)
+
+  await page.emulateMedia({ media: 'print' })
+  await page.setViewportSize({ width: 680, height: 900 })
+  const ausschnitte = anlage.locator('.druck-ausschnitt')
+  const m = await ausschnitte.count()
+  expect(m).toBeGreaterThan(1)
+  const masse = await ausschnitte.evaluateAll((els) =>
+    els.map((el) => {
+      const d = (el as HTMLElement).dataset
+      const src = el.querySelector('img')!.getAttribute('src')!
+      return { x: Number(d.x), y: Number(d.y), breite: Number(d.breite), hoehe: Number(d.hoehe), kopf: Number(d.kopf), svg: decodeURIComponent(src.slice(src.indexOf(',') + 1)) }
+    }),
+  )
+  for (const f of formen) {
+    const ganz = masse.some((a) => f.x1 >= a.x - 0.2 && f.x2 <= a.x + a.breite + 0.2 && f.y1 >= a.y - 0.2 && f.y2 <= a.y + a.hoehe + 0.2)
+    expect(ganz, `${f.id} (${Math.round(f.x1)}–${Math.round(f.x2)})`).toBe(true)
+  }
+
+  const namen = ['Bestellung bis Rechnung (Lieferdienst)', 'Kunde', 'Innendienst', 'Lager', 'Disposition', 'Fahrer', 'Buchhaltung', 'Niederlassungsleitung']
+  expect(masse[0].kopf).toBe(0)
+  for (const [i, a] of masse.entries()) {
+    if (i === 0) continue
+    expect(a.kopf, `Ausschnitt ${i + 1}`).toBe(60)
+    const kopf = a.svg.slice(a.svg.indexOf('<g class="pl-koepfe">'))
+    expect(kopf.length, `Ausschnitt ${i + 1}`).toBeLessThan(a.svg.length)
+    for (const n of namen) expect(kopf, `Ausschnitt ${i + 1}: ${n}`).toContain(`>${n}</text>`)
+  }
+})

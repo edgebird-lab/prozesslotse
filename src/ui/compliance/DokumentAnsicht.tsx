@@ -80,7 +80,7 @@ export function DokumentAnsicht({ dokument, prozess }: { dokument: Dokument; pro
         return (
           <div key={i} className="dokument-diagramm">
             <p>Das Diagramm in Originalgröße enthält die BPMN-Datei des Ist-Prozesses (Kapitel 6).</p>
-            <Diagramm xml={bpmn.xml} klein uebersicht druckbild druckInhalt={(svg) => <DiagrammDruck svg={svg} />} beschriftung={`Ablaufdiagramm: ${prozess.name || 'Unbenannter Prozess'}`} />
+            <Diagramm xml={bpmn.xml} klein uebersicht druckbild druckInhalt={(svg, formen) => <DiagrammDruck svg={svg} formen={formen} />} beschriftung={`Ablaufdiagramm: ${prozess.name || 'Unbenannter Prozess'}`} />
           </div>
         )
     }
