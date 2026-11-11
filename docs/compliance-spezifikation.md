@@ -488,7 +488,7 @@ export interface DokuVersion {
   geaenderteKapitel: string[]
   /** Gesetzt, wenn die Freigabe zurückgezogen wurde: Die Version bleibt sichtbar, zählt aber für Reihenfolge und Gültigkeit nicht mehr. */
   zurueckgezogen?: Rueckzug
-  /** Ist-Prozess bei der Freigabe, für Diagramm und Vergleich */
+  /** Ist-Prozess bei der Freigabe als Rohstand (kann ein älteres Format haben); für Diagramm und Vergleich `eingefrorenerProzess(v)` (4.4, 6.8) */
   prozess: Prozess
   verfahrensdoku: Dokument
   verzeichnis: Dokument
@@ -608,7 +608,7 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 - `validiereCompliance(x)` in `src/compliance/speicher.ts` prüft beim Laden: Typen aller Felder, Werte aus den Katalogen, Datumsfelder als gültiges `JJJJ-MM-TT` oder `null`, Zahlen endlich und ganzzahlig (`personenMitDaten` ≥ 0, `aufbewahrungJahre` 0–30, `Frist.anzahl` 0–100). Ids in `unterlagen` und `ablageorte` sind eindeutig; `zugriffe`, `datenobjekte` und `ablageSpeicherIds` verweisen auf vorhandene Einträge. Fehler werfen `Formatfehler` mit Feldnamen, z. B. „Compliance-Angaben: ‚systeme.med_erp.seit‘ ist kein gültiges Datum.“ Fehlt `ersetzendesScannen` (Dateien vor dem 11.11.2026), wird es mit `{ verfahrensdoku: null, stand: null }` ergänzt.
 - Datumsfelder liegen wie bei der Eingabe zwischen 1900 und 2199 („… liegt nicht zwischen 1900 und 2199.“); mit Jahren wie 9995 rechneten die Fristen sonst fünfstellige Jahre aus. Eine Prüfsumme in Großbuchstaben wird still klein geschrieben; das ist die einzige stille Korrektur.
 - Ist nur der Compliance-Teil fehlerhaft, wirft `leseProjekt` einen `ComplianceFormatfehler` (Unterklasse von `Formatfehler`) mit `detail` („Feld: Fehler“) und dem geprüften Projekt ohne Compliance-Teil. Beim Öffnen fragt die App: „Die Compliance-Angaben in „{Datei}“ sind beschädigt ({Feld}: {Fehler}). Nur den Prozess öffnen?“ „Nur den Prozess öffnen“ lädt ihn als neues, ungespeichertes Dokument ohne Pfad, damit Speichern die Originaldatei nie überschreibt, und meldet das. Die Datei bleibt unverändert.
-- Versionen: `nummer` aufsteigend ab 1, `gueltigAb` unter den nicht zurückgezogenen Versionen streng aufsteigend, Dokumente mit gültigen Abschnittsarten. Bei einer zurückgezogenen Version ist `zurueckgezogen.grund` nicht leer, und `zurueckgezogen.am` liegt zwischen `freigegebenAm` und dem Tag vor `gueltigAb` (sie war nie in Kraft). Der eingefrorene `prozess` durchläuft dieselbe Migration und Strukturprüfung wie `ist` (private Funktion `pruefeProzess` in `src/modell/speicher.ts`, dafür exportieren). Damit gilt jede künftige Formatmigration auch für alte Versionen.
+- Versionen: `nummer` aufsteigend ab 1, `gueltigAb` unter den nicht zurückgezogenen Versionen streng aufsteigend, Dokumente mit gültigen Abschnittsarten. Bei einer zurückgezogenen Version ist `zurueckgezogen.grund` nicht leer, und `zurueckgezogen.am` liegt zwischen `freigegebenAm` und dem Tag vor `gueltigAb` (sie war nie in Kraft). Eine Kopie des eingefrorenen `prozess` durchläuft dieselbe Migration und Strukturprüfung wie `ist` (über `leseProjekt`). Damit gilt jede künftige Formatmigration und Normalisierung auch für alte Versionen. Der eingefrorene `prozess` selbst bleibt als Rohstand unverändert, weil die Prüfsumme über ihn gerechnet ist (6.8); beim Speichern geht er so wieder hinaus. Anzeige und Vergleich nutzen die angepasste Kopie (`eingefrorenerProzess(v)` in `src/compliance/speicher.ts`).
 - `bereinigeCompliance(c, ist)`: entfernt Einträge in `systeme`, `rollen`, `kontrollen` und `zugriffe`, deren Medium, Rolle oder Aufgabe im Ist-Prozess fehlt. `Ablageort.mediumId` wird dann `null`; Unterlagen und ihre Angaben bleiben. Der Reducer ruft sie nach jeder Aktion auf, die den Ist-Prozess ändert (`prozess`, `projekt`), im selben Rückgängig-Schritt. Änderungen am Soll-Prozess bereinigen nichts.
 - Ein Eintrag in `kontrollen` bleibt erhalten, wenn die Aufgabe nur ihre Art wechselt; die Generatoren lesen ihn dann nicht.
 
@@ -976,10 +976,11 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 
 - **Kapitelschlüssel:** Nummer der nächsten Überschrift der Ebene 1 oder 2; Ebene 3 zählt zu ihrer Ebene 2. Ausnahme: alles in Kapitel 4 zählt zu „4“, weil sich sonst Nummern verschieben. Ausgenommen vom Vergleich sind Deckblatt, Gliederung und Kapitel 7 sowie im Verzeichnis Abschnitt D. Kapitel 1 wird verglichen, damit ein Wechsel der Geschäftsleitung V2 auslöst; seine Versionsangaben sind beim Vergleich gleich, weil der Kontext von v gilt. Präfixe: „VD “ und „VVT “. Sie sind nur Schlüssel: Oberfläche, Befund V2, Vorgabe im Freigabe-Dialog und Kapitel 7 schreiben sie mit `kapitelText` aus („Verfahrensdokumentation 3.2, 3.3 und 4; Verzeichnis B.1“, in Kapitel 7 ohne den Namen des eigenen Dokuments).
 - **Vergleich:** `geaenderteKapitel(v, projekt)` erzeugt beide Dokumente neu, und zwar mit dem Kontext von v: `version = v`, Historie bis v, `bezugsjahr = Jahr(v.gueltigAb)`, `heute = v.freigegebenAm`. Dann vergleicht es je Schlüssel die JSON-Darstellung der Abschnitte mit dem eingefrorenen Stand. So zählen nur fachliche Änderungen.
-- **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. So ändern Laden, Prüfen und Speichern die Prüfsumme nie. Gespeichert wird sie als Hex.
+- **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. Gespeichert wird sie als Hex.
+- **Rohstand:** Die Prüfsumme gilt für den eingefrorenen Stand, wie er bei der Freigabe entstand. Laden migriert oder normalisiert eingefrorene Prozesse deshalb nie an Ort und Stelle, sondern nur eine Kopie für Anzeige und Vergleich (`eingefrorenerProzess`, 4.4); nachgerechnet wird über den Rohstand vor jeder Migration, und Speichern schreibt ihn unverändert zurück. So ändern Laden, Prüfen und Speichern die Prüfsumme nie, auch wenn eine spätere Fassung beim Laden mehr anpasst (z. B. ein Sprung auf Format 4 oder das Entfernen von `von` an Zeit-Ereignissen).
 - **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile. Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
 - Die Prüfsumme erkennt so Beschädigungen und Änderungen außerhalb der App. Sie schützt nicht vor gezielter Änderung, weil sie sich neu berechnen lässt; so steht es auch in der App.
-- Freigaben entstehen im aktuellen Format 3; die Migration aus Format 1 und 2 betrifft nur von Hand erzeugte Dateien. Eine künftige Formatmigration eingefrorener Prozesse ändert deren JSON und damit die nachgerechnete Prüfsumme. Sie muss deshalb die Prüfsumme vor der Umstellung nachrechnen oder den Stand vor der Migration bewahren.
+- Freigaben entstehen im aktuellen Format 3. Eine künftige Formatmigration braucht für eingefrorene Prozesse nichts Eigenes: Sie wirkt nur auf die Kopie, die Prüfsumme bleibt gültig.
 - Nach einem App-Update mit geänderten Textbausteinen kann V2 erscheinen. Der Befund nennt die Kapitel; eine neue Freigabe löst ihn.
 
 ### 6.9 Feste Textbausteine (eigene Formulierungen)
@@ -1072,7 +1073,7 @@ e2e/dokumentieren.spec.ts
 Außerdem ändern sich:
 
 - `src/modell/typen.ts`: Feld `compliance`
-- `src/modell/speicher.ts`: Prüfung beim Laden, Migration eingefrorener Prozesse, getrennte Ablage der Versionen, Meldung bei vollem Speicher
+- `src/modell/speicher.ts`: Prüfung beim Laden (eingefrorene Prozesse migriert nur als Kopie), getrennte Ablage der Versionen, Meldung bei vollem Speicher
 - `src/zustand.ts`: Schritt, Teilschritt, Aktionen, Bereinigung
 - `src/ui/kontext.ts`: `aendereCompliance`
 - `src/App.tsx`: Schritt (per `lazy` nachgeladen), Menüpunkt „Daten im Browser löschen“; Menü „Beispiel Lieferdienst“ lädt `beispielMitCompliance()`
@@ -1348,7 +1349,8 @@ Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentit
 | Aufgabe `auf_rechnung` im Ist löschen | Zugriffe auf sie entfernt, Unterlage „Ausgangsrechnung“ bleibt; Rückgängig stellt alles wieder her |
 | Medium `med_papier` im Ist löschen | `dsp_ordner.mediumId` wird `null` |
 | Zugriff auf eine unbekannte Unterlage in der Datei | Formatfehler mit Feldnamen |
-| Datei mit Version, deren `prozess` ein älteres Format hat (von Hand erzeugte Testdatei, Format 2) | lädt, eingefrorener Prozess ist migriert |
+| Datei mit Version, deren `prozess` ein älteres Format hat (von Hand erzeugte Testdatei, Format 2) | lädt; `eingefrorenerProzess(v)` ist migriert, `v.prozess` bleibt im Rohstand, die Prüfsumme stimmt |
+| Version mit „Warten auf Termin“, mit Format-2-Prozess oder mit einer zusätzlichen Anpassung beim Laden (simuliert: Format 4, `von` an Zeit-Ereignissen entfernt) speichern und laden | Prüfsumme stimmt; erneutes Speichern und Laden ändern den eingefrorenen Rohstand nicht |
 | Änderung am Soll-Prozess | `compliance` unverändert |
 | `localStorage.setItem` wirft | Meldung in der Kopfzeile |
 | Tippen in einem Feld bei 3 Versionen | Schlüssel `prozesslotse:versionen` wird nicht neu geschrieben |

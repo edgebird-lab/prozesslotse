@@ -6,6 +6,7 @@ import type { Prozess } from '../modell/typen'
 import { beispielMitCompliance, complianceLieferdienst } from './beispiel'
 import { aufbewahrenBis, gueltigBisIn } from './fristen'
 import { pruefeCompliance } from './regeln'
+import { eingefrorenerProzess } from './speicher'
 import type { ComplianceProjekt, DokuVersion } from './typen'
 import { freigeben, FreigabeFehler, geaenderteKapitel, naechsteBezeichnung, pruefsumme } from './versionen'
 
@@ -106,7 +107,7 @@ describe('Freigabe (9.7)', () => {
 })
 
 describe('Laden von Versionen (9.9)', () => {
-  it('migriert den eingefrorenen Prozess aus einem älteren Format', async () => {
+  it('migriert eine Kopie des eingefrorenen Prozesses aus einem älteren Format; der Rohstand bleibt', async () => {
     const { c } = await mitErsterVersion()
     const daten = JSON.parse(alsJson({ ...beispielMitCompliance(), compliance: c }))
     // von Hand auf Format 2 zurückgesetzt: ohne externe Teilnehmer und mit formatVersion 2
@@ -114,7 +115,10 @@ describe('Laden von Versionen (9.9)', () => {
     alt.formatVersion = 2
     delete alt.teilnehmer
     const projekt = leseProjekt(daten)
-    const prozess = projekt.compliance!.versionen[0].prozess
+    const version = projekt.compliance!.versionen[0]
+    // Die Prüfsumme ist über den Rohstand gerechnet (Nachprüfung „regression“, Mangel 1)
+    expect(version.prozess.formatVersion).toBe(2)
+    const prozess = eingefrorenerProzess(version)
     expect(prozess.formatVersion).toBe(3)
     expect(prozess.teilnehmer).toEqual([])
   })

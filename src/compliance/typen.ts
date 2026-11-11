@@ -336,7 +336,10 @@ export interface DokuVersion {
   geaenderteKapitel: string[]
   /** Gesetzt, wenn die Freigabe zurückgezogen wurde: Die Version bleibt sichtbar, zählt aber für Reihenfolge und Gültigkeit nicht mehr. */
   zurueckgezogen?: Rueckzug
-  /** Ist-Prozess bei der Freigabe, für Diagramm und Vergleich */
+  /**
+   * Ist-Prozess bei der Freigabe als Rohstand, so wie er eingefroren und gespeichert wurde; die Prüfsumme
+   * ist über ihn gerechnet. Kann ein älteres Format haben: Für Diagramm und Vergleich `eingefrorenerProzess(v)`.
+   */
   prozess: Prozess
   verfahrensdoku: Dokument
   verzeichnis: Dokument

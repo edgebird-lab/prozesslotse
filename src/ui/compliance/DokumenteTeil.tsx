@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 import { formatiereDatum } from '../../compliance/datum'
 import { docxEndung, erzeugeDocx } from '../../compliance/docx'
 import { kapitelText } from '../../compliance/dokument'
+import { eingefrorenerProzess } from '../../compliance/speicher'
 import { aufbewahrenBisText, gueltigBisIn } from '../../compliance/fristen'
 import { RECHTSSTAND } from '../../compliance/standard'
 import { FUSSZEILE_VORLAGE, hinweisband } from '../../compliance/textbausteine'
@@ -223,7 +224,7 @@ export function DokumenteTeil() {
         Vorschau: {version ? `Version ${version.bezeichnung}, freigegeben am ${formatiereDatum(version.freigegebenAm)}` : 'Entwurf mit dem aktuellen Stand'}
       </p>
       <div id="dokument-vorschau" role="tabpanel" aria-labelledby={`reiter-${art}`} className="dokument-bereich">
-        <DokumentAnsicht dokument={dokument} prozess={version ? version.prozess : ist} />
+        <DokumentAnsicht dokument={dokument} prozess={version ? eingefrorenerProzess(version) : ist} />
       </div>
 
       {freigabe && (

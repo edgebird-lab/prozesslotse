@@ -224,7 +224,7 @@ Beim Zusammenführen beachten:
 
 - **Neue Bausteine aus Format 3** (Teilprozess, für jede Position, Unterbrechung): `ablauftext.ts` prüft die Bausteinart erschöpfend, TypeScript meldet also den fehlenden Satzbaustein (6.6.1). Der Test „kennt alle Felder der Bausteine“ in `generatoren.test.ts` schlägt fehl, sobald die Zufallsprozesse neue Felder wie `unterbrechungen` erzeugen. `zusammenfuehrung`, `ausfuehrung` und `beendetAlles` werden schon gelesen, falls `main` sie so benennt. `nummern` folgt `durchlaufe`; Aufgaben in neuen Rahmen zählen mit, sobald `kinderSequenzen` sie kennt. Aufgaben eines Ausnahmewegs müssen laut 6.3 direkt auf ihre Aufgabe folgen.
 - **Neue Felder an Aufgaben** gehören in die Liste `BEKANNT` dieses Tests, sobald Kapitel 4 sie beschreibt.
-- **Formatmigrationen** in `leseProjekt` gelten automatisch auch für eingefrorene Prozesse in Versionen.
+- **Formatmigrationen** in `leseProjekt` gelten automatisch auch für eingefrorene Prozesse in Versionen, aber nur für die Kopie, die Anzeige und Vergleich nutzen (`eingefrorenerProzess`). Der Rohstand in der Version bleibt unverändert, damit die Prüfsumme stimmt (Nachprüfung, Mangel 1). Wer eingefrorene Prozesse anzeigt, nimmt `eingefrorenerProzess(v)`, nie `v.prozess`.
 - **README-Bilder:** nach dem Zusammenführen `node scripts/readme-bilder.mjs` laufen lassen; die alten Bilder zeigen sechs statt sieben Schritte.
 - **Tests in gemeinsamen Dateien** gibt es nicht; neue Tests liegen in eigenen Dateien (`src/zustand.compliance.test.ts`, `src/compliance/*.test.ts`).
 

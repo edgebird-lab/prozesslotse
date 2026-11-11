@@ -39,7 +39,7 @@ import {
   ZEITEINHEITEN,
   type Eintrag,
 } from './standard'
-import { COMPLIANCE_VERSION, type ComplianceProjekt } from './typen'
+import { COMPLIANCE_VERSION, type ComplianceProjekt, type DokuVersion } from './typen'
 
 type Obj = Record<string, unknown>
 
@@ -249,17 +249,50 @@ function pruefeDokument(x: unknown, pfad: string, art: 'verfahrensdokumentation'
 }
 
 /**
- * Eingefrorener Prozess einer Version: läuft durch `leseProjekt` wie ein Ist-Prozess,
- * damit jede Formatmigration auch für alte Versionen gilt. Ändert die Daten an Ort und Stelle.
+ * Angepasste Kopien eingefrorener Prozesse für Anzeige und Vergleich; Schlüssel ist der
+ * Rohstand in `DokuVersion.prozess`. Versionen sind unveränderlich, ihr Rohstand also auch.
+ */
+const angepasst = new WeakMap<object, Prozess>()
+
+/** Kopie des Rohstands, die dieselbe Migration und Prüfung durchläuft wie ein Ist-Prozess; wirft `Formatfehler`. */
+function passeAn(roh: unknown): Prozess {
+  const kopie: unknown = structuredClone(roh)
+  const formatVersion = istObj(kopie) ? kopie.formatVersion : undefined
+  return leseProjekt({ formatVersion, ist: kopie, soll: null, massnahmen: [], verworfen: [] }).ist
+}
+
+/**
+ * Eingefrorener Prozess einer Version: Eine Kopie läuft durch `leseProjekt` wie ein Ist-Prozess,
+ * damit jede Formatmigration und Prüfung auch für alte Versionen gilt. Der Rohstand selbst bleibt
+ * unverändert, denn die Prüfsumme ist über ihn gerechnet (6.8); beim Speichern geht er so wieder hinaus.
  */
 function pruefeEingefrorenenProzess(x: unknown, pfad: string): void {
   try {
-    const formatVersion = istObj(x) ? x.formatVersion : undefined
-    leseProjekt({ formatVersion, ist: x, soll: null, massnahmen: [], verworfen: [] })
+    const kopie = passeAn(x)
+    if (istObj(x)) angepasst.set(x, kopie)
   } catch (e) {
     if (e instanceof Formatfehler) fehler(pfad, `ist kein gültiger Prozess (${e.message.replace(/^Ist-Prozess[:,]?\s*/, '').replace(/\.$/, '')})`)
     throw e
   }
+}
+
+/**
+ * Eingefrorener Prozess einer Version für Anzeige und Vergleich (z. B. das Diagramm der Anlage 9.1):
+ * migriert und normalisiert wie beim Laden. `v.prozess` ist der Rohstand, über den die Prüfsumme
+ * gerechnet ist; er kann ein älteres Format haben und wird nie verändert.
+ */
+export function eingefrorenerProzess(v: Pick<DokuVersion, 'prozess'>): Prozess {
+  let p = angepasst.get(v.prozess)
+  if (!p) {
+    try {
+      p = passeAn(v.prozess)
+    } catch {
+      // In dieser Sitzung freigegeben: Der Rohstand ist schon der aktuelle Ist-Prozess
+      p = v.prozess
+    }
+    angepasst.set(v.prozess, p)
+  }
+  return p
 }
 
 function pruefeVersionen(x: unknown[]): void {
@@ -298,7 +331,7 @@ function pruefeVersionen(x: unknown[]): void {
   })
 }
 
-/** Prüft geladene Compliance-Angaben; wirft `Formatfehler` mit Feldnamen. Eingefrorene Prozesse werden dabei migriert. */
+/** Prüft geladene Compliance-Angaben; wirft `Formatfehler` mit Feldnamen. Eingefrorene Prozesse bleiben als Rohstand erhalten (`eingefrorenerProzess`). */
 export function validiereCompliance(x: unknown): asserts x is ComplianceProjekt {
   if (!istObj(x)) throw new Formatfehler('Compliance-Angaben: kein gültiges Objekt.')
   if (x.version !== COMPLIANCE_VERSION) throw new Formatfehler(`Compliance-Angaben in Version ${String(x.version)} werden nicht unterstützt.`)
