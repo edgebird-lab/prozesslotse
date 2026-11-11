@@ -2,12 +2,15 @@
  * Zustand der Oberfläche. Das Projekt (Ist, Soll, Maßnahmen) ist
  * rückgängig machbar; Schritt, Ansicht, Einfügeposition und Auswahl nicht.
  */
+import { bereinigeCompliance } from './compliance/speicher'
+import { neueCompliance } from './compliance/standard'
+import type { ComplianceProjekt, Teilschritt } from './compliance/typen'
 import { findeBlock, findeSequenz, normalisiere } from './modell/operationen'
 import type { Cursor, Id, Projekt, Prozess } from './modell/typen'
 
 export type { Cursor }
 
-export type Schritt = 'rahmen' | 'beteiligte' | 'ablauf' | 'pruefen' | 'verbessern' | 'bericht'
+export type Schritt = 'rahmen' | 'beteiligte' | 'ablauf' | 'pruefen' | 'verbessern' | 'dokumentieren' | 'bericht'
 export type Ansicht = 'ist' | 'soll'
 
 export const SCHRITTE: { id: Schritt; name: string }[] = [
@@ -16,6 +19,7 @@ export const SCHRITTE: { id: Schritt; name: string }[] = [
   { id: 'ablauf', name: 'Ablauf' },
   { id: 'pruefen', name: 'Prüfen' },
   { id: 'verbessern', name: 'Verbessern' },
+  { id: 'dokumentieren', name: 'Dokumentieren' },
   { id: 'bericht', name: 'Bericht' },
 ]
 
@@ -42,6 +46,8 @@ export interface Zustand {
   cursor: Cursor | null
   auswahl: Id | null
   lernmodus: boolean
+  /** Teilschritt im Schritt „Dokumentieren“ (nicht rückgängig machbar) */
+  teilschritt: Teilschritt
 }
 
 export type Aktion =
@@ -56,6 +62,8 @@ export type Aktion =
   | { typ: 'cursor'; cursor: Cursor | null }
   | { typ: 'auswahl'; auswahl: Id | null }
   | { typ: 'lernmodus'; an: boolean }
+  | { typ: 'compliance'; aenderung: (c: ComplianceProjekt) => ComplianceProjekt; gruppe?: string; zeit: number }
+  | { typ: 'teilschritt'; teilschritt: Teilschritt }
 
 const MAX_VERLAUF = 100
 const GRUPPE_MS = 1500
@@ -73,7 +81,15 @@ export function startZustand(projekt: Projekt, lernmodus: boolean, dokument: Par
     cursor: null,
     auswahl: null,
     lernmodus,
+    teilschritt: 'unternehmen',
   }
+}
+
+/** Entfernt Compliance-Angaben zu Medien, Rollen und Aufgaben, die es im Ist-Prozess nicht mehr gibt. */
+function mitBereinigterCompliance(projekt: Projekt): Projekt {
+  if (!projekt.compliance) return projekt
+  const c = bereinigeCompliance(projekt.compliance, projekt.ist)
+  return c === projekt.compliance ? projekt : { ...projekt, compliance: c }
 }
 
 /**
@@ -121,7 +137,8 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
       // Aufräumen: Rücksprungbereiche ohne Rücksprung auflösen (z. B. nach dem Löschen einer Entscheidung)
       const prozess = normalisiere(typeof a.aenderung === 'function' ? a.aenderung(alt) : a.aenderung)
       if (prozess === alt) return { ...z, cursor: a.cursor !== undefined ? a.cursor : z.cursor, auswahl: a.auswahl !== undefined ? a.auswahl : z.auswahl }
-      const projekt = z.ansicht === 'soll' && z.projekt.soll ? { ...z.projekt, soll: prozess } : { ...z.projekt, ist: prozess }
+      // Änderungen am Ist bereinigen die Compliance-Angaben im selben Rückgängig-Schritt, Änderungen am Soll nicht
+      const projekt = z.ansicht === 'soll' && z.projekt.soll ? { ...z.projekt, soll: prozess } : mitBereinigterCompliance({ ...z.projekt, ist: prozess })
       const neu = mitVerlauf(z, projekt, a.zeit, a.gruppe)
       return bereinige({
         ...neu,
@@ -130,7 +147,7 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
       })
     }
     case 'projekt':
-      return bereinige({ ...mitVerlauf(z, a.projekt, a.zeit), ansicht: a.ansicht ?? z.ansicht })
+      return bereinige({ ...mitVerlauf(z, mitBereinigterCompliance(a.projekt), a.zeit), ansicht: a.ansicht ?? z.ansicht })
     case 'laden': {
       const neu = startZustand(a.projekt, z.lernmodus, a.dokument)
       return { ...neu, schritt: a.schritt ?? 'rahmen', ansicht: a.ansicht === 'soll' && a.projekt.soll ? 'soll' : 'ist' }
@@ -149,6 +166,8 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
       return bereinige({ ...z, projekt: nachher, vergangenheit: [...z.vergangenheit, z.projekt], zukunft: z.zukunft.slice(1), gruppe: null })
     }
     case 'schritt':
+      // Die Dokumentation beschreibt immer den Ist-Prozess
+      if (a.schritt === 'dokumentieren') return bereinige({ ...z, schritt: a.schritt, gruppe: null, ansicht: 'ist', cursor: z.ansicht === 'ist' ? z.cursor : null, auswahl: z.ansicht === 'ist' ? z.auswahl : null })
       return { ...z, schritt: a.schritt, gruppe: null }
     case 'ansicht':
       return bereinige({ ...z, ansicht: a.ansicht, cursor: null, auswahl: null })
@@ -158,6 +177,14 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
       return { ...z, auswahl: a.auswahl }
     case 'lernmodus':
       return { ...z, lernmodus: a.an }
+    case 'compliance': {
+      const alt = z.projekt.compliance ?? neueCompliance()
+      const neu = a.aenderung(alt)
+      if (neu === alt) return z
+      return mitVerlauf(z, { ...z.projekt, compliance: neu }, a.zeit, a.gruppe)
+    }
+    case 'teilschritt':
+      return { ...z, teilschritt: a.teilschritt, gruppe: null }
   }
 }
 
