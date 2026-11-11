@@ -5,12 +5,17 @@
  * Aufgaben darin erben die Bedingung („Nur wenn: …“). Zeiten, Anteile und
  * Anzahlen erscheinen nicht.
  *
+ * Ablaufsätze haben keine eigene Überschrift. Stünde einer sonst unter einer
+ * Aufgabe aus einem anderen Zweig, nennt ein Anschluss seinen Zusammenhang
+ * („Nach der Entscheidung …:“, „Wenn …:“, „In Zweig 2:“). Der Satz zu einer
+ * Wiederholung steht als erste Zeile im Unterkapitel ihres ersten Schritts.
+ *
  * Die Bausteinart wird erschöpfend geprüft: Kommt ein Baustein hinzu, meldet
  * TypeScript einen Fehler, statt dass er im Dokument still fehlt.
  */
 import { bereichTitel, durchlaufe, findeBlock, teilnehmerName } from '../modell/operationen'
-import type { Aufgabe, Block, EntscheidungsZweig, Id, Parallel } from '../modell/typen'
-import { kontrollAngaben, objektName, objekteVon, type Kontext } from './ableitung'
+import type { Aufgabe, Block, EntscheidungsZweig, Id, OderZweig, Parallel, Wiederholung } from '../modell/typen'
+import { kontrollAngaben, liste, objektName, objekteVon, type Kontext } from './ableitung'
 import { KONTROLLARTEN, NACHWEISE, textVon } from './standard'
 import type { Abschnitt } from './typen'
 
@@ -18,8 +23,38 @@ import type { Abschnitt } from './typen'
 type MitAbbruch = EntscheidungsZweig & { beendetAlles?: boolean }
 type ParallelV3 = Parallel & { zusammenfuehrung?: 'alle' | 'erster'; ausfuehrung?: 'gleichzeitig' | 'nacheinander' }
 
+/** Bedingung eines Zweigs: als Glied von „Nur wenn: …“ und als Nebensatz nach „wenn“. */
+export interface Bedingung {
+  text: string
+  nebensatz: string
+}
+
+/** Kapitel 4 und die Bedingungen je Aufgabe (leer: die Aufgabe läuft in jedem Vorgang). */
+export interface Ablauf {
+  abschnitte: Abschnitt[]
+  bedingungen: Map<Id, Bedingung[]>
+}
+
 function q(text: string, leer = 'offen'): string {
   return `„${text.trim() || leer}“`
+}
+
+/** „wenn „Betrag über 1.000 €?“ = „Ja“ und „Neukunde“ zutrifft“ */
+export function wennText(bedingungen: Bedingung[]): string {
+  return `wenn ${liste(bedingungen.map((b) => b.nebensatz))}`
+}
+
+function datenBedingung(frage: string, z: EntscheidungsZweig): Bedingung {
+  const text = `${frage} = ${q(z.bezeichnung)}`
+  return { text, nebensatz: text }
+}
+
+function ereignisBedingung(z: EntscheidungsZweig): Bedingung {
+  return { text: `${q(z.bezeichnung)} tritt zuerst ein`, nebensatz: `${q(z.bezeichnung)} zuerst eintritt` }
+}
+
+function oderBedingung(z: OderZweig): Bedingung {
+  return { text: `${q(z.bezeichnung)} trifft zu`, nebensatz: `${q(z.bezeichnung)} zutrifft` }
 }
 
 /** Nummern aller Aufgaben in einer Folge von Bausteinen, in Lesereihenfolge. */
@@ -36,21 +71,58 @@ function bereich(k: Kontext, schritte: Block[]): string | null {
   return nrn.length === 1 ? nrn[0] : `${nrn[0]} bis ${nrn[nrn.length - 1]}`
 }
 
+type Ziel = Exclude<Block, Wiederholung | Parallel>
+
+/**
+ * Baustein, mit dem es in einer Folge weitergeht. Wiederholung und Gleichzeitig
+ * werden betreten, weil ihr Inhalt sicher beginnt; Entscheidungen nicht, weil
+ * die Aufgaben darin nur in einem Zweig laufen.
+ */
+function ersterBaustein(schritte: Block[]): Ziel | null {
+  for (const b of schritte) {
+    if (b.typ === 'wiederholung') {
+      const erster = ersterBaustein(b.koerper.schritte)
+      if (erster) return erster
+    } else if (b.typ === 'parallel') {
+      for (const z of b.zweige) {
+        const erster = ersterBaustein(z.schritte)
+        if (erster) return erster
+      }
+    } else return b
+  }
+  return null
+}
+
+/** „weiter mit 4.3“, „weiter mit der Entscheidung „…““, „zurück zu „…“ (Warten)“ */
+function zielText(k: Kontext, b: Ziel, richtung: 'weiter' | 'zurueck'): string {
+  const weiter = richtung === 'weiter'
+  switch (b.typ) {
+    case 'aufgabe':
+      return `${weiter ? 'weiter mit' : 'zurück zu'} ${k.nummer.get(b.id) ?? '4.?'}`
+    case 'entscheidung':
+    case 'oder':
+      return `${weiter ? 'weiter mit der' : 'zurück zur'} Entscheidung ${q(b.frage)}`
+    case 'warten':
+      return `${weiter ? 'weiter mit' : 'zurück zu'} ${q(b.name, 'ohne Namen')} (Warten)`
+  }
+}
+
 function zurueck(k: Kontext, zielId: Id): string {
   const ziel = findeBlock(k.p, zielId)?.block
   if (!ziel) return 'zurück zu einem früheren Schritt'
-  const nrn = ziel.typ === 'wiederholung' ? aufgabenNummern(k, ziel.koerper.schritte) : aufgabenNummern(k, [ziel])
-  return nrn.length > 0 ? `zurück zu ${nrn[0]}` : `zurück zum Anfang von ${q(bereichTitel(ziel))}`
+  const erster = ersterBaustein(ziel.typ === 'wiederholung' ? ziel.koerper.schritte : [ziel])
+  return erster ? zielText(k, erster, 'zurueck') : `zurück zum Anfang von ${q(bereichTitel(ziel))}`
 }
 
 /** Was nach einem Ausgang einer Entscheidung geschieht. */
 function folge(k: Kontext, z: MitAbbruch): string {
-  const erste = aufgabenNummern(k, z.schritte)[0]
+  const erster = ersterBaustein(z.schritte)
   const ende = z.ende !== null ? (z.ende.trim() ? ` mit „${z.ende.trim()}“` : '') : null
-  if (erste) {
-    if (ende !== null) return z.beendetAlles ? `weiter mit ${erste}, danach endet der gesamte Vorgang sofort${ende}` : `weiter mit ${erste}, danach endet der Vorgang${ende}`
-    if (z.zurueckZu) return `weiter mit ${erste}, danach ${zurueck(k, z.zurueckZu)}`
-    return `weiter mit ${erste}`
+  if (erster) {
+    const weiter = zielText(k, erster, 'weiter')
+    if (ende !== null) return z.beendetAlles ? `${weiter}, danach endet der gesamte Vorgang sofort${ende}` : `${weiter}, danach endet der Vorgang${ende}`
+    if (z.zurueckZu) return `${weiter}, danach ${zurueck(k, z.zurueckZu)}`
+    return weiter
   }
   if (ende !== null) return z.beendetAlles ? `Der gesamte Vorgang endet sofort${ende}` : `Der Vorgang endet${ende}`
   if (z.zurueckZu) return zurueck(k, z.zurueckZu)
@@ -63,10 +135,36 @@ function ereignisText(k: Kontext, z: EntscheidungsZweig): string {
   return z.ereignis.von ? `Nachricht von ${teilnehmerName(k.p, z.ereignis.von)}` : 'Nachricht'
 }
 
-function aufgabe(k: Kontext, a: Aufgabe, bedingungen: string[], out: Abschnitt[]): void {
+/** Beginnt die Folge mit einer Aufgabe (auch in einer Wiederholung darin), steht ihr Unterkapitel vor jedem anderen Ablaufsatz. */
+function beginntMitAufgabe(schritte: Block[]): boolean {
+  const erster = schritte[0]
+  if (!erster) return false
+  if (erster.typ === 'wiederholung') return beginntMitAufgabe(erster.koerper.schritte)
+  return erster.typ === 'aufgabe'
+}
+
+/**
+ * Satz zu einer Wiederholung. Liegen Schritte des Körpers in einem Zweig, läuft
+ * nur der Abschnitt sicher, nicht jeder Schritt darin. `imSchritt`: Der Satz
+ * steht im Unterkapitel des ersten Schritts, sonst vor dem Körper.
+ */
+function wiederholungsSatz(k: Kontext, b: Wiederholung, imSchritt: boolean): string {
+  const nrn = aufgabenNummern(k, b.koerper.schritte)
+  const solange = `solange ${q(b.frage)} mit „Ja“ beantwortet wird.`
+  if (nrn.length === 0) return `Wiederholung: Der folgende Abschnitt läuft mindestens einmal und erneut, ${solange}`
+  const schritte = nrn.length === 1 ? nrn[0] : `${nrn[0]} bis ${nrn[nrn.length - 1]}`
+  const verzweigt = [...durchlaufe(b.koerper)].some(({ block }) => block.typ === 'entscheidung' || block.typ === 'oder')
+  const abschnitt = `Abschnitt mit ${nrn.length === 1 ? 'Schritt' : 'den Schritten'} ${schritte} läuft mindestens einmal und erneut, ${solange}`
+  if (!imSchritt) return `Wiederholung: Der folgende ${abschnitt}`
+  if (verzweigt) return `Wiederholung: Der ${abschnitt}`
+  return `Wiederholung: ${schritte} ${nrn.length === 1 ? 'läuft' : 'laufen'} mindestens einmal und erneut, ${solange}`
+}
+
+function aufgabe(k: Kontext, a: Aufgabe, bedingungen: Bedingung[], vorspann: string[], out: Abschnitt[]): void {
   const absatz = (text: string) => out.push({ art: 'absatz', text })
   out.push({ art: 'ueberschrift', ebene: 2, nummer: k.nummer.get(a.id) ?? '4.?', text: a.name.trim() || 'Unbenannter Schritt' })
-  if (bedingungen.length > 0) absatz(`Nur wenn: ${bedingungen.join(', ')}.`)
+  for (const zeile of vorspann) absatz(zeile)
+  if (bedingungen.length > 0) absatz(`Nur wenn: ${bedingungen.map((b) => b.text).join(', ')}.`)
   const rolle = k.p.rollen.find((r) => r.id === a.rolleId)?.name.trim() || 'offen'
   const medium = (a.mediumId ? k.medien.get(a.mediumId)?.name.trim() : '') || 'offen'
   absatz(`Zuständig: ${rolle}. System: ${medium}.`)
@@ -90,39 +188,61 @@ function aufgabe(k: Kontext, a: Aufgabe, bedingungen: string[], out: Abschnitt[]
   if (a.nachrichtAn) absatz(`Nachricht an ${teilnehmerName(k.p, a.nachrichtAn)}.`)
 }
 
-/** Abschnitte für Kapitel 4 ohne Kapitelüberschrift und ohne das letzte Unterkapitel. */
-export function ablaufAbschnitte(k: Kontext): Abschnitt[] {
+/** Kapitel 4 ohne Kapitelüberschrift und ohne das letzte Unterkapitel, dazu die Bedingungen je Aufgabe. */
+export function ablaufBeschreibung(k: Kontext): Ablauf {
   const out: Abschnitt[] = []
-  const absatz = (text: string) => out.push({ art: 'absatz', text })
-  const sequenz = (schritte: Block[], bedingungen: string[]) => schritte.forEach((b) => block(b, bedingungen))
+  const bedingungen = new Map<Id, Bedingung[]>()
+  /** Sätze zu Wiederholungen, die als erste Zeilen in das Unterkapitel der nächsten Aufgabe gehören */
+  let vorspann: string[] = []
+  /** Ablaufsatz, mit Anschluss, falls er sonst unter einer Aufgabe aus einem anderen Zweig stünde */
+  const satz = (anschluss: string | null, text: string) => out.push({ art: 'absatz', text: anschluss ? `${anschluss}: ${text}` : text })
 
-  function block(b: Block, bed: string[]): void {
+  /** Gibt den Anschluss zurück, den ein folgender Ablaufsatz braucht. */
+  function sequenz(schritte: Block[], bed: Bedingung[], anschluss: string | null): string | null {
+    let naechster = anschluss
+    for (const b of schritte) naechster = block(b, bed, naechster)
+    return naechster
+  }
+
+  /** `anschluss`: für den eigenen Ablaufsatz; Rückgabe: für den nächsten Baustein derselben Folge. */
+  function block(b: Block, bed: Bedingung[], anschluss: string | null): string | null {
     switch (b.typ) {
       case 'aufgabe':
-        aufgabe(k, b, bed, out)
-        return
+        bedingungen.set(b.id, bed)
+        aufgabe(k, b, bed, vorspann, out)
+        vorspann = []
+        return null
       case 'entscheidung': {
-        const frage = b.frage.trim() || 'offen'
+        const frage = q(b.frage)
         if (b.art === 'ereignis') {
-          absatz(`Es wird abgewartet, was zuerst eintritt („${frage}“):`)
+          satz(anschluss, `Es wird abgewartet, was zuerst eintritt (${frage}):`)
           out.push({ art: 'liste', punkte: b.zweige.map((z) => `${q(z.bezeichnung)} (${ereignisText(k, z)}): ${folge(k, z)}`) })
-          for (const z of b.zweige) sequenz(z.schritte, [...bed, `${q(z.bezeichnung)} tritt zuerst ein`])
         } else {
-          absatz(`Entscheidung „${frage}“:`)
+          satz(anschluss, `Entscheidung ${frage}:`)
           out.push({ art: 'liste', punkte: b.zweige.map((z) => `${q(z.bezeichnung)}: ${folge(k, z)}`) })
-          for (const z of b.zweige) sequenz(z.schritte, [...bed, `„${frage}“ = ${q(z.bezeichnung)}`])
         }
-        return
+        const vorher = out.length
+        for (const z of b.zweige) {
+          const bz = b.art === 'ereignis' ? ereignisBedingung(z) : datenBedingung(frage, z)
+          sequenz(z.schritte, [...bed, bz], `Wenn ${bz.nebensatz}`)
+        }
+        return out.length > vorher ? `Nach der Entscheidung ${frage}` : null
       }
       case 'oder': {
-        absatz(`Je nach Fall laufen einer oder mehrere dieser Wege („${b.frage.trim() || 'offen'}“):`)
+        const frage = q(b.frage)
+        satz(anschluss, `Je nach Fall laufen einer oder mehrere dieser Wege (${frage}):`)
         out.push({ art: 'liste', punkte: b.zweige.map((z) => `${q(z.bezeichnung)}: ${bereich(k, z.schritte) ?? 'ohne Aufgaben'}${z.id === b.standard ? ' (wenn keiner zutrifft)' : ''}`) })
-        for (const z of b.zweige) sequenz(z.schritte, [...bed, `${q(z.bezeichnung)} trifft zu`])
-        return
+        const vorher = out.length
+        for (const z of b.zweige) {
+          const bz = oderBedingung(z)
+          sequenz(z.schritte, [...bed, bz], `Wenn ${bz.nebensatz}`)
+        }
+        return out.length > vorher ? `Nach der Entscheidung ${frage}` : null
       }
       case 'parallel': {
         const par = b as ParallelV3
-        absatz(
+        satz(
+          anschluss,
           par.ausfuehrung === 'nacheinander'
             ? 'Die folgenden Zweige werden in beliebiger Reihenfolge nacheinander erledigt:'
             : par.zusammenfuehrung === 'erster'
@@ -130,28 +250,27 @@ export function ablaufAbschnitte(k: Kontext): Abschnitt[] {
               : 'Die folgenden Zweige laufen gleichzeitig; weiter geht es, wenn alle fertig sind:',
         )
         out.push({ art: 'liste', punkte: b.zweige.map((z, i) => `Zweig ${i + 1}: ${bereich(k, z.schritte) ?? 'ohne Aufgaben'}`) })
-        for (const z of b.zweige) sequenz(z.schritte, bed)
-        return
+        const vorher = out.length
+        b.zweige.forEach((z, i) => sequenz(z.schritte, bed, `In Zweig ${i + 1}`))
+        if (out.length === vorher) return null
+        const nrn = bereich(k, [b])
+        return `${par.ausfuehrung === 'nacheinander' ? 'Nach den Zweigen' : 'Nach den gleichzeitigen Zweigen'}${nrn ? ` (${nrn})` : ''}`
       }
       case 'wiederholung': {
-        if (b.modus === 'anteil') {
-          const nrn = aufgabenNummern(k, b.koerper.schritte)
-          const solange = `solange gilt: „${b.frage.trim() || 'offen'}“.`
-          absatz(
-            nrn.length > 1
-              ? `Die Schritte ${nrn[0]} bis ${nrn[nrn.length - 1]} laufen mindestens einmal und werden wiederholt, ${solange}`
-              : nrn.length === 1
-                ? `Der Schritt ${nrn[0]} läuft mindestens einmal und wird wiederholt, ${solange}`
-                : `Der folgende Abschnitt läuft mindestens einmal und wird wiederholt, ${solange}`,
-          )
-        }
-        sequenz(b.koerper.schritte, bed)
-        return
+        // Rücksprungbereich: kein eigener Absatz; was danach kommt, schließt an seinen letzten Baustein an
+        if (b.modus !== 'anteil') return sequenz(b.koerper.schritte, bed, anschluss)
+        const imSchritt = beginntMitAufgabe(b.koerper.schritte)
+        const text = wiederholungsSatz(k, b, imSchritt)
+        if (imSchritt) vorspann.push(text)
+        else satz(anschluss, text)
+        sequenz(b.koerper.schritte, bed, null)
+        const nrn = bereich(k, b.koerper.schritte)
+        return `Nach der Wiederholung${nrn ? ` (${nrn})` : ''}`
       }
       case 'warten': {
         const worauf = b.art === 'zeit' ? 'auf einen Zeitpunkt' : b.von ? `auf eine Nachricht von ${teilnehmerName(k.p, b.von)}` : 'auf eine Nachricht'
-        absatz(`Warten: ${b.name.trim() || 'ohne Namen'} (${worauf}).`)
-        return
+        satz(anschluss, `Warten: ${b.name.trim() || 'ohne Namen'} (${worauf}).`)
+        return null
       }
       default: {
         const unbekannt: never = b
@@ -160,6 +279,13 @@ export function ablaufAbschnitte(k: Kontext): Abschnitt[] {
     }
   }
 
-  sequenz(k.p.ablauf.schritte, [])
-  return out
+  sequenz(k.p.ablauf.schritte, [], null)
+  // Folgt auf eine Wiederholung keine Aufgabe mehr (kann bei gültigen Bäumen nicht vorkommen), geht ihr Satz nicht verloren
+  for (const zeile of vorspann) satz(null, zeile)
+  return { abschnitte: out, bedingungen }
+}
+
+/** Abschnitte für Kapitel 4 ohne Kapitelüberschrift und ohne das letzte Unterkapitel. */
+export function ablaufAbschnitte(k: Kontext): Abschnitt[] {
+  return ablaufBeschreibung(k).abschnitte
 }

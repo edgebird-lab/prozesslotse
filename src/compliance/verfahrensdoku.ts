@@ -20,7 +20,7 @@ import {
   systemeImEinsatz,
   type Kontext,
 } from './ableitung'
-import { ablaufAbschnitte } from './ablauftext'
+import { ablaufBeschreibung, wennText } from './ablauftext'
 import { formatiereDatum } from './datum'
 import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, laengerAlsVorgeschrieben } from './fristen'
 import {
@@ -249,17 +249,20 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   h(2, '3.3', 'Organisation und Internes Kontrollsystem')
   absatz(IKS)
+  const ablauf = ablaufBeschreibung(k)
   const kontrollen = k.aufgaben.filter((x) => x.art === 'pruefung' || x.art === 'freigabe')
   const zeilen = [
     ...kontrollen.map((x) => {
       const angabe = kontrollAngaben(c, x.id)
+      // Liegt die Kontrolle in einem Zweig, läuft sie nur unter dessen Bedingung (wie „Nur wenn“ in Kapitel 4)
+      const bedingungen = ablauf.bedingungen.get(x.id) ?? []
       return [
         schrittText(k, x),
         angabe ? textVon(KONTROLLARTEN, angabe.art, 'dok') : 'offen',
         ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() || 'offen',
         angabe?.ziel.trim() || 'offen',
         angabe ? textVon(NACHWEISE, angabe.nachweis, 'dok') : 'offen',
-        'bei jedem Vorgang',
+        bedingungen.length > 0 ? `${wennText(bedingungen)} (siehe ${k.nummer.get(x.id) ?? '4.?'})` : 'bei jedem Vorgang',
       ]
     }),
     ...c.weitereKontrollen.map((w) => {
@@ -291,7 +294,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   // 4
   h(1, '4', `Verfahren und Maßnahmen: ${name}`)
-  a.push(...ablaufAbschnitte(k))
+  a.push(...ablauf.abschnitte)
   h(2, `4.${k.aufgaben.length + 1}`, 'Aufbewahrung, Vernichtung und Löschung')
   const saetze = [
     ...unterlagen.filter((o) => istPflichtig(o.d.aufbewahrungsart)).map((o) => {
