@@ -63,6 +63,12 @@ export function feldZiel(b: ComplianceBefund, c: ComplianceProjekt): string | nu
       return `${ziel}-ablageform`
     case 'B8':
       return `${ziel}-vernichtet`
+    case 'B10':
+      // ohne Unterlage: Namensfeld von „Neue Unterlage“
+      return 'ziel-datenobjekt'
+    case 'B11':
+      // gewählte Frist der Unterlage (6 Jahre), das Ziel ist schon das Feld
+      return ziel
     case 'D1':
       return `${ziel}-personen`
     case 'D2':
@@ -72,7 +78,8 @@ export function feldZiel(b: ComplianceBefund, c: ComplianceProjekt): string | nu
     case 'D4':
       return `${ziel}-interesse`
     case 'D5':
-      return `${ziel}-besondere`
+      // ohne Ausnahme nach Art. 9 Abs. 2 ist das die offene Frage; sonst die Kategorien
+      return id && angaben(c, id).besondereKategorien.length > 0 && !angaben(c, id).ausnahmeArt9 ? `${ziel}-art9` : `${ziel}-besondere`
     case 'D7':
       return 'ziel-begruendung'
     case 'D8': {
@@ -95,6 +102,10 @@ export function feldZiel(b: ComplianceBefund, c: ComplianceProjekt): string | nu
       return `${ziel}-sicherung`
     case 'S6':
       return `${ziel}-getestet`
+    case 'S7':
+      return id && systemAngaben(c, id).standort === 'drittland' ? `${ziel}-bewilligung` : `${ziel}-standort`
+    case 'S8':
+      return id && !systemAngaben(c, id).wiederfinden?.trim() ? `${ziel}-wiederfinden` : `${ziel}-datenzugriff`
     case 'K2':
       return `${ziel}-nachweis`
     case 'K3':

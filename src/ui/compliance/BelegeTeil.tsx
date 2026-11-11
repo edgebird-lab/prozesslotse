@@ -289,7 +289,7 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
               )}
               {d.besondereKategorien.length > 0 && (
                 <>
-                  <KatalogListe label="Welche Ausnahme nach Art. 9 Abs. 2 DSGVO gilt?" katalog={AUSNAHMEN_ART9} wert={d.ausnahmeArt9 ?? null} leer="offen" onAendern={(ausnahmeArt9) => setze({ ausnahmeArt9 }, 'art9')} />
+                  <KatalogListe id={`${ziel}-art9`} label="Welche Ausnahme nach Art. 9 Abs. 2 DSGVO gilt?" katalog={AUSNAHMEN_ART9} wert={d.ausnahmeArt9 ?? null} leer="offen" onAendern={(ausnahmeArt9) => setze({ ausnahmeArt9 }, 'art9')} />
                   <p className="feld-hilfe">
                     Besonders geschützte Daten sind nur mit einer dieser Ausnahmen erlaubt, zusätzlich zur Rechtsgrundlage oben. Ob daneben eine Vorschrift des BDSG gilt, etwa für Daten von Beschäftigten, klärst du mit
                     dem Datenschutzbeauftragten oder einer fachkundigen Person.

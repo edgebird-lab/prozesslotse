@@ -1,5 +1,5 @@
 /**
- * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 40 Regeln.
+ * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 42 Regeln.
  * Die App prüft nicht, ob die Angaben stimmen, sondern ob sie vollständig und
  * widerspruchsfrei sind. Befunde sind Hinweise zum Prüfen und Klären, keine
  * Rechtsauskunft. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7).

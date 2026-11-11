@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { neueAufgabe, neuerProzess } from '../modell/bausteine'
+import { neueAufgabe, neuerProzess, neueRolle } from '../modell/bausteine'
 import { beispielLieferdienst } from '../modell/beispiel'
 import { fuegeEin } from '../modell/operationen'
 import type { Prozess } from '../modell/typen'
@@ -69,5 +69,35 @@ describe('Angaben je Teilschritt (bedienung-1)', () => {
     expect(nur((c) => (c.toms.verschluesselung.massnahmen = ['TLS']))).toEqual(['tom', 'luecken'])
     expect(nur((c) => (c.toms.pseudonymisierung.nichtZutreffend = 'keine Auswertungen'))).toEqual(['tom', 'luecken'])
     expect(nur((c) => (c.toms.verschluesselung.massnahmen = [' ']))).toEqual([])
+  })
+})
+
+describe('neue Angaben der Durchsicht vom 11.11.2026 zählen in ihrem Teilschritt', () => {
+  /** Ablauf mit einer Aufgabe der Rolle „Buchhaltung“ */
+  function mitRolle(): Prozess {
+    const p = neuerProzess({ rollen: [neueRolle('Buchhaltung', { id: 'rol_buch' })] })
+    return fuegeEin(p, 'haupt', 0, neueAufgabe({ id: 'auf_a', name: 'Rechnung buchen', rolleId: 'rol_buch' }))
+  }
+  const rolle = (aendern: (c: ComplianceProjekt) => void) => {
+    const c = neueCompliance()
+    aendern(c)
+    return mitAngaben(mitRolle(), c)
+  }
+
+  it('Rollen im Ablauf: extern oder Organisation zählen bei „Unternehmen“, nur für Rollen im Ablauf', () => {
+    expect(rolle((c) => (c.rollen.rol_buch = { extern: true, organisation: '' }))).toEqual(['unternehmen', 'luecken'])
+    expect(rolle((c) => (c.rollen.rol_buch = { extern: false, organisation: 'Kanzlei Beispiel' }))).toEqual(['unternehmen', 'luecken'])
+    expect(rolle((c) => (c.rollen.rol_buch = { extern: false, organisation: ' ' }))).toEqual([])
+    expect(rolle((c) => (c.rollen.rol_alt = { extern: true, organisation: 'Kanzlei' }))).toEqual([])
+  })
+
+  it('mitgeltende Unterlagen zählen bei „Dokumente“, leere Zeilen nicht', () => {
+    expect(nur((c) => (c.mitgeltendeUnterlagen = [{ id: 'mit_1', name: 'Berechtigungskonzept', ablageort: '' }]))).toEqual(['dokumente'])
+    expect(nur((c) => (c.mitgeltendeUnterlagen = [{ id: 'mit_1', name: '', ablageort: '' }]))).toEqual([])
+    expect(nur((c) => (c.mitgeltend = ['Berechtigungskonzept']))).toEqual(['dokumente'])
+  })
+
+  it('Antwort zur Verfahrensdokumentation des ersetzenden Scannens zählt bei „Belege und Daten“', () => {
+    expect(nur((c) => (c.ersetzendesScannen = { verfahrensdoku: false, stand: null }))).toEqual(['belege', 'luecken'])
   })
 })

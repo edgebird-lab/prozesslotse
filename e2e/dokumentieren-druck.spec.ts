@@ -11,6 +11,8 @@ async function start(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: /Mit dem Beispiel/ }).click()
   await schritt(page, 'Dokumentieren').click()
+  // „Dokumentieren“ lädt nach (abnahme-11); erst danach gibt es die Leiste
+  await expect(leiste(page)).toBeVisible()
 }
 
 /** Zahl der Bildpunkte, in denen sich zwei gleich große Bildschirmfotos deutlich unterscheiden (im Browser ausgewertet). */

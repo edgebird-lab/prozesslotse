@@ -9,8 +9,9 @@ const vorschau = (page: Page) => page.locator('#dokument-vorschau')
 
 /** Klappt eine Karte auf, falls sie zu ist (Karten ohne Fehler oder Warnung starten zugeklappt) */
 async function aufklappen(karte: Locator) {
-  await expect(karte.getByRole('button', { name: /^Angaben (bearbeiten|zuklappen)$/ })).toBeVisible()
-  const knopf = karte.getByRole('button', { name: 'Angaben bearbeiten' })
+  // Der Knopf nennt die Unterlage, z. B. „Angaben bearbeiten: Lieferschein“ (bedienung-25)
+  await expect(karte.getByRole('button', { name: /^Angaben (bearbeiten|zuklappen)/ })).toBeVisible()
+  const knopf = karte.getByRole('button', { name: /^Angaben bearbeiten/ })
   if (await knopf.isVisible()) await knopf.click()
 }
 

@@ -229,8 +229,12 @@ try {
 
   await willkommen()
   await seite.getByRole('button', { name: /Mit dem Beispiel/ }).click()
+  // „Dokumentieren“ ist ein eigener Teil und lädt erst im Schritt (abnahme-11); im Programm über das Tauri-Protokoll
+  const nachgeladen = () => seite.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/DokumentierenSchritt-[\w-]+\.js$/.test(new URL(e.name).pathname)).length)
+  pruefe((await nachgeladen()) === 0, '„Dokumentieren“ ist vor dem Schritt nicht geladen')
   await schritte().getByRole('button', { name: /Dokumentieren/ }).click()
   await teilschritte().getByRole('button', { name: /^Dokumente/ }).click()
+  pruefe((await nachgeladen()) > 0, '„Dokumentieren“ lädt im Programm nach, die Teilschritte erscheinen')
   await seite.getByText('Entwurf, nicht freigegeben').waitFor({ timeout: 10000 })
 
   // 10. speichern_unter_bytes lehnt falsche Anfragen ab, bevor ein Dialog aufgeht

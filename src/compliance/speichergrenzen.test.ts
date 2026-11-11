@@ -11,8 +11,8 @@ import type { ComplianceProjekt } from './typen'
 import { freigeben } from './versionen'
 
 /** Gemessene Werte aus Spezifikation 7.3 */
-const GRUNDGROESSE = 33_000
-const ZUWACHS = 200
+const GRUNDGROESSE = 35_000
+const ZUWACHS = 215
 const BROWSER_ZEICHEN = 5_000_000
 const DATEI_BYTES = 20 * 1024 * 1024
 
@@ -36,9 +36,9 @@ describe('Wachstum der Versionen (Spezifikation 7.3)', () => {
     // Hochrechnung wie in 7.3: Versionsschlüssel bei n Versionen
     const schluessel = (n: number) => n * groesse[0] + (zuwachs * n * (n - 1)) / 2
     expect(Math.abs(schluessel(10) - JSON.stringify(c.versionen).length)).toBeLessThan(1000)
-    // Browser-Speicher voll bei rund 115 Versionen
-    expect(schluessel(110)).toBeLessThan(BROWSER_ZEICHEN)
-    expect(schluessel(120)).toBeGreaterThan(BROWSER_ZEICHEN)
+    // Browser-Speicher voll bei rund 105 Versionen (gemessen nach dem Zusammenführen der Durchsicht: 107)
+    expect(schluessel(100)).toBeLessThan(BROWSER_ZEICHEN)
+    expect(schluessel(112)).toBeGreaterThan(BROWSER_ZEICHEN)
     // Projektdatei (mit Einrückung) erreicht 20 MiB bei rund 185 Versionen
     const dateiJeZeichen = Buffer.byteLength(alsJson({ ...p, compliance: c }), 'utf8') / JSON.stringify(c.versionen).length
     expect(schluessel(175) * dateiJeZeichen).toBeLessThan(DATEI_BYTES)

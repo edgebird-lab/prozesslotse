@@ -84,13 +84,15 @@ test('Ablage im Drittland: Warnung bis zur Bewilligung des Finanzamts, Kapitel 3
   await expect(wawi.getByLabel('Bewilligung des Finanzamts vom')).toHaveCount(0)
   await wawi.getByLabel('Wo werden die Daten verarbeitet?').selectOption({ label: 'Anderes Land (Drittland)' })
   await wawi.getByLabel('Land', { exact: true }).fill('USA')
-  await wawi.getByLabel('Garantie').selectOption({ label: 'Standardvertragsklauseln (Art. 46)' })
+  await wawi.getByLabel('Absicherung der Übermittlung').selectOption({ label: 'Standardvertragsklauseln (Art. 46)' })
 
   await teil(page, 'Lücken').click()
   await expect(page.getByText('keine Fehler · 5 Warnungen · 3 Hinweise')).toBeVisible()
   await page.getByRole('button', { name: 'Beheben: Aufbewahrung im Drittland ohne Bewilligung' }).click()
-  await expect(wawi).toBeFocused()
-  await wawi.getByLabel('Bewilligung des Finanzamts vom').fill('2026-02-01')
+  // „Beheben“ setzt den Fokus auf die offene Frage (feldZiel S7)
+  const bewilligung = wawi.getByLabel('Bewilligung des Finanzamts vom')
+  await expect(bewilligung).toBeFocused()
+  await bewilligung.fill('2026-02-01')
 
   await teil(page, 'Lücken').click()
   await expect(page.getByText('keine Fehler · 4 Warnungen · 3 Hinweise')).toBeVisible()
