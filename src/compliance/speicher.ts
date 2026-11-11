@@ -265,8 +265,19 @@ function pruefeVersionen(x: unknown[]): void {
     bezeichnungen.add(o.bezeichnung as string)
     datum(o, 'gueltigAb', p, false)
     datum(o, 'freigegebenAm', p, false)
-    if ((o.gueltigAb as string) <= letztesGueltigAb) fehler(`${p}.gueltigAb`, 'liegt nicht nach dem der vorigen Version')
-    letztesGueltigAb = o.gueltigAb as string
+    if (o.zurueckgezogen !== undefined) {
+      // zurückgezogen, bevor sie galt: zählt für die Reihenfolge nicht mehr
+      const q = `${p}.zurueckgezogen`
+      const r = obj(o.zurueckgezogen, q)
+      datum(r, 'am', q, false)
+      text(r, 'grund', q)
+      if (!(r.grund as string).trim()) fehler(`${q}.grund`, 'ist leer')
+      if ((r.am as string) < (o.freigegebenAm as string)) fehler(`${q}.am`, 'liegt vor der Freigabe')
+      if ((r.am as string) >= (o.gueltigAb as string)) fehler(`${q}.am`, 'liegt nicht vor „gültig ab“; eine Version, die in Kraft war, lässt sich nicht zurückziehen')
+    } else {
+      if ((o.gueltigAb as string) <= letztesGueltigAb) fehler(`${p}.gueltigAb`, 'liegt nicht nach dem der vorigen Version')
+      letztesGueltigAb = o.gueltigAb as string
+    }
     textListe(o, 'geaenderteKapitel', p)
     // Kleinigkeit, still behoben: eine Prüfsumme in Großbuchstaben (z. B. von Hand übertragen) wird klein geschrieben
     if (/^[0-9a-f]{64}$/i.test(o.pruefsumme as string)) o.pruefsumme = (o.pruefsumme as string).toLowerCase()

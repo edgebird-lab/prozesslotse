@@ -32,7 +32,7 @@ import { formatiereDatum, tageZwischen } from './datum'
 import { aufbewahrungText, laengerAlsVorgeschrieben, mindestJahre } from './fristen'
 import { BESONDERE_KATEGORIEN, istPflichtig, STRAFRECHTLICH_TEXT, TOM_BEREICHE } from './standard'
 import type { ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt } from './typen'
-import { geaenderteKapitel } from './versionen'
+import { geaenderteKapitel, letzteWirksame } from './versionen'
 
 const ELEKTRONISCH = new Set(['bild', 'strukturiert', 'datensatz'])
 const RANG: Record<Schwere, number> = { fehler: 0, warnung: 1, hinweis: 2 }
@@ -605,7 +605,8 @@ function pruefeKontrollen(k: Kontext, objekte: Objekt[], add: Add): void {
 }
 
 function pruefeVersionen(p: Prozess, c: ComplianceProjekt, heute: IsoDatum, add: Add): void {
-  const letzte = c.versionen[c.versionen.length - 1]
+  // zurückgezogene Freigaben zählen nicht
+  const letzte = letzteWirksame(c.versionen)
   if (!letzte) {
     add({
       regel: 'V1',

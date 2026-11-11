@@ -7,7 +7,7 @@
  * Änderung schützt sie nicht, weil sie sich neu berechnen lässt.
  */
 import type { Prozess } from '../modell/typen'
-import { formatiereDatum, istIsoDatum, jahrVon } from './datum'
+import { addiereJahre, addiereTage, formatiereDatum, istPlausiblesDatum, jahrVon, tageZwischen } from './datum'
 import { geaenderteKapitelIn } from './dokument'
 import { kanonischesJson } from './speicher'
 import type { ComplianceProjekt, Dokument, DokuVersion, IsoDatum, VersionKopf } from './typen'
@@ -52,17 +52,85 @@ export function geaenderteKapitel(v: DokuVersion, ist: Prozess, c: CompliancePro
   return [...geaenderteKapitelIn(v.verfahrensdoku, neu.verfahrensdoku), ...geaenderteKapitelIn(v.verzeichnis, neu.verzeichnis)]
 }
 
-/** Prüft die Eingaben des Freigabe-Dialogs; liefert die erste Fehlermeldung oder null. */
-export function pruefeFreigabe(c: ComplianceProjekt, e: FreigabeEingaben): string | null {
-  const bezeichnung = e.bezeichnung.trim()
-  const letzte = c.versionen[c.versionen.length - 1]
-  if (!bezeichnung) return 'Bitte eine Bezeichnung angeben.'
-  if (c.versionen.some((v) => v.bezeichnung === bezeichnung)) return `Die Bezeichnung ${bezeichnung} gibt es schon.`
-  if (!istIsoDatum(e.gueltigAb)) return 'Gültig ab ist kein gültiges Datum.'
-  if (letzte && e.gueltigAb <= letzte.gueltigAb) return `Gültig ab muss nach dem ${formatiereDatum(letzte.gueltigAb)} liegen.`
-  if (!e.freigegebenVon.trim()) return 'Bitte angeben, wer freigibt.'
-  if (letzte && !e.aenderung.trim()) return 'Bitte den Inhalt der Änderung beschreiben.'
+/** Letzte Version, deren Freigabe nicht zurückgezogen ist; nur solche zählen für Reihenfolge und Gültigkeit. */
+export function letzteWirksame<T extends Pick<VersionKopf, 'zurueckgezogen'>>(versionen: readonly T[]): T | null {
+  for (let i = versionen.length - 1; i >= 0; i--) if (!versionen[i].zurueckgezogen) return versionen[i]
   return null
+}
+
+/** Liegt „Gültig ab“ mehr Tage nach dem Freigabetag, fragt der Dialog nach. */
+export const RUECKFRAGE_TAGE = 30
+
+/** Spätestes „Gültig ab“: ein Jahr nach dem Freigabetag; ein späteres Datum ist fast immer ein Tippfehler. */
+export function spaetestesGueltigAb(heute: IsoDatum): IsoDatum {
+  return addiereJahre(heute, 1)
+}
+
+/** Frühestes „Gültig ab“: der Tag nach dem der letzten wirksamen Version; null ohne Vorgänger (dann ist auch ein Datum in der Vergangenheit möglich). */
+export function fruehestesGueltigAb(c: ComplianceProjekt): IsoDatum | null {
+  const letzte = letzteWirksame(c.versionen)
+  return letzte ? addiereTage(letzte.gueltigAb, 1) : null
+}
+
+/** Vorgabe im Dialog: heute oder, wenn das später ist, der Tag nach dem „Gültig ab“ der letzten wirksamen Version. */
+export function vorgabeGueltigAb(c: ComplianceProjekt, heute: IsoDatum): IsoDatum {
+  const frueh = fruehestesGueltigAb(c)
+  return frueh && frueh > heute ? frueh : heute
+}
+
+export type FreigabeFeld = 'bezeichnung' | 'gueltigAb' | 'freigegebenVon' | 'aenderung'
+
+/** Erster Fehler in den Eingaben des Freigabe-Dialogs mit dem Feld, zu dem er gehört; null, wenn alles passt. */
+export function freigabeFehler(c: ComplianceProjekt, e: FreigabeEingaben, heute: IsoDatum): { feld: FreigabeFeld; text: string } | null {
+  const bezeichnung = e.bezeichnung.trim()
+  const letzte = letzteWirksame(c.versionen)
+  if (!bezeichnung) return { feld: 'bezeichnung', text: 'Bitte eine Bezeichnung angeben.' }
+  // auch zurückgezogene Versionen behalten ihre Bezeichnung
+  if (c.versionen.some((v) => v.bezeichnung === bezeichnung)) return { feld: 'bezeichnung', text: `Die Bezeichnung ${bezeichnung} gibt es schon.` }
+  if (!istPlausiblesDatum(e.gueltigAb)) return { feld: 'gueltigAb', text: 'Gültig ab ist kein gültiges Datum.' }
+  if (letzte && e.gueltigAb <= letzte.gueltigAb) return { feld: 'gueltigAb', text: `Gültig ab muss nach dem ${formatiereDatum(letzte.gueltigAb)} liegen.` }
+  const spaetestens = spaetestesGueltigAb(heute)
+  if (e.gueltigAb > spaetestens) return { feld: 'gueltigAb', text: `Gültig ab darf höchstens ein Jahr nach dem Freigabetag liegen, also spätestens am ${formatiereDatum(spaetestens)}.` }
+  if (!e.freigegebenVon.trim()) return { feld: 'freigegebenVon', text: 'Bitte angeben, wer freigibt.' }
+  if (letzte && !e.aenderung.trim()) return { feld: 'aenderung', text: 'Bitte den Inhalt der Änderung beschreiben.' }
+  return null
+}
+
+/** Prüft die Eingaben des Freigabe-Dialogs; liefert die erste Fehlermeldung oder null. */
+export function pruefeFreigabe(c: ComplianceProjekt, e: FreigabeEingaben, heute: IsoDatum): string | null {
+  return freigabeFehler(c, e, heute)?.text ?? null
+}
+
+/** Rückfrage, wenn „Gültig ab“ mehr als 30 Tage nach dem Freigabetag liegt; null, wenn keine nötig ist. */
+export function rueckfrageGueltigAb(e: FreigabeEingaben, heute: IsoDatum): string | null {
+  const tage = tageZwischen(heute, e.gueltigAb)
+  if (tage <= RUECKFRAGE_TAGE) return null
+  return `Version ${e.bezeichnung.trim()} soll erst ab dem ${formatiereDatum(e.gueltigAb)} gelten, ${tage} Tage nach dem Freigabetag. Stimmt das Datum?`
+}
+
+/** Lässt sich die Freigabe von `v` zurückziehen? Nur bei der letzten wirksamen Version, solange sie noch nicht gilt. */
+export function kannZurueckziehen(c: ComplianceProjekt, v: DokuVersion, heute: IsoDatum): boolean {
+  return letzteWirksame(c.versionen) === v && v.gueltigAb > heute
+}
+
+/** Prüft „Freigabe zurückziehen“; liefert die Fehlermeldung oder null. */
+export function pruefeRueckzug(c: ComplianceProjekt, nummer: number, grund: string, heute: IsoDatum): string | null {
+  const v = letzteWirksame(c.versionen)
+  if (!v || v.nummer !== nummer) return 'Zurückziehen lässt sich nur die Freigabe der letzten Version, die noch gilt oder gelten soll.'
+  if (v.gueltigAb <= heute) return `Version ${v.bezeichnung} gilt seit dem ${formatiereDatum(v.gueltigAb)}; eine Version, die in Kraft ist, lässt sich nicht zurückziehen. Gib stattdessen eine neue Version frei.`
+  if (!grund.trim()) return 'Bitte den Grund für den Rückzug angeben.'
+  return null
+}
+
+/**
+ * Zieht die Freigabe der letzten wirksamen Version zurück, solange sie noch nicht gilt. Sie bleibt mit
+ * Datum und Grund in der Liste, zählt aber für Reihenfolge und Gültigkeit nicht mehr; ihre Nummer wird
+ * nicht wieder vergeben. Wirft `FreigabeFehler` bei ungültigen Angaben.
+ */
+export function zieheZurueck(c: ComplianceProjekt, nummer: number, grund: string, heute: IsoDatum): ComplianceProjekt {
+  const fehler = pruefeRueckzug(c, nummer, grund, heute)
+  if (fehler) throw new FreigabeFehler(fehler)
+  return { ...c, versionen: c.versionen.map((v) => (v.nummer === nummer ? { ...v, zurueckgezogen: { am: heute, grund: grund.trim() } } : v)) }
 }
 
 /** Was die Prüfsumme abdeckt: der eingefrorene Prozess (Diagramm der Anlage) und beide Dokumente. */
@@ -82,9 +150,10 @@ export async function pruefsummeStimmt(v: DokuVersion): Promise<boolean> {
 
 /** Friert Ist-Prozess und beide Dokumente als neue Version ein; wirft `FreigabeFehler` bei ungültigen Eingaben. */
 export async function freigeben(ist: Prozess, c: ComplianceProjekt, e: FreigabeEingaben, heute: IsoDatum): Promise<DokuVersion> {
-  const fehler = pruefeFreigabe(c, e)
+  const fehler = pruefeFreigabe(c, e, heute)
   if (fehler) throw new FreigabeFehler(fehler)
-  const letzte = c.versionen[c.versionen.length - 1]
+  // Geändert gegenüber der Version, die gilt oder gelten soll; zurückgezogene zählen nicht, behalten aber ihre Nummer
+  const letzte = letzteWirksame(c.versionen)
   const kopf: VersionKopf = {
     nummer: c.versionen.length + 1,
     bezeichnung: e.bezeichnung.trim(),

@@ -72,7 +72,8 @@ export function versionsZeile(kx: DokuKontext): string {
 }
 
 function vorgaenger(kx: DokuKontext): VersionKopf | null {
-  const fruehere = kx.version ? kx.historie.filter((v) => v.nummer < kx.version!.nummer) : kx.historie
+  // zurückgezogene Freigaben galten nie und sind kein Vorgänger
+  const fruehere = (kx.version ? kx.historie.filter((v) => v.nummer < kx.version!.nummer) : kx.historie).filter((v) => !v.zurueckgezogen)
   return fruehere[fruehere.length - 1] ?? null
 }
 
@@ -335,14 +336,16 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       ['Version', 'gültig ab', 'gültig bis', 'freigegeben', 'geänderte Kapitel', 'Inhalt', 'aufbewahren bis', 'Prüfsumme'],
       kx.historie.map((v, i) => {
         const bis = gueltigBisIn(kx.historie, i)
+        // Eine zurückgezogene Freigabe galt nie; sie bleibt in der Historie sichtbar
+        const rueckzug = v.zurueckgezogen
         return [
           v.bezeichnung,
           formatiereDatum(v.gueltigAb),
-          bis ? formatiereDatum(bis) : 'laufend',
+          rueckzug ? `zurückgezogen am ${formatiereDatum(rueckzug.am)}` : bis ? formatiereDatum(bis) : 'laufend',
           `${formatiereDatum(v.freigegebenAm)}, ${v.freigegebenVon.trim() || 'offen'}`,
           v.geaenderteKapitel.join(', ') || '–',
-          v.aenderung.trim() || '–',
-          aufbewahrenBisText(bis),
+          rueckzug ? `${v.aenderung.trim() || '–'}; zurückgezogen: ${rueckzug.grund.trim()}` : v.aenderung.trim() || '–',
+          rueckzug ? 'mit der Änderungshistorie' : aufbewahrenBisText(bis),
           v.nummer === kx.version?.nummer || !v.pruefsumme ? '–' : v.pruefsumme.slice(0, 12),
         ]
       }),
