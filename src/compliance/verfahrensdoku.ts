@@ -12,6 +12,7 @@ import {
   angaben,
   aufzaehlung,
   entstehtIn,
+  hatPersonenbezug,
   kontext,
   kontrollAngaben,
   mitDienstleister,
@@ -22,7 +23,7 @@ import {
   systemeImEinsatz,
   type Kontext,
 } from './ableitung'
-import { ablaufAbschnitte } from './ablauftext'
+import { ablaufBeschreibung, wennText } from './ablauftext'
 import { formatiereDatum } from './datum'
 import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb } from './fristen'
 import { mitgeltendeUnterlagen, mitgeltendText } from './mitgeltend'
@@ -54,12 +55,12 @@ import {
   GRUNDLAGEN,
   HISTORIE,
   hinweisVerfahrensdoku,
-  IKS,
+  iks,
   KRITERIEN,
   LIEFERSCHEIN_HGB,
   SYSTEMWECHSEL,
 } from './textbausteine'
-import type { Abschnitt, ComplianceProjekt, DatenobjektAngaben, Dokument, IsoDatum, SystemAngaben, VersionKopf } from './typen'
+import type { Abschnitt, ComplianceProjekt, DatenobjektAngaben, Dokument, IsoDatum, Nachweis, SystemAngaben, VersionKopf } from './typen'
 
 /** Wofür ein Dokument erzeugt wird: Version (null = Entwurf), bisherige Versionen, Bezugsjahr, Tag. */
 export interface DokuKontext {
@@ -133,7 +134,9 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   // 1
   h(1, '1', 'Vorbemerkungen zur Verfahrensdokumentation')
-  absatz(`Gegenstand dieser Dokumentation ist der Prozess „${name}“ bei ${firma}. Inhalt und jede Änderung bedürfen der Zustimmung von ${u.geschaeftsleitung.trim() || 'offen'} (Geschäftsleitung).`)
+  // Satzbau ohne Artikel vor Freitext; offene Angaben ergeben keinen Satz wie „bei offen“
+  const unternehmen = u.name.trim() ? ` des Unternehmens ${u.name.trim()}` : '; der Name des Unternehmens ist offen'
+  absatz(`Gegenstand dieser Dokumentation ist der Prozess „${name}“${unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung der Geschäftsleitung (${u.geschaeftsleitung.trim() || 'Name offen'}).`)
   absatz(
     kx.version
       ? `Version ${kx.version.bezeichnung}, freigegeben von ${kx.version.freigegebenVon.trim() || 'offen'} am ${formatiereDatum(kx.version.freigegebenAm)}. Sie gilt für das Verfahren, wie es seit dem ${formatiereDatum(kx.version.gueltigAb)} angewandt wird.`
@@ -186,6 +189,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   h(2, '2.3', 'Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien')
   absatz(GRUNDLAGEN)
   absatz(FRISTENREGEL)
+  // fristenTabelle liefert Kopien: eingefrorene Versionen teilen sich sonst das Modul-Array
   tabelle(['Unterlagen', 'Vorschrift', 'Frist'], fristenTabelle(kaufmann))
   absatz(FRISTEN_INSTITUTE)
   tabelle(
@@ -194,7 +198,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   )
   const unterlagen = unterlagenNachEntstehung(k)
   const laenger = unterlagen.filter((o) => laengerAlsVorgeschrieben(o.d, kaufmann))
-  if (laenger.length > 0) absatz(`Länger als vorgeschrieben werden aufbewahrt: ${laenger.map((o) => o.name).join(', ')}. Grund: ${c.begruendungLaengereAufbewahrung.trim() || 'offen'}.`)
+  if (laenger.length > 0) absatz(`Länger als vorgeschrieben werden aufbewahrt: ${laenger.map((o) => o.name).join(', ')}. Grund: ${c.begruendungLaengereAufbewahrung.trim().replace(/[.\s]+$/, '') || 'offen'}.`)
 
   h(2, '2.4', 'Relevante Dokumente')
   if (unterlagen.length > 0) {
@@ -210,8 +214,19 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   h(2, '2.5', 'Einweisung in das Verfahren')
   const turnus = c.einweisung.turnus
-  absatz(turnus === 'einmalig' ? 'Wer mitarbeitet, wird vor Beginn eingewiesen.' : turnus === 'jaehrlich' ? 'Wer mitarbeitet, wird vor Beginn und danach jährlich eingewiesen.' : 'Eine Einweisung ist nicht festgelegt.')
-  if (c.einweisung.protokoll) absatz('Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).')
+  // Protokoll (2.5, 9.2) und „eingewiesene Personen“ (3.3) nur bei festgelegter Einweisung; bei „Keine“ ist der Schalter ausgeblendet
+  const eingewiesen = turnus === 'einmalig' || turnus === 'jaehrlich'
+  const protokoll = eingewiesen && c.einweisung.protokoll
+  absatz(
+    turnus === 'einmalig'
+      ? 'Wer mitarbeitet, wird vor Beginn eingewiesen.'
+      : turnus === 'jaehrlich'
+        ? 'Wer mitarbeitet, wird vor Beginn und danach jährlich eingewiesen.'
+        : turnus === 'keine'
+          ? 'Eine Einweisung ist nicht vorgesehen.'
+          : 'Eine Einweisung ist nicht festgelegt.',
+  )
+  if (protokoll) absatz('Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).')
 
   h(2, '2.6', 'Abgrenzung der Bearbeitungsbereiche')
   const extern: string[] = []
@@ -264,7 +279,8 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   h(2, '3.2', 'Zuständigkeiten')
   tabelle(
-    ['Schritt', 'Rolle', 'System'],
+    // Freigabe und Durchführung der Löschung sind Freitext, dort steht oft ein Name
+    ['Schritt', 'Rolle oder Person', 'System'],
     [
       ...k.aufgaben.map((x) => [
         schrittText(k, x),
@@ -277,22 +293,33 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   )
 
   h(2, '3.3', 'Organisation und Internes Kontrollsystem')
-  absatz(IKS)
+  const ablauf = ablaufBeschreibung(k)
   const kontrollen = k.aufgaben.filter((x) => x.art === 'pruefung' || x.art === 'freigabe')
+  // Kontrollen ohne Nachweis im System oder per Kürzel bzw. ohne Zuständige; A.4 nennt sie, statt Festlegung zuzusichern
+  const offen = { nachweis: [] as string[], zustaendigkeit: [] as string[] }
+  const vermerke = (name: string, nachweis: Nachweis | null, wer: string) => {
+    if (nachweis !== 'system' && nachweis !== 'abzeichnen') offen.nachweis.push(name)
+    if (!wer) offen.zustaendigkeit.push(name)
+  }
   const zeilen = [
     ...kontrollen.map((x) => {
       const angabe = kontrollAngaben(c, x.id)
+      const wer = ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() ?? ''
+      vermerke(schrittText(k, x), angabe?.nachweis ?? null, wer)
+      // Liegt die Kontrolle in einem Zweig, läuft sie nur unter dessen Bedingung (wie „Nur wenn“ in Kapitel 4)
+      const bedingungen = ablauf.bedingungen.get(x.id) ?? []
       return [
         schrittText(k, x),
         angabe ? textVon(KONTROLLARTEN, angabe.art, 'dok') : 'offen',
-        ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() || 'offen',
+        wer || 'offen',
         angabe?.ziel.trim() || 'offen',
         angabe ? textVon(NACHWEISE, angabe.nachweis, 'dok') : 'offen',
-        'bei jedem Vorgang',
+        bedingungen.length > 0 ? `${wennText(bedingungen)} (siehe ${k.nummer.get(x.id) ?? '4.?'})` : 'bei jedem Vorgang',
       ]
     }),
     ...c.weitereKontrollen.map((w) => {
       const bezug = k.aufgaben.find((x) => x.id === w.bezugAufgabeId)
+      vermerke(w.name.trim() || 'Weitere Kontrolle', w.nachweis, w.verantwortlich.trim())
       return [
         w.name.trim() || 'Weitere Kontrolle',
         textVon(KONTROLLARTEN, w.art, 'dok'),
@@ -303,6 +330,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       ]
     }),
   ]
+  absatz(iks(eingewiesen, offen))
   if (zeilen.length > 0) tabelle(['Kontrolle', 'Art', 'Wer', 'Was geprüft wird', 'Nachweis', 'Häufigkeit'], zeilen)
   else absatz('Im Ablauf ist keine Kontrolle beschrieben.')
 
@@ -313,12 +341,14 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       ['System', 'Schutz vor Änderung', 'Datensicherung', 'Intervall', 'Rücksicherung getestet', 'Zugriffsschutz'],
       systeme.map((m) => {
         const s = systemAngaben(c, m.id)
+        // Intervall und Test fragt die Oberfläche nur bei eingerichteter Sicherung ab; ausgeblendete Altangaben zählen nicht
+        const gesichert = s.sicherung === 'manuell' || s.sicherung === 'automatisch' || s.sicherung === 'anbieter'
         return [
           m.name.trim() || 'Unbenanntes System',
           textVon(UNVERAENDERBARKEIT, s.unveraenderbarkeit, 'dok'),
           textVon(SICHERUNGEN, s.sicherung, 'dok'),
-          s.sicherungIntervall.trim() || '–',
-          s.wiederherstellungGetestet ? 'ja' : 'nein',
+          (gesichert && s.sicherungIntervall.trim()) || '–',
+          gesichert && s.wiederherstellungGetestet ? 'ja' : 'nein',
           s.zugriffsschutz.trim() || 'offen',
         ]
       }),
@@ -341,7 +371,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   // 4
   h(1, '4', `Verfahren und Maßnahmen: ${name}`)
-  a.push(...ablaufAbschnitte(k))
+  a.push(...ablauf.abschnitte)
   h(2, `4.${k.aufgaben.length + 1}`, 'Aufbewahrung, Vernichtung und Löschung')
   const saetze = [
     ...unterlagen.filter((o) => istPflichtig(o.d.aufbewahrungsart)).map((o) => {
@@ -349,31 +379,41 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       const hgb = lieferscheinHgb(o.d, kaufmann) ? ` ${LIEFERSCHEIN_HGB.charAt(0).toUpperCase()}${LIEFERSCHEIN_HGB.slice(1)}.` : ''
       return `„${o.name}“: aufbewahren ${aufbewahrungText(o.d)}; Ablage: ${orte.join(', ') || 'offen'}.${hgb}`
     }),
-    ...unterlagen.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true && o.d.loeschfrist).map((o) => `„${o.name}“: nicht aufbewahrungspflichtig; löschen ${fristText(o.d.loeschfrist!)}.`),
+    // Beurteilt ist nur das Steuerrecht; andere Gesetze können eigene Fristen haben
+    ...unterlagen.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true && o.d.loeschfrist).map((o) => `„${o.name}“: keine steuerliche Aufbewahrungspflicht (§ 147 AO); löschen ${fristText(o.d.loeschfrist!)}.`),
   ]
   if (saetze.length > 0) liste(saetze)
+  // Aufzählung statt Satz: Rollen und Namen sind Freitext ohne bekannten Artikel
+  const loeschTurnus = c.loeschung.turnus === null ? 'offen' : c.loeschung.turnus === 'keiner' ? 'kein fester' : textVon(LOESCH_TURNUS, c.loeschung.turnus, 'dok')
   absatz(
-    `Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Die Löschung gibt ${c.loeschung.freigabe.trim() || 'offen'} frei, durchgeführt wird sie von ${c.loeschung.durchfuehrung.trim() || 'offen'}, ${c.loeschung.turnus ? textVon(LOESCH_TURNUS, c.loeschung.turnus, 'dok') : 'Turnus offen'}.`,
+    `Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Freigabe der Löschung: ${c.loeschung.freigabe.trim() || 'offen'}. Durchführung: ${c.loeschung.durchfuehrung.trim() || 'offen'}. Turnus: ${loeschTurnus}.`,
   )
 
   // 5
   h(1, '5', 'Ersetzendes Scannen')
-  const scan = unterlagen.filter((o) => o.d.form === 'papier' && o.d.ablageform === 'scan' && o.d.originalVernichtet === true)
-  absatz(
-    scan.length > 0
-      ? `Für ${aufzaehlung(scan.map((o) => o.name))} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.`
-      : 'Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.',
-  )
+  const gescannt = unterlagen.filter((o) => o.d.form === 'papier' && o.d.ablageform === 'scan')
+  const scan = gescannt.filter((o) => o.d.originalVernichtet === true)
+  const scanOffen = gescannt.filter((o) => o.d.originalVernichtet === null)
+  // Ob es die eigene Verfahrensdokumentation gibt, wird erfragt, nicht unterstellt (GoBD Rz. 136)
+  const scanDoku = scan.length > 0 && c.ersetzendesScannen.verfahrensdoku === true
+  if (scan.length > 0) {
+    absatz(
+      `Für ${aufzaehlung(scan.map((o) => o.name))} gilt das ersetzende Scannen. ${scanDoku ? 'Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).' : 'Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.'}`,
+    )
+  }
+  if (scanOffen.length > 0) absatz(`Ob die Papierbelege von ${aufzaehlung(scanOffen.map((o) => o.name))} nach dem Scannen vernichtet werden, ist offen.`)
+  if (scan.length === 0 && scanOffen.length === 0) absatz('Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.')
 
   // 6
   h(1, '6', 'Mitgeltende Unterlagen')
   liste([
     'Verzeichnis von Verarbeitungstätigkeiten, gleiche Version',
     'BPMN-Datei des Ist-Prozesses',
-    ...(scan.length > 0 ? ['Verfahrensdokumentation zum ersetzenden Scannen'] : []),
+    ...(scanDoku ? [`Verfahrensdokumentation zum ersetzenden Scannen, Stand ${c.ersetzendesScannen.stand ? formatiereDatum(c.ersetzendesScannen.stand) : 'offen'}`] : []),
     ...systeme
       .map((m) => ({ m, s: systemAngaben(c, m.id) }))
-      .filter(({ s }) => s.avVertrag === 'ja')
+      // nur, wenn die Frage nach dem Vertrag gestellt wird (wie S2); ausgeblendete Altangaben zählen nicht
+      .filter(({ m, s }) => mitDienstleister(s) && hatPersonenbezug(k, m.id) && s.auftragsverarbeitung !== false && s.avVertrag === 'ja')
       .map(({ m, s }) => `Vertrag zur Auftragsverarbeitung mit ${s.dienstleister.trim() || s.hersteller.trim() || `dem Anbieter von „${m.name.trim()}“`} vom ${s.avVertragVom ? formatiereDatum(s.avVertragVom) : 'offen'}`),
     ...mitgeltendeUnterlagen(c).flatMap((m) => mitgeltendText(m) ?? []),
   ])
@@ -410,7 +450,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   h(1, '9', 'Anlage')
   h(2, '9.1', 'Ablaufdiagramm')
   a.push({ art: 'diagramm' })
-  if (c.einweisung.protokoll) {
+  if (protokoll) {
     h(2, '9.2', 'Nachweis der Einweisung')
     tabelle(
       ['Datum', 'Name', 'Rolle', 'Unterschrift'],

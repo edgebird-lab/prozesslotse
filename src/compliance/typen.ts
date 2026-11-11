@@ -250,6 +250,14 @@ export interface Einweisung {
   protokoll: boolean
 }
 
+/** Gilt für alle Unterlagen, die gescannt und danach vernichtet werden (GoBD Rz. 136). */
+export interface ErsetzendesScannen {
+  /** Gibt es eine eigene Verfahrensdokumentation zum ersetzenden Scannen? null = Weiß nicht */
+  verfahrensdoku: boolean | null
+  /** Stand dieser Verfahrensdokumentation */
+  stand: IsoDatum | null
+}
+
 export type LoeschTurnus = 'jaehrlich' | 'halbjaehrlich' | 'keiner'
 
 export interface Loeschorganisation {
@@ -361,6 +369,8 @@ export interface ComplianceProjekt {
   mitgeltend: string[]
   /** mitgeltende Unterlagen mit Ablageort aus dem Teilschritt „Dokumente“ (Kapitel 6); fehlt in älteren Dateien */
   mitgeltendeUnterlagen?: MitgeltendeUnterlage[]
+  /** fehlt in Dateien vor dem 11.11.2026; beim Laden ergänzt */
+  ersetzendesScannen: ErsetzendesScannen
   versionen: DokuVersion[]
   /** „Geprüft, keine Änderung“ ohne neue Version */
   zuletztGeprueft: IsoDatum | null

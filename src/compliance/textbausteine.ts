@@ -65,15 +65,32 @@ export const KRITERIEN: [string, string][] = [
   ['Vertraulichkeit', 'Nur Berechtigte können lesen oder ändern.'],
 ]
 
-/** A.4, Kapitel 3.3 */
-export const IKS =
-  'Nur eingewiesene Personen arbeiten in den Schritten aus Kapitel 4, und zwar stets so, wie dort beschrieben. Für jede Kontrolle ist festgelegt, wer sie ausübt und wie sie belegt wird (GoBD Rz. 100). Weicht die Praxis von dieser Beschreibung ab, erfährt es die Geschäftsleitung; Anlass und Maßnahme werden schriftlich festgehalten.'
+/**
+ * A.4, Kapitel 3.3. Sichert nur zu, was die Angaben tragen: eingewiesene Personen
+ * nur bei festgelegter Einweisung; „für jede Kontrolle festgelegt“ nur, wenn keine
+ * Kontrolle ohne Nachweis oder Zuständigkeit ist (sonst Vorgabe mit den offenen).
+ */
+export function iks(mitEinweisung: boolean, offen: { nachweis: string[]; zustaendigkeit: string[] }): string {
+  const arbeit = mitEinweisung
+    ? 'Nur eingewiesene Personen arbeiten in den Schritten aus Kapitel 4, und zwar stets so, wie dort beschrieben.'
+    : 'In den Schritten aus Kapitel 4 wird stets so gearbeitet, wie dort beschrieben.'
+  const luecken = [
+    ...(offen.nachweis.length > 0 ? [`Nachweis offen bei: ${offen.nachweis.join(', ')}.`] : []),
+    ...(offen.zustaendigkeit.length > 0 ? [`Zuständigkeit offen bei: ${offen.zustaendigkeit.join(', ')}.`] : []),
+  ]
+  const kontrollen =
+    luecken.length === 0
+      ? 'Für jede Kontrolle ist festgelegt, wer sie ausübt und wie sie belegt wird (GoBD Rz. 100).'
+      : `Kontrollen sind so auszuüben und zu belegen, wie in der Tabelle angegeben (GoBD Rz. 100). ${luecken.join(' ')}`
+  return `${arbeit} ${kontrollen} Weicht die Praxis von dieser Beschreibung ab, erfährt es die Geschäftsleitung; Anlass und Maßnahme werden schriftlich festgehalten.`
+}
 
 /** A.5, Kapitel 3.4 */
 export const DATENSCHUTZ =
   'Zugriff auf die Unterlagen haben nur berechtigte Personen, vom Entstehen bis zur Vernichtung. Wann vernichtet und gelöscht wird, regelt das letzte Unterkapitel von Kapitel 4. Die Schutzmaßnahmen im Einzelnen nennt das Verzeichnis von Verarbeitungstätigkeiten in Abschnitt C.'
 
-export const SYSTEMWECHSEL = 'Bei einem Systemwechsel bleibt die Lesbarkeit der aufbewahrten Unterlagen gesichert; der Wechsel steht in Kapitel 7.'
+/** Kapitel 3.1: Vorgabe statt Zusicherung, die Lesbarkeit nach einem Wechsel fragt die App nicht ab */
+export const SYSTEMWECHSEL = 'Bei einem Systemwechsel ist die Lesbarkeit der aufbewahrten Unterlagen sicherzustellen; der Wechsel wird in Kapitel 7 festgehalten.'
 
 /** Kapitel 3.5 vor der Tabelle je System: was verlangt ist, ohne zuzusichern, dass es erfüllt ist */
 export const DATENZUGRIFF =

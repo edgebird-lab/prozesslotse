@@ -102,7 +102,7 @@ export const AUFBEWAHRUNGSARTEN: (Eintrag<Aufbewahrungsart> & { jahre: number | 
   { wert: 'geschaeftsbrief', text: 'Handels- oder Geschäftsbrief', beschreibung: 'Angebot, Auftragsbestätigung, schriftliche Bestellung; 6 Jahre', dok: 'Geschäftsbrief', jahre: 6 },
   { wert: 'sonstige', text: 'Sonstige steuerlich bedeutsame Unterlage', beschreibung: '6 Jahre', dok: 'Sonstige Unterlage', jahre: 6 },
   { wert: 'lieferschein', text: 'Lieferschein ohne Buchungsfunktion', beschreibung: 'bis die Rechnung da ist bzw. verschickt wurde', dok: 'Lieferschein', jahre: null },
-  { wert: 'keine', text: 'Nicht aufbewahrungspflichtig', beschreibung: 'interne Notiz, E-Mail nur als Transportmittel', dok: 'nicht aufbewahrungspflichtig', jahre: null },
+  { wert: 'keine', text: 'Nicht aufbewahrungspflichtig', beschreibung: 'interne Notiz, E-Mail nur als Transportmittel', dok: 'keine steuerliche Aufbewahrungspflicht', jahre: null },
   { wert: 'unklar', text: 'Weiß nicht', beschreibung: 'Im Zweifel die Steuerberatung fragen', dok: 'offen', jahre: null },
 ]
 
@@ -157,7 +157,7 @@ export const DATENKATEGORIEN: Eintrag<Datenkategorie>[] = [
 
 /** `dok` passt in Sätze wie „„Krankmeldung“ enthält Gesundheitsdaten“. */
 export const BESONDERE_KATEGORIEN: Eintrag<BesondereKategorie>[] = [
-  { wert: 'herkunft', text: 'Herkunft', dok: 'Angaben zur Herkunft' },
+  { wert: 'herkunft', text: 'Rassische und ethnische Herkunft', dok: 'Angaben zur rassischen und ethnischen Herkunft' },
   { wert: 'politik', text: 'Politische Meinungen', dok: 'politische Meinungen' },
   { wert: 'religion', text: 'Religiöse oder weltanschauliche Überzeugungen', dok: 'religiöse oder weltanschauliche Überzeugungen' },
   { wert: 'gewerkschaft', text: 'Gewerkschaftszugehörigkeit', dok: 'Angaben zur Gewerkschaftszugehörigkeit' },
@@ -220,7 +220,7 @@ export const BETRIEBE: Eintrag<Betrieb>[] = [
 ]
 
 export const UNVERAENDERBARKEIT: Eintrag<Unveraenderbarkeit>[] = [
-  { wert: 'revisionssicher', text: 'Revisionssicheres Archiv' },
+  { wert: 'revisionssicher', text: 'Revisionssicheres Archiv', dok: 'Archiv mit Schutz vor Änderung und Löschung' },
   { wert: 'protokolliert', text: 'Änderungen werden protokolliert' },
   { wert: 'keine', text: 'Keine, z. B. einfache Dateiablage', dok: 'keiner' },
   { wert: 'unklar', text: 'Weiß nicht', dok: 'offen' },
@@ -251,8 +251,8 @@ export const KONTROLLARTEN: Eintrag<KontrollArt>[] = [
 ]
 
 export const NACHWEISE: Eintrag<Nachweis>[] = [
-  { wert: 'system', text: 'Im System protokolliert' },
-  { wert: 'abzeichnen', text: 'Abgezeichnet mit Datum und Kürzel' },
+  { wert: 'system', text: 'Im System protokolliert', dok: 'im System protokolliert' },
+  { wert: 'abzeichnen', text: 'Abgezeichnet mit Datum und Kürzel', dok: 'abgezeichnet mit Datum und Kürzel' },
   { wert: 'keiner', text: 'Kein Nachweis', dok: 'keiner' },
   { wert: 'unklar', text: 'Weiß nicht', dok: 'offen' },
 ]
@@ -378,6 +378,7 @@ export function neueCompliance(): ComplianceProjekt {
     toms: leereToms(),
     mitgeltend: [],
     mitgeltendeUnterlagen: [],
+    ersetzendesScannen: { verfahrensdoku: null, stand: null },
     versionen: [],
     zuletztGeprueft: null,
   }
