@@ -31,7 +31,7 @@ export const FRISTENREGEL =
 export const FRISTEN_TABELLE: string[][] = [
   ['Bücher, Aufzeichnungen, Inventare, Jahresabschlüsse, Lageberichte, Eröffnungsbilanz, Arbeitsanweisungen und Organisationsunterlagen, auch diese Verfahrensdokumentation', '§ 147 Abs. 1 Nr. 1 AO', '10 Jahre'],
   ['Buchungsbelege und Rechnungen (auch § 14b UStG)', '§ 147 Abs. 1 Nr. 4 AO', '8 Jahre'],
-  ['Empfangene Handels- oder Geschäftsbriefe und Wiedergaben der abgesandten', '§ 147 Abs. 1 Nr. 2 und 3 AO', '6 Jahre'],
+  ['Empfangene Handels- oder Geschäftsbriefe und Kopien der versandten', '§ 147 Abs. 1 Nr. 2 und 3 AO', '6 Jahre'],
   ['Sonstige Unterlagen, soweit sie für die Besteuerung von Bedeutung sind', '§ 147 Abs. 1 Nr. 5 AO', '6 Jahre'],
   ['Lieferscheine, die keine Buchungsbelege sind', '§ 147 Abs. 3 AO', 'bis zum Erhalt bzw. Versand der Rechnung'],
 ]

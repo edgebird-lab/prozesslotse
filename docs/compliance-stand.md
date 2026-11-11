@@ -31,13 +31,13 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Phase 3 – Dokumente erzeugen
 
-- [ ] 3.1 `dokument.ts`: Kapitelschlüssel und Vergleich
-- [ ] 3.2 Verfahrensdokumentation: Deckblatt, Kapitel 1 bis 3
-- [ ] 3.3 `ablauftext.ts`: Aufgabe, Entscheidung, Gleichzeitig, Wiederholung, Warten
-- [ ] 3.4 Satzbausteine für Format 3 (soweit umgesetzt), 300 Zufallsprozesse
-- [ ] 3.5 Kapitel 5 bis 9 und Textbausteine
-- [ ] 3.6 Verzeichnis A bis D
-- [ ] 3.7 `versionen.ts`: Freigabe, gültig bis, aufbewahren bis, Prüfsumme, geänderte Kapitel
+- [x] 3.1 `dokument.ts`: Kapitelschlüssel und Vergleich
+- [x] 3.2 Verfahrensdokumentation: Deckblatt, Kapitel 1 bis 3
+- [x] 3.3 `ablauftext.ts`: Aufgabe, Entscheidung, Gleichzeitig, Wiederholung, Warten
+- [x] 3.4 Satzbausteine für Format 3 (soweit umgesetzt), 300 Zufallsprozesse
+- [x] 3.5 Kapitel 5 bis 9 und Textbausteine; Abgleich mit dem Mustertext (BStBK/DStV 2.1, Kopie nur im Scratchpad) am 11.11.2026: längste gemeinsame Wortfolge 7 Wörter, der übernommene Kapitelname 3
+- [x] 3.6 Verzeichnis A bis D
+- [x] 3.7 `versionen.ts`: Freigabe, gültig bis, aufbewahren bis, Prüfsumme, geänderte Kapitel; eine Version des Lieferdienstes wiegt rund 33 KB
 
 ## Phase 4 – Assistent, Teil 1
 
