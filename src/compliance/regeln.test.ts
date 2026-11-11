@@ -35,15 +35,13 @@ function regeln(befunde: ComplianceBefund[], regel: string): string[] {
 }
 
 describe('Gesamttest Testdaten (9.5)', () => {
-  it('liefert genau 8 Befunde in dieser Reihenfolge', () => {
+  it('liefert genau 7 Befunde in dieser Reihenfolge', () => {
     const befunde = pruefe()
     expect(befunde.map((b) => [b.schluessel, b.schwere])).toEqual([
       ['compliance:B1:dob_bestellnotiz', 'warnung'],
       ['compliance:D6:dob_tourenliste', 'warnung'],
       ['compliance:S2:med_erp', 'warnung'],
       ['compliance:T1:ueberpruefung', 'warnung'],
-      // die GmbH ist Kaufmann: Lieferschein ggf. 6 Jahre als Handelsbrief (§ 257 HGB)
-      ['compliance:B10:dob_lieferschein', 'hinweis'],
       ['compliance:S4:med_erp', 'hinweis'],
       ['compliance:K2:auf_kontrollieren', 'hinweis'],
       ['compliance:V1', 'hinweis'],

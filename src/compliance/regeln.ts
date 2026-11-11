@@ -310,7 +310,7 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
   for (const o of objekte) {
     if (!lieferscheinHgb(o.d, kaufmann)) continue
     add({
-      regel: 'B10',
+      regel: 'B11',
       id: o.id,
       teilschritt: 'fristen',
       schwere: 'hinweis',
@@ -544,7 +544,7 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
     ]
     if (fehlt.length === 0) continue
     add({
-      regel: 'S7',
+      regel: 'S8',
       id: m.id,
       teilschritt: 'systeme',
       schwere: 'hinweis',

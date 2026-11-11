@@ -34,8 +34,7 @@ async function ohneBeschriftung(page: Page): Promise<string[]> {
 test('zeigt die Lücken des Beispiels, „Beheben“ führt zur Unterlage (9.10, 1 und 2)', async ({ page }) => {
   await start(page)
   await teil(page, 'Lücken').click()
-  // 4 Hinweise: S4, K2, V1 und B10 (Lieferschein der GmbH ggf. 6 Jahre nach § 257 HGB)
-  await expect(page.getByText('keine Fehler · 4 Warnungen · 4 Hinweise')).toBeVisible()
+  await expect(page.getByText('keine Fehler · 4 Warnungen · 3 Hinweise')).toBeVisible()
 
   await page.getByRole('button', { name: 'Beheben: Aufbewahrungsfrist fehlt' }).click()
   await expect(teil(page, 'Belege und Daten')).toHaveAttribute('aria-current', 'step')
@@ -50,10 +49,10 @@ test('zeigt die Lücken des Beispiels, „Beheben“ führt zur Unterlage (9.10,
   await expect(frist.getByRole('radio', { name: 'Ab Entstehung bzw. Eingang' })).toBeChecked()
 
   await teil(page, 'Lücken').click()
-  await expect(page.getByText('keine Fehler · 3 Warnungen · 4 Hinweise')).toBeVisible()
+  await expect(page.getByText('keine Fehler · 3 Warnungen · 3 Hinweise')).toBeVisible()
   // Rückgängig nimmt die Löschfrist wieder zurück
   await page.getByRole('button', { name: /Rückgängig/ }).click()
-  await expect(page.getByText('keine Fehler · 4 Warnungen · 4 Hinweise')).toBeVisible()
+  await expect(page.getByText('keine Fehler · 4 Warnungen · 3 Hinweise')).toBeVisible()
 })
 
 test('legt eine Unterlage an, ordnet sie ein und legt sie ab', async ({ page }) => {
@@ -72,7 +71,7 @@ test('legt eine Unterlage an, ordnet sie ein und legt sie ab', async ({ page }) 
 
   await teil(page, 'Lücken').click()
   // neu: nur „Personenbezug ungeklärt“ als Hinweis
-  await expect(page.getByText('keine Fehler · 4 Warnungen · 5 Hinweise')).toBeVisible()
+  await expect(page.getByText('keine Fehler · 4 Warnungen · 4 Hinweise')).toBeVisible()
   await expect(page.getByText('Enthält „Gutschrift“ Angaben zu Personen')).toBeVisible()
 })
 

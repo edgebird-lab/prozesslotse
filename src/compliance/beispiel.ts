@@ -78,12 +78,14 @@ export function complianceLieferdienst(): ComplianceProjekt {
         datenkategorien: ['kontakt', 'vertrag'],
         rechtsgrundlagen: ['vertrag', 'rechtspflicht'],
       }),
+      // Die GmbH ist Kaufmann: Der quittierte Lieferschein wird als möglicher Handelsbrief 6 Jahre aufbewahrt (§ 257 HGB)
       dob_lieferschein: objekt({
         aufbewahrungsart: 'lieferschein',
         form: 'papier',
         richtung: 'ausgang',
         ablageSpeicherIds: ['dsp_ordner'],
         ablageform: 'original',
+        aufbewahrungJahre: 6,
         datenkategorien: ['kontakt', 'vertrag'],
         rechtsgrundlagen: ['vertrag'],
       }),

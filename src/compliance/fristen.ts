@@ -26,7 +26,7 @@ export function istKaufmann(u: Pick<Unternehmen, 'rechtsform' | 'gewinnermittlun
 
 /**
  * Lieferschein eines Kaufmanns ohne gewählte Frist von mindestens 6 Jahren: Ist er ein Handelsbrief,
- * verlangt § 257 HGB 6 Jahre, auch wenn die AO nur „bis zur Rechnung“ verlangt (Hinweis B10).
+ * verlangt § 257 HGB 6 Jahre, auch wenn die AO nur „bis zur Rechnung“ verlangt (Hinweis B11).
  */
 export function lieferscheinHgb(d: DatenobjektAngaben, kaufmann: boolean): boolean {
   return kaufmann && d.aufbewahrungsart === 'lieferschein' && (d.aufbewahrungJahre === null || d.aufbewahrungJahre < HANDELSBRIEF_JAHRE)

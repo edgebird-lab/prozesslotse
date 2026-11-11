@@ -103,22 +103,22 @@ describe('recht-4: Wiederfinden, Lesbarmachung und Datenzugriff (GoBD Rz. 152)',
     expect(textIn(verfahrensdoku, '3.5').join(' ')).toContain('§ 147 Abs. 2, 5 und 6 AO')
   })
 
-  it('schreibt leere Angaben als „offen“ und meldet sie als Hinweis S7', () => {
+  it('schreibt leere Angaben als „offen“ und meldet sie als Hinweis S8', () => {
     const c = ohneAngaben()
     expect(zeile(tabelleIn(dokumente(c).verfahrensdoku, '3.5'), 'Warenwirtschaft')?.slice(2)).toEqual(['offen', 'offen'])
-    const b = finde(pruefe(c), 'compliance:S7:med_erp')
+    const b = finde(pruefe(c), 'compliance:S8:med_erp')
     expect(b).toMatchObject({ schwere: 'hinweis', teilschritt: 'systeme', ziel: { art: 'system', id: 'med_erp' } })
     expect(b?.text).toBe(
       'Für „Warenwirtschaft“ ist offen, wie eine Unterlage wiedergefunden wird und wie die Finanzverwaltung bei einer Außenprüfung auf die Daten zugreift, auch nach Vertragsende oder Systemwechsel.',
     )
     expect(b?.quelle).toContain('GoBD Rz. 152')
     c.systeme.med_erp.wiederfinden = 'Rechnungsnummer'
-    expect(finde(pruefe(c), 'compliance:S7:med_erp')?.text).toBe(
+    expect(finde(pruefe(c), 'compliance:S8:med_erp')?.text).toBe(
       'Für „Warenwirtschaft“ ist offen, wie die Finanzverwaltung bei einer Außenprüfung auf die Daten zugreift, auch nach Vertragsende oder Systemwechsel.',
     )
     // Beispiel ausgefüllt, und ohne aufbewahrungspflichtige Ablage gibt es keine Frage
-    expect(regeln(pruefe(), 'S7')).toEqual([])
-    expect(finde(pruefe(c), 'compliance:S7:med_excel')).toBeUndefined()
+    expect(regeln(pruefe(), 'S8')).toEqual([])
+    expect(finde(pruefe(c), 'compliance:S8:med_excel')).toBeUndefined()
   })
 
   it('kommt mit älteren Dateien ohne die neuen Felder zurecht und prüft sie streng, wenn sie da sind', () => {
@@ -127,7 +127,7 @@ describe('recht-4: Wiederfinden, Lesbarmachung und Datenzugriff (GoBD Rz. 152)',
     delete d.compliance.systeme.med_erp.datenzugriff
     const p = leseProjekt(d)
     expect(zeile(tabelleIn(dokumente(p.compliance!).verfahrensdoku, '3.5'), 'Warenwirtschaft')?.slice(2)).toEqual(['offen', 'offen'])
-    expect(finde(pruefe(p.compliance!), 'compliance:S7:med_erp')).toBeDefined()
+    expect(finde(pruefe(p.compliance!), 'compliance:S8:med_erp')).toBeDefined()
     const e = datei()
     e.compliance.systeme.med_erp.datenzugriff = 5
     expect(() => leseProjekt(e)).toThrow(Formatfehler)
@@ -276,8 +276,14 @@ describe('recht-3 und logik-18: Zugriffsschutz und mitgeltende Unterlagen', () =
 })
 
 describe('recht-0: Lieferscheine bei Kaufleuten (§ 257 HGB)', () => {
-  const einzel = (aendern: (c: ComplianceProjekt) => void = () => {}) =>
+  // Das Beispiel bewahrt den Lieferschein schon 6 Jahre auf; hier gilt die gesetzliche Frist „bis zur Rechnung“
+  const gesetzlich = (aendern: (c: ComplianceProjekt) => void = () => {}) =>
     mitAngaben((c) => {
+      c.datenobjekte.dob_lieferschein.aufbewahrungJahre = null
+      aendern(c)
+    })
+  const einzel = (aendern: (c: ComplianceProjekt) => void = () => {}) =>
+    gesetzlich((c) => {
       Object.assign(c.unternehmen, { rechtsform: 'einzelunternehmen', gewinnermittlung: 'euer' })
       aendern(c)
     })
@@ -290,7 +296,7 @@ describe('recht-0: Lieferscheine bei Kaufleuten (§ 257 HGB)', () => {
   })
 
   it('ergänzt bei der GmbH die handelsrechtliche Frist in Fristentabelle, 2.4, 4.19, B.3 und B.6', () => {
-    const { verfahrensdoku, verzeichnis } = dokumente()
+    const { verfahrensdoku, verzeichnis } = dokumente(gesetzlich())
     expect(zeile(tabelleIn(verfahrensdoku, '2.3'), 'Lieferscheine, die keine Buchungsbelege sind')?.[2]).toBe(`bis zum Erhalt bzw. Versand der Rechnung; ${HGB}`)
     expect(zeile(tabelleIn(verfahrensdoku, '2.4'), 'Lieferschein')?.[5]).toBe(`bis zum Versand der Rechnung; ${HGB}`)
     expect(textIn(verfahrensdoku, '4')).toContain('„Lieferschein“: aufbewahren bis zum Versand der Rechnung; Ablage: Ordner Lieferscheine. Handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären.')
@@ -298,13 +304,14 @@ describe('recht-0: Lieferscheine bei Kaufleuten (§ 257 HGB)', () => {
     expect(zeile(tabelleIn(verzeichnis, 'B.6'), 'Lieferschein')?.[1]).toBe(`bis zum Versand der Rechnung (§ 147 Abs. 3 AO); ${HGB}`)
   })
 
-  it('meldet den Lieferschein bei Kaufleuten als Hinweis B10, bis eine Frist von mindestens 6 Jahren gewählt ist', () => {
-    const b = finde(pruefe(), 'compliance:B10:dob_lieferschein')
+  it('meldet den Lieferschein bei Kaufleuten als Hinweis B11, bis eine Frist von mindestens 6 Jahren gewählt ist', () => {
+    const b = finde(pruefe(gesetzlich()), 'compliance:B11:dob_lieferschein')
     expect(b).toMatchObject({ schwere: 'hinweis', teilschritt: 'fristen', ziel: { art: 'frist', id: 'dob_lieferschein' } })
     expect(b?.text).toContain('Für Kaufleute kann er als Handelsbrief 6 Jahre aufzubewahren sein (§ 257 HGB).')
-    expect(finde(pruefe(mitAngaben((c) => (c.datenobjekte.dob_lieferschein.aufbewahrungJahre = 2))), 'compliance:B10:dob_lieferschein')).toBeDefined()
-    expect(regeln(pruefe(mitAngaben((c) => (c.datenobjekte.dob_lieferschein.aufbewahrungJahre = 6))), 'B10')).toEqual([])
-    expect(regeln(pruefe(einzel()), 'B10')).toEqual([])
+    expect(finde(pruefe(mitAngaben((c) => (c.datenobjekte.dob_lieferschein.aufbewahrungJahre = 2))), 'compliance:B11:dob_lieferschein')).toBeDefined()
+    // Das Beispiel hat 6 Jahre gewählt: kein Hinweis, die 7 Befunde aus 9.5 bleiben
+    expect(regeln(pruefe(), 'B11')).toEqual([])
+    expect(regeln(pruefe(einzel()), 'B11')).toEqual([])
   })
 
   it('löst bei Kaufleuten D7 und „länger als vorgeschrieben“ erst über 6 Jahren aus', () => {

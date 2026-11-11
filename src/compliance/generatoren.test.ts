@@ -111,8 +111,8 @@ describe('Verfahrensdokumentation Lieferdienst (9.6)', () => {
     expect(t.zeilen.map((z) => z[0])).toEqual(['Bestellnotiz', 'Bestellung', 'Lieferschein', 'Tourenliste', 'Ausgangsrechnung'])
     expect(t.zeilen.find((z) => z[0] === 'Ausgangsrechnung')?.[6]).toBe('bis 31.12.2034')
     expect(t.zeilen.find((z) => z[0] === 'Bestellung')?.[6]).toBe('bis 31.12.2032')
-    // die GmbH ist Kaufmann: Zusatz nach § 257 HGB
-    expect(t.zeilen.find((z) => z[0] === 'Lieferschein')?.[5]).toBe('bis zum Versand der Rechnung; handelsrechtlich ggf. 6 Jahre, falls Handelsbrief (§ 257 HGB); mit Steuerberatung klären')
+    // die GmbH bewahrt den Lieferschein als möglichen Handelsbrief 6 Jahre auf (§ 257 HGB)
+    expect(t.zeilen.find((z) => z[0] === 'Lieferschein')?.slice(5)).toEqual(['6 Jahre ab Ende des Kalenderjahres der Entstehung', 'bis 31.12.2032'])
   })
 
   it('lässt Kapitel 5 ohne Scannen entfallen', () => {
