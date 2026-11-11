@@ -143,3 +143,23 @@ test('sicht 6: bei falscher Prüfsumme warnen Zustandszeile, Lücken und Teilsch
   await expect(befund).toContainText('Version 1.0 passt nicht mehr zu ihrer Prüfsumme')
   await expect(befund.getByRole('button', { name: 'Beheben: Prüfsumme stimmt nicht – Version 1.0' })).toBeVisible()
 })
+
+// ---------- erledigt, Restfunde ----------
+
+test('bedienung-6: Die Auswahl „Nachweis“ einer weiteren Kontrolle zeigt ihren Text ganz', async ({ page }) => {
+  await start(page)
+  await schritt(page, 'Dokumentieren').click()
+  await teil(page, 'Kontrollen').click()
+  await page.getByRole('button', { name: '+ Weitere Kontrolle' }).click()
+  const karte = page.getByRole('group', { name: 'Weitere Kontrolle 1' })
+  const auswahl = karte.getByLabel('Nachweis')
+  await auswahl.selectOption({ label: 'Abgezeichnet mit Datum und Kürzel' })
+  const mass = await auswahl.evaluate((s: HTMLSelectElement) => {
+    const st = getComputedStyle(s)
+    const ctx = document.createElement('canvas').getContext('2d')!
+    ctx.font = st.font
+    return { text: Math.ceil(ctx.measureText(s.selectedOptions[0].text).width), innen: Math.floor(s.clientWidth - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight)) }
+  })
+  // rund 24 px braucht der Pfeil der Auswahl
+  expect(mass.text + 24, JSON.stringify(mass)).toBeLessThanOrEqual(mass.innen)
+})

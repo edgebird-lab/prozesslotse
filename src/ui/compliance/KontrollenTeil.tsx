@@ -56,7 +56,8 @@ export function KontrollenTeil() {
             <Schalter an={w.extern} onAendern={(extern) => setzeWeitere(w, { extern }, 'extern')}>
               Externe Stelle, z. B. Steuerberatung
             </Schalter>
-            <div className="feldreihe">
+            {/* volle Breite: „Abgezeichnet mit Datum und Kürzel“ und lange Schrittnamen passen sonst nicht (bedienung-6) */}
+            <div className="felder">
               <KatalogListe id={`ziel-kontrolle-${w.id}-nachweis`} label="Nachweis" katalog={NACHWEISE} wert={w.nachweis} onAendern={(nachweis) => nachweis && setzeWeitere(w, { nachweis }, 'nachweis')} />
               <CFeld label="Sichert ab">
                 {(id) => (
