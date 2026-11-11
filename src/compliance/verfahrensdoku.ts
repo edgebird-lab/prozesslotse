@@ -7,6 +7,7 @@ import { teilnehmerName } from '../modell/operationen'
 import { MEDIUM_ARTEN, type Prozess } from '../modell/typen'
 import { formatiereZahl } from '../modell/zeit'
 import {
+  ablageVon,
   ablageVonObjekt,
   angaben,
   aufzaehlung,
@@ -14,6 +15,7 @@ import {
   kontext,
   kontrollAngaben,
   mitDienstleister,
+  objektName,
   rollenAngaben,
   schrittText,
   systemAngaben,
@@ -22,7 +24,8 @@ import {
 } from './ableitung'
 import { ablaufAbschnitte } from './ablauftext'
 import { formatiereDatum } from './datum'
-import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, laengerAlsVorgeschrieben } from './fristen'
+import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb } from './fristen'
+import { mitgeltendeUnterlagen, mitgeltendText } from './mitgeltend'
 import {
   ABLAGEFORMEN,
   AUFBEWAHRUNGSARTEN,
@@ -40,7 +43,22 @@ import {
   textVon,
   UNVERAENDERBARKEIT,
 } from './standard'
-import { AUFBAU_RZ153, DATENSCHUTZ, FRISTEN_TABELLE, FRISTENREGEL, GLOSSAR, GRUNDLAGEN, HISTORIE, hinweisVerfahrensdoku, IKS, KRITERIEN, SYSTEMWECHSEL } from './textbausteine'
+import {
+  AUFBAU_RZ153,
+  DATENSCHUTZ,
+  DATENZUGRIFF,
+  FRISTEN_INSTITUTE,
+  fristenTabelle,
+  FRISTENREGEL,
+  GLOSSAR,
+  GRUNDLAGEN,
+  HISTORIE,
+  hinweisVerfahrensdoku,
+  IKS,
+  KRITERIEN,
+  LIEFERSCHEIN_HGB,
+  SYSTEMWECHSEL,
+} from './textbausteine'
 import type { Abschnitt, ComplianceProjekt, DatenobjektAngaben, Dokument, IsoDatum, SystemAngaben, VersionKopf } from './typen'
 
 /** Wofür ein Dokument erzeugt wird: Version (null = Entwurf), bisherige Versionen, Bezugsjahr, Tag. */
@@ -99,6 +117,9 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   const u = c.unternehmen
   const name = prozessName(ist)
   const firma = firmenName(c)
+  // Kaufleute: beim Lieferschein zusätzlich die mögliche Frist als Handelsbrief (§ 257 HGB)
+  const kaufmann = istKaufmann(u)
+  const aufbewahrung = (d: DatenobjektAngaben) => `${aufbewahrungText(d)}${lieferscheinHgb(d, kaufmann) ? `; ${LIEFERSCHEIN_HGB}` : ''}`
   const a: Abschnitt[] = []
   const h = (ebene: 1 | 2 | 3, nummer: string, text: string) => a.push({ art: 'ueberschrift', ebene, nummer, text })
   const absatz = (text: string) => a.push({ art: 'absatz', text })
@@ -164,13 +185,14 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   h(2, '2.3', 'Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien')
   absatz(GRUNDLAGEN)
   absatz(FRISTENREGEL)
-  tabelle(['Unterlagen', 'Vorschrift', 'Frist'], FRISTEN_TABELLE)
+  tabelle(['Unterlagen', 'Vorschrift', 'Frist'], fristenTabelle(kaufmann))
+  absatz(FRISTEN_INSTITUTE)
   tabelle(
     ['Nr.', 'Anforderung', 'Bedeutung'],
     KRITERIEN.map(([anforderung, bedeutung], i) => [String(i + 1), anforderung, bedeutung]),
   )
   const unterlagen = unterlagenNachEntstehung(k)
-  const laenger = unterlagen.filter((o) => laengerAlsVorgeschrieben(o.d))
+  const laenger = unterlagen.filter((o) => laengerAlsVorgeschrieben(o.d, kaufmann))
   if (laenger.length > 0) absatz(`Länger als vorgeschrieben werden aufbewahrt: ${laenger.map((o) => o.name).join(', ')}. Grund: ${c.begruendungLaengereAufbewahrung.trim() || 'offen'}.`)
 
   h(2, '2.4', 'Relevante Dokumente')
@@ -179,7 +201,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       ['Unterlage', 'Einordnung', 'Form', 'Entsteht in', 'Ablage', 'Aufbewahrung', `Beispiel ${kx.bezugsjahr}`],
       unterlagen.map((o) => {
         const e = entstehtIn(k, o.id)
-        return [o.name, textVon(AUFBEWAHRUNGSARTEN, o.d.aufbewahrungsart, 'dok'), textVon(BELEGFORMEN, o.d.form, 'dok'), e ? schrittText(k, e) : '–', ablageText(k, o.d), aufbewahrungText(o.d), beispielBis(o.d, kx.bezugsjahr)]
+        return [o.name, textVon(AUFBEWAHRUNGSARTEN, o.d.aufbewahrungsart, 'dok'), textVon(BELEGFORMEN, o.d.form, 'dok'), e ? schrittText(k, e) : '–', ablageText(k, o.d), aufbewahrung(o.d), beispielBis(o.d, kx.bezugsjahr)]
       }),
     )
     absatz(`Die Spalte „Beispiel ${kx.bezugsjahr}“ nennt das Fristende für eine Unterlage aus dem Jahr ${kx.bezugsjahr}.`)
@@ -205,10 +227,16 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   }
   for (const t of ist.teilnehmer) extern.push(`${t.name.trim() || 'Externer Beteiligter'}: tauscht Nachrichten mit dem Unternehmen aus`)
   if (u.steuerberatung.trim()) extern.push(`${u.steuerberatung.trim()}: Steuerberatung`)
+  // Ohne Angabe zum Betrieb ist offen, ob ein Dienstleister beteiligt ist
+  const betriebOffen = systemeImEinsatz(k)
+    .filter((m) => systemAngaben(c, m.id).betrieb === null && !mitDienstleister(systemAngaben(c, m.id)))
+    .map((m) => m.name.trim() || 'Unbenanntes System')
+  const offenSatz = betriebOffen.length > 0 ? `Wer ${aufzaehlung(betriebOffen)} betreibt, ist offen.` : null
   if (extern.length > 0) {
     liste(extern)
+    if (offenSatz) absatz(offenSatz)
     absatz('Mit externen Stellen ist diese Dokumentation abzustimmen.')
-  } else absatz('Alle Schritte finden im Unternehmen statt.')
+  } else absatz(offenSatz ?? 'Alle Schritte finden im Unternehmen statt.')
 
   // 3
   h(1, '3', 'Organisation und Sicherheit des IT-gestützten Verfahrens')
@@ -281,13 +309,34 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   absatz(DATENSCHUTZ)
   if (systeme.length > 0) {
     tabelle(
-      ['System', 'Schutz vor Änderung', 'Datensicherung', 'Intervall', 'Rücksicherung getestet'],
+      ['System', 'Schutz vor Änderung', 'Datensicherung', 'Intervall', 'Rücksicherung getestet', 'Zugriffsschutz'],
       systeme.map((m) => {
         const s = systemAngaben(c, m.id)
-        return [m.name.trim() || 'Unbenanntes System', textVon(UNVERAENDERBARKEIT, s.unveraenderbarkeit, 'dok'), textVon(SICHERUNGEN, s.sicherung, 'dok'), s.sicherungIntervall.trim() || '–', s.wiederherstellungGetestet ? 'ja' : 'nein']
+        return [
+          m.name.trim() || 'Unbenanntes System',
+          textVon(UNVERAENDERBARKEIT, s.unveraenderbarkeit, 'dok'),
+          textVon(SICHERUNGEN, s.sicherung, 'dok'),
+          s.sicherungIntervall.trim() || '–',
+          s.wiederherstellungGetestet ? 'ja' : 'nein',
+          s.zugriffsschutz.trim() || 'offen',
+        ]
       }),
     )
   }
+
+  // GoBD Rz. 152, 156–159: je System, das aufbewahrungspflichtige Unterlagen ablegt
+  h(2, '3.5', 'Wiederfinden, Lesbarmachung und Datenzugriff')
+  const mitAblage = systeme.map((m) => ({ m, ablage: ablageVon(k, m.id) })).filter(({ ablage }) => ablage.length > 0)
+  if (mitAblage.length > 0) {
+    absatz(DATENZUGRIFF)
+    tabelle(
+      ['System', 'Aufbewahrte Unterlagen', 'Wiederfinden über', 'Datenzugriff, auch nach Vertragsende oder Systemwechsel'],
+      mitAblage.map(({ m, ablage }) => {
+        const s = systemAngaben(c, m.id)
+        return [m.name.trim() || 'Unbenanntes System', ablage.map((id) => objektName(k, id)).join(', '), s.wiederfinden?.trim() || 'offen', s.datenzugriff?.trim() || 'offen']
+      }),
+    )
+  } else absatz('Im Prozess werden keine aufbewahrungspflichtigen Unterlagen in IT-Systemen abgelegt.')
 
   // 4
   h(1, '4', `Verfahren und Maßnahmen: ${name}`)
@@ -296,7 +345,8 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
   const saetze = [
     ...unterlagen.filter((o) => istPflichtig(o.d.aufbewahrungsart)).map((o) => {
       const orte = ablageVonObjekt(k, o.d).map((s) => s.name.trim() || 'Unbenannter Ablageort')
-      return `„${o.name}“: aufbewahren ${aufbewahrungText(o.d)}; Ablage: ${orte.join(', ') || 'offen'}.`
+      const hgb = lieferscheinHgb(o.d, kaufmann) ? ` ${LIEFERSCHEIN_HGB.charAt(0).toUpperCase()}${LIEFERSCHEIN_HGB.slice(1)}.` : ''
+      return `„${o.name}“: aufbewahren ${aufbewahrungText(o.d)}; Ablage: ${orte.join(', ') || 'offen'}.${hgb}`
     }),
     ...unterlagen.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true && o.d.loeschfrist).map((o) => `„${o.name}“: nicht aufbewahrungspflichtig; löschen ${fristText(o.d.loeschfrist!)}.`),
   ]
@@ -324,7 +374,7 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
       .map((m) => ({ m, s: systemAngaben(c, m.id) }))
       .filter(({ s }) => s.avVertrag === 'ja')
       .map(({ m, s }) => `Vertrag zur Auftragsverarbeitung mit ${s.dienstleister.trim() || s.hersteller.trim() || `dem Anbieter von „${m.name.trim()}“`} vom ${s.avVertragVom ? formatiereDatum(s.avVertragVom) : 'offen'}`),
-    ...c.mitgeltend.map((x) => x.trim()).filter(Boolean),
+    ...mitgeltendeUnterlagen(c).flatMap((m) => mitgeltendText(m) ?? []),
   ])
 
   // 7

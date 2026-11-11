@@ -1,5 +1,5 @@
 /**
- * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 38 Regeln.
+ * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 40 Regeln.
  * Die App prüft nicht, ob die Angaben stimmen, sondern ob sie vollständig und
  * widerspruchsfrei sind. Befunde sind Hinweise zum Prüfen und Klären, keine
  * Rechtsauskunft. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7).
@@ -29,7 +29,7 @@ import {
   type Kontext,
 } from './ableitung'
 import { formatiereDatum, tageZwischen } from './datum'
-import { aufbewahrungText, laengerAlsVorgeschrieben, mindestJahre } from './fristen'
+import { aufbewahrungText, HANDELSBRIEF_JAHRE, istKaufmann, laengerAlsVorgeschrieben, lieferscheinHgb, mindestJahre } from './fristen'
 import { BESONDERE_KATEGORIEN, istPflichtig, STRAFRECHTLICH_TEXT, TOM_BEREICHE } from './standard'
 import type { ComplianceBefund, ComplianceProjekt, DatenobjektAngaben, IsoDatum, Teilschritt } from './typen'
 import { geaenderteKapitel } from './versionen'
@@ -306,6 +306,20 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
       })
     }
   }
+  const kaufmann = istKaufmann(c.unternehmen)
+  for (const o of objekte) {
+    if (!lieferscheinHgb(o.d, kaufmann)) continue
+    add({
+      regel: 'B10',
+      id: o.id,
+      teilschritt: 'fristen',
+      schwere: 'hinweis',
+      titel: 'Lieferschein: Frist nach HGB klären',
+      text: `„${o.name}“ ist als Lieferschein ohne Buchungsfunktion eingeordnet. Für Kaufleute kann er als Handelsbrief 6 Jahre aufzubewahren sein (§ 257 HGB). Kläre das mit der Steuerberatung und wähle dann 6 Jahre oder ordne die Unterlage als Geschäftsbrief ein.`,
+      quelle: '§ 257 Abs. 1, 2 und 4 HGB; § 147 Abs. 3 AO',
+      ziel: { art: 'frist', id: o.id },
+    })
+  }
 }
 
 function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
@@ -350,16 +364,21 @@ function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
     }
   }
   for (const o of personen) {
-    const kategorien = [...BESONDERE_KATEGORIEN.filter((b) => o.d.besondereKategorien.includes(b.wert)).map((b) => b.dok ?? b.text), ...(o.d.strafrechtlich ? [STRAFRECHTLICH_TEXT] : [])]
+    const besondere = BESONDERE_KATEGORIEN.filter((b) => o.d.besondereKategorien.includes(b.wert)).map((b) => b.dok ?? b.text)
+    const kategorien = [...besondere, ...(o.d.strafrechtlich ? [STRAFRECHTLICH_TEXT] : [])]
     if (kategorien.length > 0) {
+      // Besondere Kategorien sind nur mit einer Ausnahme nach Art. 9 Abs. 2 erlaubt; mit ihr bleibt der Rat ein Hinweis
+      const ohneAusnahme = besondere.length > 0 && !o.d.ausnahmeArt9
       add({
         regel: 'D5',
         id: o.id,
         teilschritt: 'belege',
-        schwere: 'warnung',
+        schwere: ohneAusnahme || o.d.strafrechtlich ? 'warnung' : 'hinweis',
         titel: 'Besonders geschützte Daten',
-        text: `„${o.name}“ enthält ${liste(kategorien)}. Dafür gelten strengere Regeln; den Datenschutzbeauftragten oder eine fachkundige Person einbeziehen.`,
-        quelle: 'Art. 9 Abs. 1, Art. 10 DSGVO',
+        text: `„${o.name}“ enthält ${liste(kategorien)}. Dafür gelten strengere Regeln; den Datenschutzbeauftragten oder eine fachkundige Person einbeziehen.${
+          ohneAusnahme ? ' Gib an, welche Ausnahme nach Art. 9 Abs. 2 DSGVO die Verarbeitung erlaubt; ob daneben eine Vorschrift des BDSG gilt, klärst du mit dem Datenschutz.' : ''
+        }`,
+        quelle: 'Art. 9 Abs. 1 und 2, Art. 10 DSGVO',
         ziel: { art: 'datenobjekt', id: o.id },
       })
     }
@@ -379,9 +398,11 @@ function pruefeDaten(c: ComplianceProjekt, objekte: Objekt[], add: Add): void {
     }
   }
   if (!c.begruendungLaengereAufbewahrung.trim()) {
+    // Lieferscheine von Kaufleuten können als Handelsbrief 6 Jahre aufzubewahren sein (§ 257 HGB)
+    const kaufmann = istKaufmann(c.unternehmen)
     for (const o of personen) {
-      if (!laengerAlsVorgeschrieben(o.d)) continue
-      const min = mindestJahre(o.d.aufbewahrungsart)
+      if (!laengerAlsVorgeschrieben(o.d, kaufmann)) continue
+      const min = mindestJahre(o.d.aufbewahrungsart) ?? (kaufmann && o.d.aufbewahrungsart === 'lieferschein' ? HANDELSBRIEF_JAHRE : null)
       const vorgeschrieben = min !== null ? jahre(min) : aufbewahrungText({ ...o.d, aufbewahrungJahre: null })
       add({
         regel: 'D7',
@@ -425,7 +446,18 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
   const systeme = systemeImEinsatz(k).map((m) => ({ m, s: systemAngaben(k.c, m.id), name: m.name.trim() || 'Unbenanntes System' }))
   for (const { m, s, name } of systeme) {
     if (s.betrieb === null) {
-      add({ regel: 'S1', id: m.id, teilschritt: 'systeme', schwere: 'hinweis', titel: 'Betrieb des Systems unklar', text: `Wo läuft „${name}“: auf eigenen Geräten, auf eigenem Server oder als Cloud-Dienst?`, quelle: 'Muster BStBK/DStV, Kap. 3.1', ziel: { art: 'system', id: m.id } })
+      // Mit Personenbezug hängen Empfänger (lit. d) und Drittlandangabe (lit. e) im Verzeichnis daran
+      const personen = hatPersonenbezug(k, m.id)
+      add({
+        regel: 'S1',
+        id: m.id,
+        teilschritt: 'systeme',
+        schwere: personen ? 'warnung' : 'hinweis',
+        titel: 'Betrieb des Systems unklar',
+        text: `Wo läuft „${name}“: auf eigenen Geräten, auf eigenem Server oder als Cloud-Dienst?${personen ? ' Davon hängen die Angaben zu Empfängern und Drittländern im Verzeichnis ab.' : ''}`,
+        quelle: personen ? 'Muster BStBK/DStV, Kap. 3.1; Art. 30 Abs. 1 lit. d, e DSGVO' : 'Muster BStBK/DStV, Kap. 3.1',
+        ziel: { art: 'system', id: m.id },
+      })
     }
   }
   for (const { m, s, name } of systeme) {
@@ -501,6 +533,24 @@ function pruefeSysteme(k: Kontext, heute: IsoDatum, add: Add): void {
       titel: 'Rücksicherung nicht getestet',
       text: `Für „${name}“ wurde ${getestet === null ? 'noch nie' : `seit dem ${formatiereDatum(getestet)} nicht`} geprüft, ob sich die Sicherung zurückspielen lässt.`,
       quelle: 'Art. 32 Abs. 1 lit. c, d DSGVO',
+      ziel: { art: 'system', id: m.id },
+    })
+  }
+  for (const { m, s, name } of systeme) {
+    if (ablageVon(k, m.id).length === 0) continue
+    const fehlt = [
+      ...(!s.wiederfinden?.trim() ? ['wie eine Unterlage wiedergefunden wird'] : []),
+      ...(!s.datenzugriff?.trim() ? ['wie die Finanzverwaltung bei einer Außenprüfung auf die Daten zugreift, auch nach Vertragsende oder Systemwechsel'] : []),
+    ]
+    if (fehlt.length === 0) continue
+    add({
+      regel: 'S7',
+      id: m.id,
+      teilschritt: 'systeme',
+      schwere: 'hinweis',
+      titel: 'Wiederfinden und Datenzugriff offen',
+      text: `Für „${name}“ ist offen, ${liste(fehlt)}.`,
+      quelle: 'GoBD Rz. 152, 156–159; § 147 Abs. 2, 5 und 6 AO',
       ziel: { art: 'system', id: m.id },
     })
   }

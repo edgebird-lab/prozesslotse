@@ -6,8 +6,8 @@
 import type { Prozess } from '../modell/typen'
 import { hatPersonenbezug, kontext, mitDienstleister, rollenAngaben, rollenMitZugriff, systemAngaben, systemeImEinsatz } from './ableitung'
 import { formatiereDatum } from './datum'
-import { loeschText } from './fristen'
-import { BESONDERE_KATEGORIEN, BETROFFENE, DATENKATEGORIEN, GARANTIEN, RECHTSGRUNDLAGEN, RECHTSSTAND, STRAFRECHTLICH_TEXT, textVon, TOM_BEREICHE, type Eintrag } from './standard'
+import { istKaufmann, loeschText } from './fristen'
+import { AUSNAHMEN_ART9, BESONDERE_KATEGORIEN, BETROFFENE, DATENKATEGORIEN, GARANTIEN, RECHTSGRUNDLAGEN, RECHTSSTAND, STRAFRECHTLICH_TEXT, textVon, TOM_BEREICHE, type Eintrag } from './standard'
 import { hinweisVerzeichnis } from './textbausteine'
 import type { Abschnitt, ComplianceProjekt, Dokument, Kontakt } from './typen'
 import { anschriftText, firmenName, prozessName, unterlagenNachEntstehung, versionsZeile, type DokuKontext } from './verfahrensdoku'
@@ -72,6 +72,10 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
   )
 
   const personen = unterlagenNachEntstehung(k).filter((o) => o.d.personenbezogen === true)
+  const kaufmann = istKaufmann(u)
+  // Besondere Kategorien brauchen zusätzlich zu Art. 6 eine Ausnahme nach Art. 9 Abs. 2 DSGVO
+  const mitBesonderen = personen.filter((o) => o.d.besondereKategorien.length > 0)
+  const art9 = (o: (typeof personen)[number]) => AUSNAHMEN_ART9.find((e) => e.wert === o.d.ausnahmeArt9)
 
   h(2, 'B.1', 'Zwecke (Art. 30 Abs. 1 lit. b DSGVO)')
   const zwecke = v.zwecke.map((z) => z.trim()).filter(Boolean)
@@ -80,14 +84,19 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
 
   h(2, 'B.2', 'Rechtsgrundlagen')
   const grundlagen = RECHTSGRUNDLAGEN.filter((r) => personen.some((o) => o.d.rechtsgrundlagen.includes(r.wert)))
-  if (grundlagen.length > 0) {
-    liste(
-      grundlagen.map((r) => {
-        const interessen = r.wert === 'interesse' ? [...new Set(personen.filter((o) => o.d.rechtsgrundlagen.includes('interesse')).map((o) => o.d.berechtigtesInteresse.trim()).filter(Boolean))] : []
-        return `Art. 6 Abs. 1 lit. ${r.lit} DSGVO: ${r.dok ?? r.text}${interessen.length > 0 ? ` (${interessen.join('; ')})` : ''}`
-      }),
-    )
-  } else absatz('offen')
+  const art6 = grundlagen.map((r) => {
+    const interessen = r.wert === 'interesse' ? [...new Set(personen.filter((o) => o.d.rechtsgrundlagen.includes('interesse')).map((o) => o.d.berechtigtesInteresse.trim()).filter(Boolean))] : []
+    return `Art. 6 Abs. 1 lit. ${r.lit} DSGVO: ${r.dok ?? r.text}${interessen.length > 0 ? ` (${interessen.join('; ')})` : ''}`
+  })
+  const ausnahmen = [
+    ...AUSNAHMEN_ART9.flatMap((e) => {
+      const namen = mitBesonderen.filter((o) => o.d.ausnahmeArt9 === e.wert).map((o) => o.name)
+      return namen.length > 0 ? [`Art. 9 Abs. 2 lit. ${e.lit} DSGVO: ${e.dok ?? e.text} (für ${namen.join(', ')})`] : []
+    }),
+    ...(mitBesonderen.some((o) => !art9(o)) ? [`Art. 9 Abs. 2 DSGVO: offen (für ${mitBesonderen.filter((o) => !art9(o)).map((o) => o.name).join(', ')})`] : []),
+  ]
+  if (art6.length + ausnahmen.length > 0) liste([...(art6.length > 0 ? art6 : ['Art. 6 Abs. 1 DSGVO: offen']), ...ausnahmen])
+  else absatz('offen')
 
   h(2, 'B.3', 'Betroffene Personen und Daten (lit. c)')
   const betroffene = vereinigt(BETROFFENE, personen.map((o) => o.d.betroffene))
@@ -108,13 +117,17 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
   if (personen.length > 0) {
     tabelle(
       ['Unterlage', 'Betroffene', 'Daten', 'Rechtsgrundlage', 'Löschung'],
-      personen.map((o) => [
-        o.name,
-        BETROFFENE.filter((e) => o.d.betroffene.includes(e.wert)).map((e) => e.text).join(', ') || 'offen',
-        DATENKATEGORIEN.filter((e) => o.d.datenkategorien.includes(e.wert)).map((e) => e.dok ?? e.text).join(', ') || 'offen',
-        RECHTSGRUNDLAGEN.filter((r) => o.d.rechtsgrundlagen.includes(r.wert)).map((r) => `lit. ${r.lit}`).join(', ') || 'offen',
-        loeschText(o.d),
-      ]),
+      personen.map((o) => {
+        const besondereDaten = BESONDERE_KATEGORIEN.filter((e) => o.d.besondereKategorien.includes(e.wert)).map((e) => e.text)
+        const daten = [
+          DATENKATEGORIEN.filter((e) => o.d.datenkategorien.includes(e.wert)).map((e) => e.dok ?? e.text).join(', ') || 'offen',
+          ...(besondereDaten.length > 0 ? [`${besondereDaten.join(', ')} (Art. 9 DSGVO)`] : []),
+          ...(o.d.strafrechtlich ? [`${STRAFRECHTLICH_TEXT} (Art. 10 DSGVO)`] : []),
+        ]
+        const grundlage = RECHTSGRUNDLAGEN.filter((r) => o.d.rechtsgrundlagen.includes(r.wert)).map((r) => `lit. ${r.lit}`).join(', ') || 'offen'
+        const ausnahme = besondereDaten.length > 0 ? `; Art. 9 Abs. 2${art9(o) ? ` lit. ${art9(o)!.lit}` : ': offen'}` : ''
+        return [o.name, BETROFFENE.filter((e) => o.d.betroffene.includes(e.wert)).map((e) => e.text).join(', ') || 'offen', daten.join(', '), `${grundlage}${ausnahme}`, loeschText(o.d, kaufmann)]
+      }),
     )
   }
 
@@ -146,6 +159,8 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
   const offen: string[] = []
   for (const m of systeme) {
     const s = systemAngaben(c, m.id)
+    // Ohne Angabe zum Betrieb ist offen, ob ein Dienstleister die Daten verarbeitet und wo
+    if (s.betrieb === null && !mitDienstleister(s)) offen.push(`„${m.name.trim() || 'Unbenanntes System'}“ (Betrieb offen)`)
     if (!mitDienstleister(s)) continue
     const wer = s.dienstleister.trim() || `Anbieter von „${m.name.trim()}“`
     if (s.standort === 'drittland') drittland.push([wer, s.drittland.trim() || 'offen', textVon(GARANTIEN, s.garantie, 'dok')])
@@ -158,12 +173,15 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
       if (e.standort === 'unbekannt') offen.push(wer)
     }
   }
-  if (drittland.length > 0) tabelle(['Empfänger', 'Land', 'Garantie'], drittland)
+  // „findet nicht statt“ nur, wenn alle Standorte bekannt sind; sonst stünde dort eine ungeprüfte Aussage
+  if (drittland.length > 0) {
+    tabelle(['Empfänger', 'Land', 'Garantie'], drittland)
+    if (offen.length > 0) absatz(`Ort der Verarbeitung offen bei: ${[...new Set(offen)].join(', ')}.`)
+  } else if (offen.length > 0) absatz(`Ob personenbezogene Daten in Drittländer übermittelt werden, ist noch offen bei: ${[...new Set(offen)].join(', ')}.`)
   else absatz('Eine Übermittlung in Drittländer findet nicht statt und ist nicht geplant.')
-  if (offen.length > 0) absatz(`Ort der Verarbeitung offen bei: ${[...new Set(offen)].join(', ')}.`)
 
   h(2, 'B.6', 'Löschfristen (lit. f)')
-  if (personen.length > 0) tabelle(['Unterlage', 'Löschfrist'], personen.map((o) => [o.name, loeschText(o.d)]))
+  if (personen.length > 0) tabelle(['Unterlage', 'Löschfrist'], personen.map((o) => [o.name, loeschText(o.d, kaufmann)]))
   else absatz('offen')
 
   h(2, 'B.7', 'Technische und organisatorische Maßnahmen (lit. g)')
@@ -178,6 +196,11 @@ export function erzeugeVerzeichnis(ist: Prozess, c: ComplianceProjekt, kx: DokuK
     if (massnahmen.length > 0) liste(massnahmen)
     else if (t.nichtZutreffend.trim()) absatz(`Trifft nicht zu: ${t.nichtZutreffend.trim()}`)
     else absatz('Keine Maßnahme eingetragen.')
+    // Zugriffsschutz der Systeme mit Personenbezug (Teilschritt „Systeme und Dienstleister“)
+    if (b.wert === 'vertraulichkeit' && systeme.length > 0) {
+      absatz('Zugriffsschutz je System:')
+      liste(systeme.map((m) => `${m.name.trim() || 'Unbenanntes System'}: ${systemAngaben(c, m.id).zugriffsschutz.trim() || 'offen'}`))
+    }
   })
 
   // D

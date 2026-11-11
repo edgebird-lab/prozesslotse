@@ -7,6 +7,7 @@ import { neueId } from '../modell/bausteine'
 import type {
   Ablageform,
   Aufbewahrungsart,
+  AusnahmeArt9,
   AvVertrag,
   Belegform,
   BesondereKategorie,
@@ -25,6 +26,7 @@ import type {
   KontrollArt,
   Kontakt,
   LoeschTurnus,
+  MitgeltendeUnterlage,
   Nachweis,
   Rechtsform,
   Rechtsgrundlage,
@@ -142,7 +144,7 @@ export const BETROFFENE: Eintrag<Betroffene>[] = [
 ]
 
 export const DATENKATEGORIEN: Eintrag<Datenkategorie>[] = [
-  { wert: 'identifikation', text: 'Name, Kundennummer', dok: 'Identifikationsdaten (Name, Kundennummer)' },
+  { wert: 'identifikation', text: 'Name, Kundennummer', dok: 'Identifikationsdaten (z. B. Name, Kunden- oder Personalnummer)' },
   { wert: 'kontakt', text: 'Anschrift, Telefon, E-Mail', dok: 'Kontaktdaten (Anschrift, Telefon, E-Mail)' },
   { wert: 'vertrag', text: 'Vertrags- und Bestelldaten' },
   { wert: 'zahlung', text: 'Rechnungs- und Zahlungsdaten' },
@@ -176,6 +178,25 @@ export const RECHTSGRUNDLAGEN: (Eintrag<Rechtsgrundlage> & { lit: string })[] = 
   { wert: 'lebenswichtig', lit: 'd', text: 'Schutz lebenswichtiger Interessen (lit. d)', dok: 'Schutz lebenswichtiger Interessen' },
   { wert: 'oeffentlich', lit: 'e', text: 'Aufgabe im öffentlichen Interesse (lit. e)', dok: 'Aufgabe im öffentlichen Interesse' },
   { wert: 'interesse', lit: 'f', text: 'Berechtigtes Interesse (lit. f)', dok: 'berechtigtes Interesse' },
+]
+
+/** Art. 9 Abs. 2 lit. a bis j DSGVO, in dieser Reihenfolge; kurze Bezeichnungen in eigenen Worten. */
+export const AUSNAHMEN_ART9: (Eintrag<AusnahmeArt9> & { lit: string })[] = [
+  { wert: 'einwilligung', lit: 'a', text: 'Ausdrückliche Einwilligung (lit. a)', dok: 'ausdrückliche Einwilligung der Person' },
+  { wert: 'arbeitsrecht', lit: 'b', text: 'Arbeitsrecht und soziale Sicherheit (lit. b)', dok: 'Rechte und Pflichten aus Arbeitsrecht, sozialer Sicherheit und Sozialschutz' },
+  { wert: 'lebenswichtig', lit: 'c', text: 'Lebenswichtige Interessen, Einwilligung nicht möglich (lit. c)', dok: 'Schutz lebenswichtiger Interessen, wenn die Person nicht einwilligen kann' },
+  {
+    wert: 'organisation',
+    lit: 'd',
+    text: 'Mitglieder einer Organisation ohne Gewinnerzielungsabsicht (lit. d)',
+    dok: 'Tätigkeit einer politisch, weltanschaulich, religiös oder gewerkschaftlich ausgerichteten Organisation ohne Gewinnerzielungsabsicht für ihre Mitglieder',
+  },
+  { wert: 'oeffentlich_gemacht', lit: 'e', text: 'Von der Person selbst öffentlich gemacht (lit. e)', dok: 'von der Person offensichtlich selbst öffentlich gemacht' },
+  { wert: 'rechtsansprueche', lit: 'f', text: 'Rechtsansprüche geltend machen oder abwehren (lit. f)', dok: 'Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen' },
+  { wert: 'oeffentliches_interesse', lit: 'g', text: 'Erhebliches öffentliches Interesse (lit. g)', dok: 'erhebliches öffentliches Interesse auf gesetzlicher Grundlage' },
+  { wert: 'gesundheitsversorgung', lit: 'h', text: 'Gesundheitsvorsorge, Arbeitsmedizin, Behandlung (lit. h)', dok: 'Gesundheitsvorsorge, Arbeitsmedizin, Beurteilung der Arbeitsfähigkeit, Versorgung oder Behandlung' },
+  { wert: 'oeffentliche_gesundheit', lit: 'i', text: 'Öffentliche Gesundheit (lit. i)', dok: 'öffentliches Interesse im Bereich der öffentlichen Gesundheit' },
+  { wert: 'forschung', lit: 'j', text: 'Archiv, Forschung oder Statistik (lit. j)', dok: 'Archivzwecke im öffentlichen Interesse, Forschung oder Statistik' },
 ]
 
 export const STANDORTE: Eintrag<Standort>[] = [
@@ -356,6 +377,7 @@ export function neueCompliance(): ComplianceProjekt {
     begruendungLaengereAufbewahrung: '',
     toms: leereToms(),
     mitgeltend: [],
+    mitgeltendeUnterlagen: [],
     versionen: [],
     zuletztGeprueft: null,
   }
@@ -377,6 +399,7 @@ export function standardDatenobjekt(): DatenobjektAngaben {
     strafrechtlich: false,
     rechtsgrundlagen: [],
     berechtigtesInteresse: '',
+    ausnahmeArt9: null,
     loeschfrist: null,
     externeEmpfaenger: [],
   }
@@ -400,6 +423,8 @@ export function standardSystem(): SystemAngaben {
     sicherungIntervall: '',
     wiederherstellungGetestet: null,
     zugriffsschutz: '',
+    wiederfinden: '',
+    datenzugriff: '',
   }
 }
 
@@ -416,8 +441,13 @@ export function neueFrist(werte: Partial<Frist> = {}): Frist {
   return { anzahl: 30, einheit: 'tage', beginn: 'entstehung', ereignis: '', ...werte }
 }
 
+/** Neuer Empfänger; der Standort ist wie bei Systemen offen, bis er angegeben ist (sonst stünde in B.5 ungeprüft „findet nicht statt“). */
 export function neuerEmpfaenger(werte: Partial<Empfaenger> = {}): Empfaenger {
-  return { id: neueId('emp'), kategorie: '', name: '', standort: 'deutschland', drittland: '', garantie: null, ...werte }
+  return { id: neueId('emp'), kategorie: '', name: '', standort: 'unbekannt', drittland: '', garantie: null, ...werte }
+}
+
+export function neueMitgeltendeUnterlage(werte: Partial<MitgeltendeUnterlage> = {}): MitgeltendeUnterlage {
+  return { id: neueId('mit'), name: '', ablageort: '', ...werte }
 }
 
 export function neueWeitereKontrolle(werte: Partial<WeitereKontrolle> = {}): WeitereKontrolle {

@@ -109,6 +109,18 @@ export type Datenkategorie = 'identifikation' | 'kontakt' | 'vertrag' | 'zahlung
 export type BesondereKategorie = 'herkunft' | 'politik' | 'religion' | 'gewerkschaft' | 'genetik' | 'biometrie' | 'gesundheit' | 'sexualleben'
 /** Art. 6 Abs. 1 lit. a bis f DSGVO, in dieser Reihenfolge */
 export type Rechtsgrundlage = 'einwilligung' | 'vertrag' | 'rechtspflicht' | 'lebenswichtig' | 'oeffentlich' | 'interesse'
+/** Ausnahme vom Verbot nach Art. 9 Abs. 2 lit. a bis j DSGVO, in dieser Reihenfolge */
+export type AusnahmeArt9 =
+  | 'einwilligung'
+  | 'arbeitsrecht'
+  | 'lebenswichtig'
+  | 'organisation'
+  | 'oeffentlich_gemacht'
+  | 'rechtsansprueche'
+  | 'oeffentliches_interesse'
+  | 'gesundheitsversorgung'
+  | 'oeffentliche_gesundheit'
+  | 'forschung'
 
 export type Standort = 'deutschland' | 'eu_ewr' | 'drittland' | 'unbekannt'
 export type Garantie = 'angemessenheitsbeschluss' | 'standardvertragsklauseln' | 'andere' | 'keine'
@@ -157,6 +169,8 @@ export interface DatenobjektAngaben {
   rechtsgrundlagen: Rechtsgrundlage[]
   /** bei lit. f: welches Interesse */
   berechtigtesInteresse: string
+  /** nur bei besonderen Kategorien: Ausnahme nach Art. 9 Abs. 2 DSGVO; null oder fehlend (ältere Dateien) = offen */
+  ausnahmeArt9?: AusnahmeArt9 | null
   /** nur für personenbezogene Daten ohne steuerliche Aufbewahrungspflicht */
   loeschfrist: Frist | null
   externeEmpfaenger: Empfaenger[]
@@ -190,6 +204,10 @@ export interface SystemAngaben {
   wiederherstellungGetestet: IsoDatum | null
   /** Kurzbeschreibung, z. B. „eigenes Konto je Person, Zwei-Faktor-Anmeldung“ */
   zugriffsschutz: string
+  /** nur bei Ablage aufbewahrungspflichtiger Unterlagen: wie eine Unterlage wiedergefunden wird (Ordnungsmerkmal, GoBD Rz. 152); fehlt in älteren Dateien */
+  wiederfinden?: string
+  /** nur bei Ablage: wie die Finanzverwaltung bei einer Außenprüfung Zugriff erhält, auch nach Vertragsende oder Systemwechsel (§ 147 Abs. 6 AO); fehlt in älteren Dateien */
+  datenzugriff?: string
 }
 
 export interface RollenAngaben {
@@ -254,6 +272,14 @@ export interface TomAngaben {
 }
 
 // ---------- Dokumente und Versionen ----------
+
+/** Weitere Unterlage, die zur Verfahrensdokumentation gehört (Kapitel 6), z. B. ein Berechtigungskonzept */
+export interface MitgeltendeUnterlage {
+  id: Id
+  name: string
+  /** wo sie liegt, z. B. „Ordner Organisation, Büro“ */
+  ablageort: string
+}
 
 export type Abschnitt =
   | { art: 'ueberschrift'; ebene: 1 | 2 | 3; nummer: string; text: string }
@@ -322,8 +348,10 @@ export interface ComplianceProjekt {
   /** gilt für alle Unterlagen, die länger als gesetzlich aufbewahrt werden */
   begruendungLaengereAufbewahrung: string
   toms: Record<TomBereich, TomAngaben>
-  /** zusätzliche mitgeltende Unterlagen, z. B. „Berechtigungskonzept“ */
+  /** zusätzliche mitgeltende Unterlagen in der älteren Form ohne Ablageort, z. B. „Berechtigungskonzept“; die Oberfläche überträgt sie bei der ersten Änderung nach `mitgeltendeUnterlagen` */
   mitgeltend: string[]
+  /** mitgeltende Unterlagen mit Ablageort aus dem Teilschritt „Dokumente“ (Kapitel 6); fehlt in älteren Dateien */
+  mitgeltendeUnterlagen?: MitgeltendeUnterlage[]
   versionen: DokuVersion[]
   /** „Geprüft, keine Änderung“ ohne neue Version */
   zuletztGeprueft: IsoDatum | null
