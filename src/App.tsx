@@ -23,6 +23,7 @@ import type { DiagrammApi } from './ui/Diagramm'
 import { DiagrammLazy as Diagramm } from './ui/DiagrammLazy'
 import { Schalter } from './ui/Eingaben'
 import { useFrage } from './ui/frage'
+import { Nachladegrenze } from './ui/Nachladegrenze'
 import { FrageDialog } from './ui/FrageDialog'
 import { useVerzoegert } from './ui/hilfen'
 import { AppKontext, useApp, type AppApi } from './ui/kontext'
@@ -329,9 +330,11 @@ function Hauptfenster() {
                   {z.schritt === 'pruefen' && <PruefenSchritt />}
                   {z.schritt === 'verbessern' && <VerbessernSchritt />}
                   {z.schritt === 'dokumentieren' && (
-                    <Suspense fallback={<p className="leise">Dokumentieren wird geladen …</p>}>
-                      <DokumentierenSchritt />
-                    </Suspense>
+                    <Nachladegrenze was="Dokumentieren">
+                      <Suspense fallback={<p className="leise">Dokumentieren wird geladen …</p>}>
+                        <DokumentierenSchritt />
+                      </Suspense>
+                    </Nachladegrenze>
                   )}
                 </section>
                 {!(z.schritt === 'dokumentieren' && z.teilschritt === 'dokumente') && <Buehne p={p} hervorhebung={hervorhebung} />}

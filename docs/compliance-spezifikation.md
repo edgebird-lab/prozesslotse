@@ -1076,7 +1076,7 @@ Außerdem ändern sich:
 - `src/modell/speicher.ts`: Prüfung beim Laden (eingefrorene Prozesse migriert nur als Kopie), getrennte Ablage der Versionen, Meldung bei vollem Speicher
 - `src/zustand.ts`: Schritt, Teilschritt, Aktionen, Bereinigung
 - `src/ui/kontext.ts`: `aendereCompliance`
-- `src/App.tsx`: Schritt (per `lazy` nachgeladen), Menüpunkt „Daten im Browser löschen“; Menü „Beispiel Lieferdienst“ lädt `beispielMitCompliance()`
+- `src/App.tsx`: Schritt (per `lazy` nachgeladen, mit Fehlergrenze `Nachladegrenze`: scheitert das Nachladen, steht im Panel „„Dokumentieren“ ließ sich nicht laden. …“ mit dem Knopf „Neu laden“, die übrigen Schritte bleiben bedienbar), Menüpunkt „Daten im Browser löschen“; Menü „Beispiel Lieferdienst“ lädt `beispielMitCompliance()`
 - `src/ui/schritte/VerbessernSchritt.tsx`: Hinweis aus 6.10
 - `src/bpmn/export.ts`: Option „ohne Compliance-Angaben“ für `bpmnFuerExport`
 - `src/plattform/typen.ts`, `browser.ts`, `desktop.ts` und `src-tauri/src/lib.rs`: Speichern von Bytes (7.5)

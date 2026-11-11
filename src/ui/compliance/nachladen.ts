@@ -18,7 +18,11 @@ export function useComplianceMarkierungen(aktiv: boolean, projekt: Projekt, bpmn
   useEffect(() => {
     if (!aktiv || analyse) return
     let gilt = true
-    void import('./analyse').then((m) => gilt && setAnalyse(m))
+    // Scheitert das Nachladen, meldet es die Fehlergrenze im Schritt (er braucht denselben Teil); die Bühne bleibt ohne Markierungen
+    import('./analyse').then(
+      (m) => gilt && setAnalyse(m),
+      () => undefined,
+    )
     return () => {
       gilt = false
     }

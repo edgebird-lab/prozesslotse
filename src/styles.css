@@ -1241,6 +1241,15 @@ fieldset {
 .banner-fehler {
   border-color: var(--status-kritisch);
 }
+/* Nachladen gescheitert (Nachprüfung „regression“, Mangel 2): Meldung mit „Neu laden“ im Panel */
+.nachladefehler {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.nachladefehler p {
+  margin: 0;
+  max-width: 60ch;
+}
 
 /* Balkendiagramm „Wo die Zeit hingeht“ */
 .balkendiagramm {
