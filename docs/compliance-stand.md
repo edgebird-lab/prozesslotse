@@ -21,13 +21,13 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Phase 2 – Fristen und Lückenprüfung
 
-- [ ] 2.1 `datum.ts` und `fristen.ts`
-- [ ] 2.2 `ableitung.ts` mit `vorigeAufgabe` und `nummern`
-- [ ] 2.3 Regeln U1–U4 und B1–B9
-- [ ] 2.4 Regeln D1–D9
-- [ ] 2.5 Regeln S1–S6
-- [ ] 2.6 Regeln K1–K6 und T1
-- [ ] 2.7 Regeln V1–V3 und Gesamttest
+- [x] 2.1 `datum.ts` und `fristen.ts`
+- [x] 2.2 `ableitung.ts` mit `vorigeAufgabe` und `nummern`
+- [x] 2.3 Regeln U1–U4 und B1–B9
+- [x] 2.4 Regeln D1–D9
+- [x] 2.5 Regeln S1–S6
+- [x] 2.6 Regeln K1–K6 und T1
+- [x] 2.7 Regeln V1–V3 und Gesamttest
 
 ## Phase 3 – Dokumente erzeugen
 

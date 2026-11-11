@@ -153,16 +153,20 @@ export const DATENKATEGORIEN: Eintrag<Datenkategorie>[] = [
   { wert: 'sonstige', text: 'Sonstige' },
 ]
 
+/** `dok` passt in Sätze wie „„Krankmeldung“ enthält Gesundheitsdaten“. */
 export const BESONDERE_KATEGORIEN: Eintrag<BesondereKategorie>[] = [
-  { wert: 'herkunft', text: 'Herkunft' },
-  { wert: 'politik', text: 'Politische Meinungen' },
-  { wert: 'religion', text: 'Religiöse oder weltanschauliche Überzeugungen' },
-  { wert: 'gewerkschaft', text: 'Gewerkschaftszugehörigkeit' },
-  { wert: 'genetik', text: 'Genetische Daten' },
-  { wert: 'biometrie', text: 'Biometrische Daten zur Identifizierung' },
+  { wert: 'herkunft', text: 'Herkunft', dok: 'Angaben zur Herkunft' },
+  { wert: 'politik', text: 'Politische Meinungen', dok: 'politische Meinungen' },
+  { wert: 'religion', text: 'Religiöse oder weltanschauliche Überzeugungen', dok: 'religiöse oder weltanschauliche Überzeugungen' },
+  { wert: 'gewerkschaft', text: 'Gewerkschaftszugehörigkeit', dok: 'Angaben zur Gewerkschaftszugehörigkeit' },
+  { wert: 'genetik', text: 'Genetische Daten', dok: 'genetische Daten' },
+  { wert: 'biometrie', text: 'Biometrische Daten zur Identifizierung', dok: 'biometrische Daten zur Identifizierung' },
   { wert: 'gesundheit', text: 'Gesundheitsdaten' },
-  { wert: 'sexualleben', text: 'Sexualleben oder sexuelle Orientierung' },
+  { wert: 'sexualleben', text: 'Sexualleben oder sexuelle Orientierung', dok: 'Angaben zum Sexualleben oder zur sexuellen Orientierung' },
 ]
+
+/** Art. 10 DSGVO, im selben Satzbau wie die besonderen Kategorien */
+export const STRAFRECHTLICH_TEXT = 'Daten über strafrechtliche Verurteilungen und Straftaten'
 
 /** Art. 6 Abs. 1 lit. a bis f DSGVO, in dieser Reihenfolge. */
 export const RECHTSGRUNDLAGEN: (Eintrag<Rechtsgrundlage> & { lit: string })[] = [
