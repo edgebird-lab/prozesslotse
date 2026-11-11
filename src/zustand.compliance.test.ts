@@ -67,8 +67,10 @@ describe('Zustand: Compliance-Angaben', () => {
     let z = start()
     z = reduziere(z, { typ: 'projekt', projekt: { ...z.projekt, soll: structuredClone(z.projekt.ist) }, zeit: 1, ansicht: 'soll' })
     expect(z.ansicht).toBe('soll')
+    z = reduziere(z, { typ: 'auswahl', auswahl: 'auf_tour' })
     z = reduziere(z, { typ: 'schritt', schritt: 'dokumentieren' })
     expect(z.ansicht).toBe('ist')
+    expect(z.auswahl).toBeNull()
     expect(z.teilschritt).toBe('unternehmen')
     const verlauf = z.vergangenheit.length
     z = reduziere(z, { typ: 'teilschritt', teilschritt: 'luecken' })

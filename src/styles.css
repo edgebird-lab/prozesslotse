@@ -1827,21 +1827,10 @@ fieldset {
   color: var(--akzent-text);
   font-weight: 600;
 }
-.teilschritte .nummer {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1px solid var(--linie-stark);
-  font-size: 0.75rem;
-}
 .teilschritt-name {
   flex: 1;
   min-width: 0;
   hyphens: auto;
-  overflow-wrap: anywhere;
 }
 .arbeitsflaeche-voll .teilschritte ol {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2110,14 +2099,13 @@ input[type='date'] {
 }
 
 @media print {
-  /* Compliance-Dokumente: nur das Dokument drucken */
+  /* Compliance-Dokumente: nur das Dokument drucken (andere Schritte drucken wie bisher) */
   .dokumentieren > :not(.teil),
   .dokumente > :not(.dokument-bereich),
-  .teilschritte,
-  .buehne {
+  .teilschritte {
     display: none !important;
   }
-  .arbeitsflaeche {
+  .arbeitsflaeche-voll {
     display: block;
     padding: 0;
   }

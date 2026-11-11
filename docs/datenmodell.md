@@ -64,3 +64,24 @@ Gespeichert wird ein `Projekt` mit Ist-Prozess, optionalem Soll-Prozess, den üb
 - **Hinweise** betreffen Qualität und Vollständigkeit, z. B. Benennung als Objekt + Verb (7PMG G6), mehr als drei Ausgänge (G2), Modelle über 50 Elemente (G7), ungenutzte Rollen und Systeme.
 
 Zwei der sieben 7PMG-Richtlinien erfüllt das Modell durch seine Bauweise: G4 (so strukturiert wie möglich) und G5 (keine ODER-Verzweigungen).
+
+## Compliance-Angaben
+
+Für die Compliance-Doku trägt das Projekt das optionale Feld `compliance` (Quelltext: [`src/compliance/typen.ts`](../src/compliance/typen.ts)). Fehlt es, ist das Projekt eines ohne diese Angaben; ältere Dateien laden unverändert, das Dateiformat bleibt 3. Die Typen des Prozessmodells ändern sich nicht: Angaben zu Systemen, Rollen und Kontrollen verweisen über die Id auf das Modell.
+
+| Teil | Inhalt | Schlüssel |
+| --- | --- | --- |
+| `unternehmen`, `verarbeitung` | Verantwortlicher, Geschäftsleitung, Datenschutzbeauftragter; Benennung, Nummer und Zwecke der Verarbeitungstätigkeit | – |
+| `unterlagen`, `ablageorte`, `zugriffe` | Datenobjekte („Ausgangsrechnung“), Datenspeicher („Belegarchiv“, mit System) und welcher Schritt eine Unterlage liest oder schreibt | eigene Ids (`unt_…`, `abl_…`) |
+| `datenobjekte` | je Unterlage: Einordnung nach § 147 AO, Form, Richtung, Ablage, gewählte Frist, Personenbezug, Betroffene, Datenkategorien, Rechtsgrundlagen, Löschfrist, externe Empfänger | Unterlage |
+| `systeme` | je digitalem System: Hersteller, Version, seit, Betrieb, Dienstleister, Standort, Auftragsverarbeitung, Schutz vor Änderung, Datensicherung | Medium |
+| `rollen` | intern oder extern, Organisation | Rolle |
+| `kontrollen`, `weitereKontrollen` | Art, Ziel und Nachweis je Prüfung oder Freigabe; Kontrollen außerhalb des Ablaufs | Aufgabe bzw. eigene Id |
+| `einweisung`, `loeschung`, `toms`, `mitgeltend` | Einweisung, Löschorganisation, Schutzmaßnahmen in sechs Bereichen, weitere Unterlagen | – |
+| `versionen`, `zuletztGeprueft` | freigegebene Stände mit eingefrorenem Prozess, beiden Dokumenten und SHA-256-Prüfsumme | Nummer |
+
+- Fehlt ein Eintrag in `datenobjekte`, `systeme`, `rollen` oder `kontrollen`, gilt ein Standardwert; geschrieben wird erst bei der ersten Änderung.
+- Ändert sich der Ist-Prozess, entfernt der Reducer im selben Rückgängig-Schritt Angaben zu Systemen, Rollen und Aufgaben, die es nicht mehr gibt (`bereinigeCompliance`). Unterlagen und ihre Angaben bleiben.
+- Beim Laden prüft [`validiereCompliance`](../src/compliance/speicher.ts) jedes Feld und nennt bei einem Fehler das Feld. Eingefrorene Prozesse laufen durch dieselbe Formatmigration wie der Ist-Prozess.
+- Im Browser liegen die Versionen unter einem eigenen Schlüssel und werden nur geschrieben, wenn sich die Liste ändert.
+- Unterlagen und Ablageorte sind so geschnitten, dass sie später als `dataObjectReference` und `dataStoreReference` ins BPMN-Modell wandern können; nur [`quelle.ts`](../src/compliance/quelle.ts) kennt ihre Herkunft.

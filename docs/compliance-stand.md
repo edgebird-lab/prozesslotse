@@ -65,8 +65,8 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Phase 7 – Browsertests, Doku, Abnahme
 
-- [ ] 7.1 Browsertests 4 bis 7
-- [ ] 7.2 README, `datenmodell.md`, `fragenkatalog.md`, Bild „Dokumente“
+- [x] 7.1 Browsertests 1 bis 8 aus 9.10 und weitere in `e2e/dokumentieren.spec.ts` (13 Tests, axe hell und dunkel)
+- [x] 7.2 README, `datenmodell.md`, `fragenkatalog.md`, Bild `docs/bilder/dokumente.png` (die übrigen README-Bilder zeigen noch sechs Schritte, siehe unten)
 - [ ] 7.3 Ausgabe an Steuerberatung und Datenschutz (Robin)
 - [ ] 7.4 Rückmeldungen einarbeiten (Robin)
 
@@ -78,4 +78,38 @@ Vor jedem Commit: `npm run lint`, `npm test`, `npm run build`, `PL_PORT=4175 npx
 
 ## Zusammenführen mit `main`
 
-Geänderte gemeinsame Dateien und was dabei zu beachten ist, steht am Ende dieser Datei, sobald es sie gibt.
+`FORMAT_VERSION` ist unverändert 3; `compliance` ist ein optionales Feld am Projekt. Neue Dateien liegen in `src/compliance`, `src/ui/compliance`, `src/ui/schritte/DokumentierenSchritt.tsx` und `e2e/dokumentieren.spec.ts`.
+
+Geänderte gemeinsame Dateien (alle Änderungen ergänzend):
+
+| Datei | Änderung |
+| --- | --- |
+| `src/modell/typen.ts` | Typ-Import und optionales Feld `Projekt.compliance` |
+| `src/modell/speicher.ts` | `leseProjekt` ruft `validiereCompliance`; Versionen unter eigenem Schlüssel `prozesslotse:versionen` (`ladeAusBrowser`, `speichereImBrowser`, `vergissImBrowser`); neu `loescheBrowserDaten` |
+| `src/zustand.ts` | Schritt `dokumentieren`, Feld `teilschritt`, Aktionen `compliance` und `teilschritt`, Bereinigung nach Änderungen am Ist |
+| `src/App.tsx` | Schritt im Panel, volle Breite im Teilschritt „Dokumente“, Markierungen und Klick in der Bühne, Menüpunkte „Daten im Browser löschen …“ und „Als BPMN ohne Compliance-Angaben exportieren“, Meldung bei vollem Speicher, Beispiel mit Compliance-Angaben |
+| `src/ui/kontext.ts` | `aendereCompliance` |
+| `src/ui/datei.ts` | `exportiereBpmn` mit Option `ohneCompliance` und Hinweis |
+| `src/bpmn/export.ts` | `bpmnFuerExport` mit Option `ohneCompliance` |
+| `src/ui/schritte/RahmenSchritt.tsx` | Willkommensknopf lädt `beispielMitCompliance()` |
+| `src/ui/schritte/VerbessernSchritt.tsx` | Hinweis bei gestrichener Kontrolle, „Weiter: Dokumentieren“ |
+| `src/styles.css` | neue Regeln am Dateiende |
+| `scripts/readme-bilder.mjs` | Bild `dokumente.png` |
+| `package.json`, `package-lock.json` | `docx` 9.15.3 (exakt), `fflate` 0.8.3 (dev) |
+| `README.md`, `docs/datenmodell.md`, `docs/fragenkatalog.md` | neue Abschnitte |
+
+Beim Zusammenführen beachten:
+
+- **Neue Bausteine aus Format 3** (Teilprozess, für jede Position, Unterbrechung): `ablauftext.ts` prüft die Bausteinart erschöpfend, TypeScript meldet also den fehlenden Satzbaustein (6.6.1). Der Test „kennt alle Felder der Bausteine“ in `generatoren.test.ts` schlägt fehl, sobald die Zufallsprozesse neue Felder wie `unterbrechungen` erzeugen. `zusammenfuehrung`, `ausfuehrung` und `beendetAlles` werden schon gelesen, falls `main` sie so benennt. `nummern` folgt `durchlaufe`; Aufgaben in neuen Rahmen zählen mit, sobald `kinderSequenzen` sie kennt. Aufgaben eines Ausnahmewegs müssen laut 6.3 direkt auf ihre Aufgabe folgen.
+- **Neue Felder an Aufgaben** gehören in die Liste `BEKANNT` dieses Tests, sobald Kapitel 4 sie beschreibt.
+- **Formatmigrationen** in `leseProjekt` gelten automatisch auch für eingefrorene Prozesse in Versionen.
+- **README-Bilder:** nach dem Zusammenführen `node scripts/readme-bilder.mjs` laufen lassen; die alten Bilder zeigen sechs statt sieben Schritte.
+- **Tests in gemeinsamen Dateien** gibt es nicht; neue Tests liegen in eigenen Dateien (`src/zustand.compliance.test.ts`, `src/compliance/*.test.ts`).
+
+## Offen und bekannte Mängel
+
+- 0.3 und Phase 8: DOCX im Windows-Programm lädt derzeit wie im Browser über einen Download-Link; ob WebView2 den annimmt, ist ungeprüft. `Plattform.speichereBytes` und `speichern_unter_bytes` fehlen noch, ebenso PDF über `alsPdf`.
+- 7.3 und 7.4: fachliche Durchsicht durch Steuerberatung und Datenschutz steht aus (Robin).
+- Abnahme der Word-Dateien in Word (Navigationsbereich) durch Robin steht aus; geprüft ist der Inhalt des Pakets.
+- Der Hauptteil der App wuchs von 446 KB auf 570 KB (gzip 170 KB), weil Lückenprüfung und Generatoren schon für die Bühne geladen werden. `docx` liegt in einem eigenen Teil (224 KB, gzip 66 KB) und wird erst beim Export geladen.
+- Der Vergleich mit dem Mustertext deckt die Sätze ab, die im Lieferdienst vorkommen; seltene Varianten (z. B. Kapitel 5 mit Scannen) sind nicht abgeglichen.

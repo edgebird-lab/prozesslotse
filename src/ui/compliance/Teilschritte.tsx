@@ -10,14 +10,11 @@ export function Teilschritte({ befunde }: { befunde: ComplianceBefund[] }) {
   return (
     <nav className="teilschritte" aria-label="Teilschritte">
       <ol>
-        {TEILSCHRITTE.map((t, i) => {
+        {TEILSCHRITTE.map((t) => {
           const offen = offenePunkte(befunde, t.id)
           return (
             <li key={t.id}>
               <button type="button" aria-current={z.teilschritt === t.id ? 'step' : undefined} onClick={() => dispatch({ typ: 'teilschritt', teilschritt: t.id })}>
-                <span className="nummer" aria-hidden="true">
-                  {i + 1}
-                </span>
                 <span className="teilschritt-name">{t.name}</span>
                 {offen === 0 ? (
                   <>

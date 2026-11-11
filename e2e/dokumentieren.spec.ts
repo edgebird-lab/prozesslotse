@@ -234,3 +234,41 @@ test('löscht die Daten im Browser nach Rückfrage (1.6)', async ({ page }) => {
   expect(gespeichert.schluessel).not.toContain('prozesslotse:versionen')
   expect(gespeichert.projekt ?? '').not.toContain('Lieferdienst')
 })
+
+test('übernimmt Firmenangaben und Schutzmaßnahmen aus einer anderen Projektdatei (4.2)', async ({ page }) => {
+  await start(page)
+  await page.getByText('Projekt', { exact: true }).click()
+  const [datei] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Als Datei speichern' }).click()])
+  const pfad = (await datei.path())!
+
+  await page.getByText('Projekt', { exact: true }).click()
+  await page.getByRole('button', { name: 'Neues Projekt' }).click()
+  await expect(page.getByText('Willkommen beim Prozesslotsen')).toBeVisible()
+  await schritt(page, 'Dokumentieren').click()
+  await expect(page.getByLabel('Wie heißt das Unternehmen?')).toHaveValue('')
+
+  await page.locator('input[type="file"][accept=".prozesslotse,.json,.bpmn"]').setInputFiles(pfad)
+  const dialog = page.getByRole('dialog', { name: 'Firmenangaben übernehmen?' })
+  await dialog.getByRole('button', { name: 'Übernehmen' }).click()
+  await expect(page.getByLabel('Wie heißt das Unternehmen?')).toHaveValue('Lieferdienst Muster GmbH')
+  await teil(page, 'Schutzmaßnahmen').click()
+  await expect(page.getByRole('checkbox', { name: 'Webzugriffe und E-Mail-Versand über TLS' })).toBeChecked()
+  // Unterlagen gehören zum Prozess und werden nicht übernommen
+  await teil(page, 'Belege und Daten').click()
+  await expect(page.getByText('Noch keine Belege oder Daten.')).toBeVisible()
+})
+
+test('filtert nach einem Klick ins Diagramm auf diesen Schritt (5.1)', async ({ page }) => {
+  await start(page)
+  await teil(page, 'Kontrollen').click()
+  await expect(page.locator('#ziel-kontrolle-auf_kontrollieren')).toBeVisible()
+  // Der Schritt liegt außerhalb des sichtbaren Ausschnitts; der Klick geht direkt an das Element
+  await page.locator('.djs-element', { hasText: 'Rechnung freigeben' }).first().locator('.djs-hit').first().dispatchEvent('click')
+  await expect(page.getByText('Kontrolle von „4.17 Rechnung freigeben“')).toBeVisible()
+  await expect(page.locator('#ziel-kontrolle-auf_kontrollieren')).toHaveCount(0)
+  await expect(page.locator('#ziel-kontrolle-auf_freigeben')).toContainText('Erstellt: Buchhaltung · Freigabe: Niederlassungsleitung · andere Rolle')
+  // Der Schritt bleibt „Dokumentieren“
+  await expect(schritt(page, 'Dokumentieren')).toHaveAttribute('aria-current', 'step')
+  await page.getByRole('button', { name: 'Alle zeigen' }).click()
+  await expect(page.locator('#ziel-kontrolle-auf_kontrollieren')).toBeVisible()
+})

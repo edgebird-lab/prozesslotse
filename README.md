@@ -14,6 +14,7 @@ Geschäftsprozesse über geführte Fragen modellieren, als BPMN-2.0-Diagramm zei
 - **Schwachstellen im Diagramm:** Medienbruch, Engpass, lange Liegezeit, Nacharbeit, Freigabe ohne erkennbaren Nutzen, Kontrolle ohne Folge, dieselbe Person in parallelen Zweigen und Hin und Her zwischen Rollen werden am betroffenen Element markiert. Wiederholungen tragen einen Zweck: Nur Korrekturen zählen als Nacharbeit, gewollte Durchgänge („je Position“) nicht.
 - **Vorschläge mit berechneter Wirkung.** Sechs Regeln formen eine Kopie des Prozesses um, die Wirkung kommt aus denselben Formeln wie die Kennzahlen. Übernommene Vorschläge ergeben den Soll-Prozess.
 - **Bericht** mit Ist-Soll-Vergleich, Maßnahmen, Befunden und beiden Diagrammen. Export als BPMN, SVG und Projektdatei, Druck als PDF.
+- **Compliance-Doku:** Aus dem Ist-Prozess entstehen die Verfahrensdokumentation nach GoBD und das Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO, mit Lückenprüfung, freigegebenen Versionen und Export als Word-Datei und PDF ([Abschnitt unten](#compliance-doku)).
 - **Windows-Programm (Tauri 2):** Installer mit 1,3 MB, pro Benutzer und ohne Admin-Rechte. Projekte sind `.prozesslotse`-Dateien; ein Doppelklick öffnet sie, auch im schon laufenden Programm. Speichern, Speichern unter, „Zuletzt geöffnet“, Rückfrage bei ungespeicherten Änderungen und PDF in A4 ohne Druckdialog. Exportiertes BPMN enthält das ganze Projekt und öffnet sich wieder verlustfrei; fremde BPMN-Dateien werden angezeigt.
 - **Lernmodus:** Zu jeder Auswahl erklärt ein Hinweis das passende BPMN-Element.
 
@@ -61,12 +62,40 @@ Wiederholungen werden geschlossen gelöst, nicht ausgerollt. Ein Ausgang, der de
 
 Prüfungen und Freigaben werden nie mit anderen Schritten zusammengelegt (Vier-Augen-Prinzip).
 
+## Compliance-Doku
+
+![Teilschritt „Dokumente“: Hinweis, Freigabe und Vorschau der Verfahrensdokumentation](docs/bilder/dokumente.png)
+
+Der Schritt „Dokumentieren“ erzeugt aus dem Ist-Prozess zwei Dokumente, die in kleinen Betrieben oft fehlen:
+
+- die **Verfahrensdokumentation** nach GoBD Rz. 151–155 in der Gliederung der Muster-Verfahrensdokumentation von BStBK und DStV (Version 2.1). Kapitel 4 beschreibt den modellierten Ablauf Schritt für Schritt: Bedingungen, Zuständigkeit, System, Unterlagen, Medienbrüche, Kontrollen und Nachrichten an Externe;
+- das **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 DSGVO im Aufbau des Musters der Datenschutzkonferenz, mit den technischen und organisatorischen Maßnahmen in sechs Bereichen.
+
+| Teilschritt | Fragt nach |
+| --- | --- |
+| Unternehmen | Verantwortlicher, Geschäftsleitung, Datenschutzbeauftragter (§ 38 BDSG), Verarbeitungstätigkeit; Übernahme aus einer anderen Projektdatei |
+| Belege und Daten | je Unterlage: Einordnung nach § 147 AO, Form, Ablage, Personenbezug, Rechtsgrundlage, Empfänger; Zweck der Verarbeitung |
+| Systeme und Dienstleister | Version, Betrieb, Standort, Vertrag zur Auftragsverarbeitung, Schutz vor Änderung, Datensicherung |
+| Aufbewahrung und Löschung | gesetzliche und gewählte Frist, frühestes Löschdatum, Löschfristen, wer löscht |
+| Kontrollen | Prüfungen und Freigaben mit Vier-Augen-Status, weitere Kontrollen, Einweisung |
+| Schutzmaßnahmen | sechs Bereiche nach Art. 32 Abs. 1 DSGVO mit Vorschlägen |
+| Lücken | 38 Regeln mit Quelle und „Beheben“, z. B. Frist kürzer als vorgeschrieben, E-Mail-Postfach als einziges Archiv, Freigabe ohne Vier-Augen-Prinzip, Dienstleister ohne AV-Vertrag |
+| Dokumente | Vorschau, Druck als PDF, Word-Datei, Freigabe und Versionsliste |
+
+- **Fristen** nach § 147 AO: Bücher und Organisationsunterlagen 10 Jahre, Buchungsbelege 8, Geschäftsbriefe und sonstige Unterlagen 6, jeweils ab Ende des Kalenderjahres; Lieferscheine ohne Buchungsfunktion bis zur Rechnung.
+- **Versionen:** Eine Freigabe friert Ist-Prozess und beide Dokumente ein, mit Gültig-ab-Datum, Freigabe, geänderten Kapiteln und SHA-256-Prüfsumme über kanonisches JSON. Ändert sich danach etwas Fachliches, nennt die Lückenprüfung die betroffenen Kapitel; nach 365 Tagen erinnert sie an die Überprüfung.
+- **Vertraulich behandeln:** Die Angaben beschreiben Schwachstellen wie eine fehlende Datensicherung. Projektdatei und Ausgaben gehören nicht an Dritte; die BPMN-Datei lässt sich ohne Compliance-Angaben exportieren, und „Daten im Browser löschen“ leert den Browser-Speicher.
+- **Keine Rechts- oder Steuerberatung:** Beide Dokumente sind Vorlagen zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten, keine Rechts- oder Steuerberatung. Die App prüft, ob die Angaben vollständig und widerspruchsfrei sind, nicht, ob sie stimmen.
+
+Spezifikation, Annahmen und Stand: [compliance-spezifikation.md](docs/compliance-spezifikation.md), [compliance-entscheidungen.md](docs/compliance-entscheidungen.md), [compliance-stand.md](docs/compliance-stand.md).
+
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
 | `src/modell` | Datenmodell, Operationen, Prüfregeln, Führung durch den Ablauf, Speichern, Fallbeispiel |
 | `src/analyse` | Kennzahlen, Simulation, Schwachstellen, Verbesserungsregeln |
+| `src/compliance` | Compliance-Doku: Angaben, Fristen, Lückenprüfung, Verfahrensdokumentation, Verzeichnis, Versionen, DOCX |
 | `src/bpmn` | eigenes Layout mit Bahnen und Spuren, BPMN-XML mit DI |
 | `src/ui` | React-Oberfläche: Assistent, Diagramm (bpmn-js), Prüfen, Verbessern, Bericht |
 | `src/plattform` | Öffnen, Speichern und Fenster: im Browser per Download, im Programm über den Rust-Teil |
@@ -87,6 +116,7 @@ Die Fachlogik kennt kein React und ist vollständig getestet. bpmn-js dient nur 
 - Installer-Test in der CI auf Windows: still installieren, Dateizuordnungen prüfen (`.bpmn` nur unter „Öffnen mit“), still deinstallieren.
 - Barrierefreiheit: axe meldet in keinem Schritt schwere Befunde, weder hell noch dunkel; jedes Eingabefeld ist beschriftet.
 - Bei jedem Push laufen Lint, Unit-Tests, Build und Browsertests.
+- Compliance-Doku: 38 Regeln mit Positiv- und Negativfall, von Hand nachgerechnete Fristen (Monatsende, Schaltjahr, 365 und 366 Tage), die Testdaten liefern genau die erwarteten 7 Befunde; 300 Zufallsprozesse erzeugen Dokumente ohne Absturz und ohne Konformitätsversprechen; DOCX wird entpackt und geprüft. 13 Browsertests decken Lücken und „Beheben“, Freigabe, Word-Datei, Druck, Tastatur und axe hell und dunkel ab.
 
 ## Entwickeln
 
@@ -115,6 +145,8 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build
 - Rücksprünge führen nur zu früheren Schritten derselben oder einer umgebenden Ebene, nie aus „Gleichzeitig“ heraus.
 - Noch nicht abbildbar (in Arbeit, siehe [Modellierung, Format 3](docs/modellierung-v3.md)): Mehrfachinstanzen („für jede Position“, nur als Wiederholung angenähert), Abbruch und Eskalation über Randereignisse, Unterprozesse, Nachrichten zwischen Organisationen (Pools).
 
+- Compliance-Doku: je Projekt ein Prozess; eine Gesamtdokumentation aller Systeme eines Betriebs (GoBD Rz. 151) entsteht erst mit einer Firmenmappe. Die Ablaufhemmung (§ 147 Abs. 3 AO) wird nicht berechnet, nur genannt. Ersetzendes Scannen, Kassenführung und Lohn sind nicht abgedeckt. Rechtsstand 11.11.2026; keine Gewähr für Vollständigkeit.
+
 ## Lizenz
 
-Noch nicht festgelegt. bpmn-js steht unter der bpmn.io-Lizenz, die das bpmn.io-Logo im angezeigten Diagramm vorschreibt.
+Noch nicht festgelegt. bpmn-js steht unter der bpmn.io-Lizenz, die das bpmn.io-Logo im angezeigten Diagramm vorschreibt. Die Word-Datei erzeugt `docx` (MIT) mit `fflate` und `nanoid` (beide MIT).

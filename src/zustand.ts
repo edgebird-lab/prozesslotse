@@ -166,8 +166,8 @@ export function reduziere(z: Zustand, a: Aktion): Zustand {
       return bereinige({ ...z, projekt: nachher, vergangenheit: [...z.vergangenheit, z.projekt], zukunft: z.zukunft.slice(1), gruppe: null })
     }
     case 'schritt':
-      // Die Dokumentation beschreibt immer den Ist-Prozess
-      if (a.schritt === 'dokumentieren') return bereinige({ ...z, schritt: a.schritt, gruppe: null, ansicht: 'ist', cursor: z.ansicht === 'ist' ? z.cursor : null, auswahl: z.ansicht === 'ist' ? z.auswahl : null })
+      // Die Dokumentation beschreibt immer den Ist-Prozess; eine Auswahl dort filtert die Angaben, deshalb frisch beginnen
+      if (a.schritt === 'dokumentieren') return bereinige({ ...z, schritt: a.schritt, gruppe: null, ansicht: 'ist', cursor: null, auswahl: null })
       return { ...z, schritt: a.schritt, gruppe: null }
     case 'ansicht':
       return bereinige({ ...z, ansicht: a.ansicht, cursor: null, auswahl: null })

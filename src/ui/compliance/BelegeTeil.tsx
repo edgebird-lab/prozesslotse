@@ -15,6 +15,7 @@ import {
   RECHTSGRUNDLAGEN,
   RICHTUNGEN,
   STANDORTE,
+  textVon,
   type Eintrag,
 } from '../../compliance/standard'
 import type { DatenobjektAngaben, Empfaenger } from '../../compliance/typen'
@@ -158,8 +159,8 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
 /** Kurzfassung für eine eingeklappte Karte */
 function zusammenfassung(d: DatenobjektAngaben): string {
   const teile = [
-    AUFBEWAHRUNGSARTEN.find((a) => a.wert === d.aufbewahrungsart)?.dok ?? 'offen',
-    d.form ? (BELEGFORMEN.find((f) => f.wert === d.form)?.dok ?? '') : 'Form offen',
+    textVon(AUFBEWAHRUNGSARTEN, d.aufbewahrungsart, 'dok'),
+    d.form ? textVon(BELEGFORMEN, d.form, 'dok') : 'Form offen',
     d.personenbezogen === true ? 'personenbezogen' : d.personenbezogen === false ? 'ohne Personenbezug' : 'Personenbezug offen',
   ]
   return teile.filter(Boolean).join(' · ')

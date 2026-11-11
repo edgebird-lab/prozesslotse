@@ -34,5 +34,17 @@ await schritt(/Bericht/)
 await page.waitForTimeout(2500)
 await page.screenshot({ path: `${ziel}/bericht.png`, clip: { x: 0, y: 0, width: 1440, height: 1100 }, fullPage: true })
 
+await dokumente()
+
 await browser.close()
 console.log('Bilder in', ziel)
+
+/** Compliance-Doku: Teilschritt „Dokumente“ mit Vorschau der Verfahrensdokumentation */
+async function dokumente() {
+  await page.goto(process.env.ADRESSE ?? 'http://localhost:4173/')
+  await page.getByRole('button', { name: /Mit dem Beispiel/ }).click()
+  await schritt(/Dokumentieren/)
+  await page.getByRole('navigation', { name: 'Teilschritte' }).getByRole('button', { name: /^Dokumente/ }).click()
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: `${ziel}/dokumente.png` })
+}
