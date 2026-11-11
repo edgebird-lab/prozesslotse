@@ -77,7 +77,7 @@ Für die Compliance-Doku trägt das Projekt das optionale Feld `compliance` (Que
 | `systeme` | je digitalem System: Hersteller, Version, seit, Betrieb, Dienstleister, Standort, Auftragsverarbeitung, Schutz vor Änderung, Datensicherung | Medium |
 | `rollen` | intern oder extern, Organisation | Rolle |
 | `kontrollen`, `weitereKontrollen` | Art, Ziel und Nachweis je Prüfung oder Freigabe; Kontrollen außerhalb des Ablaufs | Aufgabe bzw. eigene Id |
-| `einweisung`, `loeschung`, `toms`, `mitgeltend` | Einweisung, Löschorganisation, Schutzmaßnahmen in sechs Bereichen, weitere Unterlagen | – |
+| `einweisung`, `loeschung`, `toms`, `mitgeltend`, `ersetzendesScannen` | Einweisung, Löschorganisation, Schutzmaßnahmen in sechs Bereichen, weitere Unterlagen, eigene Verfahrensdokumentation zum ersetzenden Scannen (vorhanden, Stand; fehlt das Feld in älteren Dateien, ergänzt das Laden „Weiß nicht“) | – |
 | `versionen`, `zuletztGeprueft` | freigegebene Stände mit eingefrorenem Prozess, beiden Dokumenten und SHA-256-Prüfsumme | Nummer |
 
 - Fehlt ein Eintrag in `datenobjekte`, `systeme`, `rollen` oder `kontrollen`, gilt ein Standardwert; geschrieben wird erst bei der ersten Änderung.

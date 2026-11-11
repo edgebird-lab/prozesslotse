@@ -270,19 +270,33 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
       ziel: { art: 'datenobjekt', id: o.id },
     })
   }
+  // Verfahrensdokumentation zum Scannen: eine Angabe für alle gescannten Unterlagen (Frage in der Karte der Unterlage)
+  const scanDoku = k.c.ersetzendesScannen.verfahrensdoku
   for (const o of objekte) {
-    if (o.d.form === 'papier' && o.d.ablageform === 'scan' && o.d.originalVernichtet === true) {
+    if (o.d.form !== 'papier' || o.d.ablageform !== 'scan' || o.d.originalVernichtet === false) continue
+    if (o.d.originalVernichtet === null) {
       add({
         regel: 'B8',
         id: o.id,
         teilschritt: 'belege',
         schwere: 'hinweis',
-        titel: 'Ersetzendes Scannen dokumentieren',
-        text: `„${o.name}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.`,
+        titel: 'Vernichtung nach dem Scannen offen',
+        text: `Wird das Papier von „${o.name}“ nach dem Scannen vernichtet? Dann braucht es eine eigene Verfahrensdokumentation zum ersetzenden Scannen.`,
         quelle: 'GoBD Rz. 136',
         ziel: { art: 'datenobjekt', id: o.id },
       })
+      continue
     }
+    add({
+      regel: 'B8',
+      id: o.id,
+      teilschritt: 'belege',
+      schwere: scanDoku === true ? 'hinweis' : 'warnung',
+      titel: scanDoku === true ? 'Ersetzendes Scannen dokumentieren' : scanDoku === false ? 'Verfahrensdokumentation zum Scannen fehlt' : 'Verfahrensdokumentation zum Scannen ungeklärt',
+      text: `„${o.name}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensdokumentation, z. B. nach dem Muster von BStBK und DStV.${scanDoku === true ? '' : ' Liegt sie vor, wähle bei der Frage danach „Ja“.'}`,
+      quelle: 'GoBD Rz. 136',
+      ziel: { art: 'datenobjekt', id: o.id },
+    })
   }
   for (const a of k.aufgaben) {
     if (!a.uebertragung) continue

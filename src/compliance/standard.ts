@@ -356,6 +356,7 @@ export function neueCompliance(): ComplianceProjekt {
     begruendungLaengereAufbewahrung: '',
     toms: leereToms(),
     mitgeltend: [],
+    ersetzendesScannen: { verfahrensdoku: null, stand: null },
     versionen: [],
     zuletztGeprueft: null,
   }

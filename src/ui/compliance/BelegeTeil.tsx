@@ -18,7 +18,7 @@ import {
   textVon,
   type Eintrag,
 } from '../../compliance/standard'
-import type { DatenobjektAngaben, Empfaenger } from '../../compliance/typen'
+import type { DatenobjektAngaben, Empfaenger, ErsetzendesScannen } from '../../compliance/typen'
 import { benenneUnterlageUm, legeAblageortAn, legeUnterlageAn, loescheUnterlage, setzeZugriffe } from '../../compliance/unterlagen'
 import { unterlagenNachEntstehung } from '../../compliance/verfahrensdoku'
 import { neueId } from '../../modell/bausteine'
@@ -28,7 +28,7 @@ import { useBestaetigen } from '../frage'
 import { useApp } from '../kontext'
 import { Kreuz } from '../Symbol'
 import { useAufgabenFilter, useCompliance } from './analyse'
-import { CFeld, Chips, JaNeinOffen, KatalogAuswahl, KatalogListe, TextFeld, ZeilenFeld } from './Eingaben'
+import { CFeld, Chips, DatumFeld, JaNeinOffen, KatalogAuswahl, KatalogListe, TextFeld, ZeilenFeld } from './Eingaben'
 
 function rolleVon(k: Kontext, a: Aufgabe): string {
   return k.p.rollen.find((r) => r.id === a.rolleId)?.name.trim() || 'ohne Rolle'
@@ -230,6 +230,7 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
           {d.form === 'papier' && d.ablageform === 'scan' && (
             <JaNeinOffen label="Wird das Papier nach dem Scannen vernichtet?" wert={d.originalVernichtet} onAendern={(originalVernichtet) => setze({ originalVernichtet }, 'vernichtet')} />
           )}
+          {d.form === 'papier' && d.ablageform === 'scan' && d.originalVernichtet === true && <ScanVerfahrensdoku />}
 
           <JaNeinOffen label="Enthält es Angaben zu Personen?" wert={d.personenbezogen} onAendern={(personenbezogen) => setze({ personenbezogen }, 'personen')} />
           {d.personenbezogen === true && (
@@ -255,6 +256,20 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
         </div>
       )}
     </section>
+  )
+}
+
+/** Eine Angabe für alle Unterlagen, die gescannt und danach vernichtet werden; Kapitel 5 und 6 und B8 hängen daran. */
+function ScanVerfahrensdoku() {
+  const { c, aendere } = useCompliance()
+  const s = c.ersetzendesScannen
+  const setze = (werte: Partial<ErsetzendesScannen>, feld: string) => aendere((x) => ({ ...x, ersetzendesScannen: { ...x.ersetzendesScannen, ...werte } }), `scannen.${feld}`)
+  return (
+    <div className="eingerueckt felder">
+      <JaNeinOffen label="Gibt es eine eigene Verfahrensdokumentation zum ersetzenden Scannen?" wert={s.verfahrensdoku} onAendern={(verfahrensdoku) => setze({ verfahrensdoku }, 'doku')} />
+      {s.verfahrensdoku === true && <DatumFeld label="Stand der Verfahrensdokumentation zum Scannen" wert={s.stand} onAendern={(stand) => setze({ stand }, 'stand')} />}
+      <p className="feld-hilfe">Die Antwort gilt für alle Unterlagen, die gescannt und danach vernichtet werden.</p>
+    </div>
   )
 }
 

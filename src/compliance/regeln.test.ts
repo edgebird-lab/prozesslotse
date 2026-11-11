@@ -166,7 +166,12 @@ describe('Belege B1–B9', () => {
   })
 
   it('B8 erinnert an die Dokumentation des ersetzenden Scannens', () => {
-    const scan = (vernichtet: boolean) => mitAngaben((c) => Object.assign(c.datenobjekte.dob_lieferschein, { ablageform: 'scan', originalVernichtet: vernichtet }))
+    // mit eigener Verfahrensdokumentation zum Scannen ein Hinweis; ohne sie eine Warnung (texte-scannen.test.ts)
+    const scan = (vernichtet: boolean) =>
+      mitAngaben((c) => {
+        Object.assign(c.datenobjekte.dob_lieferschein, { ablageform: 'scan', originalVernichtet: vernichtet })
+        c.ersetzendesScannen.verfahrensdoku = true
+      })
     expect(finde(pruefe(scan(true)), 'compliance:B8:dob_lieferschein')?.schwere).toBe('hinweis')
     expect(regeln(pruefe(scan(false)), 'B8')).toEqual([])
   })

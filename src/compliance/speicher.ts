@@ -335,6 +335,11 @@ export function validiereCompliance(x: unknown): asserts x is ComplianceProjekt 
     text(t, 'nichtZutreffend', `toms.${b}`)
   }
   textListe(x, 'mitgeltend', 'compliance')
+  // Seit der Durchsicht vom 11.11.2026; ältere Dateien bekommen „Weiß nicht“ (wie in neueCompliance)
+  if (x.ersetzendesScannen === undefined) x.ersetzendesScannen = { verfahrensdoku: null, stand: null }
+  const scannen = obj(x.ersetzendesScannen, 'ersetzendesScannen')
+  wahrheit(scannen, 'verfahrensdoku', 'ersetzendesScannen', true)
+  datum(scannen, 'stand', 'ersetzendesScannen')
   pruefeVersionen(liste(x, 'versionen', 'compliance'))
   datum(x, 'zuletztGeprueft', 'compliance')
 }

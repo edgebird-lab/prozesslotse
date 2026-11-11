@@ -395,6 +395,13 @@ export interface Einweisung {
   protokoll: boolean
 }
 
+/** Gilt für alle Unterlagen, die gescannt und danach vernichtet werden (GoBD Rz. 136). */
+export interface ErsetzendesScannen {
+  /** Gibt es eine eigene Verfahrensdokumentation zum ersetzenden Scannen? null = Weiß nicht */
+  verfahrensdoku: boolean | null
+  stand: IsoDatum | null
+}
+
 export interface Loeschorganisation {
   /** wer Vernichtung und Löschung nach Fristablauf freigibt */
   freigabe: string
@@ -480,6 +487,8 @@ export interface ComplianceProjekt {
   toms: Record<TomBereich, TomAngaben>
   /** zusätzliche mitgeltende Unterlagen, z. B. „Berechtigungskonzept“ */
   mitgeltend: string[]
+  /** fehlt in Dateien vor dem 11.11.2026; beim Laden ergänzt */
+  ersetzendesScannen: ErsetzendesScannen
   versionen: DokuVersion[]
   /** „Geprüft, keine Änderung“ ohne neue Version */
   zuletztGeprueft: IsoDatum | null
@@ -519,7 +528,7 @@ export type Schritt = 'rahmen' | 'beteiligte' | 'ablauf' | 'pruefen' | 'verbesse
 ### 4.3 Standardwerte und Kataloge (`standard.ts`)
 
 - Fehlt ein Eintrag in `datenobjekte`, `systeme`, `rollen` oder `kontrollen`, gilt der Standardwert. Geschrieben wird erst bei der ersten Änderung.
-- `neueCompliance()`: alle Texte leer, Listen leer, `null` wo erlaubt, `einweisung = { turnus: null, protokoll: false }`, `loeschung = { freigabe: '', durchfuehrung: '', turnus: null }`, je TOM-Bereich `{ massnahmen: [], nichtZutreffend: '' }`, `verarbeitung.laufendeNummer = '1'`.
+- `neueCompliance()`: alle Texte leer, Listen leer, `null` wo erlaubt, `einweisung = { turnus: null, protokoll: false }`, `loeschung = { freigabe: '', durchfuehrung: '', turnus: null }`, `ersetzendesScannen = { verfahrensdoku: null, stand: null }`, je TOM-Bereich `{ massnahmen: [], nichtZutreffend: '' }`, `verarbeitung.laufendeNummer = '1'`.
 - `DatenobjektAngaben`: `aufbewahrungsart 'unklar'`, sonst `null`, leere Listen, `strafrechtlich false`.
 - `SystemAngaben`: `standort 'unbekannt'`, `avVertrag 'unklar'`, `unveraenderbarkeit 'unklar'`, `sicherung 'unklar'`, sonst leer bzw. `null`.
 - `RollenAngaben`: `{ extern: false, organisation: '' }`.
@@ -557,7 +566,7 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 
 - `compliance` ist optional. Ältere Dateien laden unverändert; `compliance` bleibt dann `undefined`. Version 0.2.0 lädt Dateien mit `compliance` und behält das Feld beim Speichern, weil `leseProjekt` unbekannte Felder nicht entfernt.
 - `FORMAT_VERSION` ist schon 3 (Modellierung v3). Die Compliance-Doku braucht keinen eigenen Sprung, prüft aber `compliance.version === 1`.
-- `validiereCompliance(x)` in `src/compliance/speicher.ts` prüft beim Laden: Typen aller Felder, Werte aus den Katalogen, Datumsfelder als gültiges `JJJJ-MM-TT` oder `null`, Zahlen endlich und ganzzahlig (`personenMitDaten` ≥ 0, `aufbewahrungJahre` 0–30, `Frist.anzahl` 0–100). Ids in `unterlagen` und `ablageorte` sind eindeutig; `zugriffe`, `datenobjekte` und `ablageSpeicherIds` verweisen auf vorhandene Einträge. Fehler werfen `Formatfehler` mit Feldnamen, z. B. „Compliance-Angaben: ‚systeme.med_erp.seit‘ ist kein gültiges Datum.“
+- `validiereCompliance(x)` in `src/compliance/speicher.ts` prüft beim Laden: Typen aller Felder, Werte aus den Katalogen, Datumsfelder als gültiges `JJJJ-MM-TT` oder `null`, Zahlen endlich und ganzzahlig (`personenMitDaten` ≥ 0, `aufbewahrungJahre` 0–30, `Frist.anzahl` 0–100). Ids in `unterlagen` und `ablageorte` sind eindeutig; `zugriffe`, `datenobjekte` und `ablageSpeicherIds` verweisen auf vorhandene Einträge. Fehler werfen `Formatfehler` mit Feldnamen, z. B. „Compliance-Angaben: ‚systeme.med_erp.seit‘ ist kein gültiges Datum.“ Fehlt `ersetzendesScannen` (Dateien vor dem 11.11.2026), wird es mit `{ verfahrensdoku: null, stand: null }` ergänzt.
 - Versionen: `nummer` aufsteigend ab 1, `gueltigAb` streng aufsteigend, Dokumente mit gültigen Abschnittsarten. Der eingefrorene `prozess` durchläuft dieselbe Migration und Strukturprüfung wie `ist` (private Funktion `pruefeProzess` in `src/modell/speicher.ts`, dafür exportieren). Damit gilt jede künftige Formatmigration auch für alte Versionen.
 - `bereinigeCompliance(c, ist)`: entfernt Einträge in `systeme`, `rollen`, `kontrollen` und `zugriffe`, deren Medium, Rolle oder Aufgabe im Ist-Prozess fehlt. `Ablageort.mediumId` wird dann `null`; Unterlagen und ihre Angaben bleiben. Der Reducer ruft sie nach jeder Aktion auf, die den Ist-Prozess ändert (`prozess`, `projekt`), im selben Rückgängig-Schritt. Änderungen am Soll-Prozess bereinigen nichts.
 - Ein Eintrag in `kontrollen` bleibt erhalten, wenn die Aufgabe nur ihre Art wechselt; die Generatoren lesen ihn dann nicht.
@@ -619,7 +628,7 @@ Oben steht „Wozu werden die Daten in diesem Prozess verarbeitet?“ (Liste der
 | Was ist „{Name}“? | Aufbewahrungsart mit Beispielen und Frist; Hinweis „Im Zweifel die Steuerberatung fragen“ |
 | Wie kommt es an oder entsteht es? | Belegform; dazu Richtung |
 | Wo wird es aufbewahrt? | Mehrfachauswahl der Ablageorte; „+ Ablageort“ legt einen Ablageort mit System an |
-| In welcher Form? | Ablageform; bei Papier mit Scan: „Wird das Papier danach vernichtet?“ |
+| In welcher Form? | Ablageform; bei Papier mit Scan: „Wird das Papier danach vernichtet?“; bei „Ja“ zusätzlich „Gibt es eine eigene Verfahrensdokumentation zum ersetzenden Scannen?“ (Ja · Nein · Weiß nicht, bei Ja „Stand“), eine Angabe für alle gescannten Unterlagen (`ersetzendesScannen`) |
 | Enthält es Angaben zu Personen? | Ja · Nein · Weiß nicht |
 | Wer ist betroffen? Welche Daten? | Chips Betroffene, Chips Datenkategorien, aufklappbar besondere Kategorien und Art. 10 |
 | Warum dürfen die Daten verarbeitet werden? | Chips Rechtsgrundlage; bei lit. f Textfeld „Welches Interesse?“ |
@@ -795,7 +804,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | B5 | Ablage ohne Schutz vor Änderung | Warnung | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, B4 trifft nicht zu, mindestens ein digitaler Ablage-Speicher und keiner davon mit `revisionssicher` oder `protokolliert` | „„{d}“ liegt in {Systeme}, ohne dass Änderungen verhindert oder protokolliert werden. Eine einfache Dateiablage genügt dafür in der Regel nicht.“ | GoBD Rz. 108–110 | systeme |
 | B6 | Elektronisch erhalten, nur auf Papier aufbewahrt | Fehler; Hinweis bei Richtung `ausgang`, Form nicht `strukturiert` und erzeugender Aufgabe ohne Medium der Art `erp` oder `fachanwendung` | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, und Ablageform `ausdruck` oder alle Ablage-Speicher nicht digital | „„{d}“ entsteht oder kommt elektronisch an und muss elektronisch aufbewahrt werden. Ein Ausdruck reicht nicht.“ Hinweis: „Nur zulässig, wenn „{d}“ auf Papier versandt und die Datei nicht aufbewahrt wird.“ | GoBD Rz. 119, 120 | belege |
 | B7 | Elektronisches Original nicht aufbewahrt | Fehler bei Form `strukturiert`, sonst Hinweis | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, Ablageform `umgewandelt` | `strukturiert`: „Bei „{d}“ muss der strukturierte Teil aufbewahrt werden, z. B. die XML-Datei. Nur ein PDF genügt nicht.“ Sonst: „„{d}“ liegt nur umgewandelt vor. Prüfen, ob die Voraussetzungen der GoBD Rz. 135 erfüllt sind; sonst das Original zusätzlich aufbewahren.“ | GoBD Rz. 119, 131, 135 (Fassung 14.07.2025) | belege |
-| B8 | Ersetzendes Scannen dokumentieren | Hinweis | Form `papier`, Ablageform `scan`, `originalVernichtet = true` | „„{d}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.“ | GoBD Rz. 136 | belege |
+| B8 | Ersetzendes Scannen dokumentieren; ohne Verfahrensdokumentation: Verfahrensdokumentation zum Scannen fehlt bzw. ungeklärt; Vernichtung offen: Vernichtung nach dem Scannen offen | Hinweis; Warnung, wenn `ersetzendesScannen.verfahrensdoku` nicht `true` ist | Form `papier`, Ablageform `scan`, `originalVernichtet = true` oder `null` | `true`: „„{d}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensdokumentation, z. B. nach dem Muster von BStBK und DStV.“, ohne Verfahrensdokumentation dazu „Liegt sie vor, wähle bei der Frage danach „Ja“.“ · `null`: „Wird das Papier von „{d}“ nach dem Scannen vernichtet? Dann braucht es eine eigene Verfahrensdokumentation zum ersetzenden Scannen.“ (Hinweis) | GoBD Rz. 136 | belege |
 | B9 | Abtippen ohne Erfassungskontrolle | Hinweis | Aufgabe A mit Übertragung schreibt ein Objekt d mit Art `buchungsbeleg` oder `buecher`; keine Prüfung oder Freigabe liest d; keine weitere Kontrolle mit `bezugAufgabeId = A.id` | „In „{A}“ wird „{d}“ von Hand übertragen, und keine Kontrolle prüft das Ergebnis.“ | GoBD Rz. 100 | kontrollen |
 | D1 | Personenbezug ungeklärt | Hinweis | `personenbezogen = null` | „Enthält „{d}“ Angaben zu Personen, z. B. Name, Anschrift oder Telefonnummer?“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D2 | Betroffene oder Datenarten fehlen | Warnung | personenbezogen und (Betroffene leer oder Datenkategorien leer) | „Für „{d}“ fehlen {betroffene Personen / Datenkategorien}.“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
@@ -850,8 +859,8 @@ Zusammen 38 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 3.3 Organisation und Internes Kontrollsystem | Textbaustein A.4; Tabelle Kontrolle · Art · Wer · Was geprüft wird · Nachweis · Häufigkeit (Aufgaben: „bei jedem Vorgang“; Aufgaben in einem Zweig: „wenn {Bedingungen} (siehe 4.k)“, z. B. „wenn „Betrag über 1.000 €?“ = „Ja“ (siehe 4.17)“, mehrere Bedingungen mit „und“, ODER-Weg „„{Bezeichnung}“ zutrifft“, Ereignis „„{Bezeichnung}“ zuerst eintritt“) | Kontrollen |
 | 3.4 Datenschutz und Datensicherheit | Textbaustein A.5; Tabelle System · Schutz vor Änderung · Datensicherung · Intervall · Rücksicherung getestet („ja“ oder „nein“). Das Datum des letzten Tests steht nicht im Dokument, sonst löst jeder neue Test V2 aus; es dient nur Regel S6. | Systeme |
 | 4 Verfahren und Maßnahmen: {Prozess} | Ablaufbeschreibung 6.6.1; letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“ | Prozessbaum, Angaben |
-| 5 Ersetzendes Scannen | mit B8-Objekten: „Für {Liste} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.“ · sonst: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte |
-| 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` | Systeme, Angaben |
+| 5 Ersetzendes Scannen | Papier mit Scan und `originalVernichtet = true`: „Für {Liste} gilt das ersetzende Scannen.“, dann mit `ersetzendesScannen.verfahrensdoku = true` „Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).“, sonst „Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.“ · mit `originalVernichtet = null` zusätzlich „Ob die Papierbelege von {Liste} nach dem Scannen vernichtet werden, ist offen.“ · nur wenn beides fehlt: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte, ersetzendes Scannen |
+| 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, bei ersetzendem Scannen mit `verfahrensdoku = true` „Verfahrensdokumentation zum ersetzenden Scannen, Stand {Datum}“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, Einträge aus `mitgeltend` | Systeme, Angaben |
 | 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“) | Historie |
 | 8 Glossar | Tabelle aus A.6 | fest |
 | 9 Anlage | 9.1 Ablaufdiagramm (Abschnitt `diagramm`); 9.2 Nachweis der Einweisung nur bei Protokoll und Turnus einmalig oder jährlich: Tabelle Datum · Name · Rolle · Unterschrift mit 8 leeren Zeilen | Prozess |

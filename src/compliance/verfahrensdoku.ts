@@ -330,19 +330,25 @@ export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: Do
 
   // 5
   h(1, '5', 'Ersetzendes Scannen')
-  const scan = unterlagen.filter((o) => o.d.form === 'papier' && o.d.ablageform === 'scan' && o.d.originalVernichtet === true)
-  absatz(
-    scan.length > 0
-      ? `Für ${aufzaehlung(scan.map((o) => o.name))} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.`
-      : 'Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.',
-  )
+  const gescannt = unterlagen.filter((o) => o.d.form === 'papier' && o.d.ablageform === 'scan')
+  const scan = gescannt.filter((o) => o.d.originalVernichtet === true)
+  const scanOffen = gescannt.filter((o) => o.d.originalVernichtet === null)
+  // Ob es die eigene Verfahrensdokumentation gibt, wird erfragt, nicht unterstellt (GoBD Rz. 136)
+  const scanDoku = scan.length > 0 && c.ersetzendesScannen.verfahrensdoku === true
+  if (scan.length > 0) {
+    absatz(
+      `Für ${aufzaehlung(scan.map((o) => o.name))} gilt das ersetzende Scannen. ${scanDoku ? 'Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).' : 'Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.'}`,
+    )
+  }
+  if (scanOffen.length > 0) absatz(`Ob die Papierbelege von ${aufzaehlung(scanOffen.map((o) => o.name))} nach dem Scannen vernichtet werden, ist offen.`)
+  if (scan.length === 0 && scanOffen.length === 0) absatz('Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.')
 
   // 6
   h(1, '6', 'Mitgeltende Unterlagen')
   liste([
     'Verzeichnis von Verarbeitungstätigkeiten, gleiche Version',
     'BPMN-Datei des Ist-Prozesses',
-    ...(scan.length > 0 ? ['Verfahrensdokumentation zum ersetzenden Scannen'] : []),
+    ...(scanDoku ? [`Verfahrensdokumentation zum ersetzenden Scannen, Stand ${c.ersetzendesScannen.stand ? formatiereDatum(c.ersetzendesScannen.stand) : 'offen'}`] : []),
     ...systeme
       .map((m) => ({ m, s: systemAngaben(c, m.id) }))
       .filter(({ s }) => s.avVertrag === 'ja')

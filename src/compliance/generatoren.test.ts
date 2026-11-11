@@ -134,9 +134,10 @@ describe('Verfahrensdokumentation Lieferdienst (9.6)', () => {
   it('verweist in Kapitel 5 und 6 auf das ersetzende Scannen, wenn Papier vernichtet wird', () => {
     const c = complianceLieferdienst()
     Object.assign(c.datenobjekte.dob_lieferschein, { ablageform: 'scan', originalVernichtet: true })
+    c.ersetzendesScannen = { verfahrensdoku: true, stand: '2026-03-01' }
     const { verfahrensdoku } = dokumente(beispielLieferdienst(), c)
     expect(abschnitteVon(verfahrensdoku, '5').flatMap(texte).join(' ')).toContain('Für „Lieferschein“ gilt das ersetzende Scannen.')
-    expect(abschnitteVon(verfahrensdoku, '6').flatMap(texte)).toContain('Verfahrensdokumentation zum ersetzenden Scannen')
+    expect(abschnitteVon(verfahrensdoku, '6').flatMap(texte)).toContain('Verfahrensdokumentation zum ersetzenden Scannen, Stand 01.03.2026')
   })
 })
 
