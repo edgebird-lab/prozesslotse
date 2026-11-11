@@ -2133,6 +2133,18 @@ input[type='date'] {
   .dokument-tabelle thead {
     display: table-header-group;
   }
+  /* Breite Tabellen (2.4 mit sieben Spalten) passen so auf 180 mm Satzbreite (A4, Rand 15 mm);
+     nie einen Scrollbalken drucken. Silbentrennung (hyphens) beherrscht Edge hier nicht zuverlässig. */
+  .dokument .tabelle-wrap {
+    overflow: visible;
+  }
+  .dokument-tabelle {
+    font-size: 8.5pt;
+  }
+  .dokument-tabelle th,
+  .dokument-tabelle td {
+    padding: 3px 5px;
+  }
   .dokument-h1,
   .dokument-h2,
   .dokument-h3 {

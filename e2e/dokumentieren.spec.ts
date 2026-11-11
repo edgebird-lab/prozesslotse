@@ -121,6 +121,22 @@ test('druckt nur das Dokument mit dem Hinweis (9.10, 5)', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Version freigeben …' })).toBeHidden()
 })
 
+test('im Druck passen alle Tabellen auf A4 mit 15 mm Rand, wie beim PDF aus dem Programm', async ({ page }) => {
+  await start(page)
+  await teil(page, 'Dokumente').click()
+  for (const reiter of ['Verfahrensdokumentation', 'Verarbeitungsverzeichnis']) {
+    await page.emulateMedia({ media: 'screen' })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.getByRole('tab', { name: reiter }).click()
+    // Satzbreite: 210 mm − 2 × 15 mm = 180 mm ≈ 680 px
+    await page.emulateMedia({ media: 'print' })
+    await page.setViewportSize({ width: 680, height: 900 })
+    const ueberstand = await page.locator('.dokument-tabelle').evaluateAll((ts) => ts.map((t) => t.getBoundingClientRect().width - t.parentElement!.getBoundingClientRect().width))
+    expect(ueberstand.length).toBeGreaterThan(3)
+    expect(Math.max(...ueberstand), reiter).toBeLessThanOrEqual(0.5)
+  }
+})
+
 for (const schema of ['light', 'dark'] as const) {
   test(`alle Teilschritte und der Freigabe-Dialog ohne schwere Barrieren (${schema === 'light' ? 'hell' : 'dunkel'}, 9.10, 6)`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: schema })
