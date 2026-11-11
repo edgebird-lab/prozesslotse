@@ -6,9 +6,9 @@
  */
 import { gliederung } from './dokument'
 import { textBreite } from './schriftbreite'
-import { FUSSZEILE_VORLAGE } from './textbausteine'
+import { fusszeile, istEntwurf } from './textbausteine'
 import type { Dokument } from './typen'
-import { festeLeerzeichen } from './typografie'
+import { festeLeerzeichen, GESCHUETZTER_BINDESTRICH, neueSeiteVor } from './typografie'
 
 /** A4 hoch in Twips, Ränder 2 cm */
 const SEITE = { breite: 11906, hoehe: 16838, rand: 1134 }
@@ -36,7 +36,8 @@ export function spaltenbreiten(kopf: string[], zeilen: string[][], satz = SATZ):
   const summe = (a: number[]) => a.reduce((x, y) => x + y, 0)
   // leere Tabellen (Unterschriften) gleichmäßig
   if (zeilen.every((z) => z.every((t) => !t.trim()))) return { breiten: ganzzahlig(Array<number>(n).fill(satz / n), satz), silbentrennung: false }
-  const tw = (text: string, fett: boolean) => textBreite(text, TABELLE.pt, fett) * 20
+  // der geschützte Bindestrich ist so breit wie „-“, bricht aber nicht um
+  const tw = (text: string, fett: boolean) => textBreite(text.replaceAll(GESCHUETZTER_BINDESTRICH, '-'), TABELLE.pt, fett) * 20
   const hart = Array<number>(n).fill(0)
   const weich = Array<number>(n).fill(0)
   const voll = Array<number>(n).fill(0)
@@ -87,31 +88,41 @@ function ganzzahlig(breiten: number[], satz: number): number[] {
 }
 
 export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
-  const { AlignmentType, Document, Footer, HeadingLevel, HeightRule, Packer, PageBreak, PageNumber, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } = await import('docx')
+  const { AlignmentType, Document, Footer, HeadingLevel, HeightRule, NoBreakHyphen, Packer, PageBreak, PageNumber, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } = await import('docx')
   type Kind = InstanceType<typeof Paragraph> | InstanceType<typeof Table>
   const ebene = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 } as const
-  // Abstand vor und nach Überschriften; Ebene 1 beginnt ohnehin auf einer neuen Seite
-  const abstand = { 1: { after: NACH }, 2: { before: 240, after: 80 }, 3: { before: 180, after: 60 } } as const
+  // Abstand vor und nach Überschriften; Ebene 1 auf einer neuen Seite braucht keinen Abstand davor
+  const abstand = { 1: { before: 480, after: NACH }, 2: { before: 240, after: 80 }, 3: { before: 180, after: 60 } } as const
   const grau = { type: ShadingType.CLEAR, color: 'auto', fill: 'EDEDEB' }
-  const version = d.versionText === 'Entwurf' ? 'Entwurf' : `Version ${d.versionText}`
-  /** Text mit geschützten Leerzeichen nach §, Abs., Nr. usw. */
-  const lauf = (text: string) => new TextRun(festeLeerzeichen(text))
+  /** Text mit geschützten Leerzeichen nach §, Abs., Nr. usw.; den geschützten Bindestrich („E-Mail“) setzt Word als eigenes Zeichen */
+  const teile = (text: string) => festeLeerzeichen(text).split(GESCHUETZTER_BINDESTRICH).flatMap((t, i) => [...(i > 0 ? [new NoBreakHyphen()] : []), ...(t ? [t] : [])])
+  const lauf = (text: string) => new TextRun({ children: teile(text) })
 
   // Silbentrennung nur, wenn ein Wort sonst nicht in seine Spalte passt; sonst bleibt der Satz ohne Trennstriche
   let silbentrennung = false
-  const zelle = (text: string, kopf: boolean) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: festeLeerzeichen(text), bold: kopf, size: TABELLE.groesse })] })] })
+  const zelle = (text: string, kopf: boolean) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ children: teile(text), bold: kopf, size: TABELLE.groesse })] })] })
   const tabelle = (kopf: string[], zeilen: string[][]) => {
     const spalten = spaltenbreiten(kopf, zeilen)
     silbentrennung ||= spalten.silbentrennung
+    // Formular zum Ausfüllen (nur leere Zeilen, z. B. 9.2): jede Zeile bleibt bei der nächsten, die Tabelle auf einer Seite
+    const formular = zeilen.every((z) => z.every((t) => !t))
     return new Table({
       width: { size: SATZ, type: WidthType.DXA },
       columnWidths: spalten.breiten,
       layout: TableLayoutType.FIXED,
       margins: { left: TABELLE.rand, right: TABELLE.rand },
       rows: [
-        new TableRow({ tableHeader: true, cantSplit: true, children: kopf.map((t) => zelle(t, true)) }),
+        new TableRow({ tableHeader: true, cantSplit: true, keepNext: formular, children: kopf.map((t) => zelle(t, true)) }),
         // leere Zeilen (z. B. Unterschriften) bekommen Platz zum Ausfüllen
-        ...zeilen.map((z) => new TableRow({ cantSplit: true, height: z.every((t) => !t) ? { value: 567, rule: HeightRule.ATLEAST } : undefined, children: z.map((t) => zelle(t, false)) })),
+        ...zeilen.map(
+          (z, j) =>
+            new TableRow({
+              cantSplit: true,
+              keepNext: formular && j < zeilen.length - 1,
+              height: z.every((t) => !t) ? { value: 567, rule: HeightRule.ATLEAST } : undefined,
+              children: z.map((t) => zelle(t, false)),
+            }),
+        ),
       ],
     })
   }
@@ -135,17 +146,22 @@ export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
   for (const a of inhalt) {
     switch (a.art) {
       case 'ueberschrift':
-        kinder.push(new Paragraph({ heading: ebene[a.ebene], pageBreakBefore: a.ebene === 1, keepNext: true, spacing: abstand[a.ebene], children: [lauf(`${a.nummer} ${a.text}`)] }))
+        {
+          // nur die großen Kapitel auf einer neuen Seite, wie im Druck
+          const neueSeite = a.ebene === 1 && neueSeiteVor(d.art, a.nummer)
+          kinder.push(new Paragraph({ heading: ebene[a.ebene], pageBreakBefore: neueSeite, keepNext: true, spacing: neueSeite ? { after: NACH } : abstand[a.ebene], children: [lauf(`${a.nummer} ${a.text}`)] }))
+        }
         break
+      // Absatzkontrolle (widowControl): keine einzelne Zeile allein am Seitenende oder -anfang
       case 'absatz':
-        kinder.push(new Paragraph({ spacing: { after: NACH }, children: [lauf(a.text)] }))
+        kinder.push(new Paragraph({ widowControl: true, spacing: { after: NACH }, children: [lauf(a.text)] }))
         break
       case 'hinweis':
-        kinder.push(new Paragraph({ shading: grau, spacing: { after: NACH }, children: [lauf(a.text)] }))
+        kinder.push(new Paragraph({ widowControl: true, shading: grau, spacing: { after: NACH }, children: [lauf(a.text)] }))
         break
       case 'liste':
         // Abstand erst nach dem letzten Punkt
-        a.punkte.forEach((p, i) => kinder.push(new Paragraph({ bullet: { level: 0 }, spacing: { after: i === a.punkte.length - 1 ? NACH : 40 }, children: [lauf(p)] })))
+        a.punkte.forEach((p, i) => kinder.push(new Paragraph({ widowControl: true, bullet: { level: 0 }, spacing: { after: i === a.punkte.length - 1 ? NACH : 40 }, children: [lauf(p)] })))
         break
       case 'tabelle':
         kinder.push(tabelle(a.kopf, a.zeilen))
@@ -164,7 +180,7 @@ export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: `${FUSSZEILE_VORLAGE} · ${d.titel} · ${version} · Seite `, size: klein }),
+          new TextRun({ text: `${fusszeile(d)} · Seite `, size: klein }),
           new TextRun({ children: [PageNumber.CURRENT], size: klein }),
           new TextRun({ text: ' von ', size: klein }),
           new TextRun({ children: [PageNumber.TOTAL_PAGES], size: klein }),
@@ -178,7 +194,8 @@ export async function erzeugeDocx(d: Dokument): Promise<Uint8Array> {
     // sonst „Un-named“, der Standard der Bibliothek
     lastModifiedBy: 'Prozesslotse',
     title: `${d.titel} – ${d.untertitel}`,
-    description: 'Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten.',
+    // Entwurf: Vorlage zur Prüfung; freigegeben: Verantwortung beim Unternehmen (recht-5)
+    description: istEntwurf(d) ? 'Vorlage zur Prüfung durch Steuerberatung bzw. Datenschutzbeauftragten.' : 'Aus einer Vorlage mit dem Prozesslotsen erstellt; die Verantwortung für den Inhalt liegt beim Unternehmen.',
     // Deutsch auch in einem anders eingestellten Word: Rechtschreibprüfung, Silbentrennung, Sprache im PDF
     styles: { default: { document: { run: { font: 'Calibri', size: 21, language: { value: 'de-DE' } } } } },
     hyphenation: silbentrennung ? { autoHyphenation: true } : undefined,

@@ -10,7 +10,7 @@ import type { Prozess } from '../modell/typen'
 import { addiereJahre, addiereTage, formatiereDatum, istPlausiblesDatum, jahrVon, tageZwischen } from './datum'
 import { geaenderteKapitelIn } from './dokument'
 import { kanonischesJson } from './speicher'
-import type { ComplianceProjekt, Dokument, DokuVersion, IsoDatum, VersionKopf } from './typen'
+import type { ComplianceProjekt, Dokument, DokuVersion, FachlichePruefung, IsoDatum, VersionKopf } from './typen'
 import { erzeugeVerfahrensdoku, type DokuKontext } from './verfahrensdoku'
 import { erzeugeVerzeichnis } from './verzeichnis'
 
@@ -21,6 +21,10 @@ export interface FreigabeEingaben {
   gueltigAb: IsoDatum
   freigegebenVon: string
   aenderung: string
+  /** optional (recht-5): wer die Fassung vor der Freigabe fachlich geprüft hat */
+  geprueftVon?: string
+  /** optional (recht-5): wann; nur zusammen mit `geprueftVon`, spätestens am Freigabetag */
+  geprueftAm?: IsoDatum | null
 }
 
 export function kopfVon(v: DokuVersion): VersionKopf {
@@ -78,7 +82,7 @@ export function vorgabeGueltigAb(c: ComplianceProjekt, heute: IsoDatum): IsoDatu
   return frueh && frueh > heute ? frueh : heute
 }
 
-export type FreigabeFeld = 'bezeichnung' | 'gueltigAb' | 'freigegebenVon' | 'aenderung'
+export type FreigabeFeld = 'bezeichnung' | 'gueltigAb' | 'freigegebenVon' | 'aenderung' | 'geprueftVon' | 'geprueftAm'
 
 /** Erster Fehler in den Eingaben des Freigabe-Dialogs mit dem Feld, zu dem er gehört; null, wenn alles passt. */
 export function freigabeFehler(c: ComplianceProjekt, e: FreigabeEingaben, heute: IsoDatum): { feld: FreigabeFeld; text: string } | null {
@@ -93,7 +97,19 @@ export function freigabeFehler(c: ComplianceProjekt, e: FreigabeEingaben, heute:
   if (e.gueltigAb > spaetestens) return { feld: 'gueltigAb', text: `Gültig ab darf höchstens ein Jahr nach dem Freigabetag liegen, also spätestens am ${formatiereDatum(spaetestens)}.` }
   if (!e.freigegebenVon.trim()) return { feld: 'freigegebenVon', text: 'Bitte angeben, wer freigibt.' }
   if (letzte && !e.aenderung.trim()) return { feld: 'aenderung', text: 'Bitte den Inhalt der Änderung beschreiben.' }
+  // Fachliche Prüfung (recht-5): optional; ein Datum ohne Namen sagt nichts, eine Prüfung nach der Freigabe kann die eingefrorene Fassung nicht mehr nennen
+  if (e.geprueftAm) {
+    if (!istPlausiblesDatum(e.geprueftAm)) return { feld: 'geprueftAm', text: 'Geprüft am ist kein gültiges Datum.' }
+    if (!e.geprueftVon?.trim()) return { feld: 'geprueftVon', text: 'Bitte angeben, wer fachlich geprüft hat, oder das Datum leeren.' }
+    if (e.geprueftAm > heute) return { feld: 'geprueftAm', text: `Geprüft am darf nicht nach dem Freigabetag liegen, also spätestens am ${formatiereDatum(heute)}.` }
+  }
   return null
+}
+
+/** Fachliche Prüfung aus den Eingaben; ohne Namen keine. */
+export function fachlichePruefung(e: Pick<FreigabeEingaben, 'geprueftVon' | 'geprueftAm'>): FachlichePruefung | null {
+  const von = e.geprueftVon?.trim() ?? ''
+  return von ? { von, am: e.geprueftAm || null } : null
 }
 
 /** Prüft die Eingaben des Freigabe-Dialogs; liefert die erste Fehlermeldung oder null. */
@@ -163,6 +179,9 @@ export async function freigeben(ist: Prozess, c: ComplianceProjekt, e: FreigabeE
     aenderung: e.aenderung.trim(),
     geaenderteKapitel: letzte ? geaenderteKapitel(letzte, ist, c) : [],
   }
+  // steht beim Freigeben fest und geht so in Deckblatt und Kapitel 7 bzw. Abschnitt D der eingefrorenen Dokumente (Prüfsumme)
+  const pruefung = fachlichePruefung(e)
+  if (pruefung) kopf.fachlichGeprueft = pruefung
   const kx: DokuKontext = { version: kopf, historie: [...c.versionen.map(kopfVon), kopf], bezugsjahr: jahrVon(e.gueltigAb), heute }
   const { verfahrensdoku, verzeichnis } = erzeugeDokumente(ist, c, kx)
   const prozess = structuredClone(ist)

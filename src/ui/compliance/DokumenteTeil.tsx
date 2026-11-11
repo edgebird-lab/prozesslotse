@@ -6,7 +6,7 @@ import { kapitelText } from '../../compliance/dokument'
 import { eingefrorenerProzess } from '../../compliance/speicher'
 import { aufbewahrenBisText, gueltigBisIn } from '../../compliance/fristen'
 import { RECHTSSTAND } from '../../compliance/standard'
-import { FUSSZEILE_VORLAGE, hinweisband } from '../../compliance/textbausteine'
+import { fusszeile, hinweisband } from '../../compliance/textbausteine'
 import type { Dokument, DokumentArt, DokuVersion } from '../../compliance/typen'
 import { entwurfsKontext, erzeugeDokumente, geaenderteKapitel, kannZurueckziehen, letzteWirksame, zieheZurueck } from '../../compliance/versionen'
 import { plattform } from '../../plattform'
@@ -26,7 +26,7 @@ const REITER: { art: DokumentArt; name: string }[] = [
 
 /** Fußzeile auf jeder gedruckten Seite: CSS-Randfeld der Seite, damit sie keinen Text verdeckt. */
 function druckFuss(d: Dokument): string {
-  const text = `${FUSSZEILE_VORLAGE} · ${d.titel} · ${d.versionText === 'Entwurf' ? 'Entwurf' : `Version ${d.versionText}`} · Seite `.replace(/["\\]/g, '\\$&')
+  const text = `${fusszeile(d)} · Seite `.replace(/["\\]/g, '\\$&')
   return `@media print { @page { margin-bottom: 18mm; @bottom-center { content: "${text}" counter(page) " von " counter(pages); font: 8pt system-ui, sans-serif; color: #52514e; } } }`
 }
 

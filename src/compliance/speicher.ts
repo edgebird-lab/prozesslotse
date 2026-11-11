@@ -295,6 +295,15 @@ export function eingefrorenerProzess(v: Pick<DokuVersion, 'prozess'>): Prozess {
   return p
 }
 
+/** Fachliche Prüfung einer Version (recht-5): fehlt in älteren Dateien; wer geprüft hat, steht immer da, das Datum liegt nicht nach der Freigabe. */
+function pruefeFachlichePruefung(x: unknown, pfad: string, freigegebenAm: string): void {
+  const f = obj(x, pfad)
+  text(f, 'von', pfad)
+  if (!(f.von as string).trim()) fehler(`${pfad}.von`, 'ist leer')
+  datum(f, 'am', pfad)
+  if (f.am !== null && (f.am as string) > freigegebenAm) fehler(`${pfad}.am`, 'liegt nach der Freigabe')
+}
+
 function pruefeVersionen(x: unknown[]): void {
   let letztesGueltigAb = ''
   const bezeichnungen = new Set<string>()
@@ -321,6 +330,7 @@ function pruefeVersionen(x: unknown[]): void {
       if ((o.gueltigAb as string) <= letztesGueltigAb) fehler(`${p}.gueltigAb`, 'liegt nicht nach dem der vorigen Version')
       letztesGueltigAb = o.gueltigAb as string
     }
+    if (vorhanden(o, 'fachlichGeprueft')) pruefeFachlichePruefung(o.fachlichGeprueft, `${p}.fachlichGeprueft`, o.freigegebenAm as string)
     textListe(o, 'geaenderteKapitel', p)
     // Kleinigkeit, still behoben: eine Prüfsumme in Großbuchstaben (z. B. von Hand übertragen) wird klein geschrieben
     if (/^[0-9a-f]{64}$/i.test(o.pruefsumme as string)) o.pruefsumme = (o.pruefsumme as string).toLowerCase()

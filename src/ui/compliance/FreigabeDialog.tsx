@@ -16,13 +16,14 @@ import {
 } from '../../compliance/versionen'
 import type { Prozess } from '../../modell/typen'
 import { useFrage } from '../frage'
-import { CFeld, DatumEingabe, TextFeld } from './Eingaben'
+import { CFeld, DatumEingabe, FeldMeldung, TextFeld } from './Eingaben'
 
 /**
  * Freigabe einer neuen Version (Spezifikation 5.4). Der Dialog hält den Fokus
  * und schließt mit Escape. „Freigeben“ rechnet die Prüfsumme und meldet die
  * fertige Version zurück. Die Vorgaben bestehen die eigene Prüfung; liegt
  * „Gültig ab“ mehr als 30 Tage nach dem Freigabetag, fragt der Dialog nach.
+ * Fehlermeldungen stehen rot direkt am betroffenen Feld (aria-invalid).
  */
 export function FreigabeDialog({
   c,
@@ -56,8 +57,15 @@ export function FreigabeDialog({
     aenderung: letzte ? '' : 'Erstfassung',
   }))
   const [trotzdem, setTrotzdem] = useState(false)
-  const [meldung, setMeldung] = useState<string | null>(null)
+  /** Meldung am betroffenen Feld; „trotzdem“ am Kontrollkästchen, ohne Feld (Fehler beim Freigeben) unten über den Knöpfen */
+  const [meldung, setMeldung] = useState<{ feld: FreigabeFeld | 'trotzdem' | null; text: string } | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  const meldungAm = (feld: FreigabeFeld | 'trotzdem' | null) => (meldung?.feld === feld ? meldung.text : null)
+  // Eine Änderung am betroffenen Feld nimmt seine Meldung weg
+  const aendere = (x: Partial<FreigabeEingaben>) => {
+    setE({ ...e, ...x })
+    if (meldung?.feld && meldung.feld in x) setMeldung(null)
+  }
 
   useEffect(() => {
     const d = dialog.current
@@ -66,16 +74,22 @@ export function FreigabeDialog({
 
   const id = (feld: FreigabeFeld) => `${feldId}-${feld}`
   const fokus = (feld: FreigabeFeld) => document.getElementById(id(feld))?.focus()
+  const trotzdemId = `${feldId}-trotzdem`
 
   const absenden = async (ev: FormEvent) => {
     ev.preventDefault()
     const f = freigabeFehler(c, e, heute)
-    const problem = f?.text ?? (fehler > 0 && !trotzdem ? 'Bitte „Trotzdem freigeben“ bestätigen oder die Fehler zuerst beheben.' : null)
-    if (problem) {
-      setMeldung(problem)
-      if (f) fokus(f.feld)
+    if (f) {
+      setMeldung(f)
+      fokus(f.feld)
       return
     }
+    if (fehler > 0 && !trotzdem) {
+      setMeldung({ feld: 'trotzdem', text: 'Bitte „Trotzdem freigeben“ bestätigen oder die Fehler zuerst beheben.' })
+      document.getElementById(trotzdemId)?.focus()
+      return
+    }
+    setMeldung(null)
     const rueckfrage = rueckfrageGueltigAb(e, heute)
     if (rueckfrage) {
       const wahl = await frage({
@@ -93,7 +107,7 @@ export function FreigabeDialog({
     try {
       onFreigegeben(await freigeben(ist, c, e, heute))
     } catch (err) {
-      setMeldung(err instanceof Error ? err.message : String(err))
+      setMeldung({ feld: null, text: err instanceof Error ? err.message : String(err) })
       setLaeuft(false)
     }
   }
@@ -124,17 +138,25 @@ export function FreigabeDialog({
           lässt sich ihre Freigabe mit Begründung zurückziehen.
         </p>
         <div className="feldreihe">
-          <TextFeld label="Bezeichnung" id={id('bezeichnung')} wert={e.bezeichnung} onAendern={(bezeichnung) => setE({ ...e, bezeichnung })} />
-          <CFeld label="Gültig ab" id={id('gueltigAb')} hilfe={datumHilfe}>
-            {(fid) => <DatumEingabe id={fid} wert={e.gueltigAb} onAendern={(d) => setE({ ...e, gueltigAb: d ?? '' })} />}
+          <TextFeld label="Bezeichnung" id={id('bezeichnung')} wert={e.bezeichnung} fehler={meldungAm('bezeichnung')} onAendern={(bezeichnung) => aendere({ bezeichnung })} />
+          <CFeld label="Gültig ab" id={id('gueltigAb')}>
+            {(fid) => (
+              <>
+                <DatumEingabe id={fid} wert={e.gueltigAb} ungueltig={!!meldungAm('gueltigAb')} onAendern={(d) => aendere({ gueltigAb: d ?? '' })} />
+                {/* die Meldung direkt unter dem Feld, die Hilfe zu Frühestens und Spätestens darunter */}
+                <FeldMeldung feldId={fid} text={meldungAm('gueltigAb')} />
+                <p className="feld-hilfe">{datumHilfe}</p>
+              </>
+            )}
           </CFeld>
         </div>
-        <TextFeld label="Freigegeben von" id={id('freigegebenVon')} wert={e.freigegebenVon} onAendern={(freigegebenVon) => setE({ ...e, freigegebenVon })} />
+        <TextFeld label="Freigegeben von" id={id('freigegebenVon')} wert={e.freigegebenVon} fehler={meldungAm('freigegebenVon')} onAendern={(freigegebenVon) => aendere({ freigegebenVon })} />
         <TextFeld
           label="Inhalt der Änderung"
           id={id('aenderung')}
           mehrzeilig
           wert={e.aenderung}
+          fehler={meldungAm('aenderung')}
           platzhalter={letzte ? 'z. B. Rechnung wird jetzt zusätzlich von der Buchhaltung geprüft' : undefined}
           hilfe={
             letzte
@@ -143,8 +165,22 @@ export function FreigabeDialog({
                 : `Seit Version ${letzte.bezeichnung} hat sich kein Kapitel geändert.`
               : undefined
           }
-          onAendern={(aenderung) => setE({ ...e, aenderung })}
+          onAendern={(aenderung) => aendere({ aenderung })}
         />
+        <div className="feldreihe">
+          <TextFeld
+            label="Fachlich geprüft von"
+            id={id('geprueftVon')}
+            wert={e.geprueftVon ?? ''}
+            platzhalter="z. B. Steuerberatung Muster"
+            fehler={meldungAm('geprueftVon')}
+            onAendern={(geprueftVon) => aendere({ geprueftVon })}
+          />
+          <CFeld label="Geprüft am" id={id('geprueftAm')} fehler={meldungAm('geprueftAm')}>
+            {(fid) => <DatumEingabe id={fid} wert={e.geprueftAm ?? null} ungueltig={!!meldungAm('geprueftAm')} onAendern={(geprueftAm) => aendere({ geprueftAm })} />}
+          </CFeld>
+        </div>
+        <p className="feld-hilfe">Optional. Wer die Fassung vor der Freigabe fachlich geprüft hat, steht auf dem Deckblatt und in der Änderungshistorie.</p>
         <p>
           Freigegeben am: <strong>{formatiereDatum(heute)}</strong>
         </p>
@@ -152,13 +188,25 @@ export function FreigabeDialog({
           <div className="banner banner-fehler">
             <p>{fehler === 1 ? 'Es gibt 1 Fehler.' : `Es gibt ${fehler} Fehler.`} Eine Freigabe ist trotzdem möglich; die Dokumente nennen dann Angaben, die nicht stimmen können.</p>
             <label className="kontrollkaestchen">
-              <input type="checkbox" checked={trotzdem} onChange={(ev) => setTrotzdem(ev.target.checked)} /> Trotzdem freigeben
+              <input
+                id={trotzdemId}
+                type="checkbox"
+                checked={trotzdem}
+                aria-invalid={meldungAm('trotzdem') ? true : undefined}
+                aria-describedby={meldungAm('trotzdem') ? `${trotzdemId}-meldung` : undefined}
+                onChange={(ev) => {
+                  setTrotzdem(ev.target.checked)
+                  if (meldung?.feld === 'trotzdem') setMeldung(null)
+                }}
+              />{' '}
+              Trotzdem freigeben
             </label>
+            <FeldMeldung feldId={trotzdemId} text={meldungAm('trotzdem')} />
           </div>
         )}
-        {meldung && (
+        {meldung && meldung.feld === null && (
           <p className="feld-meldung" role="alert">
-            {meldung}
+            {meldung.text}
           </p>
         )}
         <div className="knopfreihe">

@@ -33,7 +33,7 @@ In vielen Kleinbetrieben fehlen zwei Pflichtdokumente: die Verfahrensdokumentati
 6. **Lückenprüfung** mit 44 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
 7. **Fristberechnung:** gesetzliche Mindestfrist je Unterlagenart, Fristende, frühestes Vernichtungs- bzw. Löschdatum.
 8. **Versionen:** Eine Freigabe friert beide Dokumente ein (gültig ab, freigegeben am und von, Änderung, geänderte Kapitel, SHA-256-Prüfsumme). Befunde, wenn sich seit der Freigabe etwas geändert hat oder sie älter als 365 Tage ist.
-9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Jede Ausgabe trägt den Hinweis „Vorlage zur Prüfung …“, nicht freigegebene Stände zusätzlich „Entwurf“.
+9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Entwürfe tragen auf Deckblatt und Fußzeile den Hinweis „Vorlage – vor Verwendung prüfen lassen“ und „Entwurf“; freigegebene Fassungen nennen in der Fußzeile Version und Freigabetag und auf dem Deckblatt die Verantwortung des Unternehmens samt empfohlener Prüfung (recht-5, 6.9).
 10. BPMN-Export wahlweise ohne Compliance-Angaben, zur Weitergabe an Dritte.
 11. Firmenangaben und Schutzmaßnahmen aus einer anderen Projektdatei übernehmen.
 12. Hinweis im Schritt „Verbessern“, wenn ein Vorschlag eine dokumentierte Kontrolle streicht.
@@ -112,7 +112,7 @@ Die App hält den Rechtsstand als Konstante `RECHTSSTAND = '2026-11-11'` und dru
 
 | Kapitel im Muster 2.1 | In der App |
 | --- | --- |
-| 0 Hinweise zur Muster-Verfahrensdokumentation | entfällt; ersetzt durch den Hinweis „Vorlage zur Prüfung“ auf dem Deckblatt |
+| 0 Hinweise zur Muster-Verfahrensdokumentation | entfällt; ersetzt durch Hinweis A.0 auf dem Deckblatt (Entwurf: Vorlage zur Prüfung; freigegebene Fassung: Verantwortung des Unternehmens, Prüfung empfohlen) |
 | 1 Vorbemerkungen zur Verfahrensdokumentation | übernommen: Genehmigung, Freigabe, Version, gültig ab, ersetzte Version |
 | 2 Zielsetzung und Überblick (2.1–2.6) | übernommen, gefüllt aus Prozess und Angaben |
 | 3 Organisation und Sicherheit des IT-gestützten Verfahrens (3.1–3.4) | übernommen, gefüllt aus Systemen, Rollen, Kontrollen; ergänzt um 3.5 „Wiederfinden, Lesbarmachung und Datenzugriff“ (GoBD Rz. 152, 156–159) |
@@ -488,6 +488,8 @@ export interface DokuVersion {
   geaenderteKapitel: string[]
   /** Gesetzt, wenn die Freigabe zurückgezogen wurde: Die Version bleibt sichtbar, zählt aber für Reihenfolge und Gültigkeit nicht mehr. */
   zurueckgezogen?: Rueckzug
+  /** optional aus dem Freigabe-Dialog (recht-5); steht auch im eingefrorenen Deckblatt und in Kapitel 7 bzw. Abschnitt D; fehlt in älteren Dateien */
+  fachlichGeprueft?: { von: string; am: IsoDatum | null }
   /** Ist-Prozess bei der Freigabe als Rohstand (kann ein älteres Format haben); für Diagramm und Vergleich `eingefrorenerProzess(v)` (4.4, 6.8) */
   prozess: Prozess
   verfahrensdoku: Dokument
@@ -749,9 +751,10 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 | Gültig ab | heute oder, wenn das später ist, der Tag nach `gueltigAb` der letzten nicht zurückgezogenen Version; die Vorgabe besteht immer die eigene Prüfung | gültiges Datum, später als `gueltigAb` der letzten nicht zurückgezogenen Version, höchstens ein Jahr nach dem Freigabetag. Ein Datum in der Vergangenheit ist erlaubt (bestehende Praxis dokumentieren). Mehr als 30 Tage nach dem Freigabetag: Rückfrage „Version {x} soll erst ab dem {Datum} gelten, {n} Tage nach dem Freigabetag. Stimmt das Datum?“ Unter dem Feld steht „Frühestens …, spätestens …“. |
 | Freigegeben von | `unternehmen.geschaeftsleitung` | nicht leer |
 | Inhalt der Änderung | ohne Vorgänger: „Erstfassung“; sonst leer mit dem Platzhalter „z. B. Rechnung wird jetzt zusätzlich von der Buchhaltung geprüft“. Darunter stehen die geänderten Kapitel ausgeschrieben („Geänderte Kapitel: Verfahrensdokumentation 3.2, 3.3, 4 (werden automatisch eingetragen)“); sie kommen in die Spalte „geänderte Kapitel“ | ab Version 2 nicht leer |
+| Fachlich geprüft von, Geprüft am | leer (optional, recht-5) | „am“ nur mit Namen („Bitte angeben, wer fachlich geprüft hat, oder das Datum leeren.“), spätestens am Freigabetag. Ausgefüllt erscheint „Fachlich geprüft von {von} am {am}.“ auf dem Deckblatt beider Dokumente und in Kapitel 7 bzw. Abschnitt D |
 | Freigegeben am | heute, nicht änderbar | – |
 
-Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem Kontrollkästchen „Trotzdem freigeben“. „Freigeben“ berechnet die Prüfsumme asynchron und schickt dann eine Aktion `compliance`. Bei einem Fehler in den Eingaben setzt der Dialog den Fokus in das betroffene Feld.
+Gibt es Befunde der Schwere Fehler, erscheint „Es gibt {n} Fehler.“ mit dem Kontrollkästchen „Trotzdem freigeben“. „Freigeben“ berechnet die Prüfsumme asynchron und schickt dann eine Aktion `compliance`. Bei einem Fehler in den Eingaben setzt der Dialog den Fokus in das betroffene Feld; die Meldung steht rot direkt unter dem Feld (bei „Gültig ab“ vor der Hilfe „Frühestens …“), das Feld ist rot umrandet und trägt `aria-invalid` und `aria-describedby`. Ebenso im Dialog „Freigabe zurückziehen“ am Feld „Grund“ und bei „Trotzdem freigeben“ am Kontrollkästchen.
 
 ### 5.5 Barrierefreiheit und Darstellung
 
@@ -900,7 +903,7 @@ Zusammen 44 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 
 | Kapitel | Inhalt | Daten aus |
 | --- | --- | --- |
-| Deckblatt | Titel „Verfahrensdokumentation“, Untertitel „{Prozess} · {Unternehmen}“, „Version {x} · gültig ab {Datum}“ oder „Entwurf · Stand {Datum}“, Hinweis A.0 | Prozess, Unternehmen, Version |
+| Deckblatt | Titel „Verfahrensdokumentation“, Untertitel „{Prozess} · {Unternehmen}“, „Version {x} · gültig ab {Datum}“ oder „Entwurf · Stand {Datum}“, bei fachlicher Prüfung „Fachlich geprüft von {von} am {am}.“ (ohne Datum „Fachlich geprüft von {von}.“), Hinweis A.0 (Entwurf oder freigegeben, 6.9) | Prozess, Unternehmen, Version |
 | Gliederung | Kapitelliste ohne Seitenzahlen | Dokument |
 | 1 Vorbemerkungen zur Verfahrensdokumentation | Textbaustein A.1 | Unternehmen, Version, Historie |
 | 2 Zielsetzung und Überblick | – | – |
@@ -922,7 +925,7 @@ Zusammen 44 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Plat
 | 4 Verfahren und Maßnahmen: {Prozess} | Ablaufbeschreibung 6.6.1; letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“ | Prozessbaum, Angaben |
 | 5 Ersetzendes Scannen | Papier mit Scan und `originalVernichtet = true`: „Für {Liste} gilt das ersetzende Scannen.“, dann mit `ersetzendesScannen.verfahrensdoku = true` „Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6).“, sonst „Dafür ist eine eigene Verfahrensdokumentation nötig (GoBD Rz. 136); offen.“, danach „Ausgenommen sind Jahresabschlüsse und Eröffnungsbilanz; sie werden im Original aufbewahrt (§ 147 Abs. 2 AO, § 257 Abs. 3 HGB).“ · mit `originalVernichtet = null` zusätzlich „Ob die Papierbelege von {Liste} nach dem Scannen vernichtet werden, ist offen.“ · nur wenn beides fehlt: „Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.“ | Datenobjekte, ersetzendes Scannen |
 | 6 Mitgeltende Unterlagen | Liste: „Verzeichnis von Verarbeitungstätigkeiten, gleiche Version“, „BPMN-Datei des Ist-Prozesses“, bei ersetzendem Scannen mit `verfahrensdoku = true` „Verfahrensdokumentation zum ersetzenden Scannen, Stand {Datum}“, je System mit AV-Vertrag „Vertrag zur Auftragsverarbeitung mit {Dienstleister} vom {Datum}“, aber nur, wenn die Frage danach gestellt wird (`mitDienstleister`, `hatPersonenbezug`, `auftragsverarbeitung ≠ false`, wie S2), Einträge aus `mitgeltend` (ältere Dateien) und `mitgeltendeUnterlagen` als „{Name} (Ablage: {Ablageort})“ bzw. nur „{Name}“ | Systeme, Angaben |
-| 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“). Eine zurückgezogene Version: „zurückgezogen am {Datum}“ und im Inhalt „{Inhalt}; zurückgezogen: {Grund}“ | Historie |
+| 7 Änderungshistorie | Satz „Jede frühere Fassung bleibt samt Zeitraum, in dem sie galt, gespeichert, mindestens bis zum Datum in der Spalte „aufbewahren bis“.“; Tabelle Version · gültig ab · gültig bis · freigegeben am · von · geänderte Kapitel · Inhalt · Prüfsumme (12 Zeichen; die eigene Zeile „–“); bei fachlicher Prüfung in der Spalte „freigegeben“ „{am}, {von}; fachlich geprüft von {Prüfer} am {Datum}“. Eine zurückgezogene Version: „zurückgezogen am {Datum}“ und im Inhalt „{Inhalt}; zurückgezogen: {Grund}“ | Historie |
 | 8 Glossar | Tabelle aus A.6 | fest |
 | 9 Anlage | 9.1 Ablaufdiagramm (Abschnitt `diagramm`); 9.2 Nachweis der Einweisung nur bei Protokoll und Turnus einmalig oder jährlich: Tabelle Datum · Name · Rolle · Unterschrift mit 8 leeren Zeilen | Prozess |
 
@@ -960,7 +963,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 
 | Abschnitt | Inhalt |
 | --- | --- |
-| Deckblatt | „Verzeichnis von Verarbeitungstätigkeiten“, „Verantwortlicher nach Art. 30 Abs. 1 DSGVO · {Unternehmen}“, Version oder Entwurf, Hinweis A.0 (Fassung für Datenschutz) |
+| Deckblatt | „Verzeichnis von Verarbeitungstätigkeiten“, „Verantwortlicher nach Art. 30 Abs. 1 DSGVO · {Unternehmen}“, Version oder Entwurf, ggf. „Fachlich geprüft von … am ….“, Hinweis A.0 (Fassung für Datenschutz) |
 | A Angaben zum Verantwortlichen | Tabelle Name, Anschrift, Telefon, E-Mail, Internet; gemeinsam Verantwortlicher und Vertreter nur wenn vorhanden; Datenschutzbeauftragter oder „nicht benannt“ |
 | B Verarbeitungstätigkeit {Nr.}: {Benennung} | Tabelle Benennung · laufende Nummer · eingeführt am · letzte Änderung (`gueltigAb` der Version bzw. „Entwurf“) · Fachabteilung · Ansprechpartner · Telefon · E-Mail |
 | B.1 Zwecke (lit. b) | Liste |
@@ -971,7 +974,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 | B.6 Löschfristen (lit. f) | Tabelle Unterlage · Frist (`loeschText`; beim Lieferschein „{aufbewahrungText} (§ 147 Abs. 3 AO)“, bei gewählter Frist „nach Ablauf der Aufbewahrung: {aufbewahrungText}“ ohne diese Fundstelle; bei Kaufleuten unter 6 Jahren mit dem Zusatz nach § 257 HGB) |
 | B.7 Technische und organisatorische Maßnahmen (lit. g) | „Siehe Abschnitt C.“ |
 | C Technische und organisatorische Maßnahmen (Art. 32 Abs. 1) | sechs Unterabschnitte; je Bereich Liste der Maßnahmen, „Trifft nicht zu: {Begründung}“ oder „Keine Maßnahme eingetragen.“; unter C.3 (Vertraulichkeit) zusätzlich „Zugriffsschutz je System:“ mit „{System}: {Zugriffsschutz}“ (leer „offen“) je System mit Personenbezug |
-| D Änderungen | Tabelle Version · gültig ab · Änderung; bei einer zurückgezogenen Version „{Änderung}; zurückgezogen am {Datum}: {Grund}“ |
+| D Änderungen | Tabelle Version · gültig ab · Änderung; bei fachlicher Prüfung „{Änderung}; fachlich geprüft von {Prüfer} am {Datum}“, bei einer zurückgezogenen Version danach „; zurückgezogen am {Datum}: {Grund}“ |
 | Schluss | Zeile „Ort, Datum · Unterschrift des Verantwortlichen“ |
 
 ### 6.8 Versionen, geänderte Kapitel, Prüfsumme
@@ -979,6 +982,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 - **Kapitelschlüssel:** Nummer der nächsten Überschrift der Ebene 1 oder 2; Ebene 3 zählt zu ihrer Ebene 2. Ausnahme: alles in Kapitel 4 zählt zu „4“, weil sich sonst Nummern verschieben. Ausgenommen vom Vergleich sind Deckblatt, Gliederung und Kapitel 7 sowie im Verzeichnis Abschnitt D. Kapitel 1 wird verglichen, damit ein Wechsel der Geschäftsleitung V2 auslöst; seine Versionsangaben sind beim Vergleich gleich, weil der Kontext von v gilt. Präfixe: „VD “ und „VVT “. Sie sind nur Schlüssel: Oberfläche, Befund V2, Vorgabe im Freigabe-Dialog und Kapitel 7 schreiben sie mit `kapitelText` aus („Verfahrensdokumentation 3.2, 3.3 und 4; Verzeichnis B.1“, in Kapitel 7 ohne den Namen des eigenen Dokuments).
 - **Vergleich:** `geaenderteKapitel(v, projekt)` erzeugt beide Dokumente neu, und zwar mit dem Kontext von v: `version = v`, Historie bis v, `bezugsjahr = Jahr(v.gueltigAb)`, `heute = v.freigegebenAm`. Dann vergleicht es je Schlüssel die JSON-Darstellung der Abschnitte mit dem eingefrorenen Stand. So zählen nur fachliche Änderungen.
 - **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. Gespeichert wird sie als Hex.
+- **Was eingefroren wird (recht-5):** Alles, was beim Freigeben feststeht, steht im Dokument und damit unter der Prüfsumme: Deckblatt mit dem Hinweis der freigegebenen Fassung und der fachlichen Prüfung, Kapitel 7 und Abschnitt D mit ihr. Die fachliche Prüfung steht zusätzlich im Kopf der Version (`fachlichGeprueft`, wie `zurueckgezogen` außerhalb der Prüfsumme), damit spätere Versionen sie in ihrer Historie nennen. Die Fußzeile entsteht erst bei der Ausgabe aus `titel`, `versionText` und `stand` (bei einer Version der Freigabetag), wie die geschützten Leerzeichen; sie gehört nicht zum Dokumenttext. Ältere Versionen behalten ihr eingefrorenes Deckblatt mit dem Vorlagenhinweis und ihre Prüfsumme; der Vergleich übergeht das Deckblatt, deshalb löst der neue Hinweis kein V2 aus.
 - **Rohstand:** Die Prüfsumme gilt für den eingefrorenen Stand, wie er bei der Freigabe entstand. Laden migriert oder normalisiert eingefrorene Prozesse deshalb nie an Ort und Stelle, sondern nur eine Kopie für Anzeige und Vergleich (`eingefrorenerProzess`, 4.4); nachgerechnet wird über den Rohstand vor jeder Migration, und Speichern schreibt ihn unverändert zurück. So ändern Laden, Prüfen und Speichern die Prüfsumme nie, auch wenn eine spätere Fassung beim Laden mehr anpasst (z. B. ein Sprung auf Format 4 oder das Entfernen von `von` an Zeit-Ereignissen).
 - **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile, die Statuszeile („– Prüfsumme stimmt nicht“) und „Lücken“ (Regel V4, Warnung, also Zahl statt Häkchen am Teilschritt „Dokumente“). Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
 - Die Prüfsumme erkennt so Beschädigungen und Änderungen außerhalb der App. Sie schützt nicht vor gezielter Änderung, weil sie sich neu berechnen lässt; so steht es auch in der App.
@@ -987,7 +991,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 
 ### 6.9 Feste Textbausteine (eigene Formulierungen)
 
-- **A.0 Hinweis:** „Vorlage, erstellt mit dem Prozesslotsen am {Stand}. Rechtsstand {Rechtsstand}. Vor Verwendung von der Steuerberatung prüfen lassen. Beschreibt nur den Prozess „{Prozess}“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen.“ Im Verzeichnis: „… vom Datenschutzbeauftragten oder einer fachkundigen Person prüfen lassen. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018).“
+- **A.0 Hinweis:** „Vorlage, erstellt mit dem Prozesslotsen am {Stand}. Rechtsstand {Rechtsstand}. Vor Verwendung von der Steuerberatung prüfen lassen. Beschreibt nur den Prozess „{Prozess}“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen.“ Im Verzeichnis: „… vom Datenschutzbeauftragten oder einer fachkundigen Person prüfen lassen. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018).“ Das gilt für Entwürfe. Eine freigegebene Fassung beginnt stattdessen mit „Aus einer Vorlage mit dem Prozesslotsen erstellt; die Verantwortung für den Inhalt liegt beim Unternehmen. Eine Prüfung durch die Steuerberatung wird empfohlen. Rechtsstand {Rechtsstand}.“ (Verzeichnis: „… Eine Prüfung durch den Datenschutzbeauftragten oder eine fachkundige Person wird empfohlen. …“), danach wie oben ab „Beschreibt …“ (recht-5).
 - **A.1 Kapitel 1:** „Gegenstand dieser Dokumentation ist der Prozess „{Prozess}“ des Unternehmens {Unternehmen}. Inhalt und jede Änderung bedürfen der Zustimmung der Geschäftsleitung ({Name}).“ Ohne Firmennamen: „… der Prozess „{Prozess}“; der Name des Unternehmens ist offen.“, ohne Namen der Geschäftsleitung: „… der Geschäftsleitung (Name offen).“ Freigegeben: „Version {x}, freigegeben von {von} am {am}. Sie gilt für das Verfahren, wie es seit dem {gültig ab} angewandt wird.“ Entwurf: „Entwurf, noch nicht freigegeben.“ Mit Vorgänger (zurückgezogene Versionen zählen nicht): „Vorgängerversion: {y}. Was sich geändert hat, zeigt Kapitel 7.“ Immer: „Aufbau nach GoBD Rz. 153: allgemeine Beschreibung in Kapitel 2, Anwenderdokumentation in Kapitel 4, technische Systemdokumentation in Kapitel 3.1, Betriebsdokumentation in Kapitel 3.2 bis 3.5.“
 - **A.2 Kapitel 2.3:** „Maßgeblich sind die Abgabenordnung (§§ 145 bis 147 AO), § 14b UStG und die GoBD (BMF-Schreiben vom 28.11.2019 in der Fassung vom 14.07.2025). Für Kaufleute gelten zusätzlich §§ 238, 239 und 257 HGB.“ Fristenregel: „Die Frist beginnt mit dem Ende des Kalenderjahres, in dem die Unterlage entstanden, eingegangen oder abgesandt wurde; bei Büchern zählt die letzte Eintragung. Sie läuft nicht ab, solange die Unterlagen für Steuern mit noch offener Festsetzungsfrist von Bedeutung sind (§ 147 Abs. 3 und 4 AO).“
 - **A.3 Ordnungsmäßigkeitskriterien:** Tabelle mit den Spalten Nr., Anforderung, Bedeutung. Die 13 Anforderungen und ihre Reihenfolge folgen dem Muster (Ziff. 2.3 [10]), die Erklärungen sind eigene Kurzfassungen:
@@ -1106,27 +1110,27 @@ Der Schritt „Dokumentieren“ mit Lückenprüfung und Generatoren bildet eigen
 
 | Dokumentmodell | Word |
 | --- | --- |
-| Deckblatt | Titel, Untertitel, Versionszeile, Hinweis A.0 grau hinterlegt, Seitenumbruch |
-| Gliederung | Liste der Kapitel ohne Seitenzahlen, Seitenumbruch |
-| `ueberschrift` 1–3 | Formatvorlagen Überschrift 1–3, damit Navigation und Inhaltsverzeichnis in Word funktionieren |
-| `absatz`, `liste` | Standardabsatz mit 6 pt Abstand danach, Aufzählung (Abstand nach dem letzten Punkt); Überschriften 2 und 3 mit Abstand davor |
-| `tabelle` | Tabelle über die volle Breite in 9 pt mit festen Spaltenbreiten nach dem Inhalt: Jede Spalte fasst ihr breitestes Wort, Daten, Zahlen und Prüfsummen brechen nie mitten im Zeichen um. Nur wenn ein Wort aus Buchstaben sonst nicht passt, schaltet die Datei die Silbentrennung ein. Kopfzeile wiederholt sich auf jeder Seite |
+| Deckblatt | Titel, Untertitel, Versionszeile, ggf. fachliche Prüfung, Hinweis A.0 grau hinterlegt, Seitenumbruch |
+| Gliederung | Liste der Kapitel ohne Seitenzahlen; Kapitel 1 bzw. Abschnitt A folgt auf derselben Seite |
+| `ueberschrift` 1–3 | Formatvorlagen Überschrift 1–3, damit Navigation und Inhaltsverzeichnis in Word funktionieren. Eine neue Seite beginnt nur vor den großen Kapiteln (Verfahrensdokumentation 2, 3, 4 und 9; Verzeichnis B und C, `neueSeiteVor` in `typografie.ts`), die übrigen Kapitel der Ebene 1 laufen mit 24 pt Abstand davor weiter |
+| `absatz`, `liste` | Standardabsatz mit 6 pt Abstand danach, Aufzählung (Abstand nach dem letzten Punkt), mit Absatzkontrolle (keine einzelne Zeile am Seitenrand); Überschriften 2 und 3 mit Abstand davor |
+| `tabelle` | Tabelle über die volle Breite in 9 pt mit festen Spaltenbreiten nach dem Inhalt: Jede Spalte fasst ihr breitestes Wort, Daten, Zahlen und Prüfsummen brechen nie mitten im Zeichen um. Nur wenn ein Wort aus Buchstaben sonst nicht passt, schaltet die Datei die Silbentrennung ein. Kopfzeile wiederholt sich auf jeder Seite. Ein Formular aus leeren Zeilen (9.2, Unterschrift) bleibt zusammen: Jede Zeile außer der letzten hält mit der nächsten zusammen |
 | `hinweis` | Absatz grau hinterlegt |
 | `diagramm` | Absatz „Das Ablaufdiagramm liegt als BPMN-Datei bei und ist in der Druckfassung enthalten.“ |
 | Seite | A4 hoch (11 906 × 16 838 Twips), Ränder 2 cm (1 134 Twips) |
-| Fußzeile | „Vorlage – vor Verwendung prüfen lassen · {Titel} · {Version} · Seite X von Y“ |
+| Fußzeile | Entwurf: „Vorlage – vor Verwendung prüfen lassen · {Titel} · Entwurf · Seite X von Y“; freigegebene Fassung: „{Titel} · Version {x} · freigegeben am {Datum} · Seite X von Y“ (`fusszeile` in `textbausteine.ts`, gleich im Druck). Die Dokumenteigenschaft „Beschreibung“ folgt dem: „Vorlage zur Prüfung …“ bzw. „Aus einer Vorlage mit dem Prozesslotsen erstellt; …“ |
 | Sprache, Eigenschaften | Dokumentsprache Deutsch (`de-DE` im Standardformat); Autor und letzter Bearbeiter „Prozesslotse“ |
-| Satz | Nach §, §§, Abs., Nr., Art., Rz., lit. und Ziff. steht ein geschütztes Leerzeichen (`festeLeerzeichen`), ebenso in der Druckansicht. Das gilt nur für die Ausgabe; der Dokumenttext für Prüfsumme und Versionsvergleich bleibt unverändert |
+| Satz | Nach §, §§, Abs., Nr., Art., Rz., lit. und Ziff. steht ein geschütztes Leerzeichen (`festeLeerzeichen`), ebenso in „z. B.“; „E-Mail“ hat einen geschützten Bindestrich (in Word `w:noBreakHyphen`). Ebenso in der Druckansicht. Das gilt nur für die Ausgabe; der Dokumenttext für Prüfsumme und Versionsvergleich bleibt unverändert |
 
 Dateinamen über `dateiname(ist.name, …)`: `-verfahrensdokumentation-entwurf.docx` bzw. `-verfahrensdokumentation-v1-0.docx`, ebenso `-verarbeitungsverzeichnis-…`. MIME-Typ `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. Im Web lädt `ladeHerunter(name, blob)` die Datei herunter.
 
 **PDF** über die Druckansicht:
 
 - „Drucken oder als PDF speichern“ druckt das gewählte Dokument mit `window.print()`.
-- Druckregeln: Kapitel der Ebene 1 beginnen auf neuer Seite; Tabellenzeilen werden nicht geteilt; Tabellenköpfe wiederholen sich; Teilschritt-Leiste, Knöpfe und Bühne sind ausgeblendet.
-- Eine Fußzeile mit `position: fixed` trägt den Hinweis auf jeder Seite. Ein unterer Seitenrand in `@page` hält Platz frei, damit sie keinen Text verdeckt. Edge prüft das in Phase 6.
+- Druckregeln: Nur die großen Kapitel beginnen auf neuer Seite (wie in der DOCX: Verfahrensdokumentation 2, 3, 4, 9; Verzeichnis B, C), die kurzen laufen weiter; Tabellenzeilen werden nicht geteilt, Formulare aus leeren Zeilen (9.2) gar nicht; Absätze und Listenpunkte werden nicht geteilt (`orphans`/`widows` 2 und `break-inside: avoid`, weil Edge `widows` hier nicht beachtet); Tabellenköpfe wiederholen sich; Teilschritt-Leiste, Knöpfe und Bühne sind ausgeblendet.
+- Die Fußzeile ist ein Randfeld der Seite (`@page { @bottom-center }`) mit dem Text aus `fusszeile` und „Seite X von Y“; ein unterer Seitenrand von 18 mm hält Platz frei, damit sie keinen Text verdeckt.
 - Kapitel 9.1 zeigt das Diagramm über `DiagrammLazy` (`klein`, `uebersicht`), bei alten Versionen aus `version.prozess`. Davor steht „Das Diagramm in Originalgröße enthält die BPMN-Datei des Ist-Prozesses (Kapitel 6).“
-- Im Druck zeigt 9.1 zuerst eine Übersicht des ganzen Diagramms auf Satzbreite. Wäre sie unlesbar klein (Maßstab unter 0,6), zeichnet sie nummerierte Rahmen ein, und es folgen Ausschnitte in lesbarem Maßstab (0,6 bis 0,8: Beschriftungen von 11 px werden etwa 5 bis 6,6 pt groß), die sich um 40 px überlappen, je mit „Ausschnitt n von m“ (`druckausschnitte.ts`, `DiagrammDruck.tsx`). Flache, breite Diagramme stehen quer, wenn das Seiten spart: Das Bild selbst ist um 90° gedreht („(quer)“), weil WebView2 immer A4 hoch druckt und `@page`-Ausrichtungen dort nicht sicher wirken.
+- Im Druck zeigt 9.1 zuerst eine Übersicht des ganzen Diagramms auf Satzbreite. Wäre sie unlesbar klein (Maßstab unter 0,6), zeichnet sie nummerierte Rahmen ein, und es folgen Ausschnitte in lesbarem Maßstab (0,6 bis 0,8: Beschriftungen von 11 px werden etwa 5 bis 6,6 pt groß), je mit „Ausschnitt n von m“ (`druckausschnitte.ts`, `DiagrammDruck.tsx`). Die Schnittkanten liegen in Lücken zwischen den Formen (Lage und Größe aus bpmn-js samt Beschriftung, 4 px Luft): Jede Form liegt in mindestens einem Ausschnitt ganz. Benachbarte Ausschnitte überlappen sich um mindestens 40 px; gibt es keine Lücke, beginnt der nächste Ausschnitt vor der zerschnittenen Form. Die Rahmen der Übersicht liegen auf diesen Kanten. Ab dem zweiten Ausschnitt einer Zeile steht links ein leicht grau hinterlegter Kopf mit den Namen von Pool (außen) und Bahnen (innen), 2 × 30 px, so wie am Anfang des Diagramms; Pools ohne Inhalt (externe Teilnehmer) über die ganze Breite. Zu lange Namen werden kleiner (bis 8 px) und notfalls mit „…“ gekürzt. Bei mehreren Zeilen zeichnet die erste Spalte den Kopf an seiner Stelle neu, damit die Namen der sichtbaren Bahnen zu lesen sind. Flache, breite Diagramme stehen quer, wenn das Seiten spart: Das Bild selbst ist um 90° gedreht („(quer)“), weil WebView2 immer A4 hoch druckt und `@page`-Ausrichtungen dort nicht sicher wirken.
 - Während des Drucks setzt die App `document.title` auf den Dateinamen ohne Endung, damit „Als PDF speichern“ ihn vorschlägt.
 
 ### 7.5 Windows-Programm (Tauri 2)
@@ -1151,7 +1155,7 @@ Das Programm ist seit Commit `90aaba0` umgesetzt (`src-tauri`, `src/plattform`).
 - **Laden:** `validiereCompliance` prüft jede Datei streng (4.4). Unbekannte Werte lösen einen `Formatfehler` aus, keinen Absturz. Ist nur der Compliance-Teil fehlerhaft, lässt sich der Prozess allein öffnen (4.4).
 - **Ausgabe:** React maskiert alle Texte, kein `dangerouslySetInnerHTML`. `docx` erzeugt XML mit Maskierung. Der BPMN-Export maskiert wie bisher mit `esc`.
 - **Integrität:** Die Prüfsumme über eingefrorenen Prozess und beide Dokumente wird nach dem Laden nachgerechnet (6.8). Sie erkennt Beschädigung, nicht Manipulation; der Text in der App sagt das.
-- **Rechtlicher Rahmen:** Hinweis A.0 auf Deckblatt, Fußzeile und Hinweisband; „Entwurf“ bis zur Freigabe; Rechtsstand in jedem Dokument; nirgends „GoBD-konform“, „DSGVO-konform“ oder „rechtssicher“ (Test in 9.6). Befunde sind als Hinweise formuliert („prüfen“, „klären“), nicht als Rechtsauskunft. Die README nennt Grenzen und schließt eine Gewähr für Vollständigkeit aus.
+- **Rechtlicher Rahmen:** Hinweis A.0 auf dem Deckblatt und Hinweisband; Entwürfe mit „Vorlage – vor Verwendung prüfen lassen“ und „Entwurf“ in der Fußzeile, freigegebene Fassungen mit Version, Freigabetag und dem Satz zur Verantwortung des Unternehmens (6.9); Rechtsstand in jedem Dokument; nirgends „GoBD-konform“, „DSGVO-konform“ oder „rechtssicher“ (Test in 9.6). Befunde sind als Hinweise formuliert („prüfen“, „klären“), nicht als Rechtsauskunft. Die README nennt Grenzen und schließt eine Gewähr für Vollständigkeit aus.
 - **Abhängigkeiten:** ein neues Paket (`docx`, exakt gepinnt) mit zwei Abhängigkeiten, alle MIT, im Lockfile festgehalten. Lizenzen stehen in der README.
 - **Windows-Programm:** Dateibefehle nur für vom Nutzer gewählte Pfade (wie `speichern_unter`), CSP unverändert.
 
@@ -1332,7 +1336,8 @@ Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentit
 ### 9.8 DOCX
 
 - Die Datei ist ein ZIP mit `word/document.xml`. Er enthält „Verfahrensdokumentation“, „4 Verfahren und Maßnahmen“ und „Vorlage“.
-- Eine Fußzeile (`word/footer*.xml`) enthält „Vorlage“; die Seitengröße ist `w:w="11906"` und `w:h="16838"`.
+- Eine Fußzeile (`word/footer*.xml`) enthält beim Entwurf „Vorlage“, bei Version 1.0 „Verfahrensdokumentation · Version 1.0 · freigegeben am 11.11.2026 · Seite “ und kein „Vorlage“ (`freigabe-vorlage.test.ts`); die Seitengröße ist `w:w="11906"` und `w:h="16838"`.
+- Seitenumbruch (`w:pageBreakBefore`) nur vor 2, 3, 4 und 9 bzw. B und C; 9.2 mit `w:keepNext` in allen Zeilen außer der letzten; „E-Mail“ mit `w:noBreakHyphen`, „z. B.“ mit geschütztem Leerzeichen (`satz-seiten.test.ts`).
 - Die Tabelle aus Kapitel 2.4 hat 6 Zeilen (Kopf und 5).
 - Ein leerer Prozess erzeugt eine gültige Datei ohne Absturz.
 - Abnahme von Hand: Robin öffnet beide Dateien in Word; Überschriften erscheinen im Navigationsbereich.
@@ -1378,7 +1383,8 @@ Excel ist eine Kaufversion im lokalen Betrieb, damit Version und Programmidentit
 7. Tastatur: Teilschritte, Chips und Dialog vollständig ohne Maus bedienbar.
 8. „Verbessern“: Vorschlag „Freigabe „Rechnung freigeben“ streichen“ zeigt den Hinweis auf die dokumentierte Kontrolle.
 9. Neues Projekt mit einer Aufgabe: Teilschritte ohne Angaben zeigen den grauen Kreis („noch nichts eingetragen“), „Belege und Daten“ einen offenen Punkt (B10); „Beheben“ setzt den Fokus auf das Namensfeld von „Neue Unterlage“. Im Beispiel ohne Befunde heißt es „Keine Lücken gefunden. Die Prüfung findet keine fehlenden oder widersprüchlichen Angaben; ob sie stimmen, prüft die App nicht.“
-10. Bedienung (`e2e/dokumentieren-bedienung.spec.ts`): „Weiter“ zeigt den Anfang des nächsten Teilschritts, „Beheben“ die Frage zum Befund; der Fokus bleibt nach Anlegen und Entfernen bei einem sinnvollen Element; fehlende Namen und ungültige Zahlen werden am Feld gemeldet; „1 markiert – zeigen“ holt den markierten Schritt ins Bild.
+10. Druck (`e2e/dokumentieren-druck-nach.spec.ts`): Meldungen in „Version freigeben“ und „Freigabe zurückziehen“ rot direkt unter dem Feld, Feld mit `aria-invalid` und roter Umrandung (hell und dunkel); Fußzeile und Deckblatt von Entwurf und Version 1.0 mit fachlicher Prüfung, auch in der DOCX; Seitenumbrüche nur vor 2, 3, 4, 9 bzw. B, C; 9.2 und Absätze ungeteilt; „z. B.“ und „E-Mail“ geschützt; Anlage 9.1: jede Form (aus bpmn-js) ganz in einem Ausschnitt, ab Ausschnitt 2 Kopf mit allen Pool- und Bahnnamen.
+11. Bedienung (`e2e/dokumentieren-bedienung.spec.ts`): „Weiter“ zeigt den Anfang des nächsten Teilschritts, „Beheben“ die Frage zum Befund; der Fokus bleibt nach Anlegen und Entfernen bei einem sinnvollen Element; fehlende Namen und ungültige Zahlen werden am Feld gemeldet; „1 markiert – zeigen“ holt den markierten Schritt ins Bild.
 
 ### 9.11 Fachliche Abnahme
 

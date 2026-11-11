@@ -323,6 +323,14 @@ export interface Rueckzug {
   grund: string
 }
 
+/** Fachliche Prüfung vor der Freigabe, z. B. durch Steuerberatung oder Datenschutzbeauftragten (recht-5); optional */
+export interface FachlichePruefung {
+  /** wer geprüft hat; nie leer */
+  von: string
+  /** Tag der Prüfung, spätestens der Freigabetag; null, wenn nicht angegeben */
+  am: IsoDatum | null
+}
+
 export interface DokuVersion {
   /** 1, 2, 3 … fortlaufend; auch zurückgezogene Versionen behalten ihre Nummer */
   nummer: number
@@ -336,6 +344,8 @@ export interface DokuVersion {
   geaenderteKapitel: string[]
   /** Gesetzt, wenn die Freigabe zurückgezogen wurde: Die Version bleibt sichtbar, zählt aber für Reihenfolge und Gültigkeit nicht mehr. */
   zurueckgezogen?: Rueckzug
+  /** Angabe aus dem Freigabe-Dialog; steht auch im eingefrorenen Deckblatt und in Kapitel 7 bzw. Abschnitt D. Fehlt in älteren Dateien. */
+  fachlichGeprueft?: FachlichePruefung
   /**
    * Ist-Prozess bei der Freigabe als Rohstand, so wie er eingefroren und gespeichert wurde; die Prüfsumme
    * ist über ihn gerechnet. Kann ein älteres Format haben: Für Diagramm und Vergleich `eingefrorenerProzess(v)`.

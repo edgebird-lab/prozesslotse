@@ -892,6 +892,19 @@ fieldset {
 .frage-dialog .knopfreihe {
   justify-content: flex-end;
 }
+/* Fehler in Dialogen: Meldung rot direkt am Feld, das Feld rot umrandet (sonst grau wie jeder Absatz im Dialog) */
+.frage-dialog .feld-meldung {
+  color: var(--schlecht-text);
+}
+.frage-dialog input[aria-invalid='true'],
+.frage-dialog textarea[aria-invalid='true'] {
+  border-color: var(--schlecht-text);
+  box-shadow: 0 0 0 1px var(--schlecht-text);
+}
+.frage-dialog input[type='checkbox'][aria-invalid='true'] {
+  outline: 2px solid var(--schlecht-text);
+  outline-offset: 1px;
+}
 
 /* Fremde BPMN-Datei: nur ansehen */
 .fremd-flaeche {
@@ -2203,11 +2216,25 @@ input[type='date'] {
     padding: 0;
     background: #fff;
   }
-  .dokument-h1 {
+  /* Nur die großen Kapitel beginnen auf einer neuen Seite; kurze laufen weiter (typografie.ts, neueSeiteVor) */
+  .dokument-h1.neue-seite {
     break-before: page;
   }
   .dokument-deckblatt {
     break-after: page;
+  }
+  /* keine einzelne Zeile eines Absatzes allein am Seitenende oder -anfang. Edge beachtet orphans
+     und widows hier nicht (geprüft mit page.pdf: „§§ 238, 239 und 257 HGB.“ allein oben auf der
+     Seite); die Absätze sind kurz, deshalb werden sie gar nicht geteilt. */
+  .dokument p,
+  .dokument li {
+    orphans: 2;
+    widows: 2;
+    break-inside: avoid;
+  }
+  /* Formulare zum Ausfüllen (9.2 Nachweis der Einweisung, Unterschrift) nicht über zwei Seiten */
+  .dokument .tabelle-formular {
+    break-inside: avoid;
   }
   .dokument-gliederung {
     border: 0;

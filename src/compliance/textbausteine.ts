@@ -4,16 +4,34 @@
  * Formulierungen. Die Dokumente versprechen nirgends Konformität.
  */
 import { formatiereDatum } from './datum'
-import type { IsoDatum } from './typen'
+import type { Dokument, FachlichePruefung, IsoDatum } from './typen'
 
-/** A.0: Hinweis auf dem Deckblatt der Verfahrensdokumentation */
-export function hinweisVerfahrensdoku(prozess: string, stand: IsoDatum, rechtsstand: IsoDatum): string {
-  return `Vorlage, erstellt mit dem Prozesslotsen am ${formatiereDatum(stand)}. Rechtsstand ${formatiereDatum(rechtsstand)}. Vor Verwendung von der Steuerberatung prüfen lassen. Beschreibt nur den Prozess „${prozess}“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen.`
+/**
+ * Erster Satz von A.0 in einer freigegebenen Fassung (recht-5): Das Unternehmen hat sie
+ * freigegeben und trägt die Verantwortung; der Vorlagenhinweis „vor Verwendung prüfen
+ * lassen“ steht nur auf Entwürfen.
+ */
+const AUS_VORLAGE = 'Aus einer Vorlage mit dem Prozesslotsen erstellt; die Verantwortung für den Inhalt liegt beim Unternehmen.'
+
+/** A.0: Hinweis auf dem Deckblatt der Verfahrensdokumentation; `freigegeben` für die eingefrorene Fassung einer Version */
+export function hinweisVerfahrensdoku(prozess: string, stand: IsoDatum, rechtsstand: IsoDatum, freigegeben = false): string {
+  const anfang = freigegeben
+    ? `${AUS_VORLAGE} Eine Prüfung durch die Steuerberatung wird empfohlen. Rechtsstand ${formatiereDatum(rechtsstand)}.`
+    : `Vorlage, erstellt mit dem Prozesslotsen am ${formatiereDatum(stand)}. Rechtsstand ${formatiereDatum(rechtsstand)}. Vor Verwendung von der Steuerberatung prüfen lassen.`
+  return `${anfang} Beschreibt nur den Prozess „${prozess}“ und die Systeme darin, nicht alle Systeme des Betriebs. Gliederung angelehnt an die Muster-Verfahrensdokumentation zum ersetzenden Scannen von BStBK und DStV (Version 2.1, Stand 27.02.2026); Texte eigene Formulierungen.`
 }
 
 /** A.0 in der Fassung für das Verzeichnis */
-export function hinweisVerzeichnis(prozess: string, stand: IsoDatum, rechtsstand: IsoDatum): string {
-  return `Vorlage, erstellt mit dem Prozesslotsen am ${formatiereDatum(stand)}. Rechtsstand ${formatiereDatum(rechtsstand)}. Vor Verwendung vom Datenschutzbeauftragten oder einer fachkundigen Person prüfen lassen. Beschreibt die Verarbeitung im Prozess „${prozess}“. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018).`
+export function hinweisVerzeichnis(prozess: string, stand: IsoDatum, rechtsstand: IsoDatum, freigegeben = false): string {
+  const anfang = freigegeben
+    ? `${AUS_VORLAGE} Eine Prüfung durch den Datenschutzbeauftragten oder eine fachkundige Person wird empfohlen. Rechtsstand ${formatiereDatum(rechtsstand)}.`
+    : `Vorlage, erstellt mit dem Prozesslotsen am ${formatiereDatum(stand)}. Rechtsstand ${formatiereDatum(rechtsstand)}. Vor Verwendung vom Datenschutzbeauftragten oder einer fachkundigen Person prüfen lassen.`
+  return `${anfang} Beschreibt die Verarbeitung im Prozess „${prozess}“. Aufbau angelehnt an das Muster der Datenschutzkonferenz (Februar 2018).`
+}
+
+/** Fachliche Prüfung vor der Freigabe (recht-5), für Deckblatt, Kapitel 7 und Abschnitt D: „fachlich geprüft von X am 10.11.2026“ */
+export function geprueftText(p: FachlichePruefung): string {
+  return `fachlich geprüft von ${p.von.trim()}${p.am ? ` am ${formatiereDatum(p.am)}` : ''}`
 }
 
 /** A.1, immer: Zuordnung nach GoBD Rz. 153 */
@@ -112,8 +130,24 @@ export const GLOSSAR: [string, string][] = [
   ['Vier-Augen-Prinzip', 'Eine zweite Person prüft oder gibt frei, was eine erste erstellt hat; so fallen Fehler und Missbrauch eher auf (GoBD Rz. 100).'],
 ]
 
-/** DOCX und Druck: Fußzeile auf jeder Seite (Spezifikation 7.4) */
+/** DOCX und Druck: Fußzeile auf jeder Seite eines Entwurfs (Spezifikation 7.4) */
 export const FUSSZEILE_VORLAGE = 'Vorlage – vor Verwendung prüfen lassen'
+
+/** Entwurf oder eingefrorene Fassung einer Version? Entwürfe tragen „Entwurf“ statt einer Versionsbezeichnung. */
+export function istEntwurf(d: Dokument): boolean {
+  return d.versionText === 'Entwurf'
+}
+
+/**
+ * Fußzeile ohne Seitenzahl (Spezifikation 7.4, recht-5); Druck und DOCX hängen „ · Seite X von Y“ an.
+ * Entwurf: „Vorlage – vor Verwendung prüfen lassen · {Titel} · Entwurf“; freigegeben:
+ * „{Titel} · Version {x} · freigegeben am {Datum}“. Sie entsteht bei der Ausgabe aus dem
+ * Dokument (bei einer Version ist `stand` der Freigabetag) und gehört nicht zum Dokumenttext;
+ * Prüfsummen bleiben unberührt.
+ */
+export function fusszeile(d: Dokument): string {
+  return istEntwurf(d) ? `${FUSSZEILE_VORLAGE} · ${d.titel} · Entwurf` : `${d.titel} · Version ${d.versionText} · freigegeben am ${formatiereDatum(d.stand)}`
+}
 
 /** Hinweisband in der Oberfläche (5.4) */
 export function hinweisband(rechtsstand: IsoDatum): string {

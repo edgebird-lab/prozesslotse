@@ -155,7 +155,20 @@ export function OptionaleZahl({
  * Datum; übernommen werden nur gültige Daten zwischen 1900 und 2199. Beim Tippen des Jahres entstehen
  * Zwischenstände (z. B. 0002) oder fünfstellige Jahre; sie bleiben in der Eingabe und gelangen nicht in die Angaben.
  */
-export function DatumEingabe({ wert, onAendern, id, ariaLabel }: { wert: string | null; onAendern: (d: string | null) => void; id?: string; ariaLabel?: string }) {
+export function DatumEingabe({
+  wert,
+  onAendern,
+  id,
+  ariaLabel,
+  ungueltig,
+}: {
+  wert: string | null
+  onAendern: (d: string | null) => void
+  id?: string
+  ariaLabel?: string
+  /** Die Meldung am Feld (`CFeld` mit `fehler`) gilt diesem Datum: aria-invalid und Verweis auf die Meldung */
+  ungueltig?: boolean
+}) {
   const [text, setText] = useState<string | null>(null)
   return (
     <input
@@ -165,6 +178,8 @@ export function DatumEingabe({ wert, onAendern, id, ariaLabel }: { wert: string 
       min="1900-01-01"
       max="2199-12-31"
       aria-label={ariaLabel}
+      aria-invalid={ungueltig ? true : undefined}
+      aria-describedby={ungueltig && id ? meldungId(id) : undefined}
       value={text ?? wert ?? ''}
       onFocus={() => setText(wert ?? '')}
       onBlur={() => setText(null)}
