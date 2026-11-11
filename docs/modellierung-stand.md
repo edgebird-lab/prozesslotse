@@ -75,7 +75,7 @@ Hinweise für Schritt 3 und später:
 
 ## Schritt 3 – Unterbrechung
 
-Fertig am 2026-11-11, Commits 5d73e28 „Unterbrechungen (Randereignisse): Modell, Rechnung, BPMN und Tokenspiel“ und „Unterbrechungen: Oberfläche, Browsertests und Doku“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 3)“.
+Fertig am 2026-11-11, Commits 5d73e28 „Unterbrechungen (Randereignisse): Modell, Rechnung, BPMN und Tokenspiel“ und addb89b „Unterbrechungen: Oberfläche, Browsertests und Doku“ auf `modellierung`. Präzisierungen gegenüber dem Entwurf stehen in [modellierung-v4.md](modellierung-v4.md) unter „Umsetzung (Schritt 3)“.
 
 - [x] Typ `Unterbrechung extends Sequenz`, optionale `unterbrechungen` an Aufgabe, Teilprozess, Mehrfach; `pruefeBlock`, `entferneFremdeAbsender`
 - [x] Operationen: Kindsequenzen, Ketten-Prädikate je Glied (`gliedRahmen`, `gliedNebenlaeufig`), Rücksprung aus dem Ausnahmeweg (`zurueckZu`, auch „noch einmal von vorn“), `normalisiere`, `ausgaengeBlock`, `verlaesstBlock`, `verschiebeUnterbrechung`, `unterbrechungFuerAbschnitt`, Führung („im Ausnahmeweg … von …“, „im Nebenweg …“)
@@ -127,4 +127,4 @@ Hinweise für Schritt 4 und später:
 | Ausgang (Commit 2fac3a3) und Design-Commit | 127 in 17 Dateien | 17 |
 | Schritt 1, Abschnitt (Commit 37363b9) | 151 in 18 Dateien | 19 |
 | Schritt 2, für jedes Stück (Commit 1d799c0) | 178 in 19 Dateien | 21 |
-| Schritt 3, Unterbrechung (Commits 5d73e28 und Oberfläche) | 210 in 20 Dateien | 23 |
+| Schritt 3, Unterbrechung (Commits 5d73e28 und addb89b) | 210 in 20 Dateien | 23 |

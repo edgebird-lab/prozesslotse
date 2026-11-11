@@ -66,7 +66,8 @@ describe('Externe Teilnehmer als Pools', () => {
     }
     expect(fehler.slice(0, 5)).toEqual([])
     expect(nachrichten).toBeGreaterThan(300)
-  })
+    // 300 Layouts: mit Unterbrechungen in den Zufallsprozessen braucht das unter Last mehr als die üblichen 5 Sekunden
+  }, 60_000)
 
   it('zählt Kontakte mit dem Kunden je Vorgang wie von Hand', () => {
     // Lieferdienst: Bestellung (1) + Benachrichtigung und neuer Termin je 0,976 · 0,1 + Rechnung 0,976
