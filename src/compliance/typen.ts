@@ -292,7 +292,7 @@ export interface DokuVersion {
   prozess: Prozess
   verfahrensdoku: Dokument
   verzeichnis: Dokument
-  /** SHA-256 als Hex (64 Zeichen) über kanonisches JSON von [verfahrensdoku, verzeichnis] (6.8) */
+  /** SHA-256 als Hex (64 Zeichen) über kanonisches JSON von [prozess, verfahrensdoku, verzeichnis] (6.8) */
   pruefsumme: string
 }
 

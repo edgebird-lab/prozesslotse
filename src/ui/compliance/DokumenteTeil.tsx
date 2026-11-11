@@ -12,6 +12,7 @@ import { useApp } from '../kontext'
 import { useCompliance } from './analyse'
 import { DokumentAnsicht } from './DokumentAnsicht'
 import { FreigabeDialog } from './FreigabeDialog'
+import { PRUEFSUMME_TEXT, usePruefsummen, type PruefsummenStand } from './pruefsummen'
 
 const REITER: { art: DokumentArt; name: string }[] = [
   { art: 'verfahrensdokumentation', name: 'Verfahrensdokumentation' },
@@ -46,6 +47,7 @@ export function DokumenteTeil() {
   const dokument = art === 'verfahrensdokumentation' ? dokumente.verfahrensdoku : dokumente.verzeichnis
   const gueltig = [...c.versionen].reverse().find((v) => v.gueltigAb <= heute) ?? null
   const fehler = befunde.filter((b) => b.schwere === 'fehler').length
+  const pruefsummeVon = usePruefsummen(c.versionen)
 
   // Nach dem Drucken den Fenstertitel zurücksetzen
   const alterTitel = useRef<string | null>(null)
@@ -147,7 +149,14 @@ export function DokumenteTeil() {
         )}
       </div>
 
-      <Versionsliste versionen={c.versionen} ansicht={ansicht} onAnsehen={setAnsicht} onDocx={(v) => void docx(art === 'verfahrensdokumentation' ? v.verfahrensdoku : v.verzeichnis)} art={art} />
+      <Versionsliste
+        versionen={c.versionen}
+        ansicht={ansicht}
+        onAnsehen={setAnsicht}
+        onDocx={(v) => void docx(art === 'verfahrensdokumentation' ? v.verfahrensdoku : v.verzeichnis)}
+        art={art}
+        pruefsumme={pruefsummeVon}
+      />
 
       <div className="reiter" role="tablist" aria-label="Dokument">
         {REITER.map((r, i) => (
@@ -174,7 +183,7 @@ export function DokumenteTeil() {
         <div className="banner banner-hinweis version-banner">
           <p>
             Version {version.bezeichnung}, gültig ab {formatiereDatum(version.gueltigAb)}, freigegeben am {formatiereDatum(version.freigegebenAm)} von {version.freigegebenVon} · Prüfsumme{' '}
-            <code>{version.pruefsumme.slice(0, 12)}</code>
+            <code>{version.pruefsumme.slice(0, 12)}</code> · <PruefsummenText stand={pruefsummeVon(version)} />
           </p>
           <button type="button" className="knopf knopf-klein" onClick={() => setAnsicht(null)}>
             Zurück zum aktuellen Entwurf
@@ -209,7 +218,26 @@ export function DokumenteTeil() {
   )
 }
 
-function Versionsliste({ versionen, ansicht, onAnsehen, onDocx, art }: { versionen: DokuVersion[]; ansicht: number | null; onAnsehen: (n: number) => void; onDocx: (v: DokuVersion) => void; art: DokumentArt }) {
+/** Ergebnis des Nachrechnens; eine veränderte oder beschädigte Version fällt deutlich auf. */
+function PruefsummenText({ stand }: { stand: PruefsummenStand }) {
+  return stand === 'falsch' ? <strong className="pruefsumme-falsch">{PRUEFSUMME_TEXT.falsch}</strong> : <span className="pruefsumme-stand">{PRUEFSUMME_TEXT[stand]}</span>
+}
+
+function Versionsliste({
+  versionen,
+  ansicht,
+  onAnsehen,
+  onDocx,
+  art,
+  pruefsumme,
+}: {
+  versionen: DokuVersion[]
+  ansicht: number | null
+  onAnsehen: (n: number) => void
+  onDocx: (v: DokuVersion) => void
+  art: DokumentArt
+  pruefsumme: (v: DokuVersion) => PruefsummenStand
+}) {
   return (
     <section aria-labelledby="versionen-titel" className="versionsliste">
       <h3 id="versionen-titel">Versionen</h3>
@@ -247,6 +275,8 @@ function Versionsliste({ versionen, ansicht, onAnsehen, onDocx, art }: { version
                     <td>{aufbewahrenBisText(bis)}</td>
                     <td>
                       <code>{v.pruefsumme.slice(0, 12)}</code>
+                      <br />
+                      <PruefsummenText stand={pruefsumme(v)} />
                     </td>
                     <td>
                       <div className="knopfreihe">
@@ -265,7 +295,10 @@ function Versionsliste({ versionen, ansicht, onAnsehen, onDocx, art }: { version
           </table>
         </div>
       )}
-      <p className="leise klein">Die Prüfsumme (SHA-256) erkennt Beschädigungen und ordnet Ausdrucke einer Version zu. Vor gezielter Änderung schützt sie nicht.</p>
+      <p className="leise klein">
+        Die Prüfsumme (SHA-256) über Ablauf und beide Dokumente wird nach dem Laden nachgerechnet; so fällt auf, wenn eine Version beschädigt oder verändert wurde. Vor gezielter Änderung schützt sie nicht, weil sie sich neu
+        berechnen lässt.
+      </p>
     </section>
   )
 }

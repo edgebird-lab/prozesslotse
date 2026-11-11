@@ -38,7 +38,7 @@ describe('Freigabe (9.7)', () => {
     const projekt = leseProjektText(alsJson({ ...beispielMitCompliance(), compliance: c }))
     const v = projekt.compliance!.versionen[0]
     const umgedreht = <T,>(x: T): T => (Array.isArray(x) ? (x.map(umgedreht) as T) : x && typeof x === 'object' ? (Object.fromEntries(Object.entries(x).reverse().map(([k, w]) => [k, umgedreht(w)])) as T) : x)
-    expect(await pruefsumme(umgedreht(v.verfahrensdoku), umgedreht(v.verzeichnis))).toBe(v.pruefsumme)
+    expect(await pruefsumme({ prozess: umgedreht(v.prozess), verfahrensdoku: umgedreht(v.verfahrensdoku), verzeichnis: umgedreht(v.verzeichnis) })).toBe(v.pruefsumme)
   })
 
   it('verlangt ein späteres Gültig-ab und eine neue Bezeichnung', async () => {

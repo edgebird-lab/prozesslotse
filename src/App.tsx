@@ -30,6 +30,7 @@ import { BerichtSchritt } from './ui/schritte/BerichtSchritt'
 import { BeteiligteSchritt } from './ui/schritte/BeteiligteSchritt'
 import { DokumentierenSchritt } from './ui/schritte/DokumentierenSchritt'
 import { useComplianceMarkierungen } from './ui/compliance/analyse'
+import { useMeldeFalschePruefsummen } from './ui/compliance/pruefsummen'
 import { PruefenSchritt } from './ui/schritte/PruefenSchritt'
 import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
 import { VerbessernSchritt } from './ui/schritte/VerbessernSchritt'
@@ -125,6 +126,9 @@ function Hauptfenster() {
   }, [ohneSicherung, geaendert])
 
   useEffect(() => speichereEinstellungen({ lernmodus: z.lernmodus }), [z.lernmodus])
+
+  // Prüfsummen freigegebener Versionen nach dem Laden nachrechnen; Abweichungen meldet die Kopfzeile
+  useMeldeFalschePruefsummen(z.projekt.compliance?.versionen, melde)
 
   // Fenstertitel; im Programm zeigt ein Punkt ungespeicherte Änderungen
   useEffect(() => {

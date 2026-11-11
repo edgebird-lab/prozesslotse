@@ -451,7 +451,7 @@ export interface DokuVersion {
   prozess: Prozess
   verfahrensdoku: Dokument
   verzeichnis: Dokument
-  /** SHA-256 als Hex (64 Zeichen) über kanonisches JSON von [verfahrensdoku, verzeichnis] (6.8) */
+  /** SHA-256 als Hex (64 Zeichen) über kanonisches JSON von [prozess, verfahrensdoku, verzeichnis] (6.8) */
   pruefsumme: string
 }
 
@@ -682,7 +682,7 @@ Sechs Abschnitte in der Reihenfolge von `TomBereich`. Jeder hat Kontrollkästche
 - Umschalter (`role="tablist"`): Verfahrensdokumentation · Verarbeitungsverzeichnis.
 - Knöpfe: „Drucken oder als PDF speichern“ (Hauptknopf), „Als Word-Datei (DOCX)“, „Version freigeben …“, „Geprüft, keine Änderung“ (nur mit Versionen und ohne V2; setzt `zuletztGeprueft`).
 - Vorschau: `DokumentAnsicht` rendert das gewählte Dokument als HTML. Beim Ansehen einer alten Version führt „Zurück zum aktuellen Entwurf“ zurück.
-- Versionsliste mit den Spalten Version, gültig ab, gültig bis, freigegeben am und von, geänderte Kapitel, aufbewahren bis, Prüfsumme (12 Zeichen). Je Zeile die Knöpfe „Ansehen“ und „DOCX“.
+- Versionsliste mit den Spalten Version, gültig ab, gültig bis, freigegeben am und von, geänderte Kapitel, aufbewahren bis, Prüfsumme (12 Zeichen und Ergebnis des Nachrechnens, 6.8). Je Zeile die Knöpfe „Ansehen“ und „DOCX“.
 - Versionen lassen sich nicht ändern oder löschen.
 
 **Freigabe-Dialog** (`<dialog>` mit `aria-labelledby`):
@@ -909,8 +909,10 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 
 - **Kapitelschlüssel:** Nummer der nächsten Überschrift der Ebene 1 oder 2; Ebene 3 zählt zu ihrer Ebene 2. Ausnahme: alles in Kapitel 4 zählt zu „4“, weil sich sonst Nummern verschieben. Ausgenommen vom Vergleich sind Deckblatt, Gliederung und Kapitel 7 sowie im Verzeichnis Abschnitt D. Kapitel 1 wird verglichen, damit ein Wechsel der Geschäftsleitung V2 auslöst; seine Versionsangaben sind beim Vergleich gleich, weil der Kontext von v gilt. Präfixe: „VD “ und „VVT “.
 - **Vergleich:** `geaenderteKapitel(v, projekt)` erzeugt beide Dokumente neu, und zwar mit dem Kontext von v: `version = v`, Historie bis v, `bezugsjahr = Jahr(v.gueltigAb)`, `heute = v.freigegebenAm`. Dann vergleicht es je Schlüssel die JSON-Darstellung der Abschnitte mit dem eingefrorenen Stand. So zählen nur fachliche Änderungen.
-- **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. So ändern Laden, Prüfen und Speichern die Prüfsumme nie. Gespeichert wird sie als Hex.
-- Die Prüfsumme erkennt Beschädigungen und ordnet Ausdrucke einer Version zu. Sie schützt nicht vor gezielter Änderung; so steht es auch in der App.
+- **Freigabe:** `freigeben(projekt, eingaben, heute): Promise<DokuVersion>` prüft die Eingaben (5.4). Es friert `prozess` (tiefe Kopie), beide Dokumente und `geaenderteKapitel` ein. Die Prüfsumme entsteht mit `crypto.subtle.digest('SHA-256', …)` über kanonisches JSON von `[prozess, verfahrensdoku, verzeichnis]`: Objektschlüssel sortiert, ohne Leerraum, UTF-8. Der eingefrorene Prozess gehört dazu, weil aus ihm das Diagramm der Anlage 9.1 entsteht. So ändern Laden, Prüfen und Speichern die Prüfsumme nie. Gespeichert wird sie als Hex.
+- **Nachrechnen:** Nach dem Laden rechnet die App die Prüfsumme jeder Version asynchron nach (`pruefsummeStimmt`, je Version einmal). Die Versionsliste zeigt je Version „Prüfsumme stimmt“ oder deutlich „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, ebenso das Banner beim Ansehen einer Version; eine Abweichung meldet zusätzlich die Kopfzeile. Ohne Web Crypto (kein sicherer Kontext) steht dort „Prüfsumme nicht nachgerechnet“, ohne Fehlalarm.
+- Die Prüfsumme erkennt so Beschädigungen und Änderungen außerhalb der App. Sie schützt nicht vor gezielter Änderung, weil sie sich neu berechnen lässt; so steht es auch in der App.
+- Freigaben entstehen im aktuellen Format 3; die Migration aus Format 1 und 2 betrifft nur von Hand erzeugte Dateien. Eine künftige Formatmigration eingefrorener Prozesse ändert deren JSON und damit die nachgerechnete Prüfsumme. Sie muss deshalb die Prüfsumme vor der Umstellung nachrechnen oder den Stand vor der Migration bewahren.
 - Nach einem App-Update mit geänderten Textbausteinen kann V2 erscheinen. Der Befund nennt die Kapitel; eine neue Freigabe löst ihn.
 
 ### 6.9 Feste Textbausteine (eigene Formulierungen)
@@ -1067,7 +1069,7 @@ Das Programm ist seit Commit `90aaba0` umgesetzt (`src-tauri`, `src/plattform`).
 - **Browser-Speicher:** `localStorage` ist unverschlüsselt. Die App weist im Menüpunkt „Daten im Browser löschen“ auf gemeinsam genutzte Rechner hin.
 - **Laden:** `validiereCompliance` prüft jede Datei streng (4.4). Unbekannte Werte lösen einen `Formatfehler` aus, keinen Absturz. Ist nur der Compliance-Teil fehlerhaft, lässt sich der Prozess allein öffnen (4.4).
 - **Ausgabe:** React maskiert alle Texte, kein `dangerouslySetInnerHTML`. `docx` erzeugt XML mit Maskierung. Der BPMN-Export maskiert wie bisher mit `esc`.
-- **Integrität:** Die Prüfsumme erkennt Beschädigung, nicht Manipulation; der Text in der App sagt das.
+- **Integrität:** Die Prüfsumme über eingefrorenen Prozess und beide Dokumente wird nach dem Laden nachgerechnet (6.8). Sie erkennt Beschädigung, nicht Manipulation; der Text in der App sagt das.
 - **Rechtlicher Rahmen:** Hinweis A.0 auf Deckblatt, Fußzeile und Hinweisband; „Entwurf“ bis zur Freigabe; Rechtsstand in jedem Dokument; nirgends „GoBD-konform“, „DSGVO-konform“ oder „rechtssicher“ (Test in 9.6). Befunde sind als Hinweise formuliert („prüfen“, „klären“), nicht als Rechtsauskunft. Die README nennt Grenzen und schließt eine Gewähr für Vollständigkeit aus.
 - **Abhängigkeiten:** ein neues Paket (`docx`, exakt gepinnt) mit zwei Abhängigkeiten, alle MIT, im Lockfile festgehalten. Lizenzen stehen in der README.
 - **Windows-Programm:** Dateibefehle nur für vom Nutzer gewählte Pfade (wie `speichern_unter`), CSP unverändert.
@@ -1218,6 +1220,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | --- | --- |
 | `freigeben(9.1, { '1.0', gültig ab '2026-11-11', von 'Erika Mustermann' }, '2026-11-11')` | Nummer 1, `geaenderteKapitel` leer, Prüfsumme 64 Hex-Zeichen; zweiter Aufruf gleiche Prüfsumme |
 | Version speichern, laden, Schlüssel der Dokumente in anderer Reihenfolge | Prüfsumme neu berechnet gleich der gespeicherten |
+| Absatz einer gespeicherten Version oder ihr eingefrorener Prozess in der Datei geändert | lädt; `pruefsummeStimmt` ist false, die Versionsliste zeigt „Prüfsumme stimmt nicht – Version wurde verändert oder ist beschädigt“, die Kopfzeile nennt die Version |
 | zweite Freigabe mit gültig ab `'2026-11-11'` | Fehler „Gültig ab muss nach dem 11.11.2026 liegen.“ |
 | nach Freigabe „Rechnung freigeben“ in „Rechnung prüfen und freigeben“ umbenennen | `geaenderteKapitel` = `['VD 3.2', 'VD 3.3', 'VD 4']`, Verzeichnis unverändert; Befund V2 |
 | Version 2 gültig ab `'2027-04-01'` | Version 1: gültig bis `'2027-03-31'`, aufbewahren bis `'2037-12-31'` |

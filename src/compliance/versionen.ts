@@ -1,9 +1,10 @@
 /**
  * Versionen der Compliance-Doku (Spezifikation 6.8): Freigabe, geänderte
  * Kapitel und Prüfsumme. Eine Freigabe friert den Ist-Prozess und beide
- * Dokumente ein. Die Prüfsumme (SHA-256 über kanonisches JSON) erkennt
- * Beschädigungen und ordnet Ausdrucke einer Version zu; vor gezielter Änderung
- * schützt sie nicht.
+ * Dokumente ein. Die Prüfsumme (SHA-256 über kanonisches JSON von
+ * eingefrorenem Prozess und beiden Dokumenten) rechnet die App nach dem Laden
+ * nach; so fallen beschädigte oder veränderte Versionen auf. Vor gezielter
+ * Änderung schützt sie nicht, weil sie sich neu berechnen lässt.
  */
 import type { Prozess } from '../modell/typen'
 import { formatiereDatum, istIsoDatum, jahrVon } from './datum'
@@ -64,11 +65,19 @@ export function pruefeFreigabe(c: ComplianceProjekt, e: FreigabeEingaben): strin
   return null
 }
 
-/** SHA-256 als Hex über das kanonische JSON beider Dokumente. */
-export async function pruefsumme(verfahrensdoku: Dokument, verzeichnis: Dokument): Promise<string> {
-  const daten = new TextEncoder().encode(kanonischesJson([verfahrensdoku, verzeichnis]))
+/** Was die Prüfsumme abdeckt: der eingefrorene Prozess (Diagramm der Anlage) und beide Dokumente. */
+export type VersionInhalt = Pick<DokuVersion, 'prozess' | 'verfahrensdoku' | 'verzeichnis'>
+
+/** SHA-256 als Hex über das kanonische JSON von [prozess, verfahrensdoku, verzeichnis]. */
+export async function pruefsumme(v: VersionInhalt): Promise<string> {
+  const daten = new TextEncoder().encode(kanonischesJson([v.prozess, v.verfahrensdoku, v.verzeichnis]))
   const hash = await globalThis.crypto.subtle.digest('SHA-256', daten)
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Rechnet die Prüfsumme einer gespeicherten Version nach; false, wenn die Version verändert oder beschädigt ist. */
+export async function pruefsummeStimmt(v: DokuVersion): Promise<boolean> {
+  return (await pruefsumme(v)) === v.pruefsumme
 }
 
 /** Friert Ist-Prozess und beide Dokumente als neue Version ein; wirft `FreigabeFehler` bei ungültigen Eingaben. */
@@ -87,7 +96,8 @@ export async function freigeben(ist: Prozess, c: ComplianceProjekt, e: FreigabeE
   }
   const kx: DokuKontext = { version: kopf, historie: [...c.versionen.map(kopfVon), kopf], bezugsjahr: jahrVon(e.gueltigAb), heute }
   const { verfahrensdoku, verzeichnis } = erzeugeDokumente(ist, c, kx)
-  return { ...kopf, prozess: structuredClone(ist), verfahrensdoku, verzeichnis, pruefsumme: await pruefsumme(verfahrensdoku, verzeichnis) }
+  const prozess = structuredClone(ist)
+  return { ...kopf, prozess, verfahrensdoku, verzeichnis, pruefsumme: await pruefsumme({ prozess, verfahrensdoku, verzeichnis }) }
 }
 
 /** Vorschlag für die Bezeichnung der nächsten Version: „{nummer}.0“, notfalls mit Zusatz. */
