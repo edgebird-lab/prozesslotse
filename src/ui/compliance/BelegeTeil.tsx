@@ -128,7 +128,8 @@ function NeueUnterlage({ onAngelegt }: { onAngelegt: (id: Id) => void }) {
       }}
     >
       <h4 id={`${nameId}-titel`}>Neue Unterlage</h4>
-      <TextFeld label="Name, z. B. „Ausgangsrechnung“" wert={name} onAendern={setName} />
+      {/* Ziel von „Beheben“ bei Regel B10 (keine Unterlage angelegt) */}
+      <TextFeld id="ziel-datenobjekt" label="Name, z. B. „Ausgangsrechnung“" wert={name} onAendern={setName} />
       <CFeld label="In welchem Schritt entsteht es?">
         {(id) => (
           <select id={id} value={entstehtIn} onChange={(e) => setEntstehtIn(e.target.value)}>

@@ -10,7 +10,7 @@ Die Erweiterung erzeugt aus dem modellierten Ablauf die **GoBD-Verfahrensdokumen
 | --- | --- | --- |
 | Gliederung „des Musters von BStBK und DStV“ | Das gemeinsame Muster gilt nur für das **ersetzende Scannen** (Version 2.1, Stand 27.02.2026). Das Muster zur Belegablage stammt von der AWV (Muster, Ziff. 0.3). | Die Gliederung der Kapitel 1–3 und 6–9 ist allgemein und wird übernommen, die Texte nicht (3.4). Kapitel 4 beschreibt den modellierten Ablauf statt des Scannens. Das Muster sieht solche Ergänzungen vor (Ziff. 0.1 [9]). |
 | Aufbewahrung „nach BEG IV 8 Jahre“ (steht bei Idee 1, gilt hier ebenso) | Gilt für Buchungsbelege. Bücher und Organisationsunterlagen: 10 Jahre, Geschäftsbriefe und sonstige Unterlagen: 6 Jahre (§ 147 Abs. 3 AO). Das Muster empfiehlt einheitlich mindestens 10 Jahre (Ziff. 2.3 [2]). | Frist je Unterlagenart. Längere Aufbewahrung personenbezogener Daten braucht eine Begründung (Regel D7). |
-| Aufwand „S“ | Zwei Dokumente, Versionen, 39 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
+| Aufwand „S“ | Zwei Dokumente, Versionen, 40 Prüfregeln, acht Teilschritte, DOCX-Export, eigene Tabellen für Unterlagen | rund 30 Arbeitstage (Abschnitt 11) |
 | (nicht in der Idee) Das Prozessmodell wächst parallel auf Dateiformat 3 (`docs/modellierung-v3.md`). ODER und externe Teilnehmer sind umgesetzt (Commits `4f8ee69`, `915e957`); Teilprozess, für jede Position, Unterbrechung und Abbruch folgen. | Kapitel 4 muss alle Bausteine beschreiben können. Datenobjekte gehören nicht zu Format 3 und sind auch sonst nirgends spezifiziert oder geplant. | Satzbausteine für alle Bausteine aus Format 3 (6.6.1); externe Teilnehmer erscheinen in Kapitel 2.6 und als Vorschläge für Empfänger. Unterlagen und Ablageorte führt die Erweiterung selbst (4.1). |
 | Angaben „über BPMN-`extensionElements`“ | Das ganze Projekt reist schon heute im BPMN-Export mit (`src/bpmn/einbettung.ts`). Damit stecken auch Compliance-Angaben und Versionen in jeder BPMN-Datei. | keine eigenen BPMN-Erweiterungen; BPMN-Export wahlweise ohne Compliance-Angaben (Abschnitt 8) |
 | Lokales LLM zum Formulieren | Widerspricht „ohne KI“ und macht Ausgaben schwer testbar | feste Satzbausteine, kein LLM |
@@ -30,7 +30,7 @@ In vielen Kleinbetrieben fehlen zwei Pflichtdokumente: die Verfahrensdokumentati
 3. **Unterlagen und Ablageorte** (fachlich Datenobjekte und Datenspeicher) mit „entsteht in“ und „genutzt in“ als eigene Tabellen in den Compliance-Angaben. Das BPMN-Diagramm zeigt sie im MVP nicht (4.1).
 4. **Verfahrensdokumentation** in der Gliederung des Musters von BStBK und DStV (Version 2.1); Kapitel 4 entsteht aus dem Ablauf.
 5. **Verzeichnis von Verarbeitungstätigkeiten** nach Art. 30 Abs. 1 lit. a–g im Aufbau des DSK-Musters, mit TOM-Übersicht in den sechs Bereichen nach Art. 32 Abs. 1 DSGVO.
-6. **Lückenprüfung** mit 39 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
+6. **Lückenprüfung** mit 40 Regeln (Abschnitt 6.5) als Befunde im Stil von `pruefung.ts`, mit Sprung zur Ursache und Markierung im Diagramm.
 7. **Fristberechnung:** gesetzliche Mindestfrist je Unterlagenart, Fristende, frühestes Vernichtungs- bzw. Löschdatum.
 8. **Versionen:** Eine Freigabe friert beide Dokumente ein (gültig ab, freigegeben am und von, Änderung, geänderte Kapitel, SHA-256-Prüfsumme). Befunde, wenn sich seit der Freigabe etwas geändert hat oder sie älter als 365 Tage ist.
 9. **Export** als DOCX (Bibliothek `docx`) und über die Druckansicht als PDF. Jede Ausgabe trägt den Hinweis „Vorlage zur Prüfung …“, nicht freigegebene Stände zusätzlich „Entwurf“.
@@ -575,7 +575,7 @@ TOM-Vorschläge je Bereich (eigene Kurzformulierungen, angelehnt an DSK Ziff. 6.
 - Schrittleiste: Rahmen · Beteiligte · Ablauf · Prüfen · Verbessern · **Dokumentieren** · Bericht.
 - Links das Panel mit einer Teilschritt-Leiste (`<nav aria-label="Teilschritte">`), rechts die Bühne mit dem Ist-Diagramm. Im Teilschritt „Dokumente“ nutzt der Inhalt die volle Breite wie der Bericht.
 - Beim Wechsel in „Dokumentieren“ schaltet die Ansicht auf Ist; der Ist-Soll-Umschalter ist dort ausgeblendet. Ein Satz erklärt: „Die Dokumentation beschreibt den Ist-Prozess.“
-- Jeder Teilschritt zeigt in der Leiste ein Häkchen, wenn es dort keinen Fehler und keine Warnung gibt, sonst die Zahl offener Punkte. Beispiel für Screenreader: „Belege und Daten, 2 offene Punkte“.
+- Jeder Teilschritt zeigt in der Leiste die Zahl offener Punkte (Fehler und Warnungen). Ohne offene Punkte zeigt er ein Häkchen, aber erst, wenn dort etwas eingetragen ist (`hatAngaben`, 6.10); sonst einen grauen Kreis. Screenreader: „Belege und Daten, 2 offene Punkte“, „…, keine offenen Punkte“ bzw. „…, noch nichts eingetragen“. Das Häkchen verspricht keine Vollständigkeit.
 - Ein Klick auf eine Aufgabe im Diagramm filtert im aktiven Teilschritt auf diese Aufgabe (Belege, Kontrollen).
 - Jeder Teilschritt hat einen Lernhinweis mit Quelle (eigene Liste `COMPLIANCE_LERNINHALTE`, Darstellung wie `Lernhinweis`, ohne BPMN-Symbol).
 - Alle Änderungen laufen über die Aktion `compliance` mit `gruppe` je Feld, damit Tippen ein Rückgängig-Schritt bleibt.
@@ -804,6 +804,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | B7 | Elektronisches Original nicht aufbewahrt | Fehler bei Form `strukturiert`, sonst Hinweis | Art in PFLICHTIG, Form `bild`, `strukturiert` oder `datensatz`, Ablageform `umgewandelt` | `strukturiert`: „Bei „{d}“ muss der strukturierte Teil aufbewahrt werden, z. B. die XML-Datei. Nur ein PDF genügt nicht.“ Sonst: „„{d}“ liegt nur umgewandelt vor. Prüfen, ob die Voraussetzungen der GoBD Rz. 135 erfüllt sind; sonst das Original zusätzlich aufbewahren.“ | GoBD Rz. 119, 131, 135 (Fassung 14.07.2025) | belege |
 | B8 | Ersetzendes Scannen dokumentieren | Hinweis | Form `papier`, Ablageform `scan`, `originalVernichtet = true` | „„{d}“ wird gescannt und das Papier vernichtet. Dafür braucht es eine eigene Verfahrensbeschreibung, z. B. nach dem Muster von BStBK und DStV.“ Bei Art `buecher` zusätzlich: „Jahresabschlüsse und Eröffnungsbilanz sind im Original aufzubewahren.“ | GoBD Rz. 136; bei `buecher`: GoBD Rz. 136, 140; § 147 Abs. 2 AO; § 257 Abs. 3 HGB | belege |
 | B9 | Abtippen ohne Erfassungskontrolle | Hinweis | Aufgabe A mit Übertragung schreibt ein Objekt d mit Art `buchungsbeleg` oder `buecher`; keine Prüfung oder Freigabe liest d nach A (spätere Position im Ablauf wie bei `nummern`); keine weitere Kontrolle mit `bezugAufgabeId = A.id` | „In „{A}“ wird „{d}“ von Hand übertragen, und keine Kontrolle prüft das Ergebnis.“ | GoBD Rz. 100 | kontrollen |
+| B10 | Keine Unterlagen angelegt | Warnung | Der Ist-Prozess hat mindestens eine Aufgabe, und es gibt keine Unterlage | „Für den Ablauf ist noch keine Unterlage angelegt. Lege an, welche Belege und Daten in den Schritten entstehen oder genutzt werden.“ „Beheben“ springt zum Namensfeld von „Neue Unterlage“ (`ziel-datenobjekt`). | GoBD Rz. 151, 152; Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D1 | Personenbezug ungeklärt | Hinweis | `personenbezogen = null` | „Enthält „{d}“ Angaben zu Personen, z. B. Name, Anschrift oder Telefonnummer?“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D2 | Betroffene oder Datenkategorien fehlen | Warnung | personenbezogen und (Betroffene leer oder Datenkategorien leer) | „Für „{d}“ fehlen {betroffene Personen / Datenkategorien}.“ | Art. 30 Abs. 1 lit. c DSGVO | belege |
 | D3 | Rechtsgrundlage fehlt | Warnung | personenbezogen und keine Rechtsgrundlage | „Auf welcher Grundlage werden die Daten in „{d}“ verarbeitet?“ | Art. 6 Abs. 1 DSGVO | belege |
@@ -831,7 +832,7 @@ Für jede Aufgabe F mit `art = 'freigabe'` oder mit `art = 'pruefung'` und Kontr
 | V2 | Geändert seit der letzten Freigabe | Warnung | `geaenderteKapitel` gegenüber der letzten Version nicht leer (6.8) | „Seit Version {x} geändert: {Kapitel}. Neue Version freigeben, damit Dokumentation und Praxis übereinstimmen.“ | GoBD Rz. 154 | dokumente |
 | V3 | Überprüfung fällig | Hinweis | Versionen vorhanden, V2 trifft nicht zu, `tageZwischen(max(letzte freigegebenAm, zuletztGeprueft), heute) > 365` | „Die letzte Prüfung ist {n} Tage her. Einmal im Jahr prüfen, ob alles noch stimmt.“ | Art. 32 Abs. 1 lit. d DSGVO; 365 Tage als Annahme | dokumente |
 
-Zusammen 39 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
+Zusammen 40 Regeln. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7). Platzhalter: `{d}` Datenobjekt, `{s}` System, `{A}` Aufgabe, `{k}` Kontrolle.
 
 ### 6.6 Verfahrensdokumentation erzeugen
 
@@ -949,7 +950,7 @@ Letztes Unterkapitel „4.{n+1} Aufbewahrung, Vernichtung und Löschung“: je O
 
 - `uebernimmFirmenangaben(ziel, quelle)`: kopiert `unternehmen`, `toms`, `einweisung`, `loeschung`, `begruendungLaengereAufbewahrung`; alles andere bleibt.
 - `gestricheneKontrollen(projekt, kandidat: Prozess): Id[]`: Ids aus `kontrollen`, deren Aufgabe im Ist existiert, im Kandidaten aber nicht. Betroffen ist heute die Regel `freigabe` aus `src/analyse/regeln.ts` (Vorschlag „Freigabe „…“ streichen“). Im Schritt „Verbessern“ zeigt ein Vorschlag dann: „„{Aufgabe}“ ist in der Verfahrensdokumentation als Kontrolle eingetragen. Wird sie gestrichen, braucht es einen Ersatz, z. B. eine Stichprobe.“
-- Fortschritt je Teilschritt: vollständig, wenn kein Befund der Schwere Fehler oder Warnung mit diesem Teilschritt existiert.
+- Stand je Teilschritt (`fortschritt.ts`): offene Punkte = Befunde der Schwere Fehler oder Warnung mit diesem Teilschritt (`offenePunkte`). Ohne offene Punkte zeigt die Leiste ein Häkchen nur, wenn `hatAngaben(k, t)` gilt, sonst einen grauen Kreis. `hatAngaben` heißt: Unternehmen: ein Feld von `unternehmen` oder `verarbeitung` gefüllt (ohne die vorbelegte laufende Nummer und ohne die Zwecke); Belege: eine Unterlage oder ein Zweck; Systeme: Angaben zu einem System im Einsatz; Fristen: eine gewählte Frist, eine Löschfrist, die Begründung oder die Löschorganisation; Kontrollen: Angaben zu einer Prüfung oder Freigabe im Ablauf, eine weitere Kontrolle oder die Einweisung; Schutzmaßnahmen: eine Maßnahme oder Begründung; Lücken: einer dieser sechs; Dokumente: eine freigegebene Version. Leerzeichen zählen nicht.
 
 ## 7. Technik
 
@@ -979,7 +980,8 @@ src/compliance/            Fachlogik ohne React, vollständig getestet
   datum.ts                 ISO-Datum: prüfen, formatieren, addieren
   fristen.ts               Mindestfrist, Fristende, Texte
   ableitung.ts             Ersteller, Nutzer, Systeme mit Daten, vorigeAufgabe
-  regeln.ts                pruefeCompliance: Lückenprüfung (39 Regeln)
+  regeln.ts                pruefeCompliance: Lückenprüfung (40 Regeln)
+  fortschritt.ts           hatAngaben: Stand der Teilschritte (6.10)
   dokument.ts              Kapitelschlüssel, Vergleich
   ablauftext.ts            Kapitel 4 aus dem Baum
   verfahrensdoku.ts        Generator Verfahrensdokumentation
@@ -1186,6 +1188,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 | Form `bild`, Richtung `ausgang`, nur Papierablage, aus einer Tabelle, Art `sonstige` bzw. `buecher` / `geschaeftsbrief`, `buchungsbeleg`, `lieferschein` | B6 Fehler / B6 Hinweis |
 | Maßnahme nur aus Leerzeichen | T1 |
 | Warenwirtschaft im Drittland mit Garantie, ohne / mit Bewilligung; ohne Personenbezug; Standort unbekannt | S7 Warnung / kein S7; S7 Warnung; S7 Hinweis |
+| Ablauf mit Aufgaben, keine Unterlage / ohne Aufgaben | B10 / kein B10 |
 
 ### 9.5 Gesamttest Testdaten
 
@@ -1274,6 +1277,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 6. axe in allen acht Teilschritten und im Freigabe-Dialog, hell und dunkel: keine schweren oder kritischen Befunde.
 7. Tastatur: Teilschritte, Chips und Dialog vollständig ohne Maus bedienbar.
 8. „Verbessern“: Vorschlag „Freigabe „Rechnung freigeben“ streichen“ zeigt den Hinweis auf die dokumentierte Kontrolle.
+9. Neues Projekt mit einer Aufgabe: Teilschritte ohne Angaben zeigen den grauen Kreis („noch nichts eingetragen“), „Belege und Daten“ einen offenen Punkt (B10); „Beheben“ setzt den Fokus auf das Namensfeld von „Neue Unterlage“. Im Beispiel ohne Befunde heißt es „Keine Lücken gefunden. Die Prüfung findet keine fehlenden oder widersprüchlichen Angaben; ob sie stimmen, prüft die App nicht.“
 
 ### 9.11 Fachliche Abnahme
 

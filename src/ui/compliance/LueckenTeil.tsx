@@ -15,7 +15,7 @@ export function LueckenTeil({ onBeheben }: { onBeheben: (b: ComplianceBefund) =>
       <p className="zaehler">{zaehle(befunde)}</p>
       {befunde.length === 0 && (
         <p className="status status-gut">
-          <StatusSymbol art="gut" /> Keine Lücken gefunden. Die Angaben sind vollständig und widerspruchsfrei; ob sie stimmen, prüft die App nicht.
+          <StatusSymbol art="gut" /> Keine Lücken gefunden. Die Prüfung findet keine fehlenden oder widersprüchlichen Angaben; ob sie stimmen, prüft die App nicht.
         </p>
       )}
       {gruppen.map(({ t, liste }) => (

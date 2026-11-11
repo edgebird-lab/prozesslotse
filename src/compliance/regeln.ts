@@ -1,5 +1,5 @@
 /**
- * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 39 Regeln.
+ * Lückenprüfung der Compliance-Doku (Spezifikation 6.4 und 6.5): 40 Regeln.
  * Die App prüft nicht, ob die Angaben stimmen, sondern ob sie vollständig und
  * widerspruchsfrei sind. Befunde sind Hinweise zum Prüfen und Klären, keine
  * Rechtsauskunft. Fehler gibt es nur bei klaren Verstößen (B2, B6, B7).
@@ -321,6 +321,18 @@ function pruefeBelege(k: Kontext, objekte: Objekt[], add: Add): void {
         ziel: { art: 'kontrolle', id: 'weitere' },
       })
     }
+  }
+  // Ohne Unterlagen bleiben Kapitel 2.4 und das Verzeichnis leer; „Beheben“ springt zum Formular für eine neue Unterlage
+  if (k.aufgaben.length > 0 && objekte.length === 0) {
+    add({
+      regel: 'B10',
+      teilschritt: 'belege',
+      schwere: 'warnung',
+      titel: 'Keine Unterlagen angelegt',
+      text: 'Für den Ablauf ist noch keine Unterlage angelegt. Lege an, welche Belege und Daten in den Schritten entstehen oder genutzt werden.',
+      quelle: 'GoBD Rz. 151, 152; Art. 30 Abs. 1 lit. c DSGVO',
+      ziel: { art: 'datenobjekt' },
+    })
   }
 }
 

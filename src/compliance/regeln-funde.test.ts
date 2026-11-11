@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { neueAufgabe } from '../modell/bausteine'
+import { neueAufgabe, neuerProzess } from '../modell/bausteine'
 import { beispielLieferdienst } from '../modell/beispiel'
 import { aendereBlock, fuegeEin } from '../modell/operationen'
 import type { Aufgabe, Prozess } from '../modell/typen'
@@ -255,6 +255,33 @@ describe('recht-21: Länder ohne Artikel in D8 und S3', () => {
     expect(finde(pruefe(warenwirtschaft({ standort: 'drittland', drittland: 'USA', garantie: 'keine' })), 'compliance:S3:med_erp')?.text).toBe(
       '„Warenwirtschaft“ verarbeitet die Daten im Drittland (USA), ohne dass eine Garantie für die Übermittlung eingetragen ist, z. B. Standardvertragsklauseln.',
     )
+  })
+})
+
+describe('bedienung-1: Ablauf ohne Unterlagen', () => {
+  const ohneUnterlagen = () =>
+    mitAngaben((c) => {
+      c.unterlagen = []
+      c.zugriffe = []
+      c.datenobjekte = {}
+    })
+
+  it('B10 warnt, wenn der Ablauf Aufgaben hat, aber keine Unterlage angelegt ist', () => {
+    const befunde = pruefe(ohneUnterlagen())
+    const b = finde(befunde, 'compliance:B10')
+    expect(b?.schwere).toBe('warnung')
+    expect(b?.teilschritt).toBe('belege')
+    expect(b?.titel).toBe('Keine Unterlagen angelegt')
+    expect(b?.text).toBe('Für den Ablauf ist noch keine Unterlage angelegt. Lege an, welche Belege und Daten in den Schritten entstehen oder genutzt werden.')
+    expect(b?.quelle).toBe('GoBD Rz. 151, 152; Art. 30 Abs. 1 lit. c DSGVO')
+    expect(b?.ziel).toEqual({ art: 'datenobjekt' })
+    expect(offenePunkte(befunde, 'belege')).toBe(1)
+  })
+
+  it('kein B10 ohne Aufgaben oder mit Unterlagen; das Beispiel bleibt bei 7 Befunden', () => {
+    expect(regeln(pruefe(ohneUnterlagen(), neuerProzess()), 'B10')).toEqual([])
+    expect(regeln(pruefe(), 'B10')).toEqual([])
+    expect(pruefe()).toHaveLength(7)
   })
 })
 
