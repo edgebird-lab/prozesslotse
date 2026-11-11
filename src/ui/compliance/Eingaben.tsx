@@ -151,10 +151,11 @@ export function Chips<T extends string>({ legende, optionen, werte, onAendern, i
 }
 
 /** Einfachauswahl aus einem Katalog als Knopfgruppe; `null` = noch nichts gewählt. */
-export function KatalogAuswahl<T extends string>({ label, katalog, wert, onAendern, spalten }: { label: string; katalog: readonly Eintrag<T>[]; wert: T | null; onAendern: (w: T) => void; spalten?: number }) {
+export function KatalogAuswahl<T extends string>({ label, katalog, wert, onAendern, spalten, id }: { label: string; katalog: readonly Eintrag<T>[]; wert: T | null; onAendern: (w: T) => void; spalten?: number; id?: string }) {
   return (
     <Auswahl<T | ''>
       label={label}
+      id={id}
       wert={wert ?? ''}
       spalten={spalten}
       optionen={katalog.map((e) => ({ wert: e.wert, text: e.text, beschreibung: e.beschreibung }))}
@@ -200,7 +201,7 @@ export function KatalogListe<T extends string>({
 type JaNein = 'ja' | 'nein' | 'offen'
 
 /** Ja · Nein · Weiß nicht für Angaben, die auch offen sein dürfen. */
-export function JaNeinOffen({ label, wert, onAendern, ohneOffen }: { label: string; wert: boolean | null; onAendern: (w: boolean | null) => void; ohneOffen?: boolean }) {
+export function JaNeinOffen({ label, wert, onAendern, ohneOffen, id }: { label: string; wert: boolean | null; onAendern: (w: boolean | null) => void; ohneOffen?: boolean; id?: string }) {
   const optionen: { wert: JaNein; text: string }[] = [
     { wert: 'ja', text: 'Ja' },
     { wert: 'nein', text: 'Nein' },
@@ -209,6 +210,7 @@ export function JaNeinOffen({ label, wert, onAendern, ohneOffen }: { label: stri
   return (
     <Auswahl<JaNein | ''>
       label={label}
+      id={id}
       spalten={optionen.length}
       wert={wert === true ? 'ja' : wert === false ? 'nein' : ohneOffen ? '' : 'offen'}
       optionen={optionen}

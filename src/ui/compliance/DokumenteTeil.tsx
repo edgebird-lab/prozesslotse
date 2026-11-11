@@ -103,6 +103,7 @@ export function DokumenteTeil() {
   return (
     <div className="teil dokumente">
       <style>{druckFuss(dokument)}</style>
+      <h3>Dokumente</h3>
       <p className="status-zeile">
         {letzte === null
           ? 'Entwurf, nicht freigegeben'

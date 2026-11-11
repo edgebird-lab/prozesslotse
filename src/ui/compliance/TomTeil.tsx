@@ -43,7 +43,7 @@ function TomBereichKarte({ wert, name, vorschlaege }: { wert: TomBereich; name: 
     <section className="karte felder" id={`ziel-tom-${wert}`} tabIndex={-1} aria-labelledby={titelId}>
       <h4 id={titelId}>{name}</h4>
       <p className="leise klein">{ERKLAERUNG[wert]}</p>
-      <Chips legende={`Maßnahmen: ${name}`} optionen={optionen} werte={t.massnahmen} onAendern={(massnahmen) => setze({ massnahmen }, 'massnahmen')} />
+      <Chips id={`ziel-tom-${wert}-massnahmen`} legende={`Maßnahmen: ${name}`} optionen={optionen} werte={t.massnahmen} onAendern={(massnahmen) => setze({ massnahmen }, 'massnahmen')} />
       <form
         className="inline-anlegen"
         onSubmit={(e) => {

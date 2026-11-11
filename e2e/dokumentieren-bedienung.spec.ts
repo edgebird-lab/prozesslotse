@@ -1,7 +1,9 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 // Browsertests zu Bedienung, Barrierefreiheit und Sprache im Schritt „Dokumentieren“, Uhr fest auf den 11.11.2026
+
+const TEILSCHRITTE = ['Unternehmen', 'Belege und Daten', 'Systeme und Dienstleister', 'Aufbewahrung und Löschung', 'Kontrollen', 'Schutzmaßnahmen', 'Lücken', 'Dokumente']
 
 const leiste = (page: Page) => page.getByRole('navigation', { name: 'Teilschritte' })
 
@@ -16,6 +18,14 @@ async function start(page: Page) {
   await schritt(page, 'Dokumentieren').click()
 }
 
+/** Liegt das Element ganz im Fenster? */
+async function imBild(l: Locator): Promise<boolean> {
+  return l.evaluate((e) => {
+    const r = e.getBoundingClientRect()
+    return r.top >= -1 && r.bottom <= window.innerHeight + 1
+  })
+}
+
 async function freigeben(page: Page) {
   await teil(page, 'Dokumente').click()
   await page.getByRole('button', { name: 'Version freigeben …' }).click()
@@ -23,6 +33,74 @@ async function freigeben(page: Page) {
   await dialog.getByRole('button', { name: 'Freigeben', exact: true }).click()
   await expect(dialog).toBeHidden()
 }
+
+async function beheben(page: Page, name: RegExp) {
+  await teil(page, 'Lücken').click()
+  await page.getByRole('button', { name }).click()
+}
+
+
+test('„Weiter“ zeigt den Anfang des nächsten Teilschritts und setzt den Fokus auf seine Überschrift', async ({ page }) => {
+  await start(page)
+  for (const name of TEILSCHRITTE.slice(1)) {
+    await page.getByRole('button', { name: `Weiter: ${name}` }).click()
+    await expect(teil(page, name)).toHaveAttribute('aria-current', 'step')
+    const ueberschrift = page.locator('.dokumentieren .teil h3').first()
+    await expect(ueberschrift, name).toBeFocused()
+    expect(await imBild(ueberschrift), name).toBe(true)
+    expect(await imBild(teil(page, name)), name).toBe(true)
+  }
+  // Ein Klick in der Leiste lässt den Fokus dort
+  await teil(page, 'Kontrollen').click()
+  await expect(teil(page, 'Kontrollen')).toBeFocused()
+})
+
+test('„Beheben“ bringt die Frage ins Bild und setzt den Fokus auf ihr Feld', async ({ page }) => {
+  await start(page)
+  // B1: Einordnung der Bestellnotiz (Karte höher als das Fenster)
+  await beheben(page, /^Beheben: Aufbewahrungsfrist fehlt/)
+  const einordnung = page.getByRole('group', { name: 'Was ist „Bestellnotiz“?' })
+  await expect(einordnung.getByRole('radio', { name: /^Weiß nicht/ })).toBeFocused()
+  expect(await imBild(einordnung)).toBe(true)
+
+  // S2: Vertrag zur Auftragsverarbeitung
+  await beheben(page, /^Beheben: Vertrag zur Auftragsverarbeitung fehlt/)
+  const av = page.getByRole('group', { name: 'Gibt es einen Vertrag zur Auftragsverarbeitung?' })
+  await expect(av.getByRole('radio', { name: 'Nein' })).toBeFocused()
+  expect(await imBild(av)).toBe(true)
+
+  // S4: Version des Systems
+  await beheben(page, /^Beheben: Programmversion fehlt/)
+  await expect(page.locator('#ziel-system-med_erp').getByLabel('Version', { exact: true })).toBeFocused()
+
+  // D6: Löschfrist der Tourenliste
+  await beheben(page, /^Beheben: Löschfrist fehlt/)
+  await expect(page.getByRole('group', { name: 'Tourenliste' }).getByRole('button', { name: 'Löschfrist festlegen' })).toBeFocused()
+
+  // K2: Nachweis der Kontrolle
+  await beheben(page, /^Beheben: Kontrolle ohne Nachweis/)
+  const nachweis = page.locator('#ziel-kontrolle-auf_kontrollieren').getByRole('group', { name: 'Wie wird die Kontrolle nachgewiesen?' })
+  await expect(nachweis.getByRole('radio', { name: 'Kein Nachweis' })).toBeFocused()
+  expect(await imBild(nachweis)).toBe(true)
+
+  // T1: erste Maßnahme des Bereichs
+  await beheben(page, /^Beheben: Schutzmaßnahmen fehlen/)
+  await expect(page.getByRole('group', { name: 'Maßnahmen: Überprüfung' }).getByRole('checkbox').first()).toBeFocused()
+})
+
+test('„Beheben“ klappt eine Unterlage mit nur Hinweisen auf und führt zur offenen Frage', async ({ page }) => {
+  await start(page)
+  await teil(page, 'Belege und Daten').click()
+  const neu = page.getByRole('form', { name: 'Neue Unterlage' })
+  await neu.getByLabel('Name, z. B. „Ausgangsrechnung“').fill('Notiz')
+  await neu.getByRole('button', { name: '+ Unterlage anlegen' }).click()
+  await page.getByRole('region', { name: 'Notiz', exact: true }).locator('label', { hasText: /^Nicht aufbewahrungspflichtig/ }).click()
+
+  await beheben(page, /^Beheben: Personenbezug ungeklärt/)
+  const frage = page.getByRole('region', { name: 'Notiz', exact: true }).getByRole('group', { name: 'Enthält es Angaben zu Personen?' })
+  await expect(frage.getByRole('radio', { name: 'Weiß nicht' })).toBeFocused()
+  expect(await imBild(frage)).toBe(true)
+})
 
 test('geänderte Kapitel stehen ausgeschrieben statt als „VD“ und „VVT“', async ({ page }) => {
   await start(page)

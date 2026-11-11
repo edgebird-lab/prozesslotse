@@ -1,4 +1,4 @@
-import { useId, useState, type FocusEvent } from 'react'
+import { useId, useState } from 'react'
 import { angaben, ersteller, nutzer, schrittText, type Kontext } from '../../compliance/ableitung'
 import { jahrVon } from '../../compliance/datum'
 import { empfaengerVorschlaege } from '../../compliance/empfaenger'
@@ -57,11 +57,14 @@ export function FilterHinweis({ k, aufgabe, aufheben, was }: { k: Kontext; aufga
   )
 }
 
-export function BelegeTeil() {
+/** `oeffnen`: Karte, die „Beheben“ ansteuert; sie ist von Anfang an offen. */
+export function BelegeTeil({ oeffnen = null }: { oeffnen?: Id | null }) {
   const { c, k, befunde, aendere } = useCompliance()
   const filter = useAufgabenFilter(k)
   // Offen sind anfangs die Karten mit Fehlern oder Warnungen; die übrigen zeigen nur eine Zusammenfassung
-  const [offen, setOffen] = useState<ReadonlySet<Id>>(() => new Set(befunde.flatMap((b) => (b.ziel?.art === 'datenobjekt' && b.ziel.id && b.schwere !== 'hinweis' ? [b.ziel.id] : []))))
+  const [offen, setOffen] = useState<ReadonlySet<Id>>(
+    () => new Set([...befunde.flatMap((b) => (b.ziel?.art === 'datenobjekt' && b.ziel.id && b.schwere !== 'hinweis' ? [b.ziel.id] : [])), ...(oeffnen ? [oeffnen] : [])]),
+  )
   const oeffne = (id: Id, an = true) =>
     setOffen((alt) => {
       const neu = new Set(alt)
@@ -178,13 +181,11 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
   const nutz = nutzer(k, id)
   const jahre = wirksameJahre(d)
   const koerperId = `unterlage-${id}-angaben`
-  // „Beheben“ setzt den Fokus auf die Karte: dann aufklappen
-  const fokus = (e: FocusEvent) => {
-    if (e.target === e.currentTarget && !offen) onOffen(true)
-  }
+  // Sprungziele für „Beheben“: die Karte und je Frage ein Feld
+  const ziel = `ziel-datenobjekt-${id}`
 
   return (
-    <section className="karte unterlage felder" id={`ziel-datenobjekt-${id}`} tabIndex={-1} aria-labelledby={titelId} onFocus={fokus}>
+    <section className="karte unterlage felder" id={ziel} tabIndex={-1} aria-labelledby={titelId}>
       <div className="teil-kopf">
         <h4 id={titelId}>{name}</h4>
         <button
@@ -223,7 +224,7 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
             </details>
           )}
 
-          <KatalogAuswahl label={`Was ist „${name}“?`} katalog={AUFBEWAHRUNGSARTEN} wert={d.aufbewahrungsart} spalten={2} onAendern={(aufbewahrungsart) => setze({ aufbewahrungsart }, 'art')} />
+          <KatalogAuswahl id={`${ziel}-art`} label={`Was ist „${name}“?`} katalog={AUFBEWAHRUNGSARTEN} wert={d.aufbewahrungsart} spalten={2} onAendern={(aufbewahrungsart) => setze({ aufbewahrungsart }, 'art')} />
           <p className="feld-hilfe">
             {istPflichtig(d.aufbewahrungsart)
               ? `Aufbewahrung: ${aufbewahrungText(d)}${jahre !== null ? `; aus ${jahrVon(heute)} also ${beispielBis(d, jahrVon(heute))}` : ''}.`
@@ -234,28 +235,28 @@ function UnterlageKarte({ id, name, offen, onOffen }: { id: Id; name: string; of
           <KatalogAuswahl label="Wie kommt es an oder entsteht es?" katalog={BELEGFORMEN} wert={d.form} spalten={2} onAendern={(form) => setze({ form }, 'form')} />
           <KatalogAuswahl label="Woher kommt es, wohin geht es?" katalog={RICHTUNGEN} wert={d.richtung} spalten={3} onAendern={(richtung) => setze({ richtung }, 'richtung')} />
           <Ablage id={id} d={d} setze={setze} />
-          <KatalogAuswahl label="In welcher Form wird es aufbewahrt?" katalog={ABLAGEFORMEN} wert={d.ablageform} spalten={2} onAendern={(ablageform) => setze({ ablageform }, 'ablageform')} />
+          <KatalogAuswahl id={`${ziel}-ablageform`} label="In welcher Form wird es aufbewahrt?" katalog={ABLAGEFORMEN} wert={d.ablageform} spalten={2} onAendern={(ablageform) => setze({ ablageform }, 'ablageform')} />
           {d.form === 'papier' && d.ablageform === 'scan' && (
-            <JaNeinOffen label="Wird das Papier nach dem Scannen vernichtet?" wert={d.originalVernichtet} onAendern={(originalVernichtet) => setze({ originalVernichtet }, 'vernichtet')} />
+            <JaNeinOffen id={`${ziel}-vernichtet`} label="Wird das Papier nach dem Scannen vernichtet?" wert={d.originalVernichtet} onAendern={(originalVernichtet) => setze({ originalVernichtet }, 'vernichtet')} />
           )}
 
-          <JaNeinOffen label="Enthält es Angaben zu Personen?" wert={d.personenbezogen} onAendern={(personenbezogen) => setze({ personenbezogen }, 'personen')} />
+          <JaNeinOffen id={`${ziel}-personen`} label="Enthält es Angaben zu Personen?" wert={d.personenbezogen} onAendern={(personenbezogen) => setze({ personenbezogen }, 'personen')} />
           {d.personenbezogen === true && (
             <div className="eingerueckt felder">
-              <Chips legende="Wer ist betroffen?" optionen={BETROFFENE} werte={d.betroffene} onAendern={(betroffene) => setze({ betroffene }, 'betroffene')} />
-              <Chips legende="Welche Daten?" optionen={DATENKATEGORIEN} werte={d.datenkategorien} onAendern={(datenkategorien) => setze({ datenkategorien }, 'kategorien')} />
+              <Chips id={`${ziel}-betroffene`} legende="Wer ist betroffen?" optionen={BETROFFENE} werte={d.betroffene} onAendern={(betroffene) => setze({ betroffene }, 'betroffene')} />
+              <Chips id={`${ziel}-kategorien`} legende="Welche Daten?" optionen={DATENKATEGORIEN} werte={d.datenkategorien} onAendern={(datenkategorien) => setze({ datenkategorien }, 'kategorien')} />
               <details className="aufklapp">
                 <summary>
                   Besonders geschützte Daten (Art. 9 und 10 DSGVO){d.besondereKategorien.length > 0 || d.strafrechtlich ? ': angegeben' : ''}
                 </summary>
-                <Chips legende="Besondere Kategorien" optionen={BESONDERE_KATEGORIEN} werte={d.besondereKategorien} onAendern={(besondereKategorien) => setze({ besondereKategorien }, 'besondere')} />
+                <Chips id={`${ziel}-besondere`} legende="Besondere Kategorien" optionen={BESONDERE_KATEGORIEN} werte={d.besondereKategorien} onAendern={(besondereKategorien) => setze({ besondereKategorien }, 'besondere')} />
                 <Schalter an={d.strafrechtlich} onAendern={(strafrechtlich) => setze({ strafrechtlich }, 'straf')}>
                   Daten über strafrechtliche Verurteilungen und Straftaten
                 </Schalter>
               </details>
-              <Chips legende="Warum dürfen die Daten verarbeitet werden?" optionen={RECHTSGRUNDLAGEN} werte={d.rechtsgrundlagen} onAendern={(rechtsgrundlagen) => setze({ rechtsgrundlagen }, 'grundlagen')} />
+              <Chips id={`${ziel}-grundlagen`} legende="Warum dürfen die Daten verarbeitet werden?" optionen={RECHTSGRUNDLAGEN} werte={d.rechtsgrundlagen} onAendern={(rechtsgrundlagen) => setze({ rechtsgrundlagen }, 'grundlagen')} />
               {d.rechtsgrundlagen.includes('interesse') && (
-                <TextFeld label="Welches Interesse?" mehrzeilig wert={d.berechtigtesInteresse} onAendern={(berechtigtesInteresse) => setze({ berechtigtesInteresse }, 'interesse')} />
+                <TextFeld id={`${ziel}-interesse`} label="Welches Interesse?" mehrzeilig wert={d.berechtigtesInteresse} onAendern={(berechtigtesInteresse) => setze({ berechtigtesInteresse }, 'interesse')} />
               )}
               <EmpfaengerListe d={d} setze={setze} teilnehmer={ist.teilnehmer.map((t) => t.name.trim()).filter(Boolean)} />
             </div>
@@ -288,7 +289,7 @@ function Ablage({ id, d, setze }: { id: Id; d: DatenobjektAngaben; setze: (w: Pa
     setMedium('')
   }
   return (
-    <div className="felder">
+    <div className="felder" id={`ziel-datenobjekt-${id}-ablage`}>
       {optionen.length > 0 ? (
         <Chips legende="Wo wird es aufbewahrt?" optionen={optionen} werte={d.ablageSpeicherIds} onAendern={(ablageSpeicherIds) => setze({ ablageSpeicherIds }, 'ablage')} />
       ) : (
@@ -332,14 +333,15 @@ function EmpfaengerListe({ d, setze, teilnehmer }: { d: DatenobjektAngaben; setz
         <fieldset key={e.id} className="empfaenger eingerueckt">
           <legend>Empfänger {i + 1}</legend>
           <div className="feldreihe">
-            <TextFeld label="Kategorie" platzhalter="z. B. Steuerberatung" wert={e.kategorie} onAendern={(kategorie) => aendereEmpfaenger(e, { kategorie }, 'kategorie')} />
-            <TextFeld label="Name" platzhalter="z. B. Kanzlei Beispiel" wert={e.name} onAendern={(name) => aendereEmpfaenger(e, { name }, 'name')} />
+            <TextFeld id={`ziel-empfaenger-${e.id}-kategorie`} label="Kategorie" platzhalter="z. B. Steuerberatung" wert={e.kategorie} onAendern={(kategorie) => aendereEmpfaenger(e, { kategorie }, 'kategorie')} />
+            <TextFeld id={`ziel-empfaenger-${e.id}-name`} label="Name" platzhalter="z. B. Kanzlei Beispiel" wert={e.name} onAendern={(name) => aendereEmpfaenger(e, { name }, 'name')} />
           </div>
-          <KatalogListe label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={e.standort} onAendern={(standort) => standort && aendereEmpfaenger(e, { standort }, 'standort')} />
+          <KatalogListe id={`ziel-empfaenger-${e.id}-standort`} label="Wo werden die Daten verarbeitet?" katalog={STANDORTE} wert={e.standort} onAendern={(standort) => standort && aendereEmpfaenger(e, { standort }, 'standort')} />
           {e.standort === 'drittland' && (
             <div className="feldreihe">
               <TextFeld label="Land" wert={e.drittland} onAendern={(drittland) => aendereEmpfaenger(e, { drittland }, 'land')} />
               <KatalogListe
+                id={`ziel-empfaenger-${e.id}-garantie`}
                 label="Absicherung der Übermittlung"
                 hilfe="Steht im Vertrag oder in den Datenschutzhinweisen des Empfängers; frag im Zweifel nach."
                 katalog={GARANTIEN}

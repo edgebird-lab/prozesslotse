@@ -670,7 +670,8 @@ Die Karte zeigt: „Verarbeitet: Bestellung, Ausgangsrechnung · Bewahrt auf: Au
 **7 Lücken**
 
 - Zählerzeile wie im Schritt „Prüfen“ (`zaehle`), dann Befunde nach Teilschritt gruppiert und nach Schwere sortiert.
-- Je Befund: Symbol, Titel, Text, Quelle in kleiner Schrift, Knopf „Beheben“. Er wechselt in den Teilschritt und setzt den Fokus auf das Ziel (Element-Id `ziel-{art}-{id}`).
+- Je Befund: Symbol, Titel, Text, Quelle in kleiner Schrift, Knopf „Beheben“. Er wechselt in den Teilschritt, bringt die Frage ins Bild, die den Befund behebt, und setzt den Fokus auf ihr Feld (`feldZiel`, Element-Id `ziel-{art}-{id}-{frage}`, z. B. `ziel-datenobjekt-{id}-art` bei B1; bei einer Auswahl auf die gewählte Option). Gibt es keine einzelne Frage (K1), gilt das Ziel selbst (`ziel-{art}-{id}`). Die Karte einer Unterlage ist dann offen, zugeklappte Bereiche um das Feld klappen auf. Fragen, die höher als das Fenster sind, beginnen oben, sonst stehen sie in der Mitte.
+- „Weiter: …“ führt an den Anfang des nächsten Teilschritts: Die Teilschritt-Leiste steht oben im Bild, der Fokus auf der ersten Überschrift des Teilschritts. Jeder Teilschritt beginnt mit einer Überschrift der Ebene 3 („Lücken“ und „Dokumente“ eigens dafür). Ein Klick in der Leiste lässt den Fokus dort.
 - Befunde mit `blockId` werden im Diagramm markiert (`markierungen`).
 
 ### 5.4 Teilschritt „Dokumente“
@@ -1252,7 +1253,7 @@ Alle ohne gewählte Jahre und ohne Löschfrist. `dob_rechnung` hat den externen 
 ### 9.10 Browsertests (Playwright, Uhr fest auf 11.11.2026)
 
 1. Beispiel „Lieferdienst“ laden, „Dokumentieren“ → „Lücken“: Zählerzeile „keine Fehler · 4 Warnungen · 3 Hinweise“ (Format von `zaehle`).
-2. „Beheben“ bei B1 öffnet „Belege und Daten“ mit Fokus auf „Bestellnotiz“. „Nicht aufbewahrungspflichtig“ und eine Löschfrist von 30 Tagen ab Entstehung wählen: „keine Fehler · 3 Warnungen · 3 Hinweise“.
+2. „Beheben“ bei B1 öffnet „Belege und Daten“ mit Fokus auf der Frage „Was ist „Bestellnotiz“?“ (Option „Weiß nicht“). „Nicht aufbewahrungspflichtig“ und eine Löschfrist von 30 Tagen ab Entstehung wählen: „keine Fehler · 3 Warnungen · 3 Hinweise“.
 3. Version freigeben: Liste zeigt „1.0 · gültig ab 11.11.2026“. Im Schritt „Ablauf“ eine Aufgabe umbenennen: „Lücken“ zeigt V2 mit „Seit Version 1.0 geändert“.
 4. „Als Word-Datei“: Download mit Namen `…-verfahrensdokumentation-v1-0.docx`, größer als 5 KB.
 5. Druckansicht (`emulateMedia print`): Hinweis sichtbar, Teilschritt-Leiste unsichtbar.

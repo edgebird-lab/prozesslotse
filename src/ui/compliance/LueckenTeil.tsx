@@ -13,6 +13,7 @@ export function LueckenTeil({ onBeheben }: { onBeheben: (b: ComplianceBefund) =>
 
   return (
     <div className="teil">
+      <h3>Lücken</h3>
       <p className="zaehler">{zaehle(befunde)}</p>
       {befunde.length === 0 && (
         <p className="status status-gut">
@@ -21,7 +22,7 @@ export function LueckenTeil({ onBeheben }: { onBeheben: (b: ComplianceBefund) =>
       )}
       {gruppen.map(({ t, liste }) => (
         <section key={t.id} aria-labelledby={`luecken-${t.id}`}>
-          <h3 id={`luecken-${t.id}`}>{t.name}</h3>
+          <h4 id={`luecken-${t.id}`}>{t.name}</h4>
           <ul className="befunde">
             {liste.map((b) => (
               <li key={b.schluessel} className={`befund befund-${b.schwere}`}>
