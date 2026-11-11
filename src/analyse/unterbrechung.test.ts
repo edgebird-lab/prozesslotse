@@ -514,6 +514,23 @@ describe('Unterbrechung: Prüfregeln und Schwachstellen', () => {
     expect(findeSchwachstellen(p, berechneKennzahlen(p)).find((b) => b.schluessel === `nebenweglang:${lang.id}`)?.text).toContain('2 Std.')
   })
 
+  it('nennt bei „Lange Liegezeit“ die Wartezeit bis zum Ablauf einer Frist (Befund der Prüfung: „liegt 0 Min., das sind 57 %“)', () => {
+    // Aufgabe ohne Liegezeit, 5 Min.; Frist 1 Arbeitstag (480 Min.), in 10 % überschritten, danach weiter.
+    // Dauer 0,9 · 5 + 0,1 · 480 = 52,5 Min.; Wartezeit bis zur Frist 0,1 · (480 − 5) = 47,5 Min. (90 % der Durchlaufzeit)
+    const u = neueUnterbrechung({ bezeichnung: 'Verpackung fehlt', art: 'zeit', anteil: 0.1, fristMin: 480 })
+    const a = aufgabe('Ware verpacken', 5, LAGER, 0, [u])
+    const p = prozess([a])
+    const k = berechneKennzahlen(p)
+    expect(k.durchlaufzeitMin).toBeCloseTo(52.5, 9)
+    expect(k.schritte.get(a.id)!.beitragWartenMin).toBeCloseTo(47.5, 9)
+    const text = findeSchwachstellen(p, k).find((b) => b.schluessel === `liegezeit:${a.id}`)?.text
+    expect(text).toBe('„Ware verpacken“ hält den Vorgang im Schnitt 48 Min. auf, ohne dass daran gearbeitet wird: 0 Min. Liegezeit davor und 48 Min. Warten, bis eine Frist abläuft. Das sind 90 % der Durchlaufzeit. Früher nachfassen oder die Ursache der Überschreitung klären?')
+    // Ohne Frist bleibt der gewohnte Text
+    const b = aufgabe('Ware prüfen', 5, LAGER, 60)
+    const q = prozess([b])
+    expect(findeSchwachstellen(q, berechneKennzahlen(q)).find((x) => x.schluessel === `liegezeit:${b.id}`)?.text).toMatch(/^Vor „Ware prüfen“ liegt der Vorgang 1 Std\., das sind 92 % der Durchlaufzeit\./)
+  })
+
   it('schlägt keine Zusammenlegung und keine Parallelisierung vor, die eine Unterbrechung verschieben würde', () => {
     const u = neueUnterbrechung({ bezeichnung: 'Storno', anteil: 0.1, ende: 'storniert' })
     const a = aufgabe('Ware packen', 10, LAGER, 30)

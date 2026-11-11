@@ -137,11 +137,18 @@ export function findeSchwachstellen(p: Prozess, k: Kennzahlen): Befund[] {
     if (block.typ === 'aufgabe') {
       aufgaben.set(block.id, block)
       if (kz && k.durchlaufzeitMin > 0 && kz.beitragWartenMin / k.durchlaufzeitMin >= LIEGEZEIT_SCHWELLE) {
+        // Läuft eine Frist ab, wartet der Vorgang bis zu ihrem Ende; diese Zeit zählt zur Liegezeit des Schritts, steht aber nicht in seinem Feld.
+        const liegezeit = kz.haeufigkeit * block.liegezeitMin
+        const bisFrist = kz.beitragWartenMin - liegezeit
+        const anteil = formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)
         add({
           schluessel: `liegezeit:${block.id}`,
           schwere: 'warnung',
           titel: 'Lange Liegezeit',
-          text: `Vor „${blockTitel(block)}“ liegt der Vorgang ${formatiereDauer(block.liegezeitMin, std)}, das sind ${formatiereProzent(kz.beitragWartenMin / k.durchlaufzeitMin)} der Durchlaufzeit. Ursache klären: Stapelbearbeitung, Vertretung, feste Termine?`,
+          text:
+            bisFrist > 0.5
+              ? `„${blockTitel(block)}“ hält den Vorgang im Schnitt ${formatiereDauer(kz.beitragWartenMin, std)} auf, ohne dass daran gearbeitet wird: ${formatiereDauer(liegezeit, std)} Liegezeit davor und ${formatiereDauer(bisFrist, std)} Warten, bis eine Frist abläuft. Das sind ${anteil} der Durchlaufzeit. Früher nachfassen oder die Ursache der Überschreitung klären?`
+              : `Vor „${blockTitel(block)}“ liegt der Vorgang ${formatiereDauer(block.liegezeitMin, std)}, das sind ${anteil} der Durchlaufzeit. Ursache klären: Stapelbearbeitung, Vertretung, feste Termine?`,
           blockId: block.id,
         })
       }
