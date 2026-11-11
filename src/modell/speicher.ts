@@ -89,6 +89,30 @@ function pruefeProzess(x: unknown, wo: string): asserts x is Prozess {
   fordere(Array.isArray(x.rollen) && x.rollen.every((r) => istObj(r) && istText(r.id) && istText(r.name) && istZahl(r.stundensatz) && istZahl(r.personen) && istZahl(r.verfuegbarProzent)), `${wo}: Rollen ungültig.`)
   fordere(Array.isArray(x.medien) && x.medien.every((m) => istObj(m) && istText(m.id) && istText(m.name) && istText(m.art)), `${wo}: Systeme ungültig.`)
   pruefeSequenz(x.ablauf, `${wo}, Ablauf`)
+  entferneFremdeAbsender(x as unknown as Prozess)
+}
+
+/**
+ * Ein Absender („von“) gehört nur zu Nachrichten; ein Nachrichtenfluss darf nicht an
+ * einem Zeit- oder Bedingungsereignis enden. Ältere Stände konnten ihn nach einem
+ * Wechsel der Art behalten; er wird beim Laden entfernt.
+ */
+function entferneFremdeAbsender(p: Prozess): void {
+  if (p.ausloeser.art !== 'nachricht') p.ausloeser.von = null
+  const sequenz = (schritte: Block[]) => {
+    for (const b of schritte) {
+      if (b.typ === 'warten' && b.art !== 'nachricht') b.von = null
+      if (b.typ === 'entscheidung') {
+        for (const z of b.zweige) {
+          if (z.ereignis && z.ereignis.art !== 'nachricht') z.ereignis.von = null
+          sequenz(z.schritte)
+        }
+      }
+      if (b.typ === 'parallel' || b.typ === 'oder') for (const z of b.zweige) sequenz(z.schritte)
+      if (b.typ === 'wiederholung') sequenz(b.koerper.schritte)
+    }
+  }
+  sequenz(p.ablauf.schritte)
 }
 
 /**

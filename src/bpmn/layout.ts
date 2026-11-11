@@ -590,7 +590,7 @@ export function berechneLayout(p: Prozess): Layout {
       const [oben, unten] = ausdehnung.get(k.id)!
       return unten + 4 <= y1 || oben - 4 >= y2
     })
-  const pools = externePools(p, { x: 0, y: 0, breite: 0, hoehe: y })
+  const pools = externePools(p, { x: 0, y: 0, breite: 0, hoehe: y }, t.knoten)
   const auftraege = nachrichtAuftraege(t.knoten, pools)
   const linien = fuehreLinien({
     knoten: t.knoten,
@@ -635,12 +635,17 @@ export function berechneLayout(p: Prozess): Layout {
 const POOL_HOEHE = 60
 const POOL_ABSTAND = 40
 
-/** Externe Teilnehmer abwechselnd über und unter dem Hauptpool, damit sich Nachrichtenflüsse selten kreuzen. */
-function externePools(p: Prozess, haupt: Rechteck): LayoutPool[] {
+/**
+ * Externe Teilnehmer abwechselnd über und unter dem Hauptpool: der mit den meisten
+ * Nachrichten (meist der Kunde) oben, der zweite unten. So kreuzen sich Nachrichtenflüsse selten.
+ */
+function externePools(p: Prozess, haupt: Rechteck, knoten: LayoutKnoten[]): LayoutPool[] {
   const pools: LayoutPool[] = []
   let oben = haupt.y
   let unten = haupt.y + haupt.hoehe
-  ;(p.teilnehmer ?? []).forEach((tn, i) => {
+  const anzahl = (id: Id) => knoten.filter((k) => k.an === id).length + knoten.filter((k) => k.von === id).length
+  const reihenfolge = [...(p.teilnehmer ?? [])].map((tn, i) => ({ tn, i, n: anzahl(tn.id) })).sort((a, b) => b.n - a.n || a.i - b.i)
+  reihenfolge.forEach(({ tn }, i) => {
     const lage = i % 2 === 0 ? 'oben' : 'unten'
     const y = lage === 'oben' ? (oben -= POOL_ABSTAND + POOL_HOEHE) : unten + POOL_ABSTAND
     if (lage === 'unten') unten += POOL_ABSTAND + POOL_HOEHE

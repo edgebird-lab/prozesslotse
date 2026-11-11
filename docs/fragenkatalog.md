@@ -25,18 +25,20 @@ Der Assistent stellt nur Fragen mit Auswahl, Zahl oder kurzem Text. Aus den Antw
 
 **Systeme** – „Womit wird gearbeitet?“ Je System ein Name und eine Art: Papier, Telefon, E-Mail, Tabelle, Fachanwendung, ERP-System, Sonstiges. Papier und Telefon gelten als nicht digital; Aufgaben damit werden als manuelle Aufgabe gezeichnet.
 
+**Externe Beteiligte** – „Mit wem außerhalb wird etwas ausgetauscht?“ Je Beteiligtem ein Name, z. B. Kunde, Lieferant, Bank (Schaltfläche „Kunde hinzufügen“ für den häufigsten Fall). Jeder wird im Diagramm ein eigener Pool. Wer was schickt oder bekommt, fragen danach die Bausteine.
+
 ## Schritt 3 – Ablauf
 
 Der Assistent führt eine **Einfügeposition**: Er fragt immer an einer bestimmten Stelle „Was passiert als Nächstes?“ und zeigt, wo diese Stelle liegt (z. B. „im Ausgang ‚Nein‘ von ‚Ware vorrätig?‘, nach ‚Kunden anrufen‘“).
 
 | Antwort | Folgefragen | Danach |
 | --- | --- | --- |
-| Eine Aufgabe | Name (Objekt + Verb) · Wer? (Rolle) · Womit? (System) · Wie lange dauert die Bearbeitung? · Wie lange liegt der Vorgang vorher? · Braucht dieser Schritt das Ergebnis des vorherigen? (nur wenn es einen gibt) · Werden Daten von Hand übertragen? Wenn ja: aus welchem System, wie viele Minuten davon? · Ist es eine Prüfung oder eine Freigabe? Bei Freigabe: Wie oft wird freigegeben? (Folgt direkt eine Entscheidung, gilt deren Ausgang, und die Frage entfällt.) | weiter hinter der Aufgabe |
+| Eine Aufgabe | Name (Objekt + Verb) · Wer? (Rolle) · Womit? (System) · Wie lange dauert die Bearbeitung? · Wie lange liegt der Vorgang vorher? · Braucht dieser Schritt das Ergebnis des vorherigen? (nur wenn es einen gibt) · Werden Daten von Hand übertragen? Wenn ja: aus welchem System, wie viele Minuten davon? · Bei externen Beteiligten: Schickt der Schritt etwas an jemand Externen? Bekommt er etwas von jemand Externem? · Ist es eine Prüfung oder eine Freigabe? Bei Freigabe: Wie oft wird freigegeben? (Folgt direkt eine Entscheidung, gilt deren Ausgang, und die Frage entfällt.) | weiter hinter der Aufgabe |
 | Eine Entscheidung | Wovon hängt ab, wie es weitergeht: von einer Prüfung oder Angabe, oder davon, was zuerst passiert? · Welche Frage wird entschieden bzw. worauf wird gewartet? · Welche Ausgänge gibt es (Bezeichnung, Anteil in %)? Bei „was zuerst passiert“ je Ausgang: Nachricht oder Frist, nach welcher Zeit im Schnitt? · Danach: weiter im Ablauf, Prozess endet (mit welchem Ergebnis?) oder zurück zu einem früheren Schritt (Auswahl aus den Schritten davor) | weiter im ersten Ausgang |
-| Mehrere Wege möglich | Worum geht es? · Welche Wege kommen in Frage (Bezeichnung) und wie oft kommt jeder vor, unabhängig von den anderen (Anteil in %)? · Was passiert, wenn keiner zutrifft: eigener Weg (mit Namen) oder trifft immer mindestens einer zu? | weiter im ersten Weg |
+| Mehrere Wege möglich | Worum geht es? · Welche Wege kommen in Frage (Bezeichnung) und wie oft kommt jeder vor (Anteil in %)? · Was passiert, wenn keiner zutrifft: eigener Weg (mit Namen) oder trifft immer mindestens einer zu? Im zweiten Fall ergeben die Anteile zusammen mindestens 100 %; die Summe steht unter den Wegen. | weiter im ersten Weg |
 | Mehrere Dinge gleichzeitig | Wie viele Zweige? | weiter im ersten Zweig |
 | Etwas wird wiederholt | Wozu wird wiederholt: Korrektur oder mehrere Durchgänge? · Welche Frage entscheidet über die Wiederholung? · In wie viel Prozent der Durchläufe wird wiederholt? | weiter im Körper der Wiederholung |
-| Warten | Worauf wird gewartet? · Auf einen Zeitpunkt oder auf eine Nachricht? · Wie lange im Schnitt? | weiter hinter dem Warten |
+| Warten | Worauf wird gewartet? · Auf einen Zeitpunkt oder auf eine Nachricht? · Wie lange im Schnitt? · Bei Nachricht und externen Beteiligten: Von wem kommt sie? | weiter hinter dem Warten |
 | Dieser Abschnitt ist fertig | – | nächster Ausgang oder Zweig; nach dem letzten hinter den Baustein; im Hauptablauf zu „Prüfen“ |
 
 Zeiten werden als Zahl mit Einheit (Minuten, Stunden, Arbeitstage) eingegeben. Eine Entscheidung beginnt mit „Ja“/„Nein“ zu je 50 %; ein Knopf verteilt die Anteile so, dass sie 100 % ergeben.

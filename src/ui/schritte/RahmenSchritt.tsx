@@ -53,7 +53,7 @@ export function RahmenSchritt() {
         wert={p.ausloeser.art}
         spalten={2}
         optionen={AUSLOESER.map((a) => ({ wert: a.wert, text: a.text, beschreibung: a.beschreibung, symbol: <Symbol art={a.symbol} groesse={26} /> }))}
-        onAendern={(art) => setze({ ausloeser: { ...p.ausloeser, art } }, 'ausloeser-art')}
+        onAendern={(art) => setze({ ausloeser: { ...p.ausloeser, art, von: art === 'nachricht' ? p.ausloeser.von : null } }, 'ausloeser-art')}
       />
       {p.ausloeser.art === 'nachricht' && p.teilnehmer.length > 0 && (
         <Feld label="Von wem kommt die Nachricht?">

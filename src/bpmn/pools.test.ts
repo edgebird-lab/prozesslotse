@@ -95,6 +95,46 @@ describe('Externe Teilnehmer als Pools', () => {
     expect(pruefeProzess(beispielOnlinebestellung()).filter((b) => b.schluessel.startsWith('teilnehmer'))).toEqual([])
   })
 
+  it('legt den Beteiligten mit den meisten Nachrichten nach oben', () => {
+    const bank = neuerTeilnehmer('Bank')
+    const kunde = neuerTeilnehmer('Kunde')
+    const p = neuerProzess({
+      name: 'Kredit',
+      teilnehmer: [bank, kunde],
+      ablauf: { id: 'haupt', schritte: [neueAufgabe({ name: 'Antrag bestätigen', nachrichtAn: kunde.id }), neueAufgabe({ name: 'Schufa anfragen', nachrichtAn: bank.id }), neuesWarten({ name: 'Unterlagen abwarten', art: 'nachricht', von: kunde.id })] },
+    })
+    const { layout } = erzeugeBpmn(p)
+    expect(layout.pools.find((x) => x.lage === 'oben')?.teilnehmerId).toBe(kunde.id)
+    expect(layout.pools.find((x) => x.lage === 'unten')?.teilnehmerId).toBe(bank.id)
+    expect(geometrieFehler(layout)).toEqual([])
+  })
+
+  it('verwirft beim Laden Absender an Zeit- und Bedingungsereignissen', () => {
+    const p = beispielLieferdienst()
+    const projekt = neuesProjekt(p)
+    const roh = JSON.parse(alsJson(projekt))
+    roh.ist.ausloeser = { ...roh.ist.ausloeser, art: 'zeit', von: 'tln_kunde' }
+    const warten = JSON.stringify(roh).includes('"typ":"warten"')
+    expect(warten).toBe(true)
+    // ein Warten auf Zeit mit Absender, wie ihn ältere Stände nach einem Wechsel der Art behalten konnten
+    const zuZeit = (x: unknown): void => {
+      if (Array.isArray(x)) x.forEach(zuZeit)
+      else if (x && typeof x === 'object') {
+        const o = x as Record<string, unknown>
+        if (o.typ === 'warten') {
+          o.art = 'zeit'
+          o.von = 'tln_kunde'
+        }
+        Object.values(o).forEach(zuZeit)
+      }
+    }
+    zuZeit(roh.ist.ablauf)
+    const gelesen = leseProjektText(JSON.stringify(roh)).ist
+    expect(gelesen.ausloeser.von).toBeNull()
+    expect(nachrichtenVerweise(gelesen).every((v) => v.ort !== 'start')).toBe(true)
+    expect(erzeugeBpmn(gelesen).layout.nachrichten.every((n) => !n.nach.startsWith('wrt_'))).toBe(true)
+  })
+
   it('liest Dateien ohne Teilnehmerliste', () => {
     const projekt = neuesProjekt(beispielLieferdienst())
     const alt = JSON.parse(alsJson(projekt))

@@ -296,6 +296,14 @@ export function pruefeProzess(p: Prozess): Befund[] {
   }
   const verweise = nachrichtenVerweise(p)
   const teilnehmerIds = new Set(p.teilnehmer.map((t) => t.id))
+  if (p.teilnehmer.length >= 3) {
+    add({
+      schluessel: 'viele-teilnehmer',
+      schwere: 'hinweis',
+      titel: 'Viele externe Beteiligte',
+      text: `Der Prozess tauscht mit ${p.teilnehmer.length} externen Beteiligten Nachrichten aus. Ab drei Pools wird das Diagramm schnell unübersichtlich; lassen sich welche zusammenfassen, z. B. „Lieferanten“?`,
+    })
+  }
   for (const t of p.teilnehmer) {
     if (!t.name.trim()) {
       add({ schluessel: `teilnehmername:${t.id}`, schwere: 'warnung', titel: 'Externer Beteiligter ohne Namen', text: 'Jeder externe Beteiligte braucht einen Namen, z. B. „Kunde“; er steht auf seinem Pool.' })
