@@ -1,0 +1,377 @@
+/**
+ * Verfahrensdokumentation nach GoBD Rz. 151–155 (Spezifikation 6.6). Reine
+ * Funktion: gleiche Eingabe ergibt gleiches Dokument. Leere Werte erscheinen als
+ * „–“, offene Pflichtangaben als „offen“.
+ */
+import { teilnehmerName } from '../modell/operationen'
+import { MEDIUM_ARTEN, type Prozess } from '../modell/typen'
+import { formatiereZahl } from '../modell/zeit'
+import {
+  ablageVonObjekt,
+  angaben,
+  aufzaehlung,
+  entstehtIn,
+  kontext,
+  kontrollAngaben,
+  mitDienstleister,
+  rollenAngaben,
+  schrittText,
+  systemAngaben,
+  systemeImEinsatz,
+  type Kontext,
+} from './ableitung'
+import { ablaufAbschnitte } from './ablauftext'
+import { formatiereDatum } from './datum'
+import { aufbewahrenBisText, aufbewahrungText, beispielBis, fristText, gueltigBisIn, laengerAlsVorgeschrieben } from './fristen'
+import {
+  ABLAGEFORMEN,
+  AUFBEWAHRUNGSARTEN,
+  BELEGFORMEN,
+  BETRIEBE,
+  GEWINNERMITTLUNGEN,
+  istPflichtig,
+  KONTROLLARTEN,
+  LOESCH_TURNUS,
+  NACHWEISE,
+  RECHTSFORMEN,
+  RECHTSSTAND,
+  SICHERUNGEN,
+  STANDORTE,
+  textVon,
+  UNVERAENDERBARKEIT,
+} from './standard'
+import { AUFBAU_RZ153, DATENSCHUTZ, FRISTEN_TABELLE, FRISTENREGEL, GLOSSAR, GRUNDLAGEN, HISTORIE, hinweisVerfahrensdoku, IKS, KRITERIEN, SYSTEMWECHSEL } from './textbausteine'
+import type { Abschnitt, ComplianceProjekt, DatenobjektAngaben, Dokument, IsoDatum, SystemAngaben, VersionKopf } from './typen'
+
+/** Wofür ein Dokument erzeugt wird: Version (null = Entwurf), bisherige Versionen, Bezugsjahr, Tag. */
+export interface DokuKontext {
+  version: VersionKopf | null
+  /** Versionen bis einschließlich `version` bzw. alle bisherigen beim Entwurf */
+  historie: VersionKopf[]
+  /** Jahr für die Beispieldaten in Kapitel 2.4 */
+  bezugsjahr: number
+  heute: IsoDatum
+}
+
+export function prozessName(p: Prozess): string {
+  return p.name.trim() || 'Unbenannter Prozess'
+}
+
+export function firmenName(c: ComplianceProjekt): string {
+  return c.unternehmen.name.trim() || 'offen'
+}
+
+export function anschriftText(a: { strasse: string; plz: string; ort: string }): string {
+  const ort = [a.plz.trim(), a.ort.trim()].filter(Boolean).join(' ')
+  return [a.strasse.trim(), ort].filter(Boolean).join(', ') || 'offen'
+}
+
+/** Zeile für das Deckblatt: „Version 1.0 · gültig ab 11.11.2026“ oder „Entwurf · Stand 11.11.2026“ */
+export function versionsZeile(kx: DokuKontext): string {
+  return kx.version ? `Version ${kx.version.bezeichnung} · gültig ab ${formatiereDatum(kx.version.gueltigAb)}` : `Entwurf · Stand ${formatiereDatum(kx.heute)}`
+}
+
+function vorgaenger(kx: DokuKontext): VersionKopf | null {
+  const fruehere = kx.version ? kx.historie.filter((v) => v.nummer < kx.version!.nummer) : kx.historie
+  return fruehere[fruehere.length - 1] ?? null
+}
+
+/** Unterlagen in der Reihenfolge ihrer Entstehung; ohne Ersteller am Ende nach Name. */
+export function unterlagenNachEntstehung(k: Kontext): { id: string; name: string; d: DatenobjektAngaben }[] {
+  const mit = k.sicht.objekte.map((o) => ({ id: o.id, name: o.name.trim() || 'Unbenannte Unterlage', d: angaben(k.c, o.id), pos: entstehtIn(k, o.id) }))
+  const mitErsteller = mit.filter((o) => o.pos).sort((a, b) => k.position.get(a.pos!.id)! - k.position.get(b.pos!.id)!)
+  const ohne = mit.filter((o) => !o.pos).sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  return [...mitErsteller, ...ohne]
+}
+
+function ablageText(k: Kontext, d: DatenobjektAngaben): string {
+  const orte = ablageVonObjekt(k, d).map((s) => s.name.trim() || 'Unbenannter Ablageort')
+  if (orte.length === 0) return istPflichtig(d.aufbewahrungsart) ? 'offen' : '–'
+  return `${orte.join(', ')}${d.ablageform ? ` (${textVon(ABLAGEFORMEN, d.ablageform, 'dok')})` : ''}`
+}
+
+export function standortText(s: { standort: SystemAngaben['standort']; drittland: string }): string {
+  return s.standort === 'drittland' ? `Drittland: ${s.drittland.trim() || 'offen'}` : textVon(STANDORTE, s.standort, 'dok')
+}
+
+export function erzeugeVerfahrensdoku(ist: Prozess, c: ComplianceProjekt, kx: DokuKontext): Dokument {
+  const k = kontext(ist, c)
+  const u = c.unternehmen
+  const name = prozessName(ist)
+  const firma = firmenName(c)
+  const a: Abschnitt[] = []
+  const h = (ebene: 1 | 2 | 3, nummer: string, text: string) => a.push({ art: 'ueberschrift', ebene, nummer, text })
+  const absatz = (text: string) => a.push({ art: 'absatz', text })
+  const liste = (punkte: string[]) => a.push({ art: 'liste', punkte })
+  const tabelle = (kopf: string[], zeilen: string[][]) => a.push({ art: 'tabelle', kopf, zeilen })
+
+  // Deckblatt
+  absatz(versionsZeile(kx))
+  a.push({ art: 'hinweis', text: hinweisVerfahrensdoku(name, kx.heute, RECHTSSTAND) })
+
+  // 1
+  h(1, '1', 'Vorbemerkungen zur Verfahrensdokumentation')
+  absatz(`Gegenstand dieser Dokumentation ist der Prozess „${name}“ bei ${firma}. Inhalt und jede Änderung bedürfen der Zustimmung von ${u.geschaeftsleitung.trim() || 'offen'} (Geschäftsleitung).`)
+  absatz(
+    kx.version
+      ? `Version ${kx.version.bezeichnung}, freigegeben von ${kx.version.freigegebenVon.trim() || 'offen'} am ${formatiereDatum(kx.version.freigegebenAm)}. Sie gilt für das Verfahren, wie es seit dem ${formatiereDatum(kx.version.gueltigAb)} angewandt wird.`
+      : 'Entwurf, noch nicht freigegeben.',
+  )
+  const vorige = vorgaenger(kx)
+  if (vorige) absatz(`Vorgängerversion: ${vorige.bezeichnung}. Was sich geändert hat, zeigt Kapitel 7.`)
+  absatz(AUFBAU_RZ153)
+
+  // 2
+  h(1, '2', 'Zielsetzung und Überblick')
+  h(2, '2.1', 'Zielsetzung und Anwendungsbereich')
+  const ausloeser = ist.ausloeser.text.trim().replace(/[.\s]+$/, '') || 'offen'
+  const von = ist.ausloeser.art === 'nachricht' && ist.ausloeser.von ? ` (Nachricht von ${teilnehmerName(ist, ist.ausloeser.von)})` : ''
+  absatz(`Die Dokumentation gilt für den Prozess „${name}“. Er beginnt mit: ${ausloeser}${von}. Er endet regulär mit: ${ist.ergebnis.trim().replace(/[.\s]+$/, '') || 'offen'}.`)
+  if (ist.beschreibung.trim()) absatz(ist.beschreibung.trim())
+  absatz('Betroffene Unterlagen: siehe 2.4.')
+
+  h(2, '2.2', 'Unternehmen und organisatorisches Umfeld')
+  h(3, '2.2.1', 'Unternehmensportrait')
+  tabelle(
+    ['Angabe', 'Inhalt'],
+    [
+      ['Name', firma],
+      ['Sitz', anschriftText(u.anschrift)],
+      ['Rechtsform', textVon(RECHTSFORMEN, u.rechtsform, 'dok')],
+      ['Branche', u.branche.trim() || '–'],
+      ['Geschäftszweck', u.geschaeftszweck.trim() || '–'],
+      ['Gewinnermittlung', textVon(GEWINNERMITTLUNGEN, u.gewinnermittlung, 'dok')],
+    ],
+  )
+  h(3, '2.2.2', 'Aufbau- und Ablauforganisation')
+  if (ist.rollen.length > 0) {
+    tabelle(
+      ['Rolle', 'Personen', 'intern oder extern'],
+      ist.rollen.map((r) => {
+        const ra = rollenAngaben(c, r.id)
+        return [r.name.trim() || 'Unbenannte Rolle', formatiereZahl(r.personen, 1), ra.extern ? `extern${ra.organisation.trim() ? ` (${ra.organisation.trim()})` : ''}` : 'intern']
+      }),
+    )
+  } else absatz('Rollen: offen.')
+  absatz('Den Ablauf zeigt das Diagramm in Kapitel 9.1.')
+  h(3, '2.2.3', 'Einsatzorte')
+  const standorte = u.standorte.map((s) => s.trim()).filter(Boolean)
+  if (standorte.length > 0) liste(standorte)
+  else absatz('Standorte: offen.')
+  const papier = k.sicht.speicher.filter((s) => s.mediumId && k.medien.get(s.mediumId)?.art === 'papier').map((s) => s.name.trim() || 'Unbenannter Ablageort')
+  if (papier.length > 0) absatz(`Papierablagen: ${papier.join(', ')}.`)
+
+  h(2, '2.3', 'Rechtliche Grundlagen und Ordnungsmäßigkeitskriterien')
+  absatz(GRUNDLAGEN)
+  absatz(FRISTENREGEL)
+  tabelle(['Unterlagen', 'Vorschrift', 'Frist'], FRISTEN_TABELLE)
+  tabelle(
+    ['Nr.', 'Anforderung', 'Bedeutung'],
+    KRITERIEN.map(([anforderung, bedeutung], i) => [String(i + 1), anforderung, bedeutung]),
+  )
+  const unterlagen = unterlagenNachEntstehung(k)
+  const laenger = unterlagen.filter((o) => laengerAlsVorgeschrieben(o.d))
+  if (laenger.length > 0) absatz(`Länger als vorgeschrieben werden aufbewahrt: ${laenger.map((o) => o.name).join(', ')}. Grund: ${c.begruendungLaengereAufbewahrung.trim() || 'offen'}.`)
+
+  h(2, '2.4', 'Relevante Dokumente')
+  if (unterlagen.length > 0) {
+    tabelle(
+      ['Unterlage', 'Einordnung', 'Form', 'Entsteht in', 'Ablage', 'Aufbewahrung', `Beispiel ${kx.bezugsjahr}`],
+      unterlagen.map((o) => {
+        const e = entstehtIn(k, o.id)
+        return [o.name, textVon(AUFBEWAHRUNGSARTEN, o.d.aufbewahrungsart, 'dok'), textVon(BELEGFORMEN, o.d.form, 'dok'), e ? schrittText(k, e) : '–', ablageText(k, o.d), aufbewahrungText(o.d), beispielBis(o.d, kx.bezugsjahr)]
+      }),
+    )
+    absatz(`Die Spalte „Beispiel ${kx.bezugsjahr}“ nennt das Fristende für eine Unterlage aus dem Jahr ${kx.bezugsjahr}.`)
+  } else absatz('Unterlagen: offen.')
+
+  h(2, '2.5', 'Einweisung in das Verfahren')
+  const turnus = c.einweisung.turnus
+  absatz(turnus === 'einmalig' ? 'Wer mitarbeitet, wird vor Beginn eingewiesen.' : turnus === 'jaehrlich' ? 'Wer mitarbeitet, wird vor Beginn und danach jährlich eingewiesen.' : 'Eine Einweisung ist nicht festgelegt.')
+  if (c.einweisung.protokoll) absatz('Die Einweisung wird schriftlich festgehalten (Kapitel 9.2).')
+
+  h(2, '2.6', 'Abgrenzung der Bearbeitungsbereiche')
+  const extern: string[] = []
+  for (const r of ist.rollen) {
+    const ra = rollenAngaben(c, r.id)
+    const schritte = k.aufgaben.filter((x) => x.rolleId === r.id)
+    if (!ra.extern || schritte.length === 0) continue
+    const wer = ra.organisation.trim() ? `${ra.organisation.trim()} (${r.name.trim() || 'Rolle'})` : r.name.trim() || 'Externe Rolle'
+    extern.push(`${wer}: ${schritte.map((x) => schrittText(k, x)).join(', ')}`)
+  }
+  for (const m of systemeImEinsatz(k)) {
+    const s = systemAngaben(c, m.id)
+    if (mitDienstleister(s)) extern.push(`${s.dienstleister.trim() || 'Anbieter'}: betreibt „${m.name.trim() || 'Unbenanntes System'}“ (${standortText(s)})`)
+  }
+  for (const t of ist.teilnehmer) extern.push(`${t.name.trim() || 'Externer Beteiligter'}: tauscht Nachrichten mit dem Unternehmen aus`)
+  if (u.steuerberatung.trim()) extern.push(`${u.steuerberatung.trim()}: Steuerberatung`)
+  if (extern.length > 0) {
+    liste(extern)
+    absatz('Mit externen Stellen ist diese Dokumentation abzustimmen.')
+  } else absatz('Alle Schritte finden im Unternehmen statt.')
+
+  // 3
+  h(1, '3', 'Organisation und Sicherheit des IT-gestützten Verfahrens')
+  h(2, '3.1', 'Eingesetzte Hard- und Software')
+  const systeme = systemeImEinsatz(k)
+  if (systeme.length > 0) {
+    tabelle(
+      ['System', 'Art', 'Hersteller', 'Version', 'im Einsatz seit', 'Betrieb', 'Dienstleister und Standort'],
+      systeme.map((m) => {
+        const s = systemAngaben(c, m.id)
+        return [
+          m.name.trim() || 'Unbenanntes System',
+          MEDIUM_ARTEN.find((x) => x.art === m.art)?.name ?? m.art,
+          s.hersteller.trim() || '–',
+          s.version.trim() || 'offen',
+          s.seit ? formatiereDatum(s.seit) : 'offen',
+          textVon(BETRIEBE, s.betrieb, 'dok'),
+          mitDienstleister(s) ? `${s.dienstleister.trim() || 'offen'}, ${standortText(s)}` : '–',
+        ]
+      }),
+    )
+    absatz(SYSTEMWECHSEL)
+  } else absatz('Im Prozess werden keine IT-Systeme eingesetzt.')
+
+  h(2, '3.2', 'Zuständigkeiten')
+  tabelle(
+    ['Schritt', 'Rolle', 'System'],
+    [
+      ...k.aufgaben.map((x) => [
+        schrittText(k, x),
+        ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() || 'offen',
+        (x.mediumId ? k.medien.get(x.mediumId)?.name.trim() : '') || 'offen',
+      ]),
+      ['Freigabe der Löschung nach Fristablauf', c.loeschung.freigabe.trim() || 'offen', '–'],
+      ['Durchführung der Löschung', c.loeschung.durchfuehrung.trim() || 'offen', '–'],
+    ],
+  )
+
+  h(2, '3.3', 'Organisation und Internes Kontrollsystem')
+  absatz(IKS)
+  const kontrollen = k.aufgaben.filter((x) => x.art === 'pruefung' || x.art === 'freigabe')
+  const zeilen = [
+    ...kontrollen.map((x) => {
+      const angabe = kontrollAngaben(c, x.id)
+      return [
+        schrittText(k, x),
+        angabe ? textVon(KONTROLLARTEN, angabe.art, 'dok') : 'offen',
+        ist.rollen.find((r) => r.id === x.rolleId)?.name.trim() || 'offen',
+        angabe?.ziel.trim() || 'offen',
+        angabe ? textVon(NACHWEISE, angabe.nachweis, 'dok') : 'offen',
+        'bei jedem Vorgang',
+      ]
+    }),
+    ...c.weitereKontrollen.map((w) => {
+      const bezug = k.aufgaben.find((x) => x.id === w.bezugAufgabeId)
+      return [
+        w.name.trim() || 'Weitere Kontrolle',
+        textVon(KONTROLLARTEN, w.art, 'dok'),
+        `${w.verantwortlich.trim() || 'offen'}${w.extern ? ' (extern)' : ''}`,
+        bezug ? `Ergebnis von ${schrittText(k, bezug)}` : '–',
+        textVon(NACHWEISE, w.nachweis, 'dok'),
+        w.haeufigkeit.trim() || 'offen',
+      ]
+    }),
+  ]
+  if (zeilen.length > 0) tabelle(['Kontrolle', 'Art', 'Wer', 'Was geprüft wird', 'Nachweis', 'Häufigkeit'], zeilen)
+  else absatz('Im Ablauf ist keine Kontrolle beschrieben.')
+
+  h(2, '3.4', 'Datenschutz und Datensicherheit')
+  absatz(DATENSCHUTZ)
+  if (systeme.length > 0) {
+    tabelle(
+      ['System', 'Schutz vor Änderung', 'Datensicherung', 'Intervall', 'Rücksicherung getestet'],
+      systeme.map((m) => {
+        const s = systemAngaben(c, m.id)
+        return [m.name.trim() || 'Unbenanntes System', textVon(UNVERAENDERBARKEIT, s.unveraenderbarkeit, 'dok'), textVon(SICHERUNGEN, s.sicherung, 'dok'), s.sicherungIntervall.trim() || '–', s.wiederherstellungGetestet ? 'ja' : 'nein']
+      }),
+    )
+  }
+
+  // 4
+  h(1, '4', `Verfahren und Maßnahmen: ${name}`)
+  a.push(...ablaufAbschnitte(k))
+  h(2, `4.${k.aufgaben.length + 1}`, 'Aufbewahrung, Vernichtung und Löschung')
+  const saetze = [
+    ...unterlagen.filter((o) => istPflichtig(o.d.aufbewahrungsart)).map((o) => {
+      const orte = ablageVonObjekt(k, o.d).map((s) => s.name.trim() || 'Unbenannter Ablageort')
+      return `„${o.name}“: aufbewahren ${aufbewahrungText(o.d)}; Ablage: ${orte.join(', ') || 'offen'}.`
+    }),
+    ...unterlagen.filter((o) => o.d.aufbewahrungsart === 'keine' && o.d.personenbezogen === true && o.d.loeschfrist).map((o) => `„${o.name}“: nicht aufbewahrungspflichtig; löschen ${fristText(o.d.loeschfrist!)}.`),
+  ]
+  if (saetze.length > 0) liste(saetze)
+  absatz(
+    `Vor Ablauf der Frist wird nichts vernichtet oder gelöscht. Die Löschung gibt ${c.loeschung.freigabe.trim() || 'offen'} frei, durchgeführt wird sie von ${c.loeschung.durchfuehrung.trim() || 'offen'}, ${c.loeschung.turnus ? textVon(LOESCH_TURNUS, c.loeschung.turnus, 'dok') : 'Turnus offen'}.`,
+  )
+
+  // 5
+  h(1, '5', 'Ersetzendes Scannen')
+  const scan = unterlagen.filter((o) => o.d.form === 'papier' && o.d.ablageform === 'scan' && o.d.originalVernichtet === true)
+  absatz(
+    scan.length > 0
+      ? `Für ${aufzaehlung(scan.map((o) => o.name))} gilt das ersetzende Scannen. Es ist in einer eigenen Verfahrensdokumentation beschrieben (Kapitel 6), z. B. nach dem Muster von BStBK und DStV.`
+      : 'Entfällt: Papierunterlagen werden nicht gescannt und anschließend vernichtet.',
+  )
+
+  // 6
+  h(1, '6', 'Mitgeltende Unterlagen')
+  liste([
+    'Verzeichnis von Verarbeitungstätigkeiten, gleiche Version',
+    'BPMN-Datei des Ist-Prozesses',
+    ...(scan.length > 0 ? ['Verfahrensdokumentation zum ersetzenden Scannen'] : []),
+    ...systeme
+      .map((m) => ({ m, s: systemAngaben(c, m.id) }))
+      .filter(({ s }) => s.avVertrag === 'ja')
+      .map(({ m, s }) => `Vertrag zur Auftragsverarbeitung mit ${s.dienstleister.trim() || s.hersteller.trim() || `dem Anbieter von „${m.name.trim()}“`} vom ${s.avVertragVom ? formatiereDatum(s.avVertragVom) : 'offen'}`),
+    ...c.mitgeltend.map((x) => x.trim()).filter(Boolean),
+  ])
+
+  // 7
+  h(1, '7', 'Änderungshistorie')
+  absatz(HISTORIE)
+  if (kx.historie.length > 0) {
+    tabelle(
+      ['Version', 'gültig ab', 'gültig bis', 'freigegeben', 'geänderte Kapitel', 'Inhalt', 'aufbewahren bis', 'Prüfsumme'],
+      kx.historie.map((v, i) => {
+        const bis = gueltigBisIn(kx.historie, i)
+        return [
+          v.bezeichnung,
+          formatiereDatum(v.gueltigAb),
+          bis ? formatiereDatum(bis) : 'laufend',
+          `${formatiereDatum(v.freigegebenAm)}, ${v.freigegebenVon.trim() || 'offen'}`,
+          v.geaenderteKapitel.join(', ') || '–',
+          v.aenderung.trim() || '–',
+          aufbewahrenBisText(bis),
+          v.nummer === kx.version?.nummer || !v.pruefsumme ? '–' : v.pruefsumme.slice(0, 12),
+        ]
+      }),
+    )
+  } else absatz('Noch keine Version freigegeben.')
+
+  // 8
+  h(1, '8', 'Glossar')
+  tabelle(['Begriff', 'Bedeutung'], GLOSSAR.map(([begriff, bedeutung]) => [begriff, bedeutung]))
+
+  // 9
+  h(1, '9', 'Anlage')
+  h(2, '9.1', 'Ablaufdiagramm')
+  a.push({ art: 'diagramm' })
+  if (c.einweisung.protokoll) {
+    h(2, '9.2', 'Nachweis der Einweisung')
+    tabelle(
+      ['Datum', 'Name', 'Rolle', 'Unterschrift'],
+      Array.from({ length: 8 }, () => ['', '', '', '']),
+    )
+  }
+
+  return {
+    art: 'verfahrensdokumentation',
+    titel: 'Verfahrensdokumentation',
+    untertitel: `${name} · ${firma}`,
+    versionText: kx.version ? kx.version.bezeichnung : 'Entwurf',
+    stand: kx.heute,
+    rechtsstand: RECHTSSTAND,
+    abschnitte: a,
+  }
+}

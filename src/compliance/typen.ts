@@ -333,7 +333,8 @@ export interface ComplianceProjekt {
 
 export type Teilschritt = 'unternehmen' | 'belege' | 'systeme' | 'fristen' | 'kontrollen' | 'tom' | 'luecken' | 'dokumente'
 
-export type ZielArt = 'unternehmen' | 'datenobjekt' | 'system' | 'kontrolle' | 'tom' | 'version'
+/** Wohin „Beheben“ springt; das Element hat die Id `ziel-{art}` bzw. `ziel-{art}-{id}`. */
+export type ZielArt = 'unternehmen' | 'zwecke' | 'datenobjekt' | 'frist' | 'system' | 'kontrolle' | 'einweisung' | 'tom' | 'version'
 
 export interface ComplianceBefund extends Befund {
   /** z. B. 'B4' */
