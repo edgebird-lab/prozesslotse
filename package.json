@@ -1,7 +1,7 @@
 {
   "name": "prozesslotse",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Geschäftsprozesse über geführte Fragen modellieren, als BPMN zeichnen, analysieren und verbessern.",
   "type": "module",
   "scripts": {

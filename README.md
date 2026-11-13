@@ -110,7 +110,7 @@ Spezifikation, Annahmen und Stand: [compliance-spezifikation.md](docs/compliance
 
 Der Knopf „Für die Beratungsakte speichern“ im Bericht schreibt das Ergebnis der Analyse als JSON-Datei im offenen Format Beratungsakte v1. Ein kleiner Dialog fragt nach dem Mandanten (vorbelegt mit dem Unternehmen aus der Compliance-Doku) und optional nach einer Mandantennummer und zeigt, was die Datei enthält, mit dem Hinweis, dass die Datei unverschlüsselt ist und Daten des Mandanten enthält. Im Browser wird sie heruntergeladen, im Programm über den Speichern-Dialog gespeichert.
 
-- **Dateiname:** `<Mandant>-prozesslotse-<Datum>.beratungsakte.json`, z. B. `Lieferdienst-Muster-GmbH-prozesslotse-2026-11-13.beratungsakte.json`.
+- **Dateiname:** `<Mandant>-prozesslotse-<Datum>.beratungsakte.json`, z. B. `Lieferdienst-Muster-GmbH-prozesslotse-2026-11-13.beratungsakte.json`. Im Programm ergänzt der Speichern-Dialog die Endung, wenn sie fehlt: aus „Akte 2.0“ wird „Akte 2.0.beratungsakte.json“, aus „x.json“ wird „x.beratungsakte.json“.
 - **Kennzahlen:** die zehn Zeilen der Kennzahlentabelle des Berichts für den Ist-Prozess (Zeiten in Minuten, Kosten in €, Anteile in %); gibt es einen Soll-Prozess, steht sein Wert im Namensraum `prozesslotse`.
 - **Befunde:** die Befunde im Ist-Prozess, wie sie der Bericht zeigt, mit Fundstelle (Schritt, Rolle oder ganzer Prozess). Fehler werden `hoch`, Warnungen `mittel`, Hinweise `hinweis`; die Originalstufe steht im Namensraum.
 - **Maßnahmen:** übernommene Maßnahmen (Priorität `hoch`) und die offenen Vorschläge aus „Verbessern“ (Priorität `mittel`) mit ihrer berechneten Wirkung im Namensraum, danach die verworfenen Vorschläge (Priorität `niedrig`). Der Stand steht als `status` (`uebernommen`, `vorschlag`, `verworfen`) im Namensraum. Eine Maßnahme verweist auf die Befunde an ihren Schritten, die sie behebt (z. B. Medienbruch beseitigen → Befund Medienbruch). Den Aufwand schätzt die App nicht.
@@ -165,7 +165,7 @@ npm run desktop:test                   # Desktop-Test gegen den Debug-Build (and
 
 `node scripts/readme-bilder.mjs` erzeugt die Bilder dieser README neu (bei laufendem `npx vite preview --port 4173`).
 
-**Neue Version:** Versionsnummer in `package.json`, `src-tauri/Cargo.toml`, `src/App.tsx` und `src/bpmn/export.ts` anheben, Notizen in `.github/release-notizen.md` schreiben, dann einen Tag wie `v0.3.0` pushen. Der Workflow „Version veröffentlichen“ baut und prüft den Installer und legt einen Release-Entwurf an, mit dem Installer zusätzlich unter dem festen Namen `Prozesslotse-Setup.exe`. Veröffentlicht wird der Entwurf von Hand (`gh release edit v0.3.0 --draft=false --latest`).
+**Neue Version:** Versionsnummer in `package.json`, `src-tauri/Cargo.toml`, `src/version.ts` und `src/bpmn/export.ts` anheben, Notizen in `.github/release-notizen.md` schreiben, dann einen Tag wie `v0.4.0` pushen. Der Workflow „Version veröffentlichen“ baut und prüft den Installer und legt einen Release-Entwurf an, mit dem Installer zusätzlich unter dem festen Namen `Prozesslotse-Setup.exe`. Veröffentlicht wird der Entwurf von Hand (`gh release edit v0.4.0 --draft=false --latest`). Aktuelle Version: 0.3.0.
 
 ## Grenzen
 

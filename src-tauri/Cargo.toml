@@ -1,6 +1,6 @@
 [package]
 name = "prozesslotse"
-version = "0.2.0"
+version = "0.3.0"
 description = "Prozesslotse: Geschäftsprozesse geführt modellieren, als BPMN zeichnen und verbessern"
 authors = ["Robin Olbricht"]
 edition = "2024"

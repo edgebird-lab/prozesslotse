@@ -133,13 +133,39 @@ type Ziel = (&'static str, &'static str, &'static str);
 /// Speichern-Dialog für eine Dateiart; im Debug-Build beantwortet ihn ggf.
 /// `PROZESSLOTSE_TEST_SPEICHERN_{ART}`. None bei Abbruch.
 fn waehle_ziel(app: &AppHandle, art: &str, vorschlag: &str, (filter, endung, titel): Ziel) -> Option<PathBuf> {
-    let mut p = testantwort(&format!("PROZESSLOTSE_TEST_SPEICHERN_{}", art.to_uppercase()))
+    let p = testantwort(&format!("PROZESSLOTSE_TEST_SPEICHERN_{}", art.to_uppercase()))
         .unwrap_or_else(|| app.dialog().file().set_title(titel).set_file_name(vorschlag).add_filter(filter, &[endung]).blocking_save_file().and_then(|w| w.into_path().ok()))?;
-    // Ohne Endung getippt: passende Endung ergänzen, damit Doppelklick und Filter funktionieren
-    if p.extension().is_none() {
-        p.set_extension(endung);
+    Some(mit_endung(p, endung))
+}
+
+/// Ohne Endung getippt: passende Endung ergänzen, damit Doppelklick und Filter funktionieren.
+/// Endungen aus mehreren Teilen („beratungsakte.json“) werden angehängt, nie per `set_extension`
+/// eingesetzt: Das ersetzte den Teil nach dem letzten Punkt („Akte 2.0“ → „Akte 2.beratungsakte.json“).
+/// Endet der Name schon auf den letzten Teil („x.json“), wird nur der Rest davor eingefügt:
+/// „x.beratungsakte.json“, nicht „x.json.beratungsakte.json“.
+fn mit_endung(mut p: PathBuf, endung: &str) -> PathBuf {
+    let Some((vorn, letzter)) = endung.rsplit_once('.') else {
+        if p.extension().is_none() {
+            p.set_extension(endung);
+        }
+        return p;
+    };
+    let datei = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+    let name = datei.to_ascii_lowercase();
+    let ganz = format!(".{}", endung.to_ascii_lowercase());
+    if name.len() > ganz.len() && name.ends_with(&ganz) {
+        return p;
     }
-    Some(p)
+    let schluss = format!(".{}", letzter.to_ascii_lowercase());
+    if name.len() > schluss.len() && name.ends_with(&schluss) && name != ganz {
+        // Die Endung ist ASCII; der Schnitt liegt deshalb auf einer Zeichengrenze.
+        let stamm = &datei[..datei.len() - schluss.len()];
+        return p.with_file_name(format!("{stamm}.{vorn}.{letzter}"));
+    }
+    let mut s = p.into_os_string();
+    s.push(".");
+    s.push(endung);
+    PathBuf::from(s)
 }
 
 /// Dateiarten, die als Text kommen (`speichern_unter`).
@@ -476,9 +502,29 @@ mod tests {
         assert_eq!(text_ziel("beratungsakte"), Some(("Beratungsakte (*.beratungsakte.json)", "beratungsakte.json", "Für die Beratungsakte speichern")));
         assert_eq!(text_ziel("projekt").map(|z| z.1), Some("prozesslotse"));
         assert_eq!(text_ziel("docx"), None);
-        let mut p = PathBuf::from("Muster-GmbH-prozesslotse-2026-11-13");
-        p.set_extension("beratungsakte.json");
-        assert_eq!(p, PathBuf::from("Muster-GmbH-prozesslotse-2026-11-13.beratungsakte.json"));
+        let akte = "beratungsakte.json";
+        let p = PathBuf::from;
+        assert_eq!(mit_endung(p("Muster-GmbH-prozesslotse-2026-11-13"), akte), p("Muster-GmbH-prozesslotse-2026-11-13.beratungsakte.json"));
+        assert_eq!(mit_endung(p("a.beratungsakte.json"), akte), p("a.beratungsakte.json"));
+        assert_eq!(mit_endung(p("a.BERATUNGSAKTE.JSON"), akte), p("a.BERATUNGSAKTE.JSON"));
+        // Punkt im Namen: Endung angehängt, nichts abgeschnitten
+        assert_eq!(mit_endung(p("Akte 2.0"), akte), p("Akte 2.0.beratungsakte.json"));
+        assert_eq!(mit_endung(p("Muster-Co.-KG-prozesslotse-2026-11-13"), akte), p("Muster-Co.-KG-prozesslotse-2026-11-13.beratungsakte.json"));
+        // „.json“ wird ergänzt, nicht verdoppelt
+        assert_eq!(mit_endung(p("x.json"), akte), p("x.beratungsakte.json"));
+        assert_eq!(mit_endung(p("x.JSON"), akte), p("x.beratungsakte.json"));
+        assert_eq!(mit_endung(p("Akte 2.0.json"), akte), p("Akte 2.0.beratungsakte.json"));
+        assert_eq!(mit_endung(p(r"C:\Akten\x.json"), akte), p(r"C:\Akten\x.beratungsakte.json"));
+        assert_eq!(mit_endung(p(".json"), akte), p(".json.beratungsakte.json"));
+        assert_eq!(mit_endung(p("a.prozesslotse"), akte), p("a.prozesslotse.beratungsakte.json"));
+    }
+
+    #[test]
+    fn einteilige_endungen_nur_ergaenzt_wenn_keine_da_ist() {
+        let p = PathBuf::from;
+        assert_eq!(mit_endung(p("Prozess"), "prozesslotse"), p("Prozess.prozesslotse"));
+        assert_eq!(mit_endung(p("Prozess.bpmn"), "bpmn"), p("Prozess.bpmn"));
+        assert_eq!(mit_endung(p("Bild.SVG"), "svg"), p("Bild.SVG"));
     }
 
     #[test]

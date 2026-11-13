@@ -281,6 +281,13 @@ Tests nach dem Zusammenführen: `npm run lint` ohne Befund, `npx tsc -b` ohne Fe
 
 Installation auf Robins Rechner (am 11.11.2026 ausdrücklich gewünscht): Release-Installer `Prozesslotse_0.2.0_x64-setup.exe` (1,47 MiB) still installiert nach `%LOCALAPPDATA%\Prozesslotse`, pro Benutzer ohne Admin-Rechte. Startmenü-Eintrag und Desktop-Verknüpfung „Prozesslotse“ legt der Installer selbst an. `.prozesslotse` öffnet per Doppelklick im Programm (Probe mit einer Datei, Fenstertitel „Doppelklick-Probe.prozesslotse – Prozesslotse“), `.bpmn` steht nur unter „Öffnen mit“. Startprobe: Fenster „Prozesslotse“ mit der Willkommensseite, danach ohne Rückfrage geschlossen. Die Programmdaten (`%LOCALAPPDATA%\de.olbricht-digital.prozesslotse`) sind nach Desktop-Test und Doppelklick-Probe auf den Stand davor zurückgesetzt.
 
+## Version 0.3.0 (13.11.2026)
+
+- Neu seit 0.2.0: Export im offenen Format Beratungsakte v1 (Knopf „Für die Beratungsakte speichern“ im Bericht, siehe README) mit den Nacharbeiten vom 13.11.2026.
+- Korrektur: `speichern_unter` setzte die zweiteilige Endung `beratungsakte.json` nicht zuverlässig. Ein Name mit Punkt („Akte 2.0“) blieb ohne Endung, `set_extension` hätte ihn zu „Akte 2.beratungsakte.json“ verstümmelt. Jetzt `mit_endung` in `src-tauri/src/lib.rs` wie im Auswahl-Lotsen (`bc22c03`): `.beratungsakte.json` nur ergänzen, wenn es fehlt, ein endendes `.json` ersetzen („x.json“ → „x.beratungsakte.json“); einteilige Endungen wie bisher. Rust-Test vorher rot, danach grün.
+- Version 0.3.0 in `package.json`, `src-tauri/Cargo.toml`, `src/version.ts`, `src/bpmn/export.ts` und `.github/release-notizen.md`. In der README stand bei „Neue Version“ noch `src/App.tsx` statt `src/version.ts`; korrigiert.
+- Geprüft: `npm run lint` ohne Befund, 710 Unit-Tests, `npm run build`, 115 Browsertests mit `--workers=2` (114 grün im Gesamtlauf; `abnahme-5` in `dokumentieren-nachpruefung.spec.ts` scheiterte unter Last und lief einzeln grün), `cargo test` (8), Debug-Build und `npm run desktop:test` grün.
+
 ## Offen und bekannte Mängel
 
 - ~~8.3: Der CI-Lauf steht aus~~: Windows-Programm #2 (Rust-Tests, Release-Build, Installer-Test) nach dem Zusammenführen grün.
