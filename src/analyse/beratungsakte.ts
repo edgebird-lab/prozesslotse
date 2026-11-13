@@ -7,8 +7,8 @@
  *   Ist-Prozesses; gibt es einen Soll-Prozess, steht dessen Wert im Namensraum.
  * - Befunde: die Befunde im Ist-Prozess, wie sie der Bericht zeigt (Prüfregeln
  *   und Schwachstellen, siehe `imBericht`).
- * - Maßnahmen: übernommene Maßnahmen und die noch offenen Vorschläge aus dem
- *   Schritt „Verbessern“ mit ihrer berechneten Wirkung.
+ * - Maßnahmen: übernommene Maßnahmen, die noch offenen und die verworfenen
+ *   Vorschläge aus dem Schritt „Verbessern“ mit ihrer berechneten Wirkung.
  *
  * Abbildung der Stufen:
  *
@@ -16,12 +16,15 @@
  * | ----------------------- | ------------- |
  * | Befund `fehler`         | `hoch`        |
  * | Befund `warnung`        | `mittel`      |
- * | Befund `hinweis`        | `niedrig`     |
+ * | Befund `hinweis`        | `hinweis`     |
  * | Maßnahme übernommen     | Priorität `hoch` |
  * | Vorschlag (offen)       | Priorität `mittel` |
+ * | Vorschlag verworfen     | Priorität `niedrig` |
  *
- * Verworfene Vorschläge zeigt die App nicht; sie fehlen auch in der Akte. Der
- * Aufwand ist „nicht geschätzt“; die App kennt nur die Wirkung. Eine Maßnahme
+ * Der Stand jeder Maßnahme steht maschinenlesbar im Namensraum (`status`:
+ * `uebernommen`, `vorschlag` oder `verworfen`). Verworfene Vorschläge bleiben
+ * in der Akte, damit nachvollziehbar ist, was geprüft und bewusst nicht
+ * umgesetzt wurde. Der Aufwand ist „nicht geschätzt“; die App kennt nur die Wirkung. Eine Maßnahme
  * antwortet auf einen Befund, wenn er einen der Schritte betrifft, die sie
  * umbaut, und von einer Art ist, die sie behebt (`BEHEBT`).
  */
@@ -40,7 +43,7 @@ export const APP_KENNUNG = 'prozesslotse'
 export const SCHWERE_IN_AKTE: Record<Schwere, AkteSchwere> = {
   fehler: 'hoch',
   warnung: 'mittel',
-  hinweis: 'niedrig',
+  hinweis: 'hinweis',
 }
 
 /**
@@ -168,14 +171,21 @@ export function beratungsakteAusProjekt({ projekt, mandant, jetzt, quelldatei }:
       erweiterungen: { [APP_KENNUNG]: { status: 'uebernommen', regel } },
     }
   })
-  const offen: AkteMassnahme[] = bewerteVorschlaege(soll ?? ist, projekt.verworfen).map((v) => ({
-    kennung: massnahmeKennung(v.schluessel),
-    text: satz(v.titel, v.annahme ? `${v.begruendung} ${v.annahme}` : v.begruendung),
-    prioritaet: 'mittel',
-    aufwand: 'nicht geschätzt',
-    befunde: bezuege(v.regel, v.blockIds),
-    erweiterungen: { [APP_KENNUNG]: { status: 'vorschlag', regel: v.regel, wirkung: wirkungGerundet(v.wirkung) } },
-  }))
+  // Offene Vorschläge wie im Schritt „Verbessern“, danach die verworfenen (gleiche Bewertung, nur nicht ausgeblendet)
+  const verworfen = new Set(projekt.verworfen)
+  const vorschlaege = bewerteVorschlaege(soll ?? ist)
+  const sortiert = [...vorschlaege.filter((v) => !verworfen.has(v.schluessel)), ...vorschlaege.filter((v) => verworfen.has(v.schluessel))]
+  const offen: AkteMassnahme[] = sortiert.map((v) => {
+    const istVerworfen = verworfen.has(v.schluessel)
+    return {
+      kennung: massnahmeKennung(v.schluessel),
+      text: satz(v.titel, v.annahme ? `${v.begruendung} ${v.annahme}` : v.begruendung) + (istVerworfen ? ' (Vorschlag verworfen)' : ''),
+      prioritaet: istVerworfen ? 'niedrig' : 'mittel',
+      aufwand: 'nicht geschätzt',
+      befunde: bezuege(v.regel, v.blockIds),
+      erweiterungen: { [APP_KENNUNG]: { status: istVerworfen ? 'verworfen' : 'vorschlag', regel: v.regel, wirkung: wirkungGerundet(v.wirkung) } },
+    }
+  })
 
   return erzeugeBeratungsakte({
     app: { kennung: APP_KENNUNG, name: 'Prozesslotse', version: VERSION },

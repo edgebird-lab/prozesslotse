@@ -98,7 +98,7 @@ describe('Beratungsakte aus dem Fallbeispiel', () => {
     const buchhaltung = akte.befunde.find((b) => b.kennung === 'engpass:rol_buchhaltung')!
     expect(buchhaltung.text).toContain('Auslastung 81 %')
     expect(akte.befunde.find((b) => b.kennung === 'medienbruch:auf_tour')!.fundstelle).toBe('Schritt „Tour planen“')
-    expect(akte.befunde.find((b) => b.kennung === 'flusseffizienz')).toMatchObject({ schwere: 'niedrig', fundstelle: 'Gesamter Prozess' })
+    expect(akte.befunde.find((b) => b.kennung === 'flusseffizienz')).toMatchObject({ schwere: 'hinweis', fundstelle: 'Gesamter Prozess' })
   })
 
   it('enthält die sieben Vorschläge mit berechneter Wirkung und Bezug auf die Befunde', () => {
@@ -153,17 +153,23 @@ describe('Beratungsakte aus dem Fallbeispiel', () => {
     expect(ns(akte)).toMatchObject({ sollProzess: true })
   })
 
-  it('lässt verworfene Vorschläge weg', () => {
+  it('behält verworfene Vorschläge am Ende, mit Status „verworfen“ und niedriger Priorität', () => {
     const projekt = { ...beispielProjekt(), verworfen: ['freigabe:auf_freigeben'] }
     const akte = beratungsakteAusProjekt({ projekt, mandant: { name: 'M' }, jetzt: JETZT })
-    expect(akte.massnahmen).toHaveLength(6)
-    expect(akte.massnahmen.map((m) => m.kennung)).not.toContain('freigabe:auf_freigeben')
+    gueltigOhneHinweise(akte)
+    expect(akte.massnahmen).toHaveLength(7)
+    const letzte = akte.massnahmen[6]
+    expect(letzte.kennung).toBe('freigabe:auf_freigeben')
+    expect(letzte.prioritaet).toBe('niedrig')
+    expect(letzte.text).toMatch(/\(Vorschlag verworfen\)$/)
+    expect((ns(letzte) as { status: string }).status).toBe('verworfen')
+    expect(akte.massnahmen.slice(0, 6).every((m) => (ns(m) as { status: string }).status === 'vorschlag')).toBe(true)
   })
 })
 
 describe('Abbildung der Stufen', () => {
   it('bildet jede Schwere der App ab', () => {
-    expect(SCHWERE_IN_AKTE).toEqual({ fehler: 'hoch', warnung: 'mittel', hinweis: 'niedrig' })
+    expect(SCHWERE_IN_AKTE).toEqual({ fehler: 'hoch', warnung: 'mittel', hinweis: 'hinweis' })
   })
 
   it('überlastete Rolle (Fehler) wird „hoch“, wachsender Bestand ein Text statt einer Zahl', () => {
@@ -177,7 +183,7 @@ describe('Abbildung der Stufen', () => {
       expect(ns(b)).toEqual({ schwere: 'fehler' })
     }
     expect(kennzahl(akte, 'vorgaenge-in-arbeit').wert).toBe('wächst (Überlast)')
-    expect(new Set(akte.befunde.map((b) => b.schwere))).toEqual(new Set(['hoch', 'mittel', 'niedrig']))
+    expect(new Set(akte.befunde.map((b) => b.schwere))).toEqual(new Set(['hoch', 'mittel', 'hinweis']))
   })
 })
 

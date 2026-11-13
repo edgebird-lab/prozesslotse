@@ -108,12 +108,12 @@ Spezifikation, Annahmen und Stand: [compliance-spezifikation.md](docs/compliance
 
 ## Export im offenen Format Beratungsakte v1
 
-Der Knopf „Für die Beratungsakte speichern“ im Bericht schreibt das Ergebnis der Analyse als JSON-Datei im offenen Format Beratungsakte v1. Ein kleiner Dialog fragt nach dem Mandanten (vorbelegt mit dem Unternehmen aus der Compliance-Doku) und optional nach einer Mandantennummer und zeigt, was die Datei enthält. Im Browser wird sie heruntergeladen, im Programm über den Speichern-Dialog gespeichert.
+Der Knopf „Für die Beratungsakte speichern“ im Bericht schreibt das Ergebnis der Analyse als JSON-Datei im offenen Format Beratungsakte v1. Ein kleiner Dialog fragt nach dem Mandanten (vorbelegt mit dem Unternehmen aus der Compliance-Doku) und optional nach einer Mandantennummer und zeigt, was die Datei enthält, mit dem Hinweis, dass die Datei unverschlüsselt ist und Daten des Mandanten enthält. Im Browser wird sie heruntergeladen, im Programm über den Speichern-Dialog gespeichert.
 
 - **Dateiname:** `<Mandant>-prozesslotse-<Datum>.beratungsakte.json`, z. B. `Lieferdienst-Muster-GmbH-prozesslotse-2026-11-13.beratungsakte.json`.
 - **Kennzahlen:** die zehn Zeilen der Kennzahlentabelle des Berichts für den Ist-Prozess (Zeiten in Minuten, Kosten in €, Anteile in %); gibt es einen Soll-Prozess, steht sein Wert im Namensraum `prozesslotse`.
-- **Befunde:** die Befunde im Ist-Prozess, wie sie der Bericht zeigt, mit Fundstelle (Schritt, Rolle oder ganzer Prozess). Fehler werden `hoch`, Warnungen `mittel`, Hinweise `niedrig`; die Originalstufe steht im Namensraum.
-- **Maßnahmen:** übernommene Maßnahmen (Priorität `hoch`) und die offenen Vorschläge aus „Verbessern“ (Priorität `mittel`) mit ihrer berechneten Wirkung im Namensraum; verworfene fehlen. Eine Maßnahme verweist auf die Befunde an ihren Schritten, die sie behebt (z. B. Medienbruch beseitigen → Befund Medienbruch). Den Aufwand schätzt die App nicht.
+- **Befunde:** die Befunde im Ist-Prozess, wie sie der Bericht zeigt, mit Fundstelle (Schritt, Rolle oder ganzer Prozess). Fehler werden `hoch`, Warnungen `mittel`, Hinweise `hinweis`; die Originalstufe steht im Namensraum.
+- **Maßnahmen:** übernommene Maßnahmen (Priorität `hoch`) und die offenen Vorschläge aus „Verbessern“ (Priorität `mittel`) mit ihrer berechneten Wirkung im Namensraum, danach die verworfenen Vorschläge (Priorität `niedrig`). Der Stand steht als `status` (`uebernommen`, `vorschlag`, `verworfen`) im Namensraum. Eine Maßnahme verweist auf die Befunde an ihren Schritten, die sie behebt (z. B. Medienbruch beseitigen → Befund Medienbruch). Den Aufwand schätzt die App nicht.
 
 Die Bibliothek des Formats liegt als Kopie in `src/beratungsakte/` (Version in `src/beratungsakte/VERSION`, dort nicht von Hand ändern), die Beispiele für die Tests in `testdaten/beratungsakte/`. Die Abbildung steht in `src/analyse/beratungsakte.ts`.
 
