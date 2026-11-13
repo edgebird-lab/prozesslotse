@@ -1,4 +1,4 @@
-// Kopie der Bibliothek beratungsakte 1.0.0 (Format Beratungsakte v1).
+// Kopie der Bibliothek beratungsakte 1.0.1 (Format Beratungsakte v1).
 // Nicht in dieser App ändern: Änderungen gehören in die Bibliothek und werden neu eingebunden.
 // Aus schema/beratungsakte-v1.schema.json erzeugt (npm run schema). Nicht von Hand ändern.
 export const SCHEMA = {

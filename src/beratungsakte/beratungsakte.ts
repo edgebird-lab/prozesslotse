@@ -1,4 +1,4 @@
-// Kopie der Bibliothek beratungsakte 1.0.0 (Format Beratungsakte v1).
+// Kopie der Bibliothek beratungsakte 1.0.1 (Format Beratungsakte v1).
 // Nicht in dieser App ändern: Änderungen gehören in die Bibliothek und werden neu eingebunden.
 /**
  * Beratungsakte v1: erzeugen, lesen und prüfen.
@@ -11,7 +11,7 @@
  */
 import { SCHEMA } from './schema.ts'
 
-export const BIBLIOTHEK_VERSION = '1.0.0'
+export const BIBLIOTHEK_VERSION = '1.0.1'
 export const FORMAT = 'beratungsakte'
 export const FORMAT_VERSION = '1.0'
 const HAUPTVERSION = 1
@@ -155,7 +155,10 @@ export function dateinamenTeil(name: string): string {
   const teil = name
     .normalize('NFC')
     .replace(/\s+/g, '-')
-    .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, '')
+    .replace(/[<>:"/\\|?*]/g, '')
+    .split('')
+    .filter((z) => z.charCodeAt(0) > 0x1f && z.charCodeAt(0) !== 0x7f) // Steuerzeichen, ohne Regex (Lint no-control-regex)
+    .join('')
     .replace(/-{2,}/g, '-')
     .replace(/^[-.]+|[-.]+$/g, '')
     .slice(0, 60)
