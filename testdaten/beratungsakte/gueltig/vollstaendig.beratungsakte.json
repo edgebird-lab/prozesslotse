@@ -1,0 +1,50 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "1.0",
+  "erzeugtVon": { "app": "beispiel", "name": "Beispiel-App", "version": "1.2.3" },
+  "erzeugtAm": "2026-11-13T09:30:00+01:00",
+  "mandant": { "name": "Bäckerei Groß & Söhne GbR", "kennung": "M-2026-007" },
+  "analyse": {
+    "art": "prozessanalyse",
+    "titel": "Rechnungseingang prüfen – Ist-Aufnahme",
+    "stand": "2026-11-12",
+    "quelldatei": "Rechnungseingang Bäckerei.prozesslotse"
+  },
+  "kennzahlen": [
+    { "kennung": "durchlaufzeit", "name": "Durchlaufzeit", "wert": 4.5, "einheit": "Tage", "bewertung": "schlecht" },
+    { "kennung": "medienbrueche", "name": "Medienbrüche", "wert": 3, "einheit": "Anzahl", "bewertung": "mittel" },
+    { "name": "Reifegrad", "wert": "teilweise dokumentiert", "einheit": "" },
+    { "name": "Anteil automatisiert", "wert": 25, "einheit": "%", "bewertung": "neutral" }
+  ],
+  "befunde": [
+    {
+      "kennung": "B1",
+      "schwere": "hoch",
+      "text": "Rechnungen werden ausgedruckt, abgezeichnet und wieder eingescannt (Medienbruch).",
+      "fundstelle": "Schritt „Rechnung freigeben“",
+      "erweiterungen": { "beispiel": { "regel": "medienbruch", "gewicht": 2 } }
+    },
+    { "kennung": "B2", "schwere": "mittel", "text": "Keine Vertretung für die Freigabe über 500 €.", "fundstelle": "Rolle „Geschäftsführung“" },
+    { "kennung": "B3", "schwere": "hinweis", "text": "Skonto wird selten genutzt.", "fundstelle": "Kennzahl Durchlaufzeit" }
+  ],
+  "massnahmen": [
+    {
+      "kennung": "M1",
+      "text": "Freigabe digital im Rechnungseingangsbuch statt auf Papier.",
+      "prioritaet": "hoch",
+      "aufwand": "gering (1–2 Tage)",
+      "befunde": ["B1", "B3"],
+      "frist": "2027-01-31"
+    },
+    { "kennung": "M2", "text": "Vertretungsregel schriftlich festlegen.", "prioritaet": "mittel", "aufwand": "sehr gering", "befunde": ["B2"] },
+    { "kennung": "M3", "text": "Zahlungsläufe wöchentlich planen.", "prioritaet": "niedrig", "aufwand": "nicht geschätzt", "befunde": [] }
+  ],
+  "anhaenge": [
+    { "name": "Prozessmodell", "verweis": "Rechnungseingang Bäckerei.bpmn", "medientyp": "application/xml" },
+    { "name": "Bericht", "verweis": "berichte/rechnungseingang.docx" }
+  ],
+  "erweiterungen": {
+    "beispiel": { "modellversion": 4, "frei": { "verschachtelt": [1, 2, 3] } },
+    "andere-app": { "unbekannt": true }
+  }
+}

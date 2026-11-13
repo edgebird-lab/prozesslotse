@@ -25,7 +25,7 @@ jobs:
           $stellen = @{
             'package.json'         = '"version": "' + $v + '"'
             'src-tauri/Cargo.toml' = 'version = "' + $v + '"'
-            'src/App.tsx'          = "const VERSION = '" + $v + "'"
+            'src/version.ts'       = "export const VERSION = '" + $v + "'"
             'src/bpmn/export.ts'   = 'exporterVersion="' + $v + '"'
             '.github/release-notizen.md' = $v
           }

@@ -93,6 +93,14 @@ function abbruchHinweis(b: Block, add: (x: Befund) => void): void {
   })
 }
 
+/** Hinweise, die der Bericht neben Fehlern und Warnungen zeigt; alle übrigen stehen nur im Schritt „Prüfen“. */
+const HINWEISE_IM_BERICHT = ['freigabe', 'nacharbeit', 'pingpong', 'flusseffizienz']
+
+/** Steht der Befund im Bericht (und damit in der Beratungsakte)? */
+export function imBericht(b: Befund): boolean {
+  return b.schwere !== 'hinweis' || HINWEISE_IM_BERICHT.includes(b.schluessel.split(':')[0])
+}
+
 function personenText(n: number, dativ = false): string {
   return n === 1 ? (dativ ? 'einer Person' : 'eine Person') : `${n} Personen`
 }

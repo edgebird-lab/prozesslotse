@@ -1,0 +1,11 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "1.0",
+  "erzeugtVon": { "app": "Beispiel App", "name": "Beispiel-App", "version": "1.0.0" },
+  "erzeugtAm": "13.11.2026 09:30",
+  "mandant": { "name": "   " },
+  "analyse": { "art": "beispiel", "titel": "Falsche Werte", "stand": "2026-02-30" },
+  "kennzahlen": [{ "name": "Quote", "wert": true, "einheit": "%", "bewertung": "sehr gut" }],
+  "befunde": [{ "kennung": "B 1", "schwere": "katastrophal", "text": "", "fundstelle": "Seite 1" }],
+  "massnahmen": [{ "kennung": "M1", "text": "Tun", "prioritaet": "dringend", "aufwand": "gering", "befunde": "B1" }]
+}

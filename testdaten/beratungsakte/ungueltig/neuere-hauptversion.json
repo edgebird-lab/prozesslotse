@@ -1,0 +1,7 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "2.0",
+  "erzeugtVon": { "app": "beispiel", "name": "Beispiel-App", "version": "9.0.0" },
+  "erzeugtAm": "2031-01-01T10:00:00+01:00",
+  "akte": { "ganzAnders": true }
+}

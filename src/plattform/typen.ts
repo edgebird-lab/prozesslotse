@@ -17,7 +17,7 @@ export interface Zuletzt {
   name: string
 }
 
-export type DateiArt = 'projekt' | 'bpmn' | 'svg' | 'docx'
+export type DateiArt = 'projekt' | 'bpmn' | 'svg' | 'docx' | 'beratungsakte'
 
 /** Befehle aus dem Programmmenü. */
 export type MenueBefehl =

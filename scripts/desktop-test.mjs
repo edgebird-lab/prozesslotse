@@ -43,6 +43,8 @@ const DIALOGE_COMPLIANCE = {
   PROZESSLOTSE_TEST_SPEICHERN_DOCX: datei('Verfahrensdokumentation Prüfung'),
   PROZESSLOTSE_TEST_PDF: datei('verfahrensdokumentation.pdf'),
   PROZESSLOTSE_TEST_OEFFNEN: datei('compliance.prozesslotse'),
+  // ohne Endung: Das Programm ergänzt „.beratungsakte.json“
+  PROZESSLOTSE_TEST_SPEICHERN_BERATUNGSAKTE: datei('akte'),
   // Nähme der Befehl eine unbekannte Art an, landete sie hier statt in einem echten Dialog
   PROZESSLOTSE_TEST_SPEICHERN_EXE: datei('falsch.exe'),
 }
@@ -289,6 +291,15 @@ try {
   pruefe(seiten > 1, `das PDF hat mehrere Seiten (${seiten})`)
   const boxen = [...vdPdf.matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)]
   pruefe(boxen.length > 0 && boxen.every(([, b, h]) => Math.abs(Number(b) - 595.4) < 2 && Math.abs(Number(h) - 841.7) < 2), `alle Seiten in A4 (${boxen.length} Seitenformate)`)
+
+  // 13a. Für die Beratungsakte speichern: über speichern_unter mit eigener Dateiart und zweiteiliger Endung
+  await schritte().getByRole('button', { name: /Bericht/ }).click()
+  await seite.getByRole('button', { name: 'Für die Beratungsakte speichern' }).click()
+  const akteDialog = seite.getByRole('dialog', { name: 'Für die Beratungsakte speichern' })
+  await akteDialog.getByRole('button', { name: 'Speichern' }).click()
+  await warte(async () => (await meldung()).includes('„akte.beratungsakte.json“ exportiert'), 'Beratungsakte gespeichert, Endung ergänzt, Meldung nennt den Dateinamen')
+  const akte = JSON.parse(readFileSync(datei('akte.beratungsakte.json'), 'utf8'))
+  pruefe(akte.format === 'beratungsakte' && akte.erzeugtVon.app === 'prozesslotse' && akte.mandant.name === 'Lieferdienst Muster GmbH', 'die Akte nennt Format, App und den vorbelegten Mandanten')
 
   // 14. Projekt mit Version speichern, dann schließen: ohne Änderungen keine Rückfrage
   await seite.keyboard.press('Control+Shift+S')

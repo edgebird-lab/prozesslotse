@@ -142,6 +142,18 @@ fn waehle_ziel(app: &AppHandle, art: &str, vorschlag: &str, (filter, endung, tit
     Some(p)
 }
 
+/// Dateiarten, die als Text kommen (`speichern_unter`).
+fn text_ziel(art: &str) -> Option<Ziel> {
+    match art {
+        "projekt" => Some(("Prozesslotse-Projekt", "prozesslotse", "Speichern unter")),
+        "bpmn" => Some(("BPMN-Diagramm", "bpmn", "Als BPMN exportieren")),
+        "svg" => Some(("SVG-Bild", "svg", "Als Bild exportieren")),
+        // Export im offenen Format Beratungsakte v1; die Endung hat zwei Teile
+        "beratungsakte" => Some(("Beratungsakte (*.beratungsakte.json)", "beratungsakte.json", "Für die Beratungsakte speichern")),
+        _ => None,
+    }
+}
+
 /// Dateiarten, die als Bytes kommen (Word). Text geht über `speichern_unter`.
 fn bytes_ziel(art: &str) -> Option<Ziel> {
     match art {
@@ -238,12 +250,7 @@ fn speichern(pfad: String, inhalt: String, freigaben: State<Freigaben>) -> Resul
 
 #[tauri::command]
 async fn speichern_unter(app: AppHandle, vorschlag: String, inhalt: String, art: String) -> Result<Option<Gespeichert>, String> {
-    let ziel = match art.as_str() {
-        "projekt" => ("Prozesslotse-Projekt", "prozesslotse", "Speichern unter"),
-        "bpmn" => ("BPMN-Diagramm", "bpmn", "Als BPMN exportieren"),
-        "svg" => ("SVG-Bild", "svg", "Als Bild exportieren"),
-        _ => return Err(format!("Unbekannte Dateiart: {art}")),
-    };
+    let Some(ziel) = text_ziel(&art) else { return Err(format!("Unbekannte Dateiart: {art}")) };
     let Some(p) = waehle_ziel(&app, &art, &vorschlag, ziel) else { return Ok(None) };
     schreibe(&p, inhalt.as_bytes())?;
     freigeben(&app, &p);
@@ -462,6 +469,16 @@ mod tests {
         assert_eq!(gelesen.inhalt, "{\"a\":2}");
         assert_eq!(gelesen.name, "projekt.prozesslotse");
         assert!(!ordner.join("projekt.prozesslotse.speichern.tmp").exists());
+    }
+
+    #[test]
+    fn kennt_die_textarten_und_ergaenzt_die_endung_der_beratungsakte() {
+        assert_eq!(text_ziel("beratungsakte"), Some(("Beratungsakte (*.beratungsakte.json)", "beratungsakte.json", "Für die Beratungsakte speichern")));
+        assert_eq!(text_ziel("projekt").map(|z| z.1), Some("prozesslotse"));
+        assert_eq!(text_ziel("docx"), None);
+        let mut p = PathBuf::from("Muster-GmbH-prozesslotse-2026-11-13");
+        p.set_extension("beratungsakte.json");
+        assert_eq!(p, PathBuf::from("Muster-GmbH-prozesslotse-2026-11-13.beratungsakte.json"));
     }
 
     #[test]

@@ -227,6 +227,9 @@ export function quantil(sortiert: Float64Array, q: number): number {
   return sortiert[rang - 1]
 }
 
+/** Durchläufe der Simulation im Bericht (90-%-Wert). */
+export const BERICHT_LAEUFE = 4000
+
 export function simuliere(p: Prozess, anzahl = 5000, startwert = 20261110): Simulationsergebnis {
   const zufall = zufallMitStartwert(startwert)
   const zeiten = new Float64Array(anzahl)

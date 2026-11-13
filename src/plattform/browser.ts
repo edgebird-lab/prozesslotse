@@ -6,6 +6,7 @@ const MIME: Record<DateiArt, string> = {
   bpmn: 'application/xml',
   svg: 'image/svg+xml',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  beratungsakte: 'application/json',
 }
 
 /**

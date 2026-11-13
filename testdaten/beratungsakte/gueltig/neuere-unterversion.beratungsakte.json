@@ -1,0 +1,12 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "1.3",
+  "erzeugtVon": { "app": "beispiel", "name": "Beispiel-App", "version": "3.0.0" },
+  "erzeugtAm": "2029-05-02T14:00:00Z",
+  "mandant": { "name": "Muster GmbH", "kennung": "M-1", "branche": "Handwerk" },
+  "analyse": { "art": "beispiel", "titel": "Datei aus einer späteren Formatversion", "stand": "2029-05-02" },
+  "kennzahlen": [{ "name": "Wert", "wert": 1, "einheit": "", "trend": "steigend" }],
+  "befunde": [],
+  "massnahmen": [],
+  "zusammenfassung": "Dieses Feld gibt es erst ab Version 1.3."
+}

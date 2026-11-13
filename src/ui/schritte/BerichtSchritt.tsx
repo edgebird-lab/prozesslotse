@@ -7,7 +7,10 @@ import { plattform } from '../../plattform'
 import { dateiname, vorzeichen } from '../hilfen'
 import { useApp } from '../kontext'
 import { zaehle } from '../befundtext'
+import { imBericht } from '../../analyse/hinweise'
 import { StatusSymbol } from './PruefenSchritt'
+import { BeratungsakteDialog } from '../BeratungsakteDialog'
+import { dateinameBeratungsakte, serialisiereBeratungsakte, type Beratungsakte } from '../../beratungsakte/beratungsakte'
 
 interface Zeile {
   name: string
@@ -33,6 +36,8 @@ export function BerichtSchritt() {
   const bpmnSoll = useBpmn(soll ?? ist)
   const refIst = useRef<DiagrammApi>(null)
   const refSoll = useRef<DiagrammApi>(null)
+  const [akteOffen, setAkteOffen] = useState(false)
+  const akteKnopf = useRef<HTMLButtonElement>(null)
   const [heute] = useState(() => new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }))
   const std = ist.arbeitsstundenProTag
   const dauer = (n: number) => formatiereDauer(n, std)
@@ -63,6 +68,15 @@ export function BerichtSchritt() {
     if (svg) await datei.exportiere(dateiname(ist.name, endung), svg, 'svg')
   }
 
+  const schliesseAkte = () => {
+    setAkteOffen(false)
+    requestAnimationFrame(() => akteKnopf.current?.focus())
+  }
+  const speichereAkte = (akte: Beratungsakte) => {
+    schliesseAkte()
+    void datei.exportiere(dateinameBeratungsakte(akte), serialisiereBeratungsakte(akte), 'beratungsakte')
+  }
+
   return (
     <article className="bericht">
       <header className="bericht-kopf">
@@ -86,7 +100,11 @@ export function BerichtSchritt() {
         <button type="button" className="knopf" onClick={() => void datei.speichernUnter()}>
           Projekt als Datei speichern
         </button>
+        <button type="button" className="knopf" ref={akteKnopf} onClick={() => setAkteOffen(true)}>
+          Für die Beratungsakte speichern
+        </button>
       </div>
+      {akteOffen && <BeratungsakteDialog projekt={projekt} quelldatei={z.dokument.name} onSpeichern={speichereAkte} onSchliessen={schliesseAkte} />}
 
       <section aria-labelledby="bericht-kennzahlen">
         <h3 id="bericht-kennzahlen">Kennzahlen{soll ? ': Ist und Soll' : ''}</h3>
@@ -149,17 +167,15 @@ export function BerichtSchritt() {
         <h3 id="bericht-befunde">Befunde im Ist-Prozess</h3>
         <p className="leise">{zaehle(aIst.befunde)}</p>
         <ul className="befunde befunde-kompakt">
-          {aIst.befunde
-            .filter((b) => b.schwere !== 'hinweis' || ['freigabe', 'nacharbeit', 'pingpong', 'flusseffizienz'].includes(b.schluessel.split(':')[0]))
-            .map((b) => (
-              <li key={b.schluessel} className={`befund befund-${b.schwere}`}>
-                <StatusSymbol art={b.schwere} />
-                <div className="befund-text">
-                  <strong>{b.titel}</strong>
-                  <p>{b.text}</p>
-                </div>
-              </li>
-            ))}
+          {aIst.befunde.filter(imBericht).map((b) => (
+            <li key={b.schluessel} className={`befund befund-${b.schwere}`}>
+              <StatusSymbol art={b.schwere} />
+              <div className="befund-text">
+                <strong>{b.titel}</strong>
+                <p>{b.text}</p>
+              </div>
+            </li>
+          ))}
         </ul>
       </section>
 

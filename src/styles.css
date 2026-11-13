@@ -2208,6 +2208,15 @@ input[type='date'] {
 .freigabe-dialog p {
   margin: 0;
 }
+/* Beratungsakte: langer Dateiname bricht um statt überzustehen */
+.akte-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.akte-datei {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
 
 @media print {
   /* Compliance-Dokumente: nur das Dokument drucken (andere Schritte drucken wie bisher) */

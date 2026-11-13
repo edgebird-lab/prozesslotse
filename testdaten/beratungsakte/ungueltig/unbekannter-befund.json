@@ -1,0 +1,11 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "1.0",
+  "erzeugtVon": { "app": "beispiel", "name": "Beispiel-App", "version": "1.0.0" },
+  "erzeugtAm": "2026-11-13T09:30:00+01:00",
+  "mandant": { "name": "Muster GmbH" },
+  "analyse": { "art": "beispiel", "titel": "Verweis ins Leere", "stand": "2026-11-13" },
+  "kennzahlen": [],
+  "befunde": [{ "kennung": "B1", "schwere": "hoch", "text": "Befund", "fundstelle": "A" }],
+  "massnahmen": [{ "kennung": "M1", "text": "Maßnahme", "prioritaet": "hoch", "aufwand": "gering", "befunde": ["B1", "B9"] }]
+}

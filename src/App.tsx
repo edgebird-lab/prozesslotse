@@ -32,9 +32,8 @@ import { useComplianceMarkierungen } from './ui/compliance/nachladen'
 import { useMeldeFalschePruefsummen } from './ui/compliance/pruefsummen'
 import { PruefenSchritt } from './ui/schritte/PruefenSchritt'
 import { RahmenSchritt } from './ui/schritte/RahmenSchritt'
+import { VERSION } from './version'
 import './styles.css'
-
-const VERSION = '0.2.0'
 
 // „Dokumentieren“ mit Lückenprüfung und Generatoren ist groß; der Schritt lädt erst, wenn er gebraucht wird.
 // Ebenso „Ablauf“ (Formulare aller Bausteine), „Verbessern“ und „Bericht“: So bleibt der Hauptteil unter 500 kB.

@@ -1,0 +1,10 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "1.0",
+  "erzeugtVon": { "app": "beispiel", "name": "Beispiel-App" },
+  "erzeugtAm": "2026-11-13T09:30:00+01:00",
+  "mandant": {},
+  "kennzahlen": [],
+  "befunde": [{ "kennung": "B1", "schwere": "hoch", "text": "Ohne Fundstelle" }],
+  "massnahmen": []
+}

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { findeSchwachstellen } from '../analyse/hinweise'
 import { berechneKennzahlen, type Kennzahlen } from '../analyse/kennzahlen'
-import { simuliere, type Simulationsergebnis } from '../analyse/simulation'
+import { BERICHT_LAEUFE, simuliere, type Simulationsergebnis } from '../analyse/simulation'
 import { erzeugeBpmn, type BpmnErgebnis } from '../bpmn/export'
 import { xmlId } from '../bpmn/layout'
 import { hatFehler, pruefeProzess, sortiereBefunde, type Befund, type Schwere } from '../modell/pruefung'
@@ -33,7 +33,7 @@ export function useAnalyse(p: Prozess): Analyse {
 }
 
 export function useSimulation(p: Prozess): Simulationsergebnis {
-  return useMemo(() => simuliere(p, 4000), [p])
+  return useMemo(() => simuliere(p, BERICHT_LAEUFE), [p])
 }
 
 export function useBpmn(p: Prozess): BpmnErgebnis {

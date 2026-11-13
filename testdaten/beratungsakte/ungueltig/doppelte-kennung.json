@@ -1,0 +1,14 @@
+{
+  "format": "beratungsakte",
+  "formatVersion": "1.0",
+  "erzeugtVon": { "app": "beispiel", "name": "Beispiel-App", "version": "1.0.0" },
+  "erzeugtAm": "2026-11-13T09:30:00+01:00",
+  "mandant": { "name": "Muster GmbH" },
+  "analyse": { "art": "beispiel", "titel": "Doppelte Kennung", "stand": "2026-11-13" },
+  "kennzahlen": [],
+  "befunde": [
+    { "kennung": "B1", "schwere": "hoch", "text": "Erster", "fundstelle": "A" },
+    { "kennung": "B1", "schwere": "niedrig", "text": "Zweiter", "fundstelle": "B" }
+  ],
+  "massnahmen": []
+}
