@@ -16,7 +16,7 @@ use tauri::{
     http::HeaderMap,
     ipc::{InvokeBody, Request},
     menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
-    AppHandle, DragDropEvent, Emitter, Manager, State, WindowEvent, Wry,
+    AppHandle, DragDropEvent, Emitter, Manager, State, WebviewWindowBuilder, WindowEvent, Wry,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -77,8 +77,20 @@ fn freigeben(app: &AppHandle, p: &Path) {
     app.state::<Freigaben>().0.lock().unwrap().insert(p.to_path_buf());
 }
 
+/// Nur im Debug-Build: eigener Datenordner für automatische Tests aus `PROZESSLOTSE_TEST_DATEN`.
+/// Dort liegen dann „Zuletzt geöffnet“ und der Speicher der WebView2, die Daten eines
+/// installierten Prozesslotsen bleiben unberührt. Im Release fehlt das.
+#[cfg(debug_assertions)]
+fn testdaten() -> Option<PathBuf> {
+    std::env::var_os("PROZESSLOTSE_TEST_DATEN").filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+#[cfg(not(debug_assertions))]
+fn testdaten() -> Option<PathBuf> {
+    None
+}
+
 fn zuletzt_datei(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("zuletzt.json"))
+    testdaten().or_else(|| app.path().app_config_dir().ok()).map(|d| d.join("zuletzt.json"))
 }
 
 fn lade_zuletzt(app: &AppHandle) -> Vec<Zuletzt> {
@@ -448,6 +460,14 @@ pub fn run() {
                     let _ = app.emit("menue", id);
                 }
             });
+            // Das Hauptfenster entsteht hier statt automatisch („create“: false in tauri.conf.json),
+            // damit ein Test ihm einen eigenen Datenordner für die WebView2 geben kann.
+            let konfig = app.config().app.windows.iter().find(|w| w.label == "main").ok_or("Fenster „main“ fehlt in tauri.conf.json")?;
+            let mut fenster = WebviewWindowBuilder::from_config(app.handle(), konfig)?;
+            if let Some(ordner) = testdaten() {
+                fenster = fenster.data_directory(ordner);
+            }
+            fenster.build()?;
             Ok(())
         })
         .on_window_event(|fenster, ereignis| {

@@ -9,26 +9,108 @@
  * Umgebungsvariablen; die Oberfläche steuert Playwright über die
  * Debug-Schnittstelle von WebView2.
  *
+ * Programmdaten: Der Debug-Build legt „Zuletzt geöffnet“ und den Speicher der
+ * WebView2 in den Ordner aus PROZESSLOTSE_TEST_DATEN (im Testordner unter
+ * %TEMP%) statt nach %APPDATA% bzw. %LOCALAPPDATA%\de.olbricht-digital.prozesslotse.
+ * Die Daten eines installierten Prozesslotsen fasst der Test so gar nicht an;
+ * eine Markierungsdatei in beiden echten Ordnern belegt das bei jedem Lauf.
+ * Läuft schon ein Prozesslotse, startet der Test nicht: Ein zweiter Start
+ * landete sonst in ihm (Single-Instance).
+ *
  * Vorher: npx tauri build --debug --no-bundle
- * Aufruf:  node scripts/desktop-test.mjs
- * PROZESSLOTSE_EXE wählt eine andere exe (z. B. bei gemeinsamem CARGO_TARGET_DIR),
- * DESKTOP_TEST_BEHALTEN=1 lässt die erzeugten Dateien liegen.
+ * Aufruf:  npm run desktop:test
+ * Die exe liegt unter CARGO_TARGET_DIR (sonst src-tauri/target), PROZESSLOTSE_EXE
+ * wählt eine andere; DESKTOP_TEST_BEHALTEN=1 lässt die erzeugten Dateien liegen.
  */
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { chromium } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
 
-const EXE = resolve(process.env.PROZESSLOTSE_EXE ?? 'src-tauri/target/debug/prozesslotse.exe')
-if (!existsSync(EXE)) throw new Error(`${EXE} fehlt. Vorher: npx tauri build --debug --no-bundle`)
+const ZIEL = resolve(process.env.CARGO_TARGET_DIR ?? 'src-tauri/target')
+const EXE = resolve(process.env.PROZESSLOTSE_EXE ?? join(ZIEL, 'debug', 'prozesslotse.exe'))
 const KENNUNG = 'de.olbricht-digital.prozesslotse'
 const PORT = 9333
+/** Echte Programmdaten: „Zuletzt geöffnet“ (Roaming) und der Speicher der WebView2 (Local) */
+const echteDaten = [join(process.env.APPDATA, KENNUNG), join(process.env.LOCALAPPDATA, KENNUNG)]
+const MARKE = 'desktop-test-marke.txt'
+
+if (!existsSync(EXE)) throw new Error(`${EXE} fehlt. Vorher: npx tauri build --debug --no-bundle`)
+// Ein Release-Build (etwa der installierte) oder ein alter Debug-Build schriebe in die echten Programmdaten
+if (!readFileSync(EXE).includes('PROZESSLOTSE_TEST_DATEN')) {
+  throw new Error(`${EXE} kennt PROZESSLOTSE_TEST_DATEN nicht (Release-Build oder veraltet). Vorher: npx tauri build --debug --no-bundle`)
+}
+if (execFileSync('tasklist', ['/FI', 'IMAGENAME eq prozesslotse.exe', '/NH'], { encoding: 'utf8' }).toLowerCase().includes('prozesslotse.exe')) {
+  console.error('Der Prozesslotse läuft bereits (installiert oder aus einem früheren Test). Der Test startet nicht. Bitte das Programm schließen, dann erneut starten.')
+  process.exit(1)
+}
+if (!(await portFrei())) {
+  console.error(`Port ${PORT} ist belegt; der Test verbände sich mit einem fremden Programm. Abbruch.`)
+  process.exit(1)
+}
+
 const ordner = mkdtempSync(join(tmpdir(), 'prozesslotse-desktop-'))
 const datei = (name) => join(ordner, name)
-const appDaten = [join(process.env.APPDATA, KENNUNG), join(process.env.LOCALAPPDATA, KENNUNG)]
-const vorhanden = appDaten.filter((d) => existsSync(d))
+/** Datenordner des Programms in diesem Lauf (PROZESSLOTSE_TEST_DATEN) */
+const testDaten = datei('programmdaten')
+
+/** Jede Datei eines Ordners mit Größe, Änderungszeit und Prüfsumme */
+function fingerabdruck(d) {
+  const dateien = new Map()
+  for (const e of readdirSync(d, { recursive: true, withFileTypes: true })) {
+    if (!e.isFile()) continue
+    const pfad = join(e.parentPath, e.name)
+    const { size, mtimeMs } = statSync(pfad)
+    dateien.set(relative(d, pfad), `${size} ${mtimeMs} ${createHash('sha256').update(readFileSync(pfad)).digest('hex')}`)
+  }
+  return dateien
+}
+
+const geaendert = (vorher, nachher) => [...new Set([...vorher.keys(), ...nachher.keys()])].filter((n) => vorher.get(n) !== nachher.get(n))
+
+/**
+ * Legt die Markierung in beide echten Ordner und merkt sich deren Inhalt. Fehlt ein Ordner
+ * oder enthält er nur die Markierung eines abgebrochenen Laufs, entfernt der Test ihn danach wieder.
+ */
+function markiere() {
+  return echteDaten.map((d) => {
+    const angelegt = !existsSync(d) || readdirSync(d).every((n) => n === MARKE)
+    mkdirSync(d, { recursive: true })
+    writeFileSync(join(d, MARKE), `Markierung von npm run desktop:test (${new Date().toISOString()}), wird nach dem Lauf entfernt.\n`)
+    return { ordner: d, angelegt, vorher: fingerabdruck(d) }
+  })
+}
+
+let marken = []
+let aufgeraeumt = false
+/** Markierungen und Testordner entfernen; einmal, auch nach einem Abbruch */
+function raeumeAuf() {
+  if (aufgeraeumt) return
+  aufgeraeumt = true
+  for (const m of marken) {
+    rmSync(join(m.ordner, MARKE), { force: true })
+    if (m.angelegt) {
+      try {
+        rmdirSync(m.ordner) // nur, wenn leer
+      } catch {
+        console.error(`${m.ordner} ist nicht leer und bleibt liegen.`)
+      }
+    }
+  }
+  if (process.env.DESKTOP_TEST_BEHALTEN) return console.log(`Testdateien bleiben in ${ordner}`)
+  // WebView2 gibt seine Dateien nach dem Beenden erst verzögert frei (rmSync mit maxRetries scheiterte beim Abbruch sofort)
+  for (let versuch = 1; ; versuch++) {
+    try {
+      return rmSync(ordner, { recursive: true, force: true })
+    } catch (e) {
+      if (versuch === 20) return console.error(`Testordner ${ordner} nicht entfernt: ${e.message}`)
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500) // synchron, auch im Signal-Handler
+    }
+  }
+}
 
 /** Antworten auf die Dateidialoge (nur im Debug-Build ausgewertet) */
 const DIALOGE = {
@@ -68,6 +150,7 @@ function starte(args = [], dialoge = DIALOGE) {
     env: {
       ...process.env,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
+      PROZESSLOTSE_TEST_DATEN: testDaten,
       ...dialoge,
     },
     stdio: 'ignore',
@@ -114,7 +197,17 @@ async function portFrei() {
   }
 }
 
+marken = markiere()
 let prozess = starte()
+// Abbruch (Strg+C, Fenster geschlossen): Programm beenden, Markierungen und Testordner entfernen
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
+  process.on(signal, () => {
+    console.error(`Abbruch (${signal}): räume auf`)
+    if (prozess.exitCode === null) prozess.kill()
+    raeumeAuf()
+    process.exit(130)
+  })
+}
 let browser
 let seite
 const titel = () => seite.title()
@@ -122,7 +215,7 @@ const meldung = async () => (await seite.locator('p.meldung').textContent()) ?? 
 const schritte = () => seite.getByRole('navigation', { name: 'Schritte' })
 const teilschritte = () => seite.getByRole('navigation', { name: 'Teilschritte' })
 
-/** Leeres Projekt mit Willkommen, auch wenn ein früherer Lauf etwas im Browser-Speicher des Programms hinterlassen hat. */
+/** Leeres Projekt mit Willkommen, auch wenn ein voriger Start etwas im Browser-Speicher des Programms hinterlassen hat. */
 async function willkommen() {
   const knopf = seite.getByRole('button', { name: /Mit dem Beispiel/ })
   await schritte().waitFor({ timeout: 15000 })
@@ -322,20 +415,24 @@ try {
   pruefe(await seite.getByText(/Gültige Version 1\.0 seit/).isVisible(), 'Version 1.0 gilt')
   await teilschritte().getByRole('button', { name: /^Unternehmen/ }).click()
   pruefe((await seite.getByLabel('Wie heißt das Unternehmen?').inputValue()) === 'Lieferdienst Muster GmbH', 'die Compliance-Angaben sind noch da (Unternehmen)')
-  // Zum Schluss ein leeres Projekt, damit der nächste Lauf wieder mit dem Willkommen beginnt
+  // Zum Schluss ein leeres Projekt: Danach schließt das Programm ohne Rückfrage
   await seite.keyboard.press('Control+n')
   await seite.getByRole('button', { name: /Mit dem Beispiel/ }).waitFor({ timeout: 10000 })
   execFileSync('taskkill', ['/PID', String(prozess.pid)])
   await warte(() => prozess.exitCode !== null, 'das Programm schließt ohne Rückfrage')
 
   pruefe(csp.length === 0, `keine Meldung zur Content Security Policy in der Konsole (drei Starts)${csp.length ? `: ${csp.join(' | ')}` : ''}`)
+
+  // 16. Programmdaten: Der Lauf schrieb nur in den eigenen Ordner, die echten sind samt Markierung unverändert
+  pruefe(existsSync(join(testDaten, 'zuletzt.json')) && existsSync(join(testDaten, 'EBWebView')), '„Zuletzt geöffnet“ und der Speicher der WebView2 liegen im Datenordner des Tests')
+  for (const m of marken) {
+    const anders = geaendert(m.vorher, fingerabdruck(m.ordner))
+    pruefe(anders.length === 0, `${m.ordner} unverändert, die Markierung auch (${m.vorher.size} Dateien)${anders.length ? `; geändert: ${anders.slice(0, 5).join(', ')}` : ''}`)
+  }
   console.log('Desktop-Test bestanden.')
 } finally {
   await browser?.close().catch(() => {})
   if (prozess.exitCode === null) prozess.kill()
   await new Promise((r) => setTimeout(r, 1500))
-  if (process.env.DESKTOP_TEST_BEHALTEN) console.log(`Testdateien bleiben in ${ordner}`)
-  else rmSync(ordner, { recursive: true, force: true })
-  // Programmdaten nur entfernen, wenn der Test sie angelegt hat
-  for (const d of appDaten) if (!vorhanden.includes(d)) rmSync(d, { recursive: true, force: true })
+  raeumeAuf()
 }
